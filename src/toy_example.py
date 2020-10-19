@@ -32,5 +32,5 @@ v_plus_of_vnf = 1
 mig_cost = np.ones (NUM_OF_VNFs)
 mig_data = 2 * np.ones (NUM_OF_VNFs)
 
-print (capacity_of_server)
+print (capacity_of_server)dd
 

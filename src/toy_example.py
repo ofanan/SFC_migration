@@ -1,10 +1,10 @@
 import numpy as np
 # from random import seed, randint
 
-class Toy_example (object):
+class toy_example (object):
     
     def __init__ (self):
-        self.NUM_OF_SERVERS = 4
+        self.NUM_OF_SERVERS = 2
         self.NUM_OF_PoA = 2
         self.NUM_OF_USERS = 2
         self.NUM_OF_CHAINS = self.NUM_OF_USERS
@@ -25,16 +25,19 @@ class Toy_example (object):
         # print (PoA_of_user)
         # print (server_to_user_delay)
         
-        self.capacity_of_server = 2 * np.ones (self.NUM_OF_SERVERS, dtype='uint8')
+        self.uniform_cpu_capacity   = 2
+        self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')
         
         self.num_of_vnfs_in_chain = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
         self.NUM_OF_VNFs          = sum (self.num_of_vnfs_in_chain).astype ('uint')
         self.theta = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
         self.Lambda = np.ones (self.NUM_OF_VNFs)
-        self.cur_cpu_alloc_per_vnf = [2, 1, 1, 2]
-        self.cur_loc_of_vnf = [1, 2, 2, 1]
-        self.target_delay # the desired (max) delay (aka Delta)
-
+        self.cur_cpu_alloc_of_vnf = np.array([2, 1, 1, 2])
+        self.nxt_cpu_alloc_of_vnf = np.array([2, 1, 1, 2])
+        self.cur_loc_of_vnf = [1, 2, 2, 1] #cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
+        self.nxt_loc_of_vnf = [1, 2, 2, 1] #cur_loc_of_vnf[v] will hold the id of the server planned to host VNF v
+        self.target_delay = np.ones (self.NUM_OF_VNFs) # the desired (max) delay (aka Delta)
+        self.perf_degradation_of_VNF = np.zeros (self.NUM_OF_VNFs)
         
         # Calculate v^+ of each VNF v.
         # v_plus_of_vnf(v) will hold the idx of the next VNF in the same chain.
@@ -46,8 +49,8 @@ class Toy_example (object):
                 self.v_plus_of_vnf [v] = v+1 if (idx_in_chain < self.num_of_vnfs_in_chain[chain]-1) else self.PoA_of_user[chain]
                 v += 1
         
-        print ('PoA of user = ', self.PoA_of_user)
-        print (self.v_plus_of_vnf)
+#         print ('PoA of user = ', self.PoA_of_user)
+#         print (self.v_plus_of_vnf)
         self.mig_comp_cost = np.ones (self.NUM_OF_VNFs)
         self.mig_data = 2 * np.ones (self.NUM_OF_VNFs)
         self.mig_bw   = 1 * np.ones (self.NUM_OF_VNFs)
@@ -56,7 +59,7 @@ class Toy_example (object):
         self.mig_data # self.mig_data[v] amount of data units to transfer during the migration of VM v
         self.servers_path_cost # self.servers_path_cost [i][j] is the cost of transmitting 1 unit of data from i to j
     
-    def perf_degradation (self, loc_v, loc_vpp, cpu_alloc):
+    def perf_degradation (self, loc_v, loc_vpp, denominator):
         """
         Calculate the performance degradation of a VM. 
         Inputs
@@ -65,7 +68,7 @@ class Toy_example (object):
         - cpu_alloc - (suggested) cpu allocation of v
         
         """
-        return ( 1 /(cpu_alloc - self.theta_v * self.lambda_v) + self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay
+        return ( 1 / denominator + self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay
             
     
     def mig_cost (self, src, dst):
@@ -74,6 +77,64 @@ class Toy_example (object):
         """
         return 42
     
-    
+    def is_feasible(self):
         
+        # Max CPU capacity of server constraint
+        available_cpu_at_server = self.cpu_capacity_of_server
+        for v in range (self.NUM_OF_VNFs):
+            available_cpu_at_server[self.nxt_loc_of_vnf[v]] -= self.nxt_cpu_alloc_of_vnf[v]
+            if (available_cpu_at_server[self.nxt_loc_of_vnf[v]] < 0):
+                return False # allocated more cpu than s's capacity
+
+        # Finite computation delay constraint and max perf' degradation constraint 
+        for v in range (self.NUM_OF_VNFs):    
+            denominator = self.nxt_cpu_alloc_of_vnf[v] - self.theta[v] * self.Lambda[v] 
+            if (denominator <= 0):
+                return False
+            self.perf_degradation_of_VNF[v] = self.perf_degradation (
+                self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.v_plus_of_vnf[v]], denominator)
+            if (self.perf_degradation_of_VNF[v] > 1):
+                return False
+        
+        return True
+    
+
+    def inc_array (self, ar, base):
+        for idx in range (ar.size-1, -1, -1):
+            if (ar[idx] < base - 1):
+                ar[idx] += 1
+                return ar
+            ar[idx] = 0
+    
+    
+    def inc_nxt_loc_of_vnf (self):
+        for idx in range (self.NUM_OF_VNFs-1, -1, -1):
+            if (self.nxt_loc_of_vnf[idx] < self.NUM_OF_SERVERS-1):
+                self.nxt_loc_of_vnf[idx] += 1
+                return
+            self.nxt_loc_of_vnf[idx] = 0
+    
+    def brute_force (self):    
+        self.nxt_loc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
+        for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)):
+            print (self.nxt_loc_of_vnf)
+            print ('*************************************')
+            self.nxt_loc_of_vnf = self.inc_array(self.nxt_loc_of_vnf, self.NUM_OF_SERVERS)
+            self.nxt_cpu_alloc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
+            for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)):
+                print (self.nxt_cpu_alloc_of_vnf)
+                self.nxt_cpu_alloc_of_vnf = self.inc_array(self.nxt_cpu_alloc_of_vnf, self.uniform_cpu_capacity)
+            print ('')
+#         for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)):
+#             print (self.nxt_loc_of_vnf)
+#             self.nxt_cpu_alloc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
+#             self.inc_nxt_loc_of_vnf()
+                        
+#             if (idx > 0):
+#                 self.nxt_loc_of_vnf[idx-1] += 1
+#             for idx in range (self.NUM_OF_VNFs, -1, 1):
+#                 self.nxt_loc_of_vnf[idx] = (self.nxt_loc_of_vnf[idx] + 1) if (self.nxt_loc_of_vnf[idx] < self.NUM_OF_SERVERS-1) else 0  
+#         for all permutations 
+#             for all possible cpu allocations
+#                 check feasibility
     

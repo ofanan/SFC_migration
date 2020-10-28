@@ -21,23 +21,21 @@ class toy_example (object):
             for u in range (self.NUM_OF_USERS):
                     self.server_to_user_delay[s][u] = self.servers_path_delay [s][self.PoA_of_user[u]]
         
-        # print (servers_path_delay)
-        # print (PoA_of_user)
-        # print (server_to_user_delay)
-        
+        self.servers_path_cost # self.servers_path_cost [i][j] is the cost of transmitting 1 unit of data from i to j
+
         self.uniform_cpu_capacity   = 2
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')
         
-        self.num_of_vnfs_in_chain = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
-        self.NUM_OF_VNFs          = sum (self.num_of_vnfs_in_chain).astype ('uint')
-        self.theta = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.Lambda = np.ones (self.NUM_OF_VNFs)
-        self.cur_cpu_alloc_of_vnf = np.array([2, 1, 1, 2])
-        self.nxt_cpu_alloc_of_vnf = np.array([2, 1, 1, 2])
-        self.cur_loc_of_vnf = [1, 2, 2, 1] #cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
-        self.nxt_loc_of_vnf = [1, 2, 2, 1] #cur_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-        self.target_delay = np.ones (self.NUM_OF_VNFs) # the desired (max) delay (aka Delta)
-        self.perf_degradation_of_VNF = np.zeros (self.NUM_OF_VNFs)
+        self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
+        self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
+        self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
+        self.Lambda                 = np.ones (self.NUM_OF_VNFs) #Lambda[v] is the input bw of VM v
+        self.cur_cpu_alloc_of_vnf   = np.array([2, 1, 1, 2])
+        self.nxt_cpu_alloc_of_vnf   = np.array([2, 1, 1, 2])
+        self.cur_loc_of_vnf         = [1, 2, 2, 1] #cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
+        self.nxt_loc_of_vnf         = [1, 2, 2, 1] #cur_loc_of_vnf[v] will hold the id of the server planned to host VNF v
+        self.target_delay           = np.ones (self.NUM_OF_VNFs) # the desired (max) delay (aka Delta)
+        self.perf_deg_of_VNF        = np.zeros (self.NUM_OF_VNFs)
         
         # Calculate v^+ of each VNF v.
         # v_plus_of_vnf(v) will hold the idx of the next VNF in the same chain.
@@ -49,16 +47,37 @@ class toy_example (object):
                 self.v_plus_of_vnf [v] = v+1 if (idx_in_chain < self.num_of_vnfs_in_chain[chain]-1) else self.PoA_of_user[chain]
                 v += 1
         
-#         print ('PoA of user = ', self.PoA_of_user)
-#         print (self.v_plus_of_vnf)
-        self.mig_comp_cost = np.ones (self.NUM_OF_VNFs)
-        self.mig_data = 2 * np.ones (self.NUM_OF_VNFs)
-        self.mig_bw   = 1 * np.ones (self.NUM_OF_VNFs)
-        self.Lambda   = 1 * np.ones (self.NUM_OF_VNFs) # self.Lambda[v] will hold the input BW of v.
-        self.mig_comp_cost # self.mig_comp_cost[v] hold the migration's computational cost of VM v
-        self.mig_data # self.mig_data[v] amount of data units to transfer during the migration of VM v
-        self.servers_path_cost # self.servers_path_cost [i][j] is the cost of transmitting 1 unit of data from i to j
-    
+        self.mig_comp_cost  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_cost[v] hold the migration's computational cost of VM v
+        self.mig_data       = 2 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v
+        self.mig_bw         = 1 * np.ones (self.NUM_OF_VNFs)
+        self.Lambda         = 1 * np.ones (self.NUM_OF_VNFs) # self.Lambda[v] will hold the input BW of v.
+           
+        self.paths_of_link = [ 
+                                [
+                                    [],               # list of paths in which l(0,0) appears 
+                                    [ [0,1], [0,2] ], # list of paths in which l(0,1) appears
+                                    []                # list of paths in which l(0,2) appears
+                                ],
+                                [
+                                    [ [1,0], [2,0] ], # list of paths in which l(1,0) appears 
+                                    [],               # list of paths in which l(1,1) appears
+                                    [ [0,2], [1,2]]                # list of paths in which l(1,2) appears
+                                ],
+                                [
+                                    [],               # list of paths in which l(2,0) appears 
+                                    [ [2,1], [2,0] ], # list of paths in which l(2,1) appears
+                                    []                # list of paths in which l(2,2) appears
+                                ]
+                            ]
+        self.NUM_OF_LINKS = 4
+        self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS+1, self.NUM_OF_SERVERS+1), dtype='uint8')
+        self.uniform_link_capacity   = 3
+        self.capacity_of_link[0][1] = self.uniform_link_capacity
+        self.capacity_of_link[1][0] = self.uniform_link_capacity
+        self.capacity_of_link[1][2] = self.uniform_link_capacity
+        self.capacity_of_link[2][1] = self.uniform_link_capacity
+        
+        
     def perf_degradation (self, loc_v, loc_vpp, denominator):
         """
         Calculate the performance degradation of a VM. 
@@ -95,6 +114,17 @@ class toy_example (object):
                 self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.v_plus_of_vnf[v]], denominator)
             if (self.perf_degradation_of_VNF[v] > 1):
                 return False
+            
+        # Total link capacity constraint
+        for s in range (self.NUM_OF_LINKS):
+            for d in range (self.NUM_OF_LINKS):
+                available_bw = self.capacity_of_link[s][d]
+                if (available_bw == 0): 
+                    continue # There's no physical link (s,d)
+                for pair in self.paths_of_link [s][d]:
+                    print (pair)
+         
+        
         
         return True
     
@@ -117,14 +147,16 @@ class toy_example (object):
     def brute_force (self):    
         self.nxt_loc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
         for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)):
-            print (self.nxt_loc_of_vnf)
-            print ('*************************************')
+#             print (self.nxt_loc_of_vnf)
+#             print ('*************************************')
             self.nxt_loc_of_vnf = self.inc_array(self.nxt_loc_of_vnf, self.NUM_OF_SERVERS)
             self.nxt_cpu_alloc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
             for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)):
-                print (self.nxt_cpu_alloc_of_vnf)
+#                 print (self.nxt_cpu_alloc_of_vnf)
                 self.nxt_cpu_alloc_of_vnf = self.inc_array(self.nxt_cpu_alloc_of_vnf, self.uniform_cpu_capacity)
-            print ('')
+                
+                self.is_feasible ()
+
 #         for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)):
 #             print (self.nxt_loc_of_vnf)
 #             self.nxt_cpu_alloc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')

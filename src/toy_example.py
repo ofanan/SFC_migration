@@ -85,7 +85,7 @@ class toy_example (object):
         self.capacity_of_link[1][2] = self.uniform_link_capacity
         self.capacity_of_link[2][1] = self.uniform_link_capacity
 
-        self.min_cost = 9999.9 # $$$ TBD: change to INF
+        self.min_cost = float ('inf')
         self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
         self.output_file = open ("../res.txt", "a")
@@ -112,7 +112,7 @@ class toy_example (object):
     def is_feasible(self):
         
         # Max CPU capacity of server constraint
-        available_cpu_at_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8') #self.cpu_capacity_of_server
+        available_cpu_at_server = self.cpu_capacity_of_server.copy () 
         for v in range (self.NUM_OF_VNFs):
             available_cpu_at_server[self.nxt_loc_of_vnf[v]] -= self.nxt_cpu_alloc_of_vnf[v]
             if (available_cpu_at_server[self.nxt_loc_of_vnf[v]] < 0):
@@ -160,20 +160,20 @@ class toy_example (object):
                 v, self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.v_plus_of_vnf[v]], denominator)
         if (cost < self.min_cost):
             self.min_cost = cost
-            self.best_nxt_cpu_alloc_of_vnf  = self.nxt_cpu_alloc_of_vnf
-            self.best_nxt_loc_of_vnf        = self.nxt_loc_of_vnf 
+            self.best_nxt_loc_of_vnf        = self.nxt_loc_of_vnf.copy () 
+            self.best_nxt_cpu_alloc_of_vnf  = self.nxt_cpu_alloc_of_vnf.copy ()
         return cost
     
     def brute_force (self):    
         self.nxt_loc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
 
-        for __ in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)): #$$$$ TBD: change to while, stopping at last relevant val
+        for i in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)): #$$$$ TBD: change to while, stopping at last relevant val
             
             printf (self.output_file, '\n\nVMs location = {}\n' .format (self.nxt_loc_of_vnf))
             printf (self.output_file, '*************************************\n')
             self.nxt_cpu_alloc_of_vnf = 2 * np.ones(self.NUM_OF_VNFs, dtype = 'uint8')
 
-            for __ in range (pow (self.uniform_cpu_capacity - 1, self.NUM_OF_VNFs)): #$$$$ TBD: change to while, stopping at last relevant val
+            for j in range (pow (self.uniform_cpu_capacity - 1, self.NUM_OF_VNFs)): #$$$$ TBD: change to while, stopping at last relevant val
                 
                 if (self.is_feasible()):
                     printf (self.output_file, 'CPU allocation = {} | ' .format (self.nxt_cpu_alloc_of_vnf))
@@ -188,6 +188,6 @@ class toy_example (object):
                 
                 self.nxt_cpu_alloc_of_vnf = self.inc_array (self.nxt_cpu_alloc_of_vnf, 2, self.uniform_cpu_capacity)
             self.nxt_loc_of_vnf = self.inc_array(self.nxt_loc_of_vnf, 0, self.NUM_OF_SERVERS-1)
-        printf (self.output_file, '\nBest solution is:\nnxt_loc_of_vnf = {}, nxt_cpu_alloc_of_vnf = {}, cost = {}' 
+        printf (self.output_file, '\nBest solution is:\nnxt_loc_of_vnf = {}, nxt_cpu_alloc_of_vnf = {}, cost = {:.4f}' 
                .format(self.best_nxt_loc_of_vnf, self.best_nxt_cpu_alloc_of_vnf, self.min_cost))
 

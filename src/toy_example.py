@@ -1,30 +1,15 @@
-import networkx as nx
 import numpy as np
+import networkx as nx
+import math
 
 from printf import printf
-# from random import seed, randint
 
 class toy_example (object):
     
-    def gen_tree (self):
-        """
-        Create a new random edge and delete one of its current edge if del_orig is True.
-        param graph: networkx graph
-        param del_orig: bool
-        return: networkx graph
-        """
-        self.G = nx.generators.classic.balanced_tree (r=2, h=2) # Generate a tree of height h where each node has r children.
-#         print (self.G.nodes())
-#         print (self.G.edges)
-        sp = nx.shortest_path(self.G)
-#         print (sp[0][0])
-          
-
     def custom_three_nodes_tree (self):
         self.NUM_OF_SERVERS = 3
         self.NUM_OF_USERS = 2
         self.NUM_OF_PoA = 2
-        self.NUM_OF_CHAINS = self.NUM_OF_USERS
     
         #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
         #         self.servers_path_delay        = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
@@ -39,6 +24,7 @@ class toy_example (object):
         # self.servers_path_delay [s][s] = 0 # Delay from server to itself is 0
         
         # self.servers_path_cost = self.servers_path_delay # # self.servers_path_cost [i][j] is the cost of transmitting 1 unit of data from i to j#np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j. Currently unused
+        # self.links_of_path[s][d] will contain the list of links found in the path from s to d
         self.links_of_path = [ 
             [
                 [],               # list of paths in which l(0,0) appears 
@@ -66,32 +52,185 @@ class toy_example (object):
         self.capacity_of_link[2][1] = self.uniform_link_capacity
         self.cur_loc_of_vnf         = [2, 2, 0, 0]                  # cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
         self.cur_cpu_alloc_of_vnf   = np.array([2, 2, 2, 2])
-
-    def __init__ (self):
-        
-        use_custom_netw = True
-        if (use_custom_netw == True):
-            self.custom_three_nodes_tree()
-        
+        self.NUM_OF_CHAINS = self.NUM_OF_USERS
+       
         # The Points of Accs will make the first rows in the path_costs matrix
-        self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
+        self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u
 #         self.server_to_user_delay = np.zeros ((self.NUM_OF_SERVERS, self.NUM_OF_USERS))
 #         for s in range (self.NUM_OF_SERVERS):
 #             for u in range (self.NUM_OF_USERS):
 #                     self.server_to_user_delay[s][u] = self.servers_path_delay [s][self.PoA_of_user[u]]
         
-        self.uniform_cpu_capacity   = 4
-        self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')
+        self.output_file            = open ("../three_nodes_tree.res.txt", "a")
+
+    def gen_tree (self):
+        """
+        Create a new random edge and delete one of its current edge if del_orig is True.
+        param graph: networkx graph
+        param del_orig: bool
+        return: networkx graph
+        """
+        self.G = nx.generators.classic.balanced_tree (r=3, h=2) # Generate a tree of height h where each node has r children.
         
-        self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
+        self.NUM_OF_SERVERS = self.G.number_of_nodes()
+        self.NUM_OF_USERS   = 2
+        self.NUM_OF_PoA     = 2
+
+        self.servers_path_delay = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) # $$$ TBD: fix links' delay, and calc servers_path_delay accordingly
+        self.servers_path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
+
+        shortest_path = nx.shortest_path(self.G)
+
+        # self.links_of_path[s][d] will contain the list of links found in the path from s to d
+        self.links_of_path = []
+        for s in range (self.NUM_OF_SERVERS):
+            row_in_links_of_path = []
+            for d in range (self.NUM_OF_SERVERS):
+                if (s == d):
+                    row_in_links_of_path.append([]) # no links in the path 
+                    continue
+                path_from_s_to_d = []
+                for link_src_node in range (len(shortest_path[s][d])-1):
+                    path_from_s_to_d.append ([shortest_path[s][d][link_src_node], shortest_path[s][d][link_src_node+1]])
+                row_in_links_of_path.append (path_from_s_to_d)
+
+            self.links_of_path.append (row_in_links_of_path)
+        
+        self.NUM_OF_LINKS = self.G.number_of_edges()
+        self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
+        
+        # Generate from each undiretional edge in the tree 2 directional edges. Assign all links capacity = self.uniform_link_capacity
+        self.uniform_link_capacity   = 3
+        for edge in self.G.edges:
+            self.capacity_of_link[edge[0]][edge[1]] = self.uniform_link_capacity
+            self.capacity_of_link[edge[1]][edge[0]] = self.uniform_link_capacity
+
+        self.NUM_OF_CHAINS = self.NUM_OF_USERS
+       
+        # The Points of Accs will make the first rows in the path_costs matrix
+        self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
+        
+        self.cur_loc_of_vnf         = np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
+        self.output_file            = open ("../larger_tree.res.txt", "a")
+        
+
+    
+        
+    def vsa2idx (self, v, s, a):
+        """
+        inputs: 
+        v - VM id
+        s - server id
+        a - allocation for VM v on server s
+        OutputL:
+        Index (ID) of the boolean (indicator) decision variable representing whether VM is scheduled to run a CPU units on server (n_{vsa}).
+        The current imp' assumes homo' values of C_s, \delta_v, \lambda_v. 
+        """
+        if (v > self.NUM_OF_VNFs or s > self.NUM_OF_SERVERS or a > self.cpu_capacity_of_server[s]):
+            print ('error: vsa2idx was called with parameters out of bounds')
+            exit ()
+        return (v * self.NUM_OF_SERVERS + s) * self.uniform_cpu_capacity + a
+        
+
+    def calc_comp_delay (self):
+        """
+        Calculate the computation delay for each possible CPU allocation for each VNF v
+        """
+        
+        denominator     = np.empty (shape = (self.NUM_OF_VNFs, self.max_cpu_capacity_of_server))
+        self.comp_delay = np.empty (shape= (self.NUM_OF_VNFs, self.max_cpu_capacity_of_server))
+        for v in range (self.NUM_OF_VNFs):               
+            denominator [v, :] = np.array ([a - self.theta_times_traffic_in[v] for a in range (1, self.max_cpu_capacity_of_server+1)])
+        for v in range (self.NUM_OF_VNFs):
+            for a in range (1, self.max_cpu_capacity_of_server+1):
+                self.comp_delay[v][a-1] = 1 / denominator[v][a-1] if (denominator[v][a-1] > 0) else  float ('inf')
+# 
+#             if (denominator <= 0):
+#                 return False
+#             self.perf_deg_of_vnf[v] = self.perf_degradation (
+#                 v, self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.vpp[v]], denominator)
+#             if (self.perf_deg_of_vnf[v] > 1):
+#                 return False
+# 
+#         self.comp_delay = np.empty (shape= (self.NUM_OF_VNFs, self.max_cpu_capacity_of_server))
+# #         for a in range (1, self.max_cpu_capacity_of_server + 1):
+#         for v in range (self.NUM_OF_VNFs):
+#             self.comp_delay[v,:] = np.array ([1 / (a - self.theta_times_traffic_in[v])  for a in range (1, self.max_cpu_capacity_of_server+1)])
+              
+              
+    def gen_c (self):
+        self.c = self.n.copy ()
+        for item in self.c:
+            v = item['v']
+            print ('v = {}, s = {}, a = {}' .format (v, item['s'], item['a']))
+            item['value'] = 1  if (item['s'] == self.cur_loc_of_vnf[v] and item['a'] == self.cur_cpu_alloc_of_vnf[v]) else 0 
+              
+    def gen_n (self):
+        """"
+        Calculate the cost of a feasible solution, given by its nxt_loc_of_vnf (y) and nxt_cpu_alloc (\beta_{vs}), and assuming that the perf' deg' was already calculated.
+        Note that it's only for a feasible sol', as the calculation uses the array self.perf_deg_of_vnf, that should have been calculated by is_feasible() 
+        """
+
+        self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
+        id = 0
+        
+        # Loop over all combinations of v, s, and a
+        for v in range (self.NUM_OF_VNFs):
+            for s in range (self.NUM_OF_SERVERS):
+                mig = 1 if (s != self.cur_loc_of_vnf[v]) else 0 # if s is s different than v's current location, this implies a mig'
+                for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity allocations), which cause infinite comp' delay
+                    denominator = a - math.ceil (self.theta_times_traffic_in[v]) 
+                    if (denominator <= 0): # skip too small values of a (capacity allocations), which cause infinite comp' delay
+                        continue
+ 
+                    comp_cost = 1/denominator
+                    if (comp_cost > self.target_delay[v]): # Too high perf' degradation
+                        continue 
+                     
+                    self.n.append (
+                    {'v'        : v, 
+                    's'         : s,
+                    'a'         : a,
+                    'id'        : id,
+                    'comp cost' : comp_cost,
+                    'mig'       : mig})
+                    
+                    id +=1 
+
+        for item in self.n:
+            s = item['s']
+            item['cost'] = (item['comp cost'] + self.servers_path_delay [s] [self.PoA_of_vnf[item['v']]] ) / self.target_delay[v] + item['a'] + item['mig'] * self.mig_cost[v]
+            print (item)
+    
+    def gen_LP (self):
+        # Calculate the computation cost
+        return 1
+        
+    def __init__ (self):
+        
+        use_custom_netw = True
+        if (use_custom_netw == True):
+            self.custom_three_nodes_tree()
+        else:
+            self.gen_tree()
+                 
+        self.num_of_vnfs_in_chain   = np.ones (self.NUM_OF_USERS, dtype='uint8')
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
-        self.theta                  = 0.7 * np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic 
-        #self.traffic_out            = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic 
+
+        self.mig_cost = np.ones (self.NUM_OF_SERVERS) # np.random.rand (self.NUM_OF_SERVERS)         
+        self.uniform_cpu_capacity   = 3
+        self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')     
+        self.max_cpu_capacity_of_server = max (self.cpu_capacity_of_server)  
+        self.theta                  = 0.5 * np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
+        self.traffic_in             = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic ("\lambda_v")
+        self.theta_times_traffic_in = self.theta * self.traffic_in 
+        #self.traffic_out            = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic
+        self.calc_comp_delay()
         self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
         self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
         self.target_delay           = 20 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
-        self.perf_deg_of_VNF        = np.zeros (self.NUM_OF_VNFs)
+        self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs)
         
         # Calculate v^+ of each VNF v.
         # vpp(v) will hold the idx of the next VNF in the same chain.
@@ -103,18 +242,27 @@ class toy_example (object):
                 self.vpp [v] = v+1 if (idx_in_chain < self.num_of_vnfs_in_chain[chain]-1) else self.PoA_of_user[chain]
                 v += 1
        
-#         self.mig_comp_cost  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_cost[v] hold the migration's computational cost of VM v. Currently unused.
-#         self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
+        self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
+        v = 0
+        for chain in range (self.NUM_OF_CHAINS):
+            for __ in range (self.num_of_vnfs_in_chain[chain]):
+                self.PoA_of_vnf [v] = self.PoA_of_user[chain]
+                v += 1
+
+        # self.mig_comp_cost  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_cost[v] hold the migration's computational cost of VM v. Currently unused.
+        # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
         self.mig_bw         = 1.1 * np.ones (self.NUM_OF_VNFs)
-           
-        
 
         self.min_cost = float ('inf')
         self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-        self.output_file = open ("../res.txt", "a")
-        
 
+        self.gen_n()
+        exit ()
+        # self.gen_c()
+        
+        
+        
     def perf_degradation (self, v, loc_v, loc_vpp, denominator):
         """
         Calculate the performance degradation of a VM. 
@@ -127,12 +275,6 @@ class toy_example (object):
         return ( 1 / denominator + self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay[v]
             
     
-    def mig_cost (self, src = 0, dst = 0):
-        """
-        Calculate the cost of migration a VM from src to dst
-        """
-        return 0.35
-    
     def is_feasible(self):
         
         # Max CPU capacity of server constraint
@@ -144,12 +286,12 @@ class toy_example (object):
 
         # Finite computation delay constraint and max perf' degradation constraint 
         for v in range (self.NUM_OF_VNFs):               
-            denominator = self.nxt_cpu_alloc_of_vnf[v] - self.theta[v] * self.traffic_in[v] 
+            denominator = self.nxt_cpu_alloc_of_vnf[v] - theta_times_traffic_in[v] 
             if (denominator <= 0):
                 return False
-            self.perf_deg_of_VNF[v] = self.perf_degradation (
+            self.perf_deg_of_vnf[v] = self.perf_degradation (
                 v, self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.vpp[v]], denominator)
-            if (self.perf_deg_of_VNF[v] > 1):
+            if (self.perf_deg_of_vnf[v] > 1):
                 return False
             
         # Total link capacity constraint
@@ -178,13 +320,15 @@ class toy_example (object):
         return ar
     
     def cost (self):
-        cost = 0.0
-        if (not(self.cur_loc_of_vnf == self.nxt_loc_of_vnf).all()):
-            cost += self.mig_cost ()
-        for v in range (self.NUM_OF_VNFs):
-            denominator = self.nxt_cpu_alloc_of_vnf[v] - self.theta[v] * self.traffic_in[v] 
-            cost += self.perf_degradation (
-                v, self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.vpp[v]], denominator)
+        """"
+        Calculate the cost of a feasible solution, given by its nxt_loc_of_vnf (y) and nxt_cpu_alloc (\beta_{vs}), and assuming that the perf' deg' was already calculated.
+        Note that it's only for a feasible sol', as the calculation uses the array self.perf_deg_of_vnf, that should have been calculated by is_feasible() 
+        """
+        cost = sum (self.perf_deg_of_vnf) + \
+               sum (self.mig_cost[v] for v in range (self.NUM_OF_VNFs) if self.cur_loc_of_vnf[v] != self.nxt_loc_of_vnf[v]) + \
+               sum (self.nxt_cpu_alloc_of_vnf)
+#         for v in range (self.NUM_OF_VNFs):
+#             cost = cost if (self.cur_loc_of_vnf[v] == self.nxt_loc_of_vnf[v]) else cost + self.mig_cost[v] 
         if (cost < self.min_cost):
             self.min_cost = cost
             self.best_nxt_loc_of_vnf        = self.nxt_loc_of_vnf.copy () 

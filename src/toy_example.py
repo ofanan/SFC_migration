@@ -51,7 +51,7 @@ class toy_example (object):
        
         # The Points of Accs will make the first rows in the path_costs matrix
         self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
-        self.output_file            = open ("../custom_tree.res.txt", "a")
+        self.output_file            = open ("../res/custom_tree.res.txt", "a")
 
     def gen_tree (self):
         """

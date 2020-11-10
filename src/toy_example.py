@@ -51,7 +51,8 @@ class toy_example (object):
        
         # The Points of Accs will make the first rows in the path_costs matrix
         self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
-        self.output_file            = open ("../res/custom_tree.res.txt", "a")
+        self.output_file            = open ("../res/custom_tree.res", "a")
+        self.LP_output_file         = open ("../res/custom_tree.LP", "a")
 
     def gen_tree (self):
         """
@@ -104,21 +105,70 @@ class toy_example (object):
         self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
         self.output_file            = open ("../larger_tree.res.txt", "a")
                 
-    def vsa2idx (self, v, s, a):
-        """
-        inputs: 
-        v - VM id
-        s - server id
-        a - allocation for VM v on server s
-        OutputL:
-        Index (ID) of the boolean (indicator) decision variable representing whether VM is scheduled to run a CPU units on server (n_{vsa}).
-        The current imp' assumes homo' values of C_s, \delta_v, \lambda_v. 
-        """
-        if (v > self.NUM_OF_VNFs or s > self.NUM_OF_SERVERS or a > self.cpu_capacity_of_server[s]):
-            print ('error: vsa2idx was called with parameters out of bounds')
-            exit ()
-        return (v * self.NUM_OF_SERVERS + s) * self.uniform_cpu_capacity + a
+#     def vsa2idx (self, v, s, a):
+#         """
+#         inputs: 
+#         v - VM id
+#         s - server id
+#         a - allocation for VM v on server s
+#         OutputL:
+#         Index (ID) of the boolean (indicator) decision variable representing whether VM is scheduled to run a CPU units on server (n_{vsa}).
+#         The current imp' assumes homo' values of C_s, \delta_v, \lambda_v. 
+#         """
+#         if (v > self.NUM_OF_VNFs or s > self.NUM_OF_SERVERS or a > self.cpu_capacity_of_server[s]):
+#             print ('error: vsa2idx was called with parameters out of bounds')
+#             exit ()
+#         return (v * self.NUM_OF_SERVERS + s) * self.uniform_cpu_capacity + a
                       
+
+    def print_single_alloc_const (self):
+        """
+        Print the constraint of a single allocation for each VM
+        """
+        print ('\n\n')
+        v = -1 
+        for item in self.n:
+            if (item['v'] == v): #Already seen decision var' related to this VM
+                printf (self.LP_output_file, '+ X{}' .format (item['id']))
+            else: # First time observing decision var' related to this VM
+                if (v > -1):
+                    printf (self.LP_output_file, ' = 1;\n' )
+                printf (self.LP_output_file, 'subject to C{}:   X{} ' .format (self.const_num, item['id'])) 
+                v = item['v']
+            self.const_num += 1
+        printf (self.LP_output_file, ' = 1;\n\n' )
+               
+    def print_vars (self):
+        """
+        Print the var' ranges constraints  >=0  
+        """
+        for __ in self.n:
+            printf (self.LP_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
+        printf (self.LP_output_file, '\n')
+
+    def print_vars_leq1_const (self):
+        """
+        Print the var' ranges constraints  >=0  
+        """
+        for __ in self.n:
+            printf (self.LP_output_file, 'subject to C{}: X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
+            self.const_num += 1
+        printf (self.LP_output_file, '\n')
+
+    
+    def print_obj_function (self):
+        """
+        Print the objective function in a standard LP form (linear combination of the decision variables)
+        """
+        printf (self.LP_output_file, '\minimize z:   ')
+        is_first_item = True
+        for item in self.n:
+            if (not (is_first_item)):
+                printf (self.LP_output_file, ' + ')
+            printf (self.LP_output_file, '{:.4f}*X{}' .format (item['cost'], item ['id']) ) 
+            is_first_item = False
+        printf (self.LP_output_file, ';\n')
+    
     def gen_c (self):
         self.c = self.n.copy ()
         for item in self.c:
@@ -150,7 +200,7 @@ class toy_example (object):
         """
 
         self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
-        id = 0
+        id = int (0)
         
         # Loop over all combinations of v, s, and a
         for v in range (self.NUM_OF_VNFs):
@@ -165,6 +215,9 @@ class toy_example (object):
                     if (comp_delay > self.target_delay[v]): # Too high perf' degradation
                         continue 
                      
+                    total_delay = comp_delay + self.servers_path_delay [s] [self.PoA_of_vnf[v]]
+                    if (total_delay > self.target_delay[v]): # Too high perf' degradation
+                        continue
                     self.n.append (
                     {'v'        : v, 
                     's'         : s,
@@ -177,7 +230,7 @@ class toy_example (object):
 
         for item in self.n:
             s = item['s']
-            item['cost'] = (item['comp delay'] + self.servers_path_delay [s] [self.PoA_of_vnf[item['v']]] ) / self.target_delay[v] + item['a'] + item['mig'] * self.mig_cost[v]
+            item['cost'] = total_delay / self.target_delay[v] + item['a'] + item['mig'] * self.mig_cost[v]
             if (self.verbose == 1):
                 print (item)
     
@@ -207,7 +260,7 @@ class toy_example (object):
         #self.traffic_out            = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic
         self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
         self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
-        self.target_delay           = 20 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
+        self.target_delay           = 15 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
         self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs)
         
         # Calculate v^+ of each VNF v.
@@ -234,11 +287,17 @@ class toy_example (object):
         self.min_cost = float ('inf')
         self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-        self.verbose = 0
+        self.verbose = 1
 
         if (self.verbose == 1):
             print (self.PoA_of_vnf)
         self.gen_n()
+        self.print_vars ()
+        self.print_obj_function ()
+        self.const_num = int(0)
+        self.print_vars_leq1_const ()
+        self.print_single_alloc_const ()
+        exit ()
         self.gen_c()
         self.brute_force()
         

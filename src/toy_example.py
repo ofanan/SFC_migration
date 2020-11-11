@@ -105,27 +105,26 @@ class toy_example (object):
         self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
         self.output_file            = open ("../larger_tree.res.txt", "a")
                 
-#     def vsa2idx (self, v, s, a):
-#         """
-#         inputs: 
-#         v - VM id
-#         s - server id
-#         a - allocation for VM v on server s
-#         OutputL:
-#         Index (ID) of the boolean (indicator) decision variable representing whether VM is scheduled to run a CPU units on server (n_{vsa}).
-#         The current imp' assumes homo' values of C_s, \delta_v, \lambda_v. 
-#         """
-#         if (v > self.NUM_OF_VNFs or s > self.NUM_OF_SERVERS or a > self.cpu_capacity_of_server[s]):
-#             print ('error: vsa2idx was called with parameters out of bounds')
-#             exit ()
-#         return (v * self.NUM_OF_SERVERS + s) * self.uniform_cpu_capacity + a
-                      
+    def print_cpu_cap_const (self):
+        """
+        Print the constraint of maximum server's CPU capacity in a LP format
+        """
+        
+        for s in range (self.NUM_OF_SERVERS):
+            is_first_in_list = True
+            for item in list (filter (lambda item: item['s'] == s, self.n )): # for each decision var' related to server s
+                if (is_first_in_list):
+                    printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.const_num, item['a'], item['id']))
+                    self.const_num += 1
+                    is_first_in_list = False
+                else: 
+                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.const_num, item['a'], item['id']))
+            printf (self.LP_output_file, ' <= <= {}\n' .format (self.cpu_capacity_of_server[s]))
 
     def print_single_alloc_const (self):
         """
-        Print the constraint of a single allocation for each VM
+        Print the constraint of a single allocation for each VM in a LP format
         """
-        print ('\n\n')
         v = -1 
         for item in self.n:
             if (item['v'] == v): #Already seen decision var' related to this VM
@@ -133,7 +132,7 @@ class toy_example (object):
             else: # First time observing decision var' related to this VM
                 if (v > -1):
                     printf (self.LP_output_file, ' = 1;\n' )
-                printf (self.LP_output_file, 'subject to C{}:   X{} ' .format (self.const_num, item['id'])) 
+                printf (self.LP_output_file, 'subject to single_alloc_C{}:   X{} ' .format (self.const_num, item['id'])) 
                 v = item['v']
             self.const_num += 1
         printf (self.LP_output_file, ' = 1;\n\n' )
@@ -150,8 +149,9 @@ class toy_example (object):
         """
         Print the var' ranges constraints  >=0  
         """
+        printf (self.LP_output_file, '\n') 
         for __ in self.n:
-            printf (self.LP_output_file, 'subject to C{}: X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
+            printf (self.LP_output_file, 'subject to X_leq1_C{}: X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
             self.const_num += 1
         printf (self.LP_output_file, '\n')
 
@@ -160,7 +160,7 @@ class toy_example (object):
         """
         Print the objective function in a standard LP form (linear combination of the decision variables)
         """
-        printf (self.LP_output_file, '\minimize z:   ')
+        printf (self.LP_output_file, 'minimize z:   ')
         is_first_item = True
         for item in self.n:
             if (not (is_first_item)):
@@ -238,8 +238,9 @@ class toy_example (object):
         # Calculate the computation cost
         return 1
         
-    def __init__ (self):
+    def __init__ (self, verbose = 0):
         
+        self.verbose = verbose
         use_custom_netw = True
         if (use_custom_netw == True):
             self.custom_three_nodes_tree()
@@ -287,17 +288,20 @@ class toy_example (object):
         self.min_cost = float ('inf')
         self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-        self.verbose = 1
 
         if (self.verbose == 1):
             print (self.PoA_of_vnf)
         self.gen_n()
-        self.print_vars ()
-        self.print_obj_function ()
         self.const_num = int(0)
-        self.print_vars_leq1_const ()
-        self.print_single_alloc_const ()
+#         self.print_vars ()
+#         self.print_obj_function ()
+#         self.print_vars_leq1_const ()
+#         self.print_single_alloc_const ()
+#         printf (self.LP_output_file, '\nend;\n')
+#         print (next (item for item in self.n if item['v'] == 1))
+        self.print_cpu_cap_const()
         exit ()
+        
         self.gen_c()
         self.brute_force()
         

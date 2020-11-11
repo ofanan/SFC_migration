@@ -1,8 +1,9 @@
-import numpy as np
 import networkx as nx
+import numpy as np
 import math
 
 from printf import printf
+
 
 class toy_example (object):
     
@@ -21,27 +22,45 @@ class toy_example (object):
     
         
         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
-        self.links_of_path = [ 
+        self.links_of_path = [
             [
-                [],               # list of paths in which l(0,0) appears 
-                [ [0,1], [0,2] ], # list of paths in which l(0,1) appears
-                []                # list of paths in which l(0,2) appears
+                [],
+                [[0,1]],
+                [[0,1], [1,2]]
             ],
             [
-                [ [1,0], [2,0] ], # list of paths in which l(1,0) appears 
-                [],               # list of paths in which l(1,1) appears
-                [ [0,2], [1,2]]                # list of paths in which l(1,2) appears
+                [[1,0]],
+                [],
+                [[1,2]]  
             ],
             [
-                [],               # list of paths in which l(2,0) appears 
-                [ [2,1], [2,0] ], # list of paths in which l(2,1) appears
-                []                # list of paths in which l(2,2) appears
+                [[2,1],[1,0]],
+                [[2,1]],
+                []
             ]
         ]
+        
+#         self.paths_of_link = [ # self.paths_of_link[i][j] will contain a list of the paths [s,d] which use link (i,j)
+#             [
+#                 [],               # list of paths in which l(0,0) appears 
+#                 [ [0,1], [0,2] ], # list of paths in which l(0,1) appears
+#                 []                # list of paths in which l(0,2) appears
+#             ],
+#             [
+#                 [ [1,0], [2,0] ], # list of paths in which l(1,0) appears 
+#                 [],               # list of paths in which l(1,1) appears
+#                 [ [0,2], [1,2]]                # list of paths in which l(1,2) appears
+#             ],
+#             [
+#                 [],               # list of paths in which l(2,0) appears 
+#                 [ [2,1], [2,0] ], # list of paths in which l(2,1) appears
+#                 []                # list of paths in which l(2,2) appears
+#             ]
+#         ]
 
         self.NUM_OF_LINKS = 4
         self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
-        self.uniform_link_capacity   = 3
+        self.uniform_link_capacity  = 100
         self.capacity_of_link[0][1] = self.uniform_link_capacity
         self.capacity_of_link[1][0] = self.uniform_link_capacity
         self.capacity_of_link[1][2] = self.uniform_link_capacity
@@ -106,27 +125,42 @@ class toy_example (object):
         self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
         self.output_file            = open ("../larger_tree.res.txt", "a")
 
+    def calc_paths_of_links (self):
+        """
+        Calculate for each link the paths in which this link appears
+        """
+        self.paths_of_link = [] #np.empty(shape = (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS), dtype = object)
+        for link in self.list_of_links:
+            paths = []
+            for src in range (self.NUM_OF_SERVERS):
+                for dst in range (self.NUM_OF_SERVERS): 
+                    if (link in self.links_of_path[src][dst]): # Does think link appear in the path from src to dst
+                        paths.append ([src, dst]) # Yep --> append it to the list of paths in which this link appears
+            self.paths_of_link.append ({'link' : link, 'paths' : paths}) 
+                        
+                     
     def print_link_cap_const (self):
         """
         Print the constraints of maximum link's capacity in a LP format
+        $$$ The func' isn't complete yet
         """
         for link in self.list_of_links:
-#             for path in self.links_of_path:
-            for src in range (self.NUM_OF_SERVERS):
-                for dst in range (self.NUM_OF_SERVERS): 
-                    if (link in self.links_of_path[src][dst]):
-                        print ('link ', link, ' is in path ', self.links_of_path[src][dst])
-#             for v in range (self.NUM_OF_VNFs):
-#                 for s_nxt in range (self.NUM_OF_SERVERS):
-                
-#             for link in self.links_of_path [self.cur_loc_of_vnf[v]] [self.nxt_loc_of_vnf[v]]: # for each link on the path from v's cur location to v's new location (this path exists in practice only if v is scheduled to migrate) 
-#                 available_bw[link[0]][link[1]] -= self.mig_bw[v]
-#                 if (available_bw[link[0]][link[1]] < 0):
-#                     return False
+            printf (self.LP_output_file, 'subject to max_link_bw_C{}: ' .format (self.const_num))
+            is_first_in_list = True
+            for list_of_paths_of_this_link in list (filter (lambda item : item['link'] == link, self.paths_of_link)):
+                for path in list_of_paths_of_this_link['paths']: # For each path (s, s') that uses this link
+                    for v in range (self.NUM_OF_VNFs):           # For each VM v
+                        if (path[0] == self.PoA_of_vnf[v]):       # if s == PoA(v), 
+                            for item in list (filter (lambda item  : item['v'] == v and item['s'] == s) ): # For each decision var' related which implies locating VM v on server s
+                                if (is_first_in_list): 
+                                    printf (self.LP_output_file, '{}*X{} ' .format (self.traffic_in[v], item['id']))
+                                    is_first_in_list = False
+                                else:
+                                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.traffic_in[v], item['id']))
+                                     
+                    print ('path ', path, ' uses link ', link)
+            self.const_num += 1
 
-        
-
-                
     def print_cpu_cap_const (self):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
@@ -153,7 +187,7 @@ class toy_example (object):
                     for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
                         printf (self.LP_output_file, '- {}*X{}' .format (a, item['id']))
                        
-            printf (self.LP_output_file, ' <= {}\n' .format (server_s_available_cap))
+            printf (self.LP_output_file, ' <= {};\n' .format (server_s_available_cap))
 
     def print_single_alloc_const (self):
         """
@@ -205,11 +239,11 @@ class toy_example (object):
     
     def gen_c (self):
         self.c = self.n.copy ()
-        if (self.verbose == 1):
+        if (self.verbose == 2):
             print ('\n C = \n********************************\n')
         for item in self.c:
             v = item['v']
-            if (self.verbose == 1):
+            if (self.verbose == 2):
                 print ('v = {}, s = {}, a = {}' .format (v, item['s'], item['a']))
             item['value'] = 1  if (item['s'] == self.cur_loc_of_vnf[v] and item['a'] == self.cur_cpu_alloc_of_vnf[v]) else 0
             
@@ -255,27 +289,27 @@ class toy_example (object):
                     total_delay = comp_delay + 2 * self.servers_path_delay [s] [self.PoA_of_vnf[v]]
                     if (total_delay > self.target_delay[v]): # Too high perf' degradation
                         continue
-                    self.n.append (
-                    {'v'        : v, 
-                    's'         : s,
-                    'a'         : a,
-                    'id'        : id,
-                    'comp delay' : comp_delay,
-                    'mig'       : mig})
                     
+                    cost = total_delay / self.target_delay[v] + a
+                    if (mig):
+                        cost += self.mig_cost[v]
+                    
+                    item = {
+                        'v'          : v, 
+                        's'          : s,
+                        'a'          : a,
+                        'id'         : id,
+                        'comp delay' : comp_delay,
+                        'mig'        : mig,
+                        'cost'       : cost
+                    }
+                    
+                    self.n.append (item)                
+                    
+                    if (self.verbose == 1):
+                        print (item)
                     id +=1 
-#                 if (mig): #if this v is currently not located on s
-#                     self.list_of_migrating_VMs.append ({'v' : v, 's'})
-        
 
-        for item in self.n:
-            s = item['s']
-            item['cost'] = total_delay / self.target_delay[v] + item['a']
-            if (item['mig']):
-                item['cost'] += self.mig_cost[v]
-            if (self.verbose == 1):
-                print (item)
-    
     def gen_LP (self):
         # Calculate the computation cost
         return 1
@@ -303,7 +337,7 @@ class toy_example (object):
         #self.traffic_out            = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic
         self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
         self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
-        self.target_delay           = 15 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
+        self.target_delay           = 10 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
         self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs)
         
         # Calculate v^+ of each VNF v.
@@ -337,29 +371,41 @@ class toy_example (object):
             print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
         self.gen_n()
         self.const_num = int(0)
-#         self.print_vars ()
-#         self.print_obj_function ()
-#         self.print_vars_leq1_const ()
-#         self.print_single_alloc_const ()
-#         self.print_cpu_cap_const ()
-        self.print_link_cap_const ()
+        self.print_vars ()
+        self.print_obj_function ()
+        self.print_vars_leq1_const ()
+        self.print_single_alloc_const ()
+        self.print_cpu_cap_const ()
+        self.calc_paths_of_links ()
+#         self.print_link_cap_const ()
         printf (self.LP_output_file, '\nend;\n')
-        exit ()
-        
         self.gen_c()
         self.brute_force()
+        self.print_best_sol_as_LP ()
         
         
-    def perf_degradation (self, v, loc_v, loc_vpp, denominator):
+    def perf_degradation_not_last_vm (self, v, loc_v, loc_vpp, denominator):
         """
-        Calculate the performance degradation of a VM. 
+        Calculate the performance degradation of a VM, which isn't the last in its chain
         Inputs
         - loc_v - location of v, 
         - loc_vpp - location of v^+ (the next VM after v in the service chain)
         - cpu_alloc - (suggested) cpu allocation of v
         
         """
-        return ( 1 / denominator + 2 * self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay[v]
+        return ( 1 / denominator + self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay[v]
+            
+    def perf_degradation_single_vm_chain (self, v, loc_v, denominator):
+        """
+        Calculate the performance degradation of a VM in a single-vm chain.
+        Hence, the path delay includes twice twice the delay to the PoA, as the service path begins and ends in the PoA.
+        Inputs
+        - loc_v - location of v, 
+        - loc_vpp - location of v^+ (the next VM after v in the service chain)
+        - cpu_alloc - (suggested) cpu allocation of v
+        
+        """
+        return ( 1 / denominator + 2 * self.servers_path_delay[loc_v][self.PoA_of_vnf[v]] ) / self.target_delay[v]
             
     
     def is_feasible(self):
@@ -376,8 +422,7 @@ class toy_example (object):
             denominator = self.nxt_cpu_alloc_of_vnf[v] - self.theta_times_traffic_in[v] 
             if (denominator <= 0):
                 return False
-            self.perf_deg_of_vnf[v] = self.perf_degradation (
-                v, self.nxt_loc_of_vnf[v], self.nxt_loc_of_vnf[self.vpp[v]], denominator)
+            self.perf_deg_of_vnf[v] = self.perf_degradation_single_vm_chain (v, self.nxt_loc_of_vnf[v], denominator)
             if (self.perf_deg_of_vnf[v] > 1):
                 return False
             
@@ -429,14 +474,23 @@ class toy_example (object):
         self.beta = np.zeros ((self.NUM_OF_VNFs, self.NUM_OF_SERVERS))
         for v in range (self.NUM_OF_VNFs):
             self.beta[v][nxt_loc_of_vnf[v]] = int (nxt_cpu_alloc_of_vnf[v])
-        
+
+    def print_best_sol_as_LP (self):
+        """
+        Translate the best sol' obtained by brute-force to n_vsa's decision variables
+        """
+        printf (self.output_file, '\nSet X in the LP are:\n')
+        n = []
+        for v in range (self.NUM_OF_VNFs):             
+            for item in list (filter (lambda item : item['v'] == v and item['s'] == self.best_nxt_loc_of_vnf[v] and item['a'] == self.best_nxt_cpu_alloc_of_vnf[v], self.n)):
+                printf (self.output_file, 'X{}, ' .format (item['id']))
     
     def brute_force (self):    
         self.nxt_loc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
 
         for i in range (pow (self.NUM_OF_SERVERS, self.NUM_OF_VNFs)): #$$$$ TBD: change to while, stopping at last relevant val
             
-            self.nxt_cpu_alloc_of_vnf = 2 * np.ones(self.NUM_OF_VNFs, dtype = 'uint8')
+            self.nxt_cpu_alloc_of_vnf = 1 * np.ones(self.NUM_OF_VNFs, dtype = 'uint8')
 
             for j in range (pow (self.uniform_cpu_capacity - 1, self.NUM_OF_VNFs)): #$$$$ TBD: change to while, stopping at last relevant val
                 

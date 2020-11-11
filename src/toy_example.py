@@ -45,12 +45,12 @@ class toy_example (object):
         self.capacity_of_link[1][0] = self.uniform_link_capacity
         self.capacity_of_link[1][2] = self.uniform_link_capacity
         self.capacity_of_link[2][1] = self.uniform_link_capacity
-        self.cur_loc_of_vnf         = [2, 2, 0, 0]                  # cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
-        self.cur_cpu_alloc_of_vnf   = np.array([2, 2, 2, 2])
+        self.cur_loc_of_vnf         = [2, 1]                  # cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
+        self.cur_cpu_alloc_of_vnf   = [2, 1]
         self.NUM_OF_CHAINS = self.NUM_OF_USERS
        
         # The Points of Accs will make the first rows in the path_costs matrix
-        self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user     = np.zeros (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
 
@@ -104,13 +104,21 @@ class toy_example (object):
         self.cur_loc_of_vnf         = np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
         self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
         self.output_file            = open ("../larger_tree.res.txt", "a")
+
+    def print_link_cap_const (self):
+        """
+        Print the constraints of maximum link's capacity in a LP format
+        """
                 
     def print_cpu_cap_const (self):
         """
-        Print the constraint of maximum server's CPU capacity in a LP format
+        Print the constraints of maximum server's CPU capacity in a LP format
         """
         
         for s in range (self.NUM_OF_SERVERS):
+            
+            server_s_available_cap = self.cpu_capacity_of_server[s]
+            # Consider the CPU consumed by all VMs assigned to work on server s
             is_first_in_list = True
             for item in list (filter (lambda item: item['s'] == s, self.n )): # for each decision var' related to server s
                 if (is_first_in_list):
@@ -118,8 +126,17 @@ class toy_example (object):
                     self.const_num += 1
                     is_first_in_list = False
                 else: 
-                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.const_num, item['a'], item['id']))
-            printf (self.LP_output_file, ' <= <= {}\n' .format (self.cpu_capacity_of_server[s]))
+                    printf (self.LP_output_file, '+ {}*X{} ' .format (item['a'], item['id']))
+            
+            # Consider the CPU consumed by all VMs that are assigned to migrate from this machine
+            for v in range (self.NUM_OF_VNFs):
+                if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
+                    a = self.cur_cpu_alloc_of_vnf[v]
+                    server_s_available_cap -= a
+                    for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
+                        printf (self.LP_output_file, '- {}*X{}' .format (a, item['id']))
+                       
+            printf (self.LP_output_file, ' <= {}\n' .format (server_s_available_cap))
 
     def print_single_alloc_const (self):
         """
@@ -139,7 +156,7 @@ class toy_example (object):
                
     def print_vars (self):
         """
-        Print the var' ranges constraints  >=0  
+        Print the decision variables. Each variable is printed with the constraints that it's >=0  
         """
         for __ in self.n:
             printf (self.LP_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
@@ -147,7 +164,7 @@ class toy_example (object):
 
     def print_vars_leq1_const (self):
         """
-        Print the var' ranges constraints  >=0  
+        Print the var' ranges constraints: each var should be <=1  
         """
         printf (self.LP_output_file, '\n') 
         for __ in self.n:
@@ -171,6 +188,8 @@ class toy_example (object):
     
     def gen_c (self):
         self.c = self.n.copy ()
+        if (self.verbose == 1):
+            print ('\n C = \n********************************\n')
         for item in self.c:
             v = item['v']
             if (self.verbose == 1):
@@ -290,16 +309,17 @@ class toy_example (object):
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
 
         if (self.verbose == 1):
-            print (self.PoA_of_vnf)
+            print ('PoA = ', self.PoA_of_vnf)
+            print ('cur VM loc = ', self.cur_loc_of_vnf)
+            print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
         self.gen_n()
         self.const_num = int(0)
 #         self.print_vars ()
 #         self.print_obj_function ()
 #         self.print_vars_leq1_const ()
 #         self.print_single_alloc_const ()
-#         printf (self.LP_output_file, '\nend;\n')
-#         print (next (item for item in self.n if item['v'] == 1))
-        self.print_cpu_cap_const()
+        self.print_cpu_cap_const ()
+        printf (self.LP_output_file, '\nend;\n')
         exit ()
         
         self.gen_c()

@@ -11,6 +11,7 @@ class toy_example (object):
         self.NUM_OF_USERS = 2
         self.NUM_OF_PoA = 2
     
+        self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
         #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
         self.servers_path_delay  = [
                                    [0, 1, 2],
@@ -109,6 +110,22 @@ class toy_example (object):
         """
         Print the constraints of maximum link's capacity in a LP format
         """
+        for link in self.list_of_links:
+#             for path in self.links_of_path:
+            for src in range (self.NUM_OF_SERVERS):
+                for dst in range (self.NUM_OF_SERVERS): 
+                    if (link in self.links_of_path[src][dst]):
+                        print ('link ', link, ' is in path ', self.links_of_path[src][dst])
+#             for v in range (self.NUM_OF_VNFs):
+#                 for s_nxt in range (self.NUM_OF_SERVERS):
+                
+#             for link in self.links_of_path [self.cur_loc_of_vnf[v]] [self.nxt_loc_of_vnf[v]]: # for each link on the path from v's cur location to v's new location (this path exists in practice only if v is scheduled to migrate) 
+#                 available_bw[link[0]][link[1]] -= self.mig_bw[v]
+#                 if (available_bw[link[0]][link[1]] < 0):
+#                     return False
+
+        
+
                 
     def print_cpu_cap_const (self):
         """
@@ -120,7 +137,7 @@ class toy_example (object):
             server_s_available_cap = self.cpu_capacity_of_server[s]
             # Consider the CPU consumed by all VMs assigned to work on server s
             is_first_in_list = True
-            for item in list (filter (lambda item: item['s'] == s, self.n )): # for each decision var' related to server s
+            for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
                 if (is_first_in_list):
                     printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.const_num, item['a'], item['id']))
                     self.const_num += 1
@@ -222,9 +239,10 @@ class toy_example (object):
         id = int (0)
         
         # Loop over all combinations of v, s, and a
+#         self.list_of_migrating_VMs = []
         for v in range (self.NUM_OF_VNFs):
             for s in range (self.NUM_OF_SERVERS):
-                mig = 1 if (s != self.cur_loc_of_vnf[v]) else 0 # if s is s different than v's current location, this implies a mig'
+                mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is s different than v's current location, this implies a mig'
                 for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity allocations), which cause infinite comp' delay
                     denominator = a - self.theta_times_traffic_in[v] 
                     if (denominator <= 0): # skip too small values of a (capacity allocations), which cause infinite comp' delay
@@ -234,7 +252,7 @@ class toy_example (object):
                     if (comp_delay > self.target_delay[v]): # Too high perf' degradation
                         continue 
                      
-                    total_delay = comp_delay + self.servers_path_delay [s] [self.PoA_of_vnf[v]]
+                    total_delay = comp_delay + 2 * self.servers_path_delay [s] [self.PoA_of_vnf[v]]
                     if (total_delay > self.target_delay[v]): # Too high perf' degradation
                         continue
                     self.n.append (
@@ -246,10 +264,15 @@ class toy_example (object):
                     'mig'       : mig})
                     
                     id +=1 
+#                 if (mig): #if this v is currently not located on s
+#                     self.list_of_migrating_VMs.append ({'v' : v, 's'})
+        
 
         for item in self.n:
             s = item['s']
-            item['cost'] = total_delay / self.target_delay[v] + item['a'] + item['mig'] * self.mig_cost[v]
+            item['cost'] = total_delay / self.target_delay[v] + item['a']
+            if (item['mig']):
+                item['cost'] += self.mig_cost[v]
             if (self.verbose == 1):
                 print (item)
     
@@ -318,7 +341,8 @@ class toy_example (object):
 #         self.print_obj_function ()
 #         self.print_vars_leq1_const ()
 #         self.print_single_alloc_const ()
-        self.print_cpu_cap_const ()
+#         self.print_cpu_cap_const ()
+        self.print_link_cap_const ()
         printf (self.LP_output_file, '\nend;\n')
         exit ()
         
@@ -335,7 +359,7 @@ class toy_example (object):
         - cpu_alloc - (suggested) cpu allocation of v
         
         """
-        return ( 1 / denominator + self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay[v]
+        return ( 1 / denominator + 2 * self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay[v]
             
     
     def is_feasible(self):

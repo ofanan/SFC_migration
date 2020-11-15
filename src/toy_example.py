@@ -1,9 +1,10 @@
 import networkx as nx
 import numpy as np
 import math
+import itertools 
 
 from printf import printf
-
+from LP_file_parser import LP_file_parser
 
 class toy_example (object):
     
@@ -139,7 +140,7 @@ class toy_example (object):
             self.paths_of_link.append ({'link' : link, 'paths' : paths}) 
                         
                      
-    def print_link_cap_const (self):
+    def gen_const_link_cap (self):
         """
         Print the constraints of maximum link's capacity in a LP format
         $$$ The func' isn't complete yet
@@ -161,7 +162,7 @@ class toy_example (object):
                     print ('path ', path, ' uses link ', link)
             self.const_num += 1
 
-    def print_cpu_cap_const (self):
+    def gen_const_cpu_cap (self):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
         """
@@ -189,7 +190,7 @@ class toy_example (object):
                        
             printf (self.LP_output_file, ' <= {};\n' .format (server_s_available_cap))
 
-    def print_single_alloc_const (self):
+    def gen_const_single_alloc (self):
         """
         Print the constraint of a single allocation for each VM in a LP format
         """
@@ -213,12 +214,26 @@ class toy_example (object):
             printf (self.LP_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
         printf (self.LP_output_file, '\n')
 
-    def print_vars_leq1_const (self):
+
+    def gen_all_consts (self):
+        """
+        Generate all the constraints. 
+        """
+        self.constraints = [] 
+        self.gen_const_leq1 ()
+        self.gen_const_single_alloc ()
+        self.gen_const_cpu_cap ()
+        self.calc_paths_of_links ()
+#         self.gen_const_link_cap ()
+        
+
+    def gen_const_leq1 (self):
         """
         Print the var' ranges constraints: each var should be <=1  
         """
         printf (self.LP_output_file, '\n') 
         for __ in self.n:
+            #self.constraint.append()
             printf (self.LP_output_file, 'subject to X_leq1_C{}: X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
             self.const_num += 1
         printf (self.LP_output_file, '\n')
@@ -283,14 +298,17 @@ class toy_example (object):
                         continue
  
                     comp_delay = 1/denominator
-                    if (comp_delay > self.target_delay[v]): # Too high perf' degradation
-                        continue 
+                    # Check for per-VM target delay - currently unused
+                    # if (comp_delay > self.VM_target_delay[v]): # Too high perf' degradation
+                    #     continue 
                      
                     total_delay = comp_delay + 2 * self.servers_path_delay [s] [self.PoA_of_vnf[v]]
-                    if (total_delay > self.target_delay[v]): # Too high perf' degradation
+                    if (total_delay > self.VM_target_delay[v]): # Too high perf' degradation
                         continue
                     
-                    cost = total_delay / self.target_delay[v] + a
+                    cost =  a
+                    # To include the VM's target delay in the cost, unco
+                    # cost += total_delay / self.VM_target_delay[v] 
                     if (mig):
                         cost += self.mig_cost[v]
                     
@@ -310,11 +328,28 @@ class toy_example (object):
                         print (item)
                     id +=1 
 
-    def gen_LP (self):
-        # Calculate the computation cost
-        return 1
+    def cost_single_VM_chain (self):
+        cost = 0
+        for item in self.n:
+            cost += item['cost'] * self.sol[item['id']]
+        return cost
+                    
+#     def is_feasible (self):
         
-    def __init__ (self, verbose = 0):
+                    
+    def brute_force_by_n (self):
+        self.min_cost = float ('inf')
+        for self.sol in itertools.product ([0,1],repeat = len (self.n)):
+#              if (!(is_feasible())):
+#                  continue
+             cost = self.cost_single_VM_chain ()
+             if (cost < self.min_cost):
+                 self.min_cost = cost
+                 self.best_n = sol
+        print ('min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
+            
+
+    def __init__ (self, verbose = -1):
         
         self.verbose = verbose
         use_custom_netw = True
@@ -337,7 +372,7 @@ class toy_example (object):
         #self.traffic_out            = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic
         self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
         self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
-        self.target_delay           = 10 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
+        self.VM_target_delay           = 10 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
         self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs)
         
         # Calculate v^+ of each VNF v.
@@ -369,17 +404,18 @@ class toy_example (object):
             print ('PoA = ', self.PoA_of_vnf)
             print ('cur VM loc = ', self.cur_loc_of_vnf)
             print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
-        self.gen_n()
-        self.const_num = int(0)
-        self.print_vars ()
-        self.print_obj_function ()
-        self.print_vars_leq1_const ()
-        self.print_single_alloc_const ()
-        self.print_cpu_cap_const ()
-        self.calc_paths_of_links ()
-#         self.print_link_cap_const ()
-        printf (self.LP_output_file, '\nend;\n')
-        self.gen_c()
+
+        self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
+#         self.gen_n()
+#         self.const_num = int(0)
+#         self.print_vars ()
+#         self.print_obj_function ()
+#         self.gen_c()
+#         self.gen_all_consts ()
+        my_LP_file_parser = LP_file_parser ()
+        my_LP_file_parser.parse_LP_file ('custom_tree.LP')
+#         self.brute_force_by_n ()
+#        printf (self.LP_output_file, '\nend;\n')
         self.brute_force()
         self.print_best_sol_as_LP ()
         
@@ -393,7 +429,7 @@ class toy_example (object):
         - cpu_alloc - (suggested) cpu allocation of v
         
         """
-        return ( 1 / denominator + self.servers_path_delay[loc_v][loc_vpp] ) / self.target_delay[v]
+        return ( 1 / denominator + self.servers_path_delay[loc_v][loc_vpp] ) / self.VM_target_delay[v]
             
     def perf_degradation_single_vm_chain (self, v, loc_v, denominator):
         """
@@ -405,7 +441,7 @@ class toy_example (object):
         - cpu_alloc - (suggested) cpu allocation of v
         
         """
-        return ( 1 / denominator + 2 * self.servers_path_delay[loc_v][self.PoA_of_vnf[v]] ) / self.target_delay[v]
+        return ( 1 / denominator + 2 * self.servers_path_delay[loc_v][self.PoA_of_vnf[v]] ) / self.VM_target_delay[v]
             
     
     def is_feasible(self):
@@ -422,9 +458,11 @@ class toy_example (object):
             denominator = self.nxt_cpu_alloc_of_vnf[v] - self.theta_times_traffic_in[v] 
             if (denominator <= 0):
                 return False
-            self.perf_deg_of_vnf[v] = self.perf_degradation_single_vm_chain (v, self.nxt_loc_of_vnf[v], denominator)
-            if (self.perf_deg_of_vnf[v] > 1):
-                return False
+            
+            # Calculation of per chain perf' deg' - currently unused
+            # self.perf_deg_of_vnf[v] = self.perf_degradation_single_vm_chain (v, self.nxt_loc_of_vnf[v], denominator)
+            # if (self.perf_deg_of_vnf[v] > 1):
+            #     return False
             
         # Total link capacity constraint
         available_bw = self.capacity_of_link.copy()

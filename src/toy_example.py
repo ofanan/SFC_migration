@@ -120,7 +120,7 @@ class toy_example (object):
         self.NUM_OF_CHAINS = self.NUM_OF_USERS
        
         # The Points of Accs will make the first rows in the path_costs matrix
-        self.PoA_of_user     = np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
+        self.PoA_of_user     = [0,0] #np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
         
         self.cur_loc_of_vnf         = np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
         self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
@@ -168,27 +168,42 @@ class toy_example (object):
         """
         
         for s in range (self.NUM_OF_SERVERS):
+            for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                item['coef'] = item['a']
+
+                
+                # self.ids_of_y_vs
             
-            server_s_available_cap = self.cpu_capacity_of_server[s]
+            
             # Consider the CPU consumed by all VMs assigned to work on server s
+            #list_of_n_server_s = list (filter (lambda item:  item['s'] == s, self.n )) #list_of_n_server_s will hold all the decision variables related to server s1 
+            #list_of_p_server_s = list (filter (lambda item:  item['s'] == s, self.p )) #list_of_n_server_s will hold all the present-state parameters related to server s1 
+            
+            
+            
+             
+            # Consider the CPU consumed by all VMs that are assigned to migrate from this machine
+            server_s_available_cap = self.cpu_capacity_of_server[s]
+            for v in range (self.NUM_OF_VNFs):
+                if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
+                    a_cur = self.cur_cpu_alloc_of_vnf[v]
+                    server_s_available_cap -= a_cur
+                    for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
+                        item['coef'] -= a_cur 
+                        
             is_first_in_list = True
             for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                  
                 if (is_first_in_list):
-                    printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.const_num, item['a'], item['id']))
+                    printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.const_num, item['coef'], item['id']))
                     self.const_num += 1
                     is_first_in_list = False
                 else: 
-                    printf (self.LP_output_file, '+ {}*X{} ' .format (item['a'], item['id']))
-            
-            # Consider the CPU consumed by all VMs that are assigned to migrate from this machine
-            for v in range (self.NUM_OF_VNFs):
-                if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
-                    a = self.cur_cpu_alloc_of_vnf[v]
-                    server_s_available_cap -= a
-                    for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
-                        printf (self.LP_output_file, '- {}*X{}' .format (a, item['id']))
-                       
+                    printf (self.LP_output_file, '+ {}*X{} ' .format (item['coef'], item['id']))
             printf (self.LP_output_file, ' <= {};\n' .format (server_s_available_cap))
+
+
+
 
     def gen_const_single_alloc (self):
         """
@@ -219,11 +234,10 @@ class toy_example (object):
         """
         Generate all the constraints. 
         """
-        self.constraints = [] 
-        self.gen_const_leq1 ()
-        self.gen_const_single_alloc ()
+        # self.gen_const_leq1 ()
+        # self.gen_const_single_alloc ()
         self.gen_const_cpu_cap ()
-        self.calc_paths_of_links ()
+        # self.calc_paths_of_links ()
 #         self.gen_const_link_cap ()
         
 
@@ -252,15 +266,44 @@ class toy_example (object):
             is_first_item = False
         printf (self.LP_output_file, ';\n')
     
-    def gen_c (self):
-        self.c = self.n.copy ()
-        if (self.verbose == 2):
-            print ('\n C = \n********************************\n')
-        for item in self.c:
-            v = item['v']
-            if (self.verbose == 2):
-                print ('v = {}, s = {}, a = {}' .format (v, item['s'], item['a']))
-            item['value'] = 1  if (item['s'] == self.cur_loc_of_vnf[v] and item['a'] == self.cur_cpu_alloc_of_vnf[v]) else 0
+    def gen_p (self):
+        
+        self.p = []
+        for n_item in self.n:
+            self.p.append ({'v'     : n_item['v'],
+                            's'     : n_item['s'],
+                            'a'     : n_item['a'],
+                            'id'    : n_item['id'],
+                            'val'   : 0,
+                            })
+         
+         # Hard-code an initial allocation
+        tmp_list  = list (filter (lambda item : (item ['v'] == 0 and item ['s'] == 0 and item['a']==2) or
+                                                (item ['v'] == 1 and item ['s'] == 0 and item['a']==1)
+                                  , self.p))
+        for item in tmp_list:
+            item['val'] = 1  
+        
+        # Generate y
+        self.x = self.gen_loc_var_from_alloc_var (self.p)
+        for item in (self.x):
+            print (item)
+                
+    
+    def gen_loc_var_from_alloc_var (self, alloc_var):
+        """
+        Input: CPU allocation variable (p, or n)
+        Ouput: location variable (x, or y) 
+        """    
+        loc = []
+        for v in range (self.NUM_OF_VNFs):
+            for s in range (self.NUM_OF_SERVERS):
+                tmp_list = list (filter (lambda item : item ['v'] == v and item['s'] == s, alloc_var))
+                loc.append ({'v' : v, 
+                             's' : s, 
+                             'val' : True if (sum (item['val'] for item in tmp_list)==1) else False}
+                             ) 
+        return loc
             
     def calc_cost_by_n (self):
         """
@@ -285,6 +328,7 @@ class toy_example (object):
         """
 
         self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
+        self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
         id = int (0)
         
         # Loop over all combinations of v, s, and a
@@ -292,6 +336,7 @@ class toy_example (object):
         for v in range (self.NUM_OF_VNFs):
             for s in range (self.NUM_OF_SERVERS):
                 mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is s different than v's current location, this implies a mig'
+                list_of_ids = []
                 for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity allocations), which cause infinite comp' delay
                     denominator = a - self.theta_times_traffic_in[v] 
                     if (denominator <= 0): # skip too small values of a (capacity allocations), which cause infinite comp' delay
@@ -303,8 +348,9 @@ class toy_example (object):
                     #     continue 
                      
                     total_delay = comp_delay + 2 * self.servers_path_delay [s] [self.PoA_of_vnf[v]]
-                    if (total_delay > self.VM_target_delay[v]): # Too high perf' degradation
-                        continue
+                    # Check for per-VM target delay - currently unused
+                    # if (total_delay > self.VM_target_delay[v]): # Too high perf' degradation
+                    #     continue
                     
                     cost =  a
                     # To include the VM's target delay in the cost, unco
@@ -324,9 +370,19 @@ class toy_example (object):
                     
                     self.n.append (item)                
                     
+                    list_of_ids.append (id)
+                    
                     if (self.verbose == 1):
                         print (item)
                     id +=1 
+            
+                self.ids_of_y_vs.append ({'v' : v, 's' : s, 'ids' : list_of_ids})
+    
+
+        if (self.verbose == 1):
+            for item in self.ids_of_y_vs:
+                print (item)
+     
 
     def cost_single_VM_chain (self):
         cost = 0
@@ -406,12 +462,13 @@ class toy_example (object):
             print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
 
         self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
-#         self.gen_n()
-#         self.const_num = int(0)
-#         self.print_vars ()
-#         self.print_obj_function ()
-#         self.gen_c()
-#         self.gen_all_consts ()
+        self.gen_n()
+        self.const_num = int(0)
+        self.print_vars ()
+        self.print_obj_function ()
+        self.gen_p()
+        self.gen_all_consts ()
+        exit ()
         my_LP_file_parser = LP_file_parser ()
         my_LP_file_parser.parse_LP_file ('custom_tree.LP')
 #         self.brute_force_by_n ()

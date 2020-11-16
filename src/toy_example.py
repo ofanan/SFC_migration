@@ -8,7 +8,10 @@ from LP_file_parser import LP_file_parser
 
 class toy_example (object):
     
-    def custom_three_nodes_tree (self):
+    def gen_custom_three_nodes_tree (self):
+        """
+        generate a custom three-nodes tree (root and 2 leaves). 
+        """
         self.NUM_OF_SERVERS = 3
         self.NUM_OF_USERS = 2
         self.NUM_OF_PoA = 2
@@ -60,33 +63,24 @@ class toy_example (object):
 #         ]
 
         self.NUM_OF_LINKS = 4
-        self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
-        self.uniform_link_capacity  = 100
+        self.capacity_of_link       = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
         self.capacity_of_link[0][1] = self.uniform_link_capacity
         self.capacity_of_link[1][0] = self.uniform_link_capacity
         self.capacity_of_link[1][2] = self.uniform_link_capacity
         self.capacity_of_link[2][1] = self.uniform_link_capacity
-        self.cur_loc_of_vnf         = [2, 1]                  # cur_loc_of_vnf[v] will hold the id of the server currently hosting VNF v
-        self.cur_cpu_alloc_of_vnf   = [2, 1]
-        self.NUM_OF_CHAINS = self.NUM_OF_USERS
-       
-        # The Points of Accs will make the first rows in the path_costs matrix
-        self.PoA_of_user     = np.zeros (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.NUM_OF_CHAINS          = self.NUM_OF_USERS
+        self.PoA_of_user            = np.zeros (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
 
-    def gen_tree (self):
+    def gen_parameterized_tree (self):
         """
-        Create a new random edge and delete one of its current edge if del_orig is True.
-        param graph: networkx graph
-        param del_orig: bool
-        return: networkx graph
+        Generate a parameterized regular three-nodes tree (root and 2 leaves). 
         """
-        self.G = nx.generators.classic.balanced_tree (r=3, h=2) # Generate a tree of height h where each node has r children.
-        
-        self.NUM_OF_SERVERS = self.G.number_of_nodes()
-        self.NUM_OF_USERS   = 2
-        self.NUM_OF_PoA     = 2
+        self.G                  = nx.generators.classic.balanced_tree (r=3, h=2) # Generate a tree of height h where each node has r children.
+        self.NUM_OF_SERVERS     = self.G.number_of_nodes()
+        self.NUM_OF_USERS       = 2
+        self.NUM_OF_PoA         = 2
 
         self.servers_path_delay = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) # $$$ TBD: fix links' delay, and calc servers_path_delay accordingly
         self.servers_path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
@@ -94,7 +88,7 @@ class toy_example (object):
         shortest_path = nx.shortest_path(self.G)
 
         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
-        self.links_of_path = []
+        self.links_of_path      = []
         for s in range (self.NUM_OF_SERVERS):
             row_in_links_of_path = []
             for d in range (self.NUM_OF_SERVERS):
@@ -112,23 +106,102 @@ class toy_example (object):
         self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
         
         # Generate from each undiretional edge in the tree 2 directional edges. Assign all links capacity = self.uniform_link_capacity
+        self.list_of_links = []
         self.uniform_link_capacity   = 3
         for edge in self.G.edges:
             self.capacity_of_link[edge[0]][edge[1]] = self.uniform_link_capacity
             self.capacity_of_link[edge[1]][edge[0]] = self.uniform_link_capacity
+            self.list_of_links.append ([edge[0], edge[1]])
 
         self.NUM_OF_CHAINS = self.NUM_OF_USERS
        
         # The Points of Accs will make the first rows in the path_costs matrix
-        self.PoA_of_user     = [0,0] #np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
+        self.PoA_of_user            = [0,0] #np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
         
-        self.cur_loc_of_vnf         = np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
-        self.cur_cpu_alloc_of_vnf   = 2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
-        self.output_file            = open ("../larger_tree.res.txt", "a")
+        self.output_file            = open ("../param_tree.res", "a")
+        self.LP_output_file         = open ("../param_tree.LP", "a")
 
+    def __init__ (self, verbose = -1):
+        
+        self.verbose = verbose
+        self.uniform_link_capacity  = 100
+
+        use_custom_netw = True
+        if (use_custom_netw == True):
+            self.gen_custom_three_nodes_tree()
+        else:
+            self.gen_parameterized_tree()
+            
+        self.num_of_vnfs_in_chain   = np.ones (self.NUM_OF_USERS, dtype='uint8')
+        self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
+
+        self.cur_loc_of_vnf         = [2, 1] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
+
+        self.mig_cost               = np.ones (self.NUM_OF_SERVERS) # np.random.rand (self.NUM_OF_SERVERS)         
+        self.uniform_cpu_capacity   = 3
+        self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')     
+        self.theta                  = 0.5 * np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
+        self.traffic_in             = np.ones (self.NUM_OF_VNFs+1) #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). traffic_in[-1] will hold the user's input traffic, which is also the output traffic of the last VNF in the chain.
+        self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs-1]
+
+        self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
+        self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
+        # self.VM_target_delay           = 10 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta). Currently unused
+        # self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs). Currently unused
+        
+        # Calculate v^+ of each VNF v.
+        # vpp(v) will hold the idx of the next VNF in the same chain.
+        # if v is the last VNF in its chain, then vpp(v) will hold the PoA of this chain's user  
+        self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
+        self.v0                     = [] # self.v0 will hold a list of all the VNFs which are first in their chain
+        self.v_inf                  = [] # self.v_inf will hold a list of all the VNFs which are last in their chain
+        self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
+        v = 0
+        for chain in range (self.NUM_OF_CHAINS):
+            for idx_in_chain in range (self.num_of_vnfs_in_chain[chain]):
+                if (idx_in_chain == 0):
+                    self.v0.append(v)
+                if (idx_in_chain == self.num_of_vnfs_in_chain[chain]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
+                    self.v_inf.append (v)
+                    self.vpp [v] = self.PoA_of_user[chain]
+                else: # Not the last VM in the chain
+                    self.vpp [v] = v+1 
+                self.PoA_of_vnf [v] = self.PoA_of_user[chain]    
+                v += 1
+       
+        # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
+        # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
+        self.mig_bw         = 1.1 * np.ones (self.NUM_OF_VNFs)
+
+        self.min_cost = float ('inf')
+        self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
+        self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
+
+        if (self.verbose == 1):
+            print ('PoA = ', self.PoA_of_vnf)
+            print ('cur VM loc = ', self.cur_loc_of_vnf)
+            print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
+
+        self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
+        self.gen_n()
+        self.const_num = int(0)
+        self.print_vars ()
+        self.print_obj_function ()
+        self.gen_p()
+        self.gen_all_constraints ()
+        exit ()
+        my_LP_file_parser = LP_file_parser ()
+        my_LP_file_parser.parse_LP_file ('custom_tree.LP')
+#         self.brute_force_by_n ()
+#        printf (self.LP_output_file, '\nend;\n')
+        self.brute_force()
+        self.print_best_sol_as_LP ()
+        
     def calc_paths_of_links (self):
         """
-        Calculate for each link the paths in which this link appears
+        Given self.links_of_path (list of links which appear in each path), 
+        calculate self.paths_of_link (links of path in which each  link appears).
         """
         self.paths_of_link = [] #np.empty(shape = (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS), dtype = object)
         for link in self.list_of_links:
@@ -140,29 +213,82 @@ class toy_example (object):
             self.paths_of_link.append ({'link' : link, 'paths' : paths}) 
                         
                      
-    def gen_const_link_cap (self):
+    def gen_link_cap_constraints (self):
         """
         Print the constraints of maximum link's capacity in a LP format
         $$$ The func' isn't complete yet
         """
-        for link in self.list_of_links:
-            printf (self.LP_output_file, 'subject to max_link_bw_C{}: ' .format (self.const_num))
-            is_first_in_list = True
-            for list_of_paths_of_this_link in list (filter (lambda item : item['link'] == link, self.paths_of_link)):
-                for path in list_of_paths_of_this_link['paths']: # For each path (s, s') that uses this link
-                    for v in range (self.NUM_OF_VNFs):           # For each VM v
-                        if (path[0] == self.PoA_of_vnf[v]):       # if s == PoA(v), 
-                            for item in list (filter (lambda item  : item['v'] == v and item['s'] == s) ): # For each decision var' related which implies locating VM v on server s
-                                if (is_first_in_list): 
-                                    printf (self.LP_output_file, '{}*X{} ' .format (self.traffic_in[v], item['id']))
-                                    is_first_in_list = False
-                                else:
-                                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.traffic_in[v], item['id']))
-                                     
-                    print ('path ', path, ' uses link ', link)
-            self.const_num += 1
+        for l in self.list_of_links:
+            link_l_avail_bw = self.capacity_of_link[l]
+            list_of_decision_vars_in_this_eq = []
+            
+            for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
+                list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] # for each path (s, s') that uses the link l
+                print (list_of_paths_using_link_l)
+                exit ()
 
-    def gen_const_cpu_cap (self):
+            for v0 in self.v0: # for each VNF which is the first in its chain
+                for s in range(self.NUM_OF_SERVERS):
+                    if ( not( [self.PoA_of_vnf[v0], s] in list_of_paths_using_link_l)):
+                        continue
+                    
+                    # Now we know that the path from V0's PoA to s uses link l
+                    if (self.x[v0][s]): # if x[v][s] == 1, namely v0 is already located on server s 
+                        link_l_avail_bw -= self.traffic_in[v0]
+                    else: # x[v][s] == 0
+                         for id in self.ids_of_y_vs: 
+                             list_of_decision_vars_in_this_eq.append ({'id' : id, 'coef' : self.traffic_in[v0]})
+                             
+#             
+#             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
+#                 for path in list_of_paths_using_link_l['paths']: # for each path (s, s') that uses the link l
+#                     if (path[0] in self.PoA_of_vnf):  #if s==PoA of some VNF 
+#                         # = self.PoA_of_vnf.index(path[0]) # PoA(v) = s == path[0])
+#                         
+#                         for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+# 
+#                     print (path)
+#                 exit ()
+#                 for path in list_of_paths_of_this_link['paths']: # For each path (s, s') that uses this link
+#                     for v in range (self.NUM_OF_VNFs):           # For each VM v
+#                         if (path[0] == self.PoA_of_vnf[v]):       # if s == PoA(v), 
+            
+            
+#             for item in self.y: # for each decision var' related to server s
+#                 item['coef'] = 0
+
+            
+#             for v0 in self.v0: # for every VNF v which first in its chain
+#                 if l is in links_of_path [self.PoA_of_vnf[v0]][v0]]:
+#                 if l['link'] == [[self.PoA_of_vnf[v0] , v0]] 
+#                 
+#             
+#                             for item in list (filter (lambda item  : item['v'] == v and item['s'] == s) ): # For each decision var' related which implies locating VM v on server s
+#                                 if (is_first_in_list): 
+#                                     printf (self.LP_output_file, '{}*X{} ' .format (self.traffic_in[v], item['id']))
+#                                     is_first_in_list = False
+#                                 else:                                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.traffic_in[v], item['id']))
+#                                      
+# 
+# 
+#             
+#         for l in self.list_of_links:
+#             printf (self.LP_output_file, 'subject to max_link_bw_C{}: ' .format (self.const_num))
+#             is_first_in_list = True
+#             for list_of_paths_of_this_link in list (filter (lambda item : item['link'] == link, self.paths_of_link)):
+#                 for path in list_of_paths_of_this_link['paths']: # For each path (s, s') that uses this link
+#                     for v in range (self.NUM_OF_VNFs):           # For each VM v
+#                         if (path[0] == self.PoA_of_vnf[v]):       # if s == PoA(v), 
+#                             for item in list (filter (lambda item  : item['v'] == v and item['s'] == s) ): # For each decision var' related which implies locating VM v on server s
+#                                 if (is_first_in_list): 
+#                                     printf (self.LP_output_file, '{}*X{} ' .format (self.traffic_in[v], item['id']))
+#                                     is_first_in_list = False
+#                                 else:                                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.traffic_in[v], item['id']))
+#                                      
+#                     print ('path ', path, ' uses link ', link)
+#             self.const_num += 1
+
+    def gen_cpu_cap_constraints (self):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
         """
@@ -199,7 +325,7 @@ class toy_example (object):
 
 
 
-    def gen_const_single_alloc (self):
+    def gen_single_alloc_constraints (self):
         """
         Print the constraint of a single allocation for each VM in a LP format
         """
@@ -224,18 +350,18 @@ class toy_example (object):
         printf (self.LP_output_file, '\n')
 
 
-    def gen_all_consts (self):
+    def gen_all_constraints (self):
         """
         Generate all the constraints. 
         """
-        # self.gen_const_leq1 ()
-        # self.gen_const_single_alloc ()
-        self.gen_const_cpu_cap ()
-        # self.calc_paths_of_links ()
-#         self.gen_const_link_cap ()
+        # self.gen_leq1_constraints ()
+        # self.gen_single_alloc_constraints ()
+        # self.gen_cpu_cap_constraints ()
+        self.calc_paths_of_links ()
+        self.gen_link_cap_constraints ()
         
 
-    def gen_const_leq1 (self):
+    def gen_leq1_constraints (self):
         """
         Print the var' ranges constraints: each var should be <=1  
         """
@@ -261,7 +387,11 @@ class toy_example (object):
         printf (self.LP_output_file, ';\n')
     
     def gen_p (self):
-        
+        """
+        Generate self.p (present CPU allocation params) based on the values of self.cur_loc_of_vnf and self.cur_cpu_alloc_of_vnf
+        """
+
+        # Generate self.p (present CPU allocation params) as a copy of relevant fields in self.n (scheduled CPU location variables)         
         self.p = []
         for n_item in self.n:
             self.p.append ({'v'     : n_item['v'],
@@ -272,32 +402,34 @@ class toy_example (object):
                             })
          
          # Hard-code an initial allocation
-        tmp_list  = list (filter (lambda item : (item ['v'] == 0 and item ['s'] == 0 and item['a']==2) or
-                                                (item ['v'] == 1 and item ['s'] == 0 and item['a']==1)
-                                  , self.p))
-        for item in tmp_list:
-            item['val'] = 1  
+        for v in range (self.NUM_OF_VNFs):
+            tmp_list  = list (filter (lambda item : item ['v'] == v and item ['s'] == self.cur_loc_of_vnf[v] and item['a'] == self.cur_cpu_alloc_of_vnf, self.p))
+            for item in tmp_list:
+                item['val'] = 1  
+         
         
-        # Generate y
-        self.x = self.gen_loc_var_from_alloc_var (self.p)
-        for item in (self.x):
-            print (item)
+        # Generate x and y
+        self.gen_x_y ()
                 
     
-    def gen_loc_var_from_alloc_var (self, alloc_var):
+    def gen_x_y (self):
         """
-        Input: CPU allocation variable (p, or n)
-        Ouput: location variable (x, or y) 
+        Generate the location variable (x and y).
+        y are generated without specified value.  
+        x's values are generated based on the value of self.p
         """    
-        loc = []
+        self.x = - np.zeros (shape = (self.NUM_OF_VNFs, self.NUM_OF_SERVERS), dtype = bool) #[]
+        self.y = []
         for v in range (self.NUM_OF_VNFs):
             for s in range (self.NUM_OF_SERVERS):
-                tmp_list = list (filter (lambda item : item ['v'] == v and item['s'] == s, alloc_var))
-                loc.append ({'v' : v, 
-                             's' : s, 
-                             'val' : True if (sum (item['val'] for item in tmp_list)==1) else False}
-                             ) 
-        return loc
+                self.y.append ({'v' : v, 's' : s} ) 
+                tmp_list = list (filter (lambda item : item ['v'] == v and item['s'] == s, self.p))
+                if (sum (item['val'] for item in tmp_list)==1):
+                    self.x[v][s] = True
+#                 self.x.append ({'v' : v, 
+#                              's' : s, 
+#                              'val' : True if (sum (item['val'] for item in tmp_list)==1) else False}
+#                              ) 
             
     def calc_cost_by_n (self):
         """
@@ -399,77 +531,6 @@ class toy_example (object):
         print ('min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
             
 
-    def __init__ (self, verbose = -1):
-        
-        self.verbose = verbose
-        use_custom_netw = True
-        if (use_custom_netw == True):
-            self.custom_three_nodes_tree()
-        else:
-            self.gen_tree()
-                 
-        self.num_of_vnfs_in_chain   = np.ones (self.NUM_OF_USERS, dtype='uint8')
-        self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
-
-        self.mig_cost = np.ones (self.NUM_OF_SERVERS) # np.random.rand (self.NUM_OF_SERVERS)         
-        self.uniform_cpu_capacity   = 3
-        self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')     
-        self.max_cpu_capacity_of_server = max (self.cpu_capacity_of_server)  
-        self.theta                  = 0.5 * np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic ("\lambda_v")
-        self.theta_times_traffic_in = self.theta * self.traffic_in 
-
-        #self.traffic_out            = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic
-        self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-        self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
-        self.VM_target_delay           = 10 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta)
-        self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs)
-        
-        # Calculate v^+ of each VNF v.
-        # vpp(v) will hold the idx of the next VNF in the same chain.
-        # if v is the last VNF in its chain, then vpp(v) will hold the PoA of this chain's user  
-        self.vpp = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
-        v = 0
-        for chain in range (self.NUM_OF_CHAINS):
-            for idx_in_chain in range (self.num_of_vnfs_in_chain[chain]):
-                self.vpp [v] = v+1 if (idx_in_chain < self.num_of_vnfs_in_chain[chain]-1) else self.PoA_of_user[chain]
-                v += 1
-       
-        self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
-        v = 0
-        for chain in range (self.NUM_OF_CHAINS):
-            for __ in range (self.num_of_vnfs_in_chain[chain]):
-                self.PoA_of_vnf [v] = self.PoA_of_user[chain]
-                v += 1
-
-        # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
-        # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
-        self.mig_bw         = 1.1 * np.ones (self.NUM_OF_VNFs)
-
-        self.min_cost = float ('inf')
-        self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
-        self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-
-        if (self.verbose == 1):
-            print ('PoA = ', self.PoA_of_vnf)
-            print ('cur VM loc = ', self.cur_loc_of_vnf)
-            print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
-
-        self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
-        self.gen_n()
-        self.const_num = int(0)
-        self.print_vars ()
-        self.print_obj_function ()
-        self.gen_p()
-        self.gen_all_consts ()
-        exit ()
-        my_LP_file_parser = LP_file_parser ()
-        my_LP_file_parser.parse_LP_file ('custom_tree.LP')
-#         self.brute_force_by_n ()
-#        printf (self.LP_output_file, '\nend;\n')
-        self.brute_force()
-        self.print_best_sol_as_LP ()
-        
         
     def perf_degradation_not_last_vm (self, v, loc_v, loc_vpp, denominator):
         """

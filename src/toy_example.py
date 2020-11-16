@@ -166,23 +166,15 @@ class toy_example (object):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
         """
-        
+
+        printf (self.LP_output_file, '\n')        
         for s in range (self.NUM_OF_SERVERS):
+
+            # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
             for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
                 item['coef'] = item['a']
 
-                
-                # self.ids_of_y_vs
-            
-            
-            # Consider the CPU consumed by all VMs assigned to work on server s
-            #list_of_n_server_s = list (filter (lambda item:  item['s'] == s, self.n )) #list_of_n_server_s will hold all the decision variables related to server s1 
-            #list_of_p_server_s = list (filter (lambda item:  item['s'] == s, self.p )) #list_of_n_server_s will hold all the present-state parameters related to server s1 
-            
-            
-            
-             
-            # Consider the CPU consumed by all VMs that are assigned to migrate from this machine
+            # Consider the CPU consumed by all VMs that are currently assigned to servers (by p_{vsa} parameters)
             server_s_available_cap = self.cpu_capacity_of_server[s]
             for v in range (self.NUM_OF_VNFs):
                 if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
@@ -191,9 +183,11 @@ class toy_example (object):
                     for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
                         item['coef'] -= a_cur 
                         
+            # Print the data we have collected (all the non-zero coefficients)
             is_first_in_list = True
             for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
-                  
+                if (item['coef'] == 0):
+                    continue  
                 if (is_first_in_list):
                     printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.const_num, item['coef'], item['id']))
                     self.const_num += 1

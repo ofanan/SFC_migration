@@ -69,7 +69,7 @@ class toy_example (object):
         self.capacity_of_link[1][2] = self.uniform_link_capacity
         self.capacity_of_link[2][1] = self.uniform_link_capacity
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
-        self.PoA_of_user            = np.zeros (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user            = np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
 
@@ -183,7 +183,6 @@ class toy_example (object):
             print ('cur VM loc = ', self.cur_loc_of_vnf)
             print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
 
-        self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
         self.gen_n()
         self.const_num = int(0)
         self.print_vars ()
@@ -219,26 +218,40 @@ class toy_example (object):
         $$$ The func' isn't complete yet
         """
         for l in self.list_of_links:
-            link_l_avail_bw = self.capacity_of_link[l]
+            link_l_avail_bw = self.capacity_of_link[l[0], l[1]]
             list_of_decision_vars_in_this_eq = []
             
             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
-                list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] # for each path (s, s') that uses the link l
-                print (list_of_paths_using_link_l)
-                exit ()
+                list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] 
+                # print (list_of_paths_using_link_l)
 
             for v0 in self.v0: # for each VNF which is the first in its chain
                 for s in range(self.NUM_OF_SERVERS):
-                    if ( not( [self.PoA_of_vnf[v0], s] in list_of_paths_using_link_l)):
+                    if ( not( [self.PoA_of_vnf[v0], s] in list_of_paths_using_link_l)): # The path (PoA(v0), s) doesn't use link l
                         continue
                     
                     # Now we know that the path from V0's PoA to s uses link l
-                    if (self.x[v0][s]): # if x[v][s] == 1, namely v0 is already located on server s 
+                    if (self.x[v0][s]): # if x_{vs} == 1, namely v0 is already located on server s 
                         link_l_avail_bw -= self.traffic_in[v0]
                     else: # x[v][s] == 0
-                         for id in self.ids_of_y_vs: 
-                             list_of_decision_vars_in_this_eq.append ({'id' : id, 'coef' : self.traffic_in[v0]})
-                             
+                         for y_vs in list (filter (lambda item : item['v'] == v0 and item['s'] == s, self.ids_of_y_vs) ):
+                             for id in y_vs['ids']:                             
+                                 list_of_decision_vars_in_this_eq.append ({'id' : id, 'coef' : self.traffic_in[v0]})
+            
+            if (len(list_of_decision_vars_in_this_eq) == 0): #No one uses this link --> no constraints
+                continue
+            printf (self.LP_output_file, 'subject to link_cap_C{}: ' .format (self.const_num))
+            self.const_num += 1
+            for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
+                printf (self.LP_output_file, '{}*X{} + ' .format (
+                        list_of_decision_vars_in_this_eq[decision_var_idx]['coef'], 
+                        list_of_decision_vars_in_this_eq[decision_var_idx]['id']))
+            printf (self.LP_output_file, '{}*X{} <= {}\n' .format (
+                    list_of_decision_vars_in_this_eq[-1]['coef'], 
+                    list_of_decision_vars_in_this_eq[-1]['id'],
+                    link_l_avail_bw))
+            
+
 #             
 #             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
 #                 for path in list_of_paths_using_link_l['paths']: # for each path (s, s') that uses the link l
@@ -418,7 +431,7 @@ class toy_example (object):
         y are generated without specified value.  
         x's values are generated based on the value of self.p
         """    
-        self.x = - np.zeros (shape = (self.NUM_OF_VNFs, self.NUM_OF_SERVERS), dtype = bool) #[]
+        self.x = np.zeros (shape = (self.NUM_OF_VNFs, self.NUM_OF_SERVERS), dtype = bool) #[]
         self.y = []
         for v in range (self.NUM_OF_VNFs):
             for s in range (self.NUM_OF_SERVERS):

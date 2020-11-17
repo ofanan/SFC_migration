@@ -69,7 +69,7 @@ class toy_example (object):
         self.capacity_of_link[1][2] = self.uniform_link_capacity
         self.capacity_of_link[2][1] = self.uniform_link_capacity
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
-        self.PoA_of_user            = np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user            = np.zeros (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
 
@@ -142,8 +142,9 @@ class toy_example (object):
         self.uniform_cpu_capacity   = 3
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')     
         self.theta                  = 0.5 * np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = np.ones (self.NUM_OF_VNFs+1) #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). traffic_in[-1] will hold the user's input traffic, which is also the output traffic of the last VNF in the chain.
-        self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs-1]
+        self.traffic_in             = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
+        self.traffic_out_of_chain   = 2 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
+        self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
 
         self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
         self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
@@ -154,16 +155,16 @@ class toy_example (object):
         # vpp(v) will hold the idx of the next VNF in the same chain.
         # if v is the last VNF in its chain, then vpp(v) will hold the PoA of this chain's user  
         self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
-        self.v0                     = [] # self.v0 will hold a list of all the VNFs which are first in their chain
-        self.v_inf                  = [] # self.v_inf will hold a list of all the VNFs which are last in their chain
+        self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
+        self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
         v = 0
         for chain in range (self.NUM_OF_CHAINS):
             for idx_in_chain in range (self.num_of_vnfs_in_chain[chain]):
                 if (idx_in_chain == 0):
-                    self.v0.append(v)
+                    self.v0[chain] =v
                 if (idx_in_chain == self.num_of_vnfs_in_chain[chain]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
-                    self.v_inf.append (v)
+                    self.v_inf[chain] =v
                     self.vpp [v] = self.PoA_of_user[chain]
                 else: # Not the last VM in the chain
                     self.vpp [v] = v+1 
@@ -217,14 +218,16 @@ class toy_example (object):
         Print the constraints of maximum link's capacity in a LP format
         $$$ The func' isn't complete yet
         """
+        printf (self.LP_output_file, '\n')
         for l in self.list_of_links:
             link_l_avail_bw = self.capacity_of_link[l[0], l[1]]
             list_of_decision_vars_in_this_eq = []
+            list_of_coefs_in_this_eq         = []
             
             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
                 list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] 
-                # print (list_of_paths_using_link_l)
 
+            # Consider the BW from the PoA to the first VM in each chain
             for v0 in self.v0: # for each VNF which is the first in its chain
                 for s in range(self.NUM_OF_SERVERS):
                     if ( not( [self.PoA_of_vnf[v0], s] in list_of_paths_using_link_l)): # The path (PoA(v0), s) doesn't use link l
@@ -236,71 +239,60 @@ class toy_example (object):
                     else: # x[v][s] == 0
                          for y_vs in list (filter (lambda item : item['v'] == v0 and item['s'] == s, self.ids_of_y_vs) ):
                              for id in y_vs['ids']:                             
-                                 list_of_decision_vars_in_this_eq.append ({'id' : id, 'coef' : self.traffic_in[v0]})
+                                 list_of_decision_vars_in_this_eq.append (id) #({'id' : id, 'coef' : self.traffic_in[v0]})
+                                 list_of_coefs_in_this_eq.append         (self.traffic_in[v0])
             
+            # Consider the BW from the last VM in each chain to the PoA 
+            for chain in range (self.NUM_OF_CHAINS): # for each VNF which is the last in its chain
+                v_inf = self.v_inf[chain]
+                for s in range(self.NUM_OF_SERVERS):
+                    if ( not( [s, self.PoA_of_vnf[v_inf]] in list_of_paths_using_link_l)): # The path (s, PoA(v_inf)) doesn't use link l
+                        continue
+                    
+                    # Now we know that the path from s to v_inf's PoA uses link l
+                    traffic_out = self.traffic_out_of_chain [chain]
+                    if (self.x[v_inf][s]): # if x_{vs} == 1, namely v_inf is already located on server s 
+                        link_l_avail_bw -= traffic_out
+                    else: # x[v][s] == 0
+                         for y_vs in list (filter (lambda item : item['v'] == v_inf and item['s'] == s, self.ids_of_y_vs) ):
+                             for id in y_vs['ids']:               
+                                #list_of_decision_vars_in_this_eq.append ({'id' : id, 'coef' : traffic_out})
+                                list_of_decision_vars_in_this_eq.append (id) 
+                                list_of_coefs_in_this_eq.append         (self.traffic_out)
+
+
+            for v in range (self.NUM_OF_VNFs):
+                for mig_src in range (self.NUM_OF_SERVERS):
+                    for mig_dst in range (self.NUM_OF_SERVERS):
+                        
+                        if (mig_dst == mig_src or not ([mig_src, mig_dst] in list_of_paths_using_link_l) or self.x[v][s] == 0):
+                            continue
+                        
+                        for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == mig_dst, self.ids_of_y_vs) ):
+                            for id in y_vs['ids']:     
+                                if (id in list_of_decision_vars_in_this_eq): # Already seen, and wrote a coef', for this decision var, for this inequality
+                                    list_of_coefs_in_this_eq [list_of_decision_vars_in_this_eq.index(id)] += self.mig_cost[v] 
+                                else:
+                                    list_of_decision_vars_in_this_eq.append (id) 
+                                    list_of_coefs_in_this_eq.append         (self.mig_cost[v])
+                                    
+
+            # Print the constraint obtained for this link
             if (len(list_of_decision_vars_in_this_eq) == 0): #No one uses this link --> no constraints
                 continue
+            
             printf (self.LP_output_file, 'subject to link_cap_C{}: ' .format (self.const_num))
             self.const_num += 1
             for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
                 printf (self.LP_output_file, '{}*X{} + ' .format (
-                        list_of_decision_vars_in_this_eq[decision_var_idx]['coef'], 
-                        list_of_decision_vars_in_this_eq[decision_var_idx]['id']))
+                    list_of_decision_vars_in_this_eq [decision_var_idx], #['coef'], 
+                    list_of_coefs_in_this_eq         [decision_var_idx]))#['id']))
+                    
             printf (self.LP_output_file, '{}*X{} <= {}\n' .format (
-                    list_of_decision_vars_in_this_eq[-1]['coef'], 
-                    list_of_decision_vars_in_this_eq[-1]['id'],
+                    list_of_decision_vars_in_this_eq[-1],# ['coef'], 
+                    list_of_coefs_in_this_eq        [-1],# ['id'],
                     link_l_avail_bw))
             
-
-#             
-#             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
-#                 for path in list_of_paths_using_link_l['paths']: # for each path (s, s') that uses the link l
-#                     if (path[0] in self.PoA_of_vnf):  #if s==PoA of some VNF 
-#                         # = self.PoA_of_vnf.index(path[0]) # PoA(v) = s == path[0])
-#                         
-#                         for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
-# 
-#                     print (path)
-#                 exit ()
-#                 for path in list_of_paths_of_this_link['paths']: # For each path (s, s') that uses this link
-#                     for v in range (self.NUM_OF_VNFs):           # For each VM v
-#                         if (path[0] == self.PoA_of_vnf[v]):       # if s == PoA(v), 
-            
-            
-#             for item in self.y: # for each decision var' related to server s
-#                 item['coef'] = 0
-
-            
-#             for v0 in self.v0: # for every VNF v which first in its chain
-#                 if l is in links_of_path [self.PoA_of_vnf[v0]][v0]]:
-#                 if l['link'] == [[self.PoA_of_vnf[v0] , v0]] 
-#                 
-#             
-#                             for item in list (filter (lambda item  : item['v'] == v and item['s'] == s) ): # For each decision var' related which implies locating VM v on server s
-#                                 if (is_first_in_list): 
-#                                     printf (self.LP_output_file, '{}*X{} ' .format (self.traffic_in[v], item['id']))
-#                                     is_first_in_list = False
-#                                 else:                                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.traffic_in[v], item['id']))
-#                                      
-# 
-# 
-#             
-#         for l in self.list_of_links:
-#             printf (self.LP_output_file, 'subject to max_link_bw_C{}: ' .format (self.const_num))
-#             is_first_in_list = True
-#             for list_of_paths_of_this_link in list (filter (lambda item : item['link'] == link, self.paths_of_link)):
-#                 for path in list_of_paths_of_this_link['paths']: # For each path (s, s') that uses this link
-#                     for v in range (self.NUM_OF_VNFs):           # For each VM v
-#                         if (path[0] == self.PoA_of_vnf[v]):       # if s == PoA(v), 
-#                             for item in list (filter (lambda item  : item['v'] == v and item['s'] == s) ): # For each decision var' related which implies locating VM v on server s
-#                                 if (is_first_in_list): 
-#                                     printf (self.LP_output_file, '{}*X{} ' .format (self.traffic_in[v], item['id']))
-#                                     is_first_in_list = False
-#                                 else:                                    printf (self.LP_output_file, '+ {}*X{} ' .format (self.traffic_in[v], item['id']))
-#                                      
-#                     print ('path ', path, ' uses link ', link)
-#             self.const_num += 1
-
     def gen_cpu_cap_constraints (self):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
@@ -416,7 +408,7 @@ class toy_example (object):
          
          # Hard-code an initial allocation
         for v in range (self.NUM_OF_VNFs):
-            tmp_list  = list (filter (lambda item : item ['v'] == v and item ['s'] == self.cur_loc_of_vnf[v] and item['a'] == self.cur_cpu_alloc_of_vnf, self.p))
+            tmp_list  = list (filter (lambda item : item ['v'] == v and item ['s'] == self.cur_loc_of_vnf[v]  and item['a'] == self.cur_cpu_alloc_of_vnf[v], self.p))
             for item in tmp_list:
                 item['val'] = 1  
          

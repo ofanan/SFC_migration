@@ -135,7 +135,7 @@ class toy_example (object):
         self.num_of_vnfs_in_chain   = np.ones (self.NUM_OF_USERS, dtype='uint8')
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
-        self.cur_loc_of_vnf         = [2, 1] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_loc_of_vnf         = [0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
         self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_cost               = np.ones (self.NUM_OF_SERVERS) # np.random.rand (self.NUM_OF_SERVERS)         
@@ -173,7 +173,7 @@ class toy_example (object):
        
         # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
         # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
-        self.mig_bw         = 1.1 * np.ones (self.NUM_OF_VNFs)
+        self.mig_bw         = 10 * np.ones (self.NUM_OF_VNFs)
 
         self.min_cost = float ('inf')
         self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
@@ -194,7 +194,6 @@ class toy_example (object):
         my_LP_file_parser = LP_file_parser ()
         my_LP_file_parser.parse_LP_file ('custom_tree.LP')
 #         self.brute_force_by_n ()
-#        printf (self.LP_output_file, '\nend;\n')
         self.brute_force()
         self.print_best_sol_as_LP ()
         
@@ -258,20 +257,20 @@ class toy_example (object):
                              for id in y_vs['ids']:               
                                 #list_of_decision_vars_in_this_eq.append ({'id' : id, 'coef' : traffic_out})
                                 list_of_decision_vars_in_this_eq.append (id) 
-                                list_of_coefs_in_this_eq.append         (self.traffic_out)
+                                list_of_coefs_in_this_eq.append         (traffic_out)
 
-
+            # Consider the bw due to migrations
             for v in range (self.NUM_OF_VNFs):
                 for mig_src in range (self.NUM_OF_SERVERS):
                     for mig_dst in range (self.NUM_OF_SERVERS):
-                        
-                        if (mig_dst == mig_src or not ([mig_src, mig_dst] in list_of_paths_using_link_l) or self.x[v][s] == 0):
+                         
+                        if (mig_dst == mig_src or not ([mig_src, mig_dst] in list_of_paths_using_link_l) or self.x[v][mig_src] == 0):
                             continue
-                        
+                         
                         for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == mig_dst, self.ids_of_y_vs) ):
                             for id in y_vs['ids']:     
                                 if (id in list_of_decision_vars_in_this_eq): # Already seen, and wrote a coef', for this decision var, for this inequality
-                                    list_of_coefs_in_this_eq [list_of_decision_vars_in_this_eq.index(id)] += self.mig_cost[v] 
+                                    list_of_coefs_in_this_eq [list_of_decision_vars_in_this_eq.index(id)] += self.mig_bw[v] 
                                 else:
                                     list_of_decision_vars_in_this_eq.append (id) 
                                     list_of_coefs_in_this_eq.append         (self.mig_cost[v])
@@ -283,14 +282,17 @@ class toy_example (object):
             
             printf (self.LP_output_file, 'subject to link_cap_C{}: ' .format (self.const_num))
             self.const_num += 1
+            
+            list_of_coefs_in_this_eq = [list_of_coefs_in_this_eq[i] for i in np.argsort(list_of_decision_vars_in_this_eq)]
+            list_of_decision_vars_in_this_eq = np.sort (list_of_decision_vars_in_this_eq)
             for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
                 printf (self.LP_output_file, '{}*X{} + ' .format (
-                    list_of_decision_vars_in_this_eq [decision_var_idx], #['coef'], 
-                    list_of_coefs_in_this_eq         [decision_var_idx]))#['id']))
+                    list_of_coefs_in_this_eq         [decision_var_idx], #['coef'], 
+                    list_of_decision_vars_in_this_eq [decision_var_idx]))#['id']))
                     
-            printf (self.LP_output_file, '{}*X{} <= {}\n' .format (
-                    list_of_decision_vars_in_this_eq[-1],# ['coef'], 
-                    list_of_coefs_in_this_eq        [-1],# ['id'],
+            printf (self.LP_output_file, '{}*X{} <= {};\n' .format (
+                    list_of_coefs_in_this_eq            [-1],# ['coef'], 
+                    list_of_decision_vars_in_this_eq    [-1],# ['id'],
                     link_l_avail_bw))
             
     def gen_cpu_cap_constraints (self):
@@ -359,12 +361,13 @@ class toy_example (object):
         """
         Generate all the constraints. 
         """
-        # self.gen_leq1_constraints ()
-        # self.gen_single_alloc_constraints ()
-        # self.gen_cpu_cap_constraints ()
+        self.gen_leq1_constraints ()
+        self.gen_single_alloc_constraints ()
+        self.gen_cpu_cap_constraints ()
         self.calc_paths_of_links ()
         self.gen_link_cap_constraints ()
-        
+        printf (self.LP_output_file, '\nend;\n')
+
 
     def gen_leq1_constraints (self):
         """
@@ -503,7 +506,7 @@ class toy_example (object):
                     
                     list_of_ids.append (id)
                     
-                    if (self.verbose == 1):
+                    if (self.verbose == 2):
                         print (item)
                     id +=1 
             

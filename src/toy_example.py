@@ -19,9 +19,9 @@ class toy_example (object):
         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
         #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
         self.servers_path_delay  = [
-                                   [0, 1, 2],
-                                   [1, 0, 1],
-                                   [2, 1, 0]
+                                   [0, 10, 20],
+                                   [10, 0, 10],
+                                   [20, 10, 0]
                                   ]
     
         
@@ -69,7 +69,7 @@ class toy_example (object):
         self.capacity_of_link[1][2] = self.uniform_link_capacity
         self.capacity_of_link[2][1] = self.uniform_link_capacity
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
-        self.PoA_of_user            = np.zeros (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
 
@@ -158,17 +158,22 @@ class toy_example (object):
         self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
         self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
+
+        self.chain_target_delay     = 5 * np.ones (self.NUM_OF_CHAINS)
+        self.vnf_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
         v = 0
-        for chain in range (self.NUM_OF_CHAINS):
-            for idx_in_chain in range (self.num_of_vnfs_in_chain[chain]):
+        for chain_num in range (self.NUM_OF_CHAINS):
+            self.vnf_in_chain[chain_num] = []
+            for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
+                self.vnf_in_chain[chain_num].append (v)
                 if (idx_in_chain == 0):
-                    self.v0[chain] =v
-                if (idx_in_chain == self.num_of_vnfs_in_chain[chain]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
-                    self.v_inf[chain] =v
-                    self.vpp [v] = self.PoA_of_user[chain]
+                    self.v0[chain_num] = v 
+                if (idx_in_chain == self.num_of_vnfs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
+                    self.v_inf[chain_num] =v
+                    self.vpp [v] = self.PoA_of_user[chain_num]
                 else: # Not the last VM in the chain
                     self.vpp [v] = v+1 
-                self.PoA_of_vnf [v] = self.PoA_of_user[chain]    
+                self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
                 v += 1
        
         # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
@@ -212,10 +217,61 @@ class toy_example (object):
             self.paths_of_link.append ({'link' : link, 'paths' : paths}) 
                         
                      
+    def gen_chain_delay_constraints (self):
+        """
+        Print the constraints of maximum delay of each chain in a LP format
+        """
+        printf (self.LP_output_file, '\n')
+        for chain_num in range (self.NUM_OF_CHAINS):
+            list_of_decision_vars_in_this_eq = []
+            list_of_coefs_in_this_eq         = []            
+ 
+            for v in self.vnf_in_chain[chain_num]:
+                for s in range (self.NUM_OF_SERVERS):
+                    for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
+                        for id in y_vs['ids']: # for each relevant decision var'                             
+                            list_of_decision_vars_in_this_eq.append (id) # Add this n_{vsa} decision var to the list of decision vars used in this constraint
+                            
+                            # Extract the comp' delay implied by this decision var
+                            for n_vsa in list (filter (lambda item : item['id'] == id, self.n)):
+                                list_of_coefs_in_this_eq.append (n_vsa['comp delay'])
+                                
+                if (v == self.v0[chain_num]): # v is the first VNF in this chain
+                    for s in range (self.NUM_OF_SERVERS):
+                        for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
+                            for id in y_vs['ids']: 
+                                list_of_coefs_in_this_eq [list_of_decision_vars_in_this_eq.index(id)] += self.servers_path_delay[self.PoA_of_vnf[v]][s] 
+                     
+                if (v == self.v_inf[chain_num]): # v is the first VNF in this chain
+                    for s in range (self.NUM_OF_SERVERS):
+                        for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
+                            for id in y_vs['ids']: 
+                                list_of_coefs_in_this_eq [list_of_decision_vars_in_this_eq.index(id)] += self.servers_path_delay[s][self.PoA_of_vnf[v]] 
+
+            # Print the constraint obtained for this chain
+            printf (self.LP_output_file, 'subject to chain_delay_C{}: ' .format (self.const_num))
+
+            # For convenience, order the decision vars to appear in an increasing ID # order            
+            list_of_coefs_in_this_eq = [list_of_coefs_in_this_eq[i] for i in np.argsort(list_of_decision_vars_in_this_eq)]
+            list_of_decision_vars_in_this_eq = np.sort (list_of_decision_vars_in_this_eq)
+            self.const_num += 1
+            for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
+                printf (self.LP_output_file, '{:.4f}*X{} + ' .format (
+                    list_of_coefs_in_this_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_this_eq [decision_var_idx]))
+                     
+            # Print the constraint obtained for this link
+            if (len(list_of_decision_vars_in_this_eq) == 0): #No one uses this link --> no constraints
+                continue
+
+            printf (self.LP_output_file, '{:.4f}*X{} <= {};\n' .format (
+                    list_of_coefs_in_this_eq            [-1],
+                    list_of_decision_vars_in_this_eq    [-1],
+                    self.chain_target_delay [chain_num]))
+            
     def gen_link_cap_constraints (self):
         """
         Print the constraints of maximum link's capacity in a LP format
-        $$$ The func' isn't complete yet
         """
         printf (self.LP_output_file, '\n')
         for l in self.list_of_links:
@@ -282,7 +338,8 @@ class toy_example (object):
             
             printf (self.LP_output_file, 'subject to link_cap_C{}: ' .format (self.const_num))
             self.const_num += 1
-            
+
+            # For convenience, order the decision vars to appear in an increasing ID # order            
             list_of_coefs_in_this_eq = [list_of_coefs_in_this_eq[i] for i in np.argsort(list_of_decision_vars_in_this_eq)]
             list_of_decision_vars_in_this_eq = np.sort (list_of_decision_vars_in_this_eq)
             for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
@@ -366,6 +423,7 @@ class toy_example (object):
         self.gen_cpu_cap_constraints ()
         self.calc_paths_of_links ()
         self.gen_link_cap_constraints ()
+        self.gen_chain_delay_constraints ()
         printf (self.LP_output_file, '\nend;\n')
 
 

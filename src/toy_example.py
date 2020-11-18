@@ -72,6 +72,7 @@ class toy_example (object):
         self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
+        self.py_output_file         = open ("../res/Check_LP_sol.py", "a")
 
     def gen_parameterized_tree (self):
         """
@@ -217,6 +218,34 @@ class toy_example (object):
             self.paths_of_link.append ({'link' : link, 'paths' : paths}) 
                         
                      
+    def gen_all_constraints (self):
+        """
+        Generate all the constraints. 
+        """
+        self.return_false_str = '):\n\t\treturn False'
+        self.gen_leq1_constraints ()
+        self.gen_single_alloc_constraints ()
+        self.gen_cpu_cap_constraints ()
+        self.calc_paths_of_links ()
+        self.gen_link_cap_constraints ()
+        self.gen_chain_delay_constraints ()
+        printf (self.LP_output_file, '\nend;\n')
+        printf (self.py_output_file, '\n\n\treturn True\n')
+
+
+    def gen_leq1_constraints (self):
+        """
+        Print the var' ranges constraints: each var should be <=1  
+        """
+        printf (self.LP_output_file, '\n') 
+        for __ in self.n:
+            #self.constraint.append()
+            printf (self.LP_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
+            printf (self.py_output_file, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
+            self.const_num += 1
+        printf (self.LP_output_file, '\n')
+
+    
     def gen_chain_delay_constraints (self):
         """
         Print the constraints of maximum delay of each chain in a LP format
@@ -250,13 +279,18 @@ class toy_example (object):
 
             # Print the constraint obtained for this chain
             printf (self.LP_output_file, 'subject to chain_delay_C{}: ' .format (self.const_num))
+            printf (self.py_output_file, '\tif (')
 
             # For convenience, order the decision vars to appear in an increasing ID # order            
             list_of_coefs_in_this_eq = [list_of_coefs_in_this_eq[i] for i in np.argsort(list_of_decision_vars_in_this_eq)]
             list_of_decision_vars_in_this_eq = np.sort (list_of_decision_vars_in_this_eq)
+            
             self.const_num += 1
             for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
                 printf (self.LP_output_file, '{:.4f}*X{} + ' .format (
+                    list_of_coefs_in_this_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_this_eq [decision_var_idx]))
+                printf (self.py_output_file, '{:.4f}*X[{}] + ' .format (
                     list_of_coefs_in_this_eq         [decision_var_idx],  
                     list_of_decision_vars_in_this_eq [decision_var_idx]))
                      
@@ -265,6 +299,10 @@ class toy_example (object):
                 continue
 
             printf (self.LP_output_file, '{:.4f}*X{} <= {};\n' .format (
+                    list_of_coefs_in_this_eq            [-1],
+                    list_of_decision_vars_in_this_eq    [-1],
+                    self.chain_target_delay [chain_num]))
+            printf (self.py_output_file, '{:.4f}*X[{}] > {}):\n\t\treturn False\n\n' .format (
                     list_of_coefs_in_this_eq            [-1],
                     list_of_decision_vars_in_this_eq    [-1],
                     self.chain_target_delay [chain_num]))
@@ -337,6 +375,7 @@ class toy_example (object):
                 continue
             
             printf (self.LP_output_file, 'subject to link_cap_C{}: ' .format (self.const_num))
+            printf (self.py_output_file, '\tif (')
             self.const_num += 1
 
             # For convenience, order the decision vars to appear in an increasing ID # order            
@@ -344,11 +383,18 @@ class toy_example (object):
             list_of_decision_vars_in_this_eq = np.sort (list_of_decision_vars_in_this_eq)
             for decision_var_idx in range (len(list_of_decision_vars_in_this_eq)-1): 
                 printf (self.LP_output_file, '{}*X{} + ' .format (
-                    list_of_coefs_in_this_eq         [decision_var_idx], #['coef'], 
-                    list_of_decision_vars_in_this_eq [decision_var_idx]))#['id']))
+                    list_of_coefs_in_this_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_this_eq [decision_var_idx]))
+                printf (self.py_output_file, '{}*X[{}] + ' .format (
+                    list_of_coefs_in_this_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_this_eq [decision_var_idx]))
                     
             printf (self.LP_output_file, '{}*X{} <= {};\n' .format (
-                    list_of_coefs_in_this_eq            [-1],# ['coef'], 
+                    list_of_coefs_in_this_eq            [-1],
+                    list_of_decision_vars_in_this_eq    [-1],# ['id'],
+                    link_l_avail_bw))
+            printf (self.py_output_file, '{}*X[{}] > {}):\n\t\treturn False\n\n' .format (
+                    list_of_coefs_in_this_eq            [-1],
                     list_of_decision_vars_in_this_eq    [-1],# ['id'],
                     link_l_avail_bw))
             
@@ -380,11 +426,14 @@ class toy_example (object):
                     continue  
                 if (is_first_in_list):
                     printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.const_num, item['coef'], item['id']))
+                    printf (self.py_output_file, '\tif ({}*X[{}] ' .format (item['coef'], item['id']))
                     self.const_num += 1
                     is_first_in_list = False
                 else: 
                     printf (self.LP_output_file, '+ {}*X{} ' .format (item['coef'], item['id']))
+                    printf (self.py_output_file, '+ {}*X[{}] ' .format (item['coef'], item['id']))
             printf (self.LP_output_file, ' <= {};\n' .format (server_s_available_cap))
+            printf (self.py_output_file, ' > {}):\n\t\treturn False\n\n' .format (server_s_available_cap))
 
 
 
@@ -397,13 +446,17 @@ class toy_example (object):
         for item in self.n:
             if (item['v'] == v): #Already seen decision var' related to this VM
                 printf (self.LP_output_file, '+ X{}' .format (item['id']))
+                printf (self.py_output_file, '+ X[{}]' .format (item['id']))
             else: # First time observing decision var' related to this VM
                 if (v > -1):
                     printf (self.LP_output_file, ' = 1;\n' )
+                    printf (self.py_output_file, ' == 1)):\n\t\treturn False\n' )
                 printf (self.LP_output_file, 'subject to single_alloc_C{}:   X{} ' .format (self.const_num, item['id'])) 
+                printf (self.py_output_file, '\tif (not (X[{}] ' .format (item['id']))
                 v = item['v']
             self.const_num += 1
         printf (self.LP_output_file, ' = 1;\n\n' )
+        printf (self.py_output_file, ' == 1)):\n\t\treturn False\n\n' )
                
     def print_vars (self):
         """
@@ -414,31 +467,6 @@ class toy_example (object):
         printf (self.LP_output_file, '\n')
 
 
-    def gen_all_constraints (self):
-        """
-        Generate all the constraints. 
-        """
-        self.gen_leq1_constraints ()
-        self.gen_single_alloc_constraints ()
-        self.gen_cpu_cap_constraints ()
-        self.calc_paths_of_links ()
-        self.gen_link_cap_constraints ()
-        self.gen_chain_delay_constraints ()
-        printf (self.LP_output_file, '\nend;\n')
-
-
-    def gen_leq1_constraints (self):
-        """
-        Print the var' ranges constraints: each var should be <=1  
-        """
-        printf (self.LP_output_file, '\n') 
-        for __ in self.n:
-            #self.constraint.append()
-            printf (self.LP_output_file, 'subject to X_leq1_C{}: X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
-            self.const_num += 1
-        printf (self.LP_output_file, '\n')
-
-    
     def print_obj_function (self):
         """
         Print the objective function in a standard LP form (linear combination of the decision variables)

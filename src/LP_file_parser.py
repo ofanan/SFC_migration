@@ -10,8 +10,6 @@ class LP_file_parser (object):
         for item in filtered:
             print (item)
         
-#         for item in (fiter (None, lin_comb_string.split(" [,+-]")):
-#             print (item)
     
     
     def parse_line (self, line):
@@ -23,6 +21,8 @@ class LP_file_parser (object):
             op = '='
             if (len (constraint_string_split_lt)==2):                
                 op = '<='
+            else:
+                opt = '='
                 self.parse_lin_comb(constraint_string_split_lt[0])
                 print ('******')
         elif (splitted_line[0] == 'minimize' and splitted_line[1] == 'z:'):
@@ -30,6 +30,9 @@ class LP_file_parser (object):
 
     
     def parse_LP_file (self, input_file_name):
+        """
+        Parse a file of a LP format. Extract the constraints.
+        """
         
         self.input_file  = open ("../res/" + input_file_name,  "r")
         # self.output_file = open ("../res/" + input_file_name.split(".")[0] + ".dat", "a")  
@@ -38,6 +41,7 @@ class LP_file_parser (object):
 
         self.cost_func   = []
         self.constraints = []
+        self.const_num   = 0
     
     
         for line in lines:

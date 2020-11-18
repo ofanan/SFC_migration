@@ -5,6 +5,7 @@ import itertools
 
 from printf import printf
 from LP_file_parser import LP_file_parser
+from Check_LP_sol import Check_LP_sol
 
 class toy_example (object):
     
@@ -18,11 +19,11 @@ class toy_example (object):
     
         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
         #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
-        self.servers_path_delay  = [
-                                   [0, 10, 20],
-                                   [10, 0, 10],
-                                   [20, 10, 0]
-                                  ]
+        self.servers_path_delay  = self.uniformm_link_delay * np.array ([
+                                   [0, 1, 2],
+                                   [1, 0, 1],
+                                   [2, 1, 0]
+                                  ]) 
     
         
         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
@@ -72,6 +73,7 @@ class toy_example (object):
         self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file         = open ("../res/custom_tree.LP", "a")
+        self.cfg_output_file         = open ("../res/custom_tree.cfg", "a")
         self.py_output_file         = open ("../res/Check_LP_sol.py", "a")
 
     def gen_parameterized_tree (self):
@@ -108,7 +110,6 @@ class toy_example (object):
         
         # Generate from each undiretional edge in the tree 2 directional edges. Assign all links capacity = self.uniform_link_capacity
         self.list_of_links = []
-        self.uniform_link_capacity   = 3
         for edge in self.G.edges:
             self.capacity_of_link[edge[0]][edge[1]] = self.uniform_link_capacity
             self.capacity_of_link[edge[1]][edge[0]] = self.uniform_link_capacity
@@ -125,7 +126,9 @@ class toy_example (object):
     def __init__ (self, verbose = -1):
         
         self.verbose = verbose
-        self.uniform_link_capacity  = 100
+        self.uniform_link_capacity  = 10
+        self.uniform_cpu_capacity   = 3
+        self.uniformm_link_delay    = 10
 
         use_custom_netw = True
         if (use_custom_netw == True):
@@ -140,7 +143,6 @@ class toy_example (object):
         self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_cost               = np.ones (self.NUM_OF_SERVERS) # np.random.rand (self.NUM_OF_SERVERS)         
-        self.uniform_cpu_capacity   = 3
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')     
         self.theta                  = 0.5 * np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
         self.traffic_in             = np.ones (self.NUM_OF_VNFs) #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
@@ -186,20 +188,24 @@ class toy_example (object):
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
 
         if (self.verbose == 1):
-            print ('PoA = ', self.PoA_of_vnf)
-            print ('cur VM loc = ', self.cur_loc_of_vnf)
-            print ('cur CPU alloc = ', self.cur_cpu_alloc_of_vnf)
-
+            printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_vnf))
+            printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
+            printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
+            printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
+            printf (self.cfg_output_file, 'lambda_v = {}\n' .format (self.traffic_in))
+            printf (self.cfg_output_file, 'uniform cpu capacities = {}\n' .format (self.uniform_cpu_capacity))
+            printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
+            printf (self.cfg_output_file, 'traffic back to user = {}\n' .format (self.traffic_out_of_chain))
+            printf (self.cfg_output_file, 'path delay = {}\n' .format (self.servers_path_delay))
+            
         self.gen_n()
         self.const_num = int(0)
         self.print_vars ()
         self.print_obj_function ()
         self.gen_p()
         self.gen_all_constraints ()
+        self.brute_force_by_n ()
         exit ()
-        my_LP_file_parser = LP_file_parser ()
-        my_LP_file_parser.parse_LP_file ('custom_tree.LP')
-#         self.brute_force_by_n ()
         self.brute_force()
         self.print_best_sol_as_LP ()
         
@@ -593,15 +599,16 @@ class toy_example (object):
                     list_of_ids.append (id)
                     
                     if (self.verbose == 2):
-                        print (item)
+                        printf (self.cfg_output_file, item)
                     id +=1 
             
                 self.ids_of_y_vs.append ({'v' : v, 's' : s, 'ids' : list_of_ids})
     
 
         if (self.verbose == 1):
+            printf (self.cfg_output_file, 'self.n =\n')
             for item in self.ids_of_y_vs:
-                print (item)
+                printf (self.cfg_output_file, '{}\n' .format (item))
      
 
     def cost_single_VM_chain (self):
@@ -616,13 +623,15 @@ class toy_example (object):
     def brute_force_by_n (self):
         self.min_cost = float ('inf')
         for self.sol in itertools.product ([0,1],repeat = len (self.n)):
-#              if (!(is_feasible())):
-#                  continue
-             cost = self.cost_single_VM_chain ()
-             if (cost < self.min_cost):
-                 self.min_cost = cost
-                 self.best_n = sol
-        print ('min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
+            if ( not (Check_LP_sol (self.sol)) ):
+                continue
+            cost = self.cost_single_VM_chain ()
+            if (cost < self.min_cost):
+                self.min_cost = cost
+                self.best_n = sol
+        printf (self.cfg_output_file, 'min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
+#             if (!(Check_LP_sol(self.sol))):
+#                 continue
             
 
         

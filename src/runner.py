@@ -4,7 +4,7 @@ from toy_example import toy_example
 from LP_file_parser import LP_file_parser
 from Check_LP_sol import Check_LP_sol
 
-run_toy = False
+run_toy = True
 if (run_toy):
     my_toy_example = toy_example (verbose = 1)
 else:

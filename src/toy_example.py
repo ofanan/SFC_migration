@@ -5,8 +5,8 @@ import itertools
 
 from printf import printf
 from LP_file_parser import LP_file_parser
-from Check_LP_sol import Check_LP_sol
-from obj_func import obj_func
+import Check_sol
+import obj_func
 
 class toy_example (object):
     
@@ -72,11 +72,11 @@ class toy_example (object):
         self.capacity_of_link[2][1] = self.uniform_link_capacity
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
-        self.output_file            = open ("../res/custom_tree.res", "a")
-        self.LP_output_file         = open ("../res/custom_tree.LP", "a")
-        self.cfg_output_file         = open ("../res/custom_tree.cfg", "a")
-        self.LP_const_output_file    = open ("../res/Check_LP_sol.py", "a")
-        self.LP_obj_func_output_file = open ("../res/obj_func.py", "a")
+        self.res_output_file            = open ("../res/custom_tree.res", "a")
+        self.LP_output_file             = open ("../res/custom_tree.LP", "a")
+        self.cfg_output_file            = open ("../res/custom_tree.cfg", "a")
+        self.LP_const_output_file       = open ("Check_sol.py", "a")
+        self.LP_obj_func_output_file    = open ("obj_func.py", "a")
 
     def gen_parameterized_tree (self):
         """
@@ -122,9 +122,6 @@ class toy_example (object):
         # The Points of Accs will make the first rows in the path_costs matrix
         self.PoA_of_user            = [0,0] #np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
         
-        self.output_file            = open ("../param_tree.res", "a")
-        self.LP_output_file         = open ("../param_tree.LP", "a")
-
     def __init__ (self, verbose = -1):
         
         self.verbose = verbose
@@ -235,7 +232,8 @@ class toy_example (object):
         """
         Generate all the constraints. 
         """
-        self.return_false_str = '):\n\t\treturn False'
+        printf (self.LP_const_output_file, 'def Check_sol (X):\n')
+        printf (self.LP_const_output_file, '\t"""\n\tCheck whether a solution for the LP problem satisfies all the constraints\n\t"""\n')
         self.gen_leq1_constraints ()
         self.gen_single_alloc_constraints ()
         self.gen_cpu_cap_constraints ()
@@ -250,7 +248,6 @@ class toy_example (object):
         """
         Print the var' ranges constraints: each var should be <=1  
         """
-        printf (self.LP_output_file, '\n') 
         for __ in self.n:
             #self.constraint.append()
             printf (self.LP_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n' .format (self.const_num, __['id'], __['id']) )
@@ -485,7 +482,8 @@ class toy_example (object):
         Print the objective function in a standard LP form (linear combination of the decision variables)
         """
         printf (self.LP_output_file, 'minimize z:   ')
-        printf (self.LP_obj_func_output_file, 'return ')
+        printf (self.LP_obj_func_output_file, 'def obj_func (X):\n')
+        printf (self.LP_obj_func_output_file, '\t"""\n\tCalculate the objective function, given a feasible solution.\n\t"""\n\treturn ')
         is_first_item = True
         for item in self.n:
             if (not (is_first_item)):
@@ -634,9 +632,9 @@ class toy_example (object):
     def brute_force_by_n (self):
         self.min_cost = float ('inf')
         for sol in itertools.product ([0,1],repeat = len (self.n)):
-            if ( not (Check_LP_sol (sol)) ):
+            if ( not (Check_sol.Check_sol (sol)) ):
                 continue
-            cost = obj_func (sol)
+            cost = obj_func.obj_func (sol)
             if (cost < self.min_cost):
                 self.min_cost = cost
                 self.best_n = sol
@@ -645,8 +643,6 @@ class toy_example (object):
             return
         printf (self.cfg_output_file, 'min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
         print ('min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
-#             if (!(Check_LP_sol(self.sol))):
-#                 continue
             
 
         
@@ -747,11 +743,11 @@ class toy_example (object):
         """
         Translate the best sol' obtained by brute-force to n_vsa's decision variables
         """
-        printf (self.output_file, '\nSet X in the LP are:\n')
+        printf (self.res_output_file, '\nSet X in the LP are:\n')
         n = []
         for v in range (self.NUM_OF_VNFs):             
             for item in list (filter (lambda item : item['v'] == v and item['s'] == self.best_nxt_loc_of_vnf[v] and item['a'] == self.best_nxt_cpu_alloc_of_vnf[v], self.n)):
-                printf (self.output_file, 'X{}, ' .format (item['id']))
+                printf (self.res_output_file, 'X{}, ' .format (item['id']))
     
     def brute_force (self):    
         self.nxt_loc_of_vnf = np.zeros(self.NUM_OF_VNFs, dtype = 'uint8')
@@ -764,11 +760,11 @@ class toy_example (object):
                 
                 if (self.is_feasible()):
                     self.calc_beta (self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf)
-                    printf (self.output_file, 'beta = \n{}\nCost = {:.4}\n\n' .format (self.beta, self.cost ()))
-                    # printf (self.output_file, 'cost by n = {:.4}\n\n' .format (self.calc_cost_by_n()))
+                    printf (self.res_output_file, 'beta = \n{}\nCost = {:.4}\n\n' .format (self.beta, self.cost ()))
+                    # printf (self.res_output_file, 'cost by n = {:.4}\n\n' .format (self.calc_cost_by_n()))
                 
                 self.nxt_cpu_alloc_of_vnf = self.inc_array (self.nxt_cpu_alloc_of_vnf, 2, self.uniform_cpu_capacity)
             self.nxt_loc_of_vnf = self.inc_array(self.nxt_loc_of_vnf, 0, self.NUM_OF_SERVERS-1)
         self.calc_beta (self.best_nxt_loc_of_vnf, self.best_nxt_cpu_alloc_of_vnf)
-        printf (self.output_file, '\nBest solution is:\nbeta = \n{}\nCost = {:.4}\n\n' .format (self.beta, self.min_cost))
+        printf (self.res_output_file, '\nBest solution is:\nbeta = \n{}\nCost = {:.4}\n\n' .format (self.beta, self.min_cost))
 

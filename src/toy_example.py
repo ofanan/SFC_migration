@@ -14,10 +14,7 @@ class toy_example (object):
         """
         generate a custom three-nodes tree (root and 2 leaves). 
         """
-        self.NUM_OF_SERVERS = 3
-        self.NUM_OF_USERS = 1
-        self.NUM_OF_PoA = 1
-    
+  
         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
         #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
         self.servers_path_delay  = self.uniform_link_delay * np.array ([
@@ -64,14 +61,17 @@ class toy_example (object):
 #             ]
 #         ]
 
-        self.NUM_OF_LINKS = 4
-        self.capacity_of_link       = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
-        self.capacity_of_link[0][1] = self.uniform_link_capacity
-        self.capacity_of_link[1][0] = self.uniform_link_capacity
-        self.capacity_of_link[1][2] = self.uniform_link_capacity
-        self.capacity_of_link[2][1] = self.uniform_link_capacity
-        self.NUM_OF_CHAINS          = self.NUM_OF_USERS
-        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.NUM_OF_SERVERS             = 3
+        self.NUM_OF_USERS               = 1
+        self.NUM_OF_PoA                 = 1
+        self.NUM_OF_LINKS               = 4
+        self.capacity_of_link           = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
+        self.capacity_of_link[0][1]     = self.uniform_link_capacity
+        self.capacity_of_link[1][0]     = self.uniform_link_capacity
+        self.capacity_of_link[1][2]     = self.uniform_link_capacity
+        self.capacity_of_link[2][1]     = self.uniform_link_capacity
+        self.NUM_OF_CHAINS              = self.NUM_OF_USERS
+        self.PoA_of_user                = [0] #2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.res_output_file            = open ("../res/custom_tree.res", "a")
         self.LP_output_file             = open ("../res/custom_tree.LP", "a")
         self.cfg_output_file            = open ("../res/custom_tree.cfg", "a")
@@ -117,17 +117,16 @@ class toy_example (object):
             self.capacity_of_link[edge[1]][edge[0]] = self.uniform_link_capacity
             self.list_of_links.append ([edge[0], edge[1]])
 
-        self.NUM_OF_CHAINS = self.NUM_OF_USERS
        
         # The Points of Accs will make the first rows in the path_costs matrix
         self.PoA_of_user            = [0,0] #np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) #[0,0]
         
     def __init__ (self, verbose = -1):
         
-        self.verbose = verbose
+        self.verbose                = verbose
         self.uniform_link_capacity  = 10
         self.uniform_cpu_capacity   = 3
-        self.uniform_link_delay    = 2
+        self.uniform_link_delay     = 2
 
         use_custom_netw = True
         if (use_custom_netw == True):
@@ -136,6 +135,7 @@ class toy_example (object):
             self.gen_parameterized_tree()
             
         self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
+        self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
         self.cur_loc_of_vnf         = [0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
@@ -159,6 +159,7 @@ class toy_example (object):
         self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
         self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
         self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
+        self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
 
         self.chain_target_delay     = 10 * np.ones (self.NUM_OF_CHAINS)
@@ -174,6 +175,7 @@ class toy_example (object):
                     self.v_inf[chain_num] = v
                     self.vpp [v] = self.PoA_of_user[chain_num]
                 else: # Not the last VM in the chain
+                    self.v_not_inf.append(v)
                     self.vpp [v] = v+1 
                 self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
                 v += 1
@@ -264,8 +266,8 @@ class toy_example (object):
         for chain_num in range (self.NUM_OF_CHAINS):
             list_of_decision_vars_in_lin_eq  = [] # The decision vars that will appear in the relevant lin' constraint 
             list_of_coefs_in_lin_eq          = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
-            first_decision_vars_in_mult_eq   = [] # The decision vars that will appear in the relevant lin' constraint 
-            scnd_decision_vars_in_mult_eq    = [] # The decision vars that will appear in the relevant lin' constraint 
+            first_decision_vars_in_mult_eq   = [] # The first decision vars that will appear in the relevant multiplicative constraint 
+            scnd_decision_vars_in_mult_eq    = [] # The scnd decision vars that will appear in the relevant multiplicative constraint
             list_of_coefs_in_mult_eq         = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
  
             for v in self.vnf_in_chain[chain_num]:
@@ -300,19 +302,19 @@ class toy_example (object):
                 
                 # Now we know that v isn't the last in its chain --> add the delay from v to vpp
                 vpp = self.vpp[v]
-                for sv in range (self.NUM_OF_SERVERS): # for every possible location of v
-                    for svpp in range (self.NUM_OF_SERVERS): # for every possible location of vpp (the next VM in the chain)
-                        if (sv == svpp): # if v and vpp are scheduled to the same server, no netw' delay between them
+                for s in range (self.NUM_OF_SERVERS): # for every possible location of v
+                    for s_prime in range (self.NUM_OF_SERVERS): # for every possible location of vpp (the next VM in the chain)
+                        if (s == s_prime): # if v and vpp are scheduled to the same server, no netw' delay between them
                             continue
                         
-                        for y_sv in list (filter (lambda item : item['v'] == v and item['s'] == sv, self.ids_of_y_vs) ):
-                            for id_v in y_sv['ids']:     
-                                for y_svpp in list (filter (lambda item : item['v'] == vpp and item['s'] == svpp, self.ids_of_y_vs) ):
-                                    for id_vpp in y_svpp['ids']:     
+                        for y_s in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
+                            for id_v in y_s['ids']:     
+                                for y_s_prime in list (filter (lambda item : item['v'] == vpp and item['s'] == s_prime, self.ids_of_y_vs) ):
+                                    for id_vpp in y_s_prime['ids']:     
                                 
                                         first_decision_vars_in_mult_eq.append   (id_v) 
                                         scnd_decision_vars_in_mult_eq.append    (id_vpp)
-                                        list_of_coefs_in_mult_eq.append         (self.servers_path_delay[sv][svpp])
+                                        list_of_coefs_in_mult_eq.append         (self.servers_path_delay[s][s_prime])
                         
                 
                 
@@ -321,16 +323,13 @@ class toy_example (object):
             printf (self.LP_output_file, 'subject to chain_delay_C{}: ' .format (self.const_num))
             printf (self.LP_const_output_file, '\tif (')
 
-            # Print the lin' constraint obtained for this chain
+            # Print the mult' constraint obtained for this chain
             self.const_num += 1
             for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
                 printf (self.LP_output_file, '{:.4f}*X{}*X{} + ' .format (
                     list_of_coefs_in_mult_eq        [decision_var_idx],  
                     first_decision_vars_in_mult_eq  [decision_var_idx],
                     scnd_decision_vars_in_mult_eq   [decision_var_idx]))
-#                 printf (self.LP_const_output_file, '{:.4f}*X[{}] + ' .format (
-#                     list_of_coefs_in_lin_eq         [decision_var_idx],  
-#                     list_of_decision_vars_in_lin_eq [decision_var_idx]))
 
             # For convenience, order the decision vars to appear in an increasing ID # order            
             list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
@@ -347,7 +346,7 @@ class toy_example (object):
                     list_of_decision_vars_in_lin_eq [decision_var_idx]))
                      
             # Print the last lin' constraint for this chain
-            printf (self.LP_output_file, '{:.4f}*X{} <= {};\n' .format (
+            printf (self.LP_output_file, '{:.4f}*X{} <= {};\n\n' .format (
                     list_of_coefs_in_lin_eq            [-1],
                     list_of_decision_vars_in_lin_eq    [-1],
                     self.chain_target_delay [chain_num]))
@@ -362,9 +361,12 @@ class toy_example (object):
         """
         printf (self.LP_output_file, '\n')
         for l in self.list_of_links:
-            link_l_avail_bw = self.capacity_of_link[l[0], l[1]]
-            list_of_decision_vars_in_lin_eq = []
-            list_of_coefs_in_lin_eq         = []
+            link_l_avail_bw                  = self.capacity_of_link[l[0], l[1]]
+            list_of_decision_vars_in_lin_eq  = [] # The decision vars that will appear in the relevant lin' constraint 
+            list_of_coefs_in_lin_eq          = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
+            first_decision_vars_in_mult_eq   = [] # The first decision vars that will appear in the relevant multiplicative constraint 
+            scnd_decision_vars_in_mult_eq    = [] # The scnd decision vars that will appear in the relevant multiplicative constraint
+            list_of_coefs_in_mult_eq         = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
             
             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
                 list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] 
@@ -402,6 +404,28 @@ class toy_example (object):
                                 list_of_decision_vars_in_lin_eq.append (id) 
                                 list_of_coefs_in_lin_eq.append         (traffic_out)
 
+            # Consider the bw due to traffic along the chain
+            for v in self.v_not_inf: # For every VNF that is not last in its chain
+                vpp = self.vpp[v]    # vpp is the next VM in that chain
+                for s in range (self.NUM_OF_SERVERS): # for every possible location of v
+                    for s_prime in range (self.NUM_OF_SERVERS): # for every possible location of vpp (the next VM in the chain)
+                        if (s == s_prime): # if v and vpp are scheduled to the same server, no bw created for the traffic from v to vpp
+                            continue
+                
+                        if (self.x[v][s] and self.x[vpp][s_prime]): # the path s --> s' is used already in the cur allocation
+                            link_l_avail_bw -= self.theta_times_traffic_in[vpp]
+                        else:            # the path s --> s' is NOT used by the cur allocation. Need to extract all the decision variables that imply using this path
+                            for y_s in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ): #re
+                                for id_v in y_s['ids']:     
+                                    for y_s_prime in list (filter (lambda item : item['v'] == vpp and item['s'] == s_prime, self.ids_of_y_vs) ):
+                                        for id_vpp in y_s_prime['ids']:     
+                                    
+                                            first_decision_vars_in_mult_eq.append   (id_v) 
+                                            scnd_decision_vars_in_mult_eq.append    (id_vpp)
+                                            list_of_coefs_in_mult_eq.append         (self.theta_times_traffic_in[vpp])
+
+            
+            
             # Consider the bw due to migrations
             for v in range (self.NUM_OF_VNFs):
                 for mig_src in range (self.NUM_OF_SERVERS):
@@ -427,6 +451,14 @@ class toy_example (object):
             printf (self.LP_const_output_file, '\tif (')
             self.const_num += 1
 
+            # Print the mult' constraint obtained for this chain
+            self.const_num += 1
+            for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
+                printf (self.LP_output_file, '{:.4f}*X{}*X{} + ' .format (
+                    list_of_coefs_in_mult_eq        [decision_var_idx],  
+                    first_decision_vars_in_mult_eq  [decision_var_idx],
+                    scnd_decision_vars_in_mult_eq   [decision_var_idx]))
+
             # For convenience, order the decision vars to appear in an increasing ID # order            
             list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
             list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
@@ -438,7 +470,7 @@ class toy_example (object):
                     list_of_coefs_in_lin_eq         [decision_var_idx],  
                     list_of_decision_vars_in_lin_eq [decision_var_idx]))
                     
-            printf (self.LP_output_file, '{}*X{} <= {};\n' .format (
+            printf (self.LP_output_file, '{}*X{} <= {};\n\n' .format (
                     list_of_coefs_in_lin_eq            [-1],
                     list_of_decision_vars_in_lin_eq    [-1],# ['id'],
                     link_l_avail_bw))

@@ -1,2 +1,0 @@
-# A linear programming for the \migprob (the migration prob').
-

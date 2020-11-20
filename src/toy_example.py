@@ -454,24 +454,23 @@ class toy_example (object):
         list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
         list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
         
-        for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)-1): 
+        is_first = True
+        for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)): 
             if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
                 continue
-            printf (self.LP_output_file, '{:.4f}*X{} + ' .format (
-                list_of_coefs_in_lin_eq         [decision_var_idx],  
-                list_of_decision_vars_in_lin_eq [decision_var_idx]))
-            printf (self.constraint_check_script, '{:.4f}*X[{}] + ' .format (
-                list_of_coefs_in_lin_eq         [decision_var_idx],  
-                list_of_decision_vars_in_lin_eq [decision_var_idx]))
-        
-        if (list_of_coefs_in_lin_eq [-1] > 0):
+            if (not(is_first)): # for any component beside the first one, need to add the "+" sign
+                printf (self.LP_output_file, '+ ')
+                printf (self.constraint_check_script, '+ ')
+            else:
+                is_first = False
+                
             printf (self.LP_output_file, '{:.4f}*X{} ' .format (
-                    list_of_coefs_in_lin_eq            [-1],
-                    list_of_decision_vars_in_lin_eq    [-1]))
+                list_of_coefs_in_lin_eq         [decision_var_idx],  
+                list_of_decision_vars_in_lin_eq [decision_var_idx]))
             printf (self.constraint_check_script, '{:.4f}*X[{}] ' .format (
-                    list_of_coefs_in_lin_eq            [-1],
-                    list_of_decision_vars_in_lin_eq    [-1]))
-        
+                list_of_coefs_in_lin_eq         [decision_var_idx],  
+                list_of_decision_vars_in_lin_eq [decision_var_idx]))
+               
         printf (self.LP_output_file, '<= {};\n\n' .format (constant))
         printf (self.constraint_check_script, '> {}):\n\t\treturn False\n\n' .format (constant))
         

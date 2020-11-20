@@ -72,12 +72,8 @@ class toy_example (object):
         self.capacity_of_link[1][2]     = self.uniform_link_capacity
         self.capacity_of_link[2][1]     = self.uniform_link_capacity
         self.NUM_OF_CHAINS              = self.NUM_OF_USERS
-        self.PoA_of_user                = [0] #2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user                = [2] #2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.res_output_file            = open ("../res/custom_tree.res", "a")
-        self.LP_output_file             = open ("../res/custom_tree.LP", "w")
-        self.cfg_output_file            = open ("../res/custom_tree.cfg", "w")
-        self.constraint_check_script    = open ("Check_sol.py", "w")
-        self.obj_func_calc_script       = open ("obj_func.py", "w")
 
     def gen_parameterized_tree (self):
         """
@@ -138,11 +134,12 @@ class toy_example (object):
         self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
+        self.chain_target_delay     = 30 * np.ones (self.NUM_OF_CHAINS)
 
         self.cur_loc_of_vnf         = [0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
         self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
 
-        self.mig_bw                 = 0 * np.ones (self.NUM_OF_VNFs)
+        self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
         self.mig_cost               = 5 * np.ones (self.NUM_OF_VNFs) # np.random.rand (self.NUM_OF_VNFs)         
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='int8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
@@ -150,8 +147,6 @@ class toy_example (object):
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
-        self.nxt_loc_of_vnf         = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-        self.nxt_cpu_alloc_of_vnf   = np.array (self.NUM_OF_VNFs)
         # self.VM_target_delay           = 10 * np.ones (self.NUM_OF_VNFs)    # the desired (max) delay (aka Delta). Currently unused
         # self.perf_deg_of_vnf        = np.zeros (self.NUM_OF_VNFs). Currently unused
         
@@ -164,7 +159,6 @@ class toy_example (object):
         self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
 
-        self.chain_target_delay     = 1 * np.ones (self.NUM_OF_CHAINS)
         self.vnf_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
         v = 0
         for chain_num in range (self.NUM_OF_CHAINS):
@@ -185,10 +179,8 @@ class toy_example (object):
         # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
         # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
 
-        self.min_cost = float ('inf')
-        self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
-        self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-
+        self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
+        
         if (self.verbose == 1):
             printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
             printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
@@ -208,13 +200,25 @@ class toy_example (object):
         self.gen_n()
         
         if (gen_LP):
+            self.LP_output_file             = open ("../res/custom_tree.LP", "w")
+            self.constraint_check_script    = open ("Check_sol.py", "w")
+            self.obj_func_calc_script       = open ("obj_func.py", "w")
             self.constraint_num = int(0)
             self.print_vars ()
             self.print_obj_function ()
             self.gen_p()
             self.gen_all_constraints ()
         if (run_brute_force):
+            self.min_cost = float ('inf')
+            self.best_sol = None
+            self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
+            self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_by_n ()
+            if (self.min_cost == float ('inf')):
+                print ('Did not find a feasible sol')
+                return
+            self.sol_to_loc_alloc (best_sol)
+            self.print_sol()
         # self.print_best_sol_as_LP ()
         
     def calc_paths_of_links (self):
@@ -437,16 +441,23 @@ class toy_example (object):
         printf (self.constraint_check_script, '\tif (')
         self.constraint_num += 1
 
+        is_first = True
         if (not (list_of_coefs_in_mult_eq == None)): # If there exist multiplicative components in the inequality
             # Print the mult' constraint obtained for this chain
             for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
                 if (list_of_coefs_in_mult_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
                     continue
-                printf (self.LP_output_file, '{:.4f}*X{}*X{} + ' .format (
+
+            if (not(is_first)): # for any component beside the first one, need to add the "+" sign
+                printf (self.LP_output_file, '+ ')
+                printf (self.constraint_check_script, '+ ')
+            else:
+                is_first = False
+                printf (self.LP_output_file, '{:.4f}*X{}*X{} ' .format (
                     list_of_coefs_in_mult_eq        [decision_var_idx],  
                     first_decision_vars_in_mult_eq  [decision_var_idx],
                     scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
-                printf (self.constraint_check_script, '{:.4f}*X[{}]*X[{}] + ' .format (
+                printf (self.constraint_check_script, '{:.4f}*X[{}]*X[{}] ' .format (
                     list_of_coefs_in_mult_eq        [decision_var_idx],  
                     first_decision_vars_in_mult_eq  [decision_var_idx],
                     scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
@@ -455,7 +466,6 @@ class toy_example (object):
         list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
         list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
         
-        is_first = True
         for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)): 
             if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
                 continue
@@ -562,6 +572,24 @@ class toy_example (object):
             is_first_item = False
         printf (self.LP_output_file, ';\n\n')
         printf (self.obj_func_calc_script, '\n')
+    
+    def sol_to_loc_alloc (self, sol):
+        """
+        Translate a sol' to the optimization prob', given as a multi-dimensional binary vector n_{vsa}, to two vectors:
+        nxt_loc_of_vnf[v] - will be s iff VNF v is scheduled to server s
+        nxt_cpu_loc_of_vnf[v] - will be a iff a is assigned a units of CPU
+        """
+        
+        self.nxt_loc_of_vnf         = (-1) * np.ones (self.NUM_OF_VNFs)
+        self.nxt_cpu_alloc_of_vnf   = (-1) * np.ones (self.NUM_OF_VNFs)
+        
+        set_ids = [i for i, entry in enumerate(sol) if entry == 1]
+
+        for id in set_ids:
+            for item in list (filter (lambda item : item['id'] == id, self.n)):
+                self.nxt_loc_of_vnf       [item['v']] = item['s']
+                self.nxt_cpu_alloc_of_vnf [item['v']] = item['a']
+                
     
     def gen_p (self):
         """
@@ -706,12 +734,16 @@ class toy_example (object):
             if (cost < self.min_cost):
                 self.min_cost = cost
                 self.best_n = sol
-        if (self.min_cost == float ('inf')):
-            print ('Did not find a feasible sol')
-            return
-        printf (self.cfg_output_file, 'min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
-        print ('min cost = {}. best sol is {}\n' .format (self.min_cost, self.best_n))
-            
+
+    def print_sol (self):
+        """
+        Print the solution found
+        """
+        
+        printf (self.cfg_output_file, '\t{:.0f} & {:.0f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
+                (self.chain_target_delay[0], self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
+#         printf (self.cfg_output_file, 'min cost = {}, VM loc = {} cpu alloc = {} \n'  .format 
+#                 (self.min_cost, self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
 
         
     def perf_degradation_not_last_vm (self, v, loc_v, loc_vpp, denominator):

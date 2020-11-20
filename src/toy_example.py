@@ -164,7 +164,7 @@ class toy_example (object):
         self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
 
-        self.chain_target_delay     = 10 * np.ones (self.NUM_OF_CHAINS)
+        self.chain_target_delay     = 1 * np.ones (self.NUM_OF_CHAINS)
         self.vnf_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
         v = 0
         for chain_num in range (self.NUM_OF_CHAINS):
@@ -190,7 +190,7 @@ class toy_example (object):
         self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
 
         if (self.verbose == 1):
-            printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_vnf))
+            printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
             printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
             printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
             printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
@@ -200,7 +200,7 @@ class toy_example (object):
             printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
             printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n' .format (self.theta_times_traffic_in))
             printf (self.cfg_output_file, 'traffic back to user = {}\n' .format (self.traffic_out_of_chain))
-            printf (self.cfg_output_file, 'path delay = {}\n' .format (self.servers_path_delay))
+            printf (self.cfg_output_file, 'path delay = \\{}\n' .format (self.servers_path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n' .format (self.chain_target_delay))
             
     def run (self, gen_LP = True, run_brute_force = False):
@@ -253,9 +253,10 @@ class toy_example (object):
         Print the var' ranges constraints: each var should be <=1  
         """
         for __ in self.n:
-            #self.constraint.append()
             printf (self.LP_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n' .format (self.constraint_num, __['id'], __['id']) )
-            printf (self.constraint_check_script, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
+            
+            # The Python script doesn't really need these constraints, as anyway it checks only binary values for the decision variables. Hence, it's commented out.
+            # printf (self.constraint_check_script, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
             self.constraint_num += 1
         printf (self.LP_output_file, '\n')
 
@@ -681,7 +682,7 @@ class toy_example (object):
                 self.ids_of_y_vs.append ({'v' : v, 's' : s, 'ids' : list_of_ids})
     
 
-        if (self.verbose == 1):
+        if (self.verbose == 2):
             printf (self.cfg_output_file, 'self.n =\n')
             for item in self.ids_of_y_vs:
                 printf (self.cfg_output_file, '{}\n' .format (item))

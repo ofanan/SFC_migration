@@ -134,7 +134,7 @@ class toy_example (object):
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
         self.cur_loc_of_vnf         = [0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
-        self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
+        self.cur_cpu_alloc_of_vnf   = [2, 2] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
         self.mig_cost               = 5 * np.ones (self.NUM_OF_VNFs) # np.random.rand (self.NUM_OF_VNFs)         
@@ -514,11 +514,10 @@ class toy_example (object):
                     is_first = False
                 else: 
                     coef = item['coef']
-                    sign = '+ ' if (coef > 0) else '- '
-                    printf (self.LP_output_file, '{} {}*X{} ' .format (sign, coef, item['id']))
-                    printf (self.constraint_check_script, '+ {}*X[{}] ' .format (coef, item['id']))
-                    printf (self.LP_output_file, '{} {}*X{} ' .format (sign, coef, item['id']))
-                    printf (self.constraint_check_script, '+ {}*X[{}] ' .format (coef, item['id']))
+                    sign = '+' if (coef > 0) else '-'
+                    abs_coef = abs(coef)
+                    printf (self.LP_output_file,          '{} {}*X{} ' .format (sign, abs_coef, item['id']))
+                    printf (self.constraint_check_script, '{} {}*X[{}] '  .format (sign, abs_coef, item['id']))
             printf (self.LP_output_file, ' <= {};\n' .format (server_s_available_cap))
             printf (self.constraint_check_script, ' > {}):\n\t\treturn False\n\n' .format (server_s_available_cap))
 

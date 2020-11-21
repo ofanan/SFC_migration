@@ -134,10 +134,10 @@ class toy_example (object):
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
         self.cur_loc_of_vnf         = [0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
-        self.cur_cpu_alloc_of_vnf   = [2, 2] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
+        self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
-        self.mig_cost               = 5 * np.ones (self.NUM_OF_VNFs) # np.random.rand (self.NUM_OF_VNFs)         
+        self.mig_cost               = [3, 4] #5 * np.ones (self.NUM_OF_VNFs) # np.random.rand (self.NUM_OF_VNFs)         
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
         self.traffic_in             = [0.1, 0.5] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
@@ -192,19 +192,22 @@ class toy_example (object):
             printf (self.cfg_output_file, 'path delay = \n{}\n' .format (self.servers_path_delay))
             # printf (self.cfg_output_file, 'chain_target_delay = {}\n' .format (self.chain_target_delay))
             
-    def run (self, chain_target_delay, gen_LP = True, run_brute_force = True):
+    def run (self, chain_target_delay = 0, gen_LP = True, run_brute_force = True):
                 
+        self.gen_n()
+        self.chain_target_delay         = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         if (gen_LP):
-            self.chain_target_delay         = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
-            self.gen_n()
             self.LP_output_file             = open ("../res/custom_tree.LP", "w")
             self.constraint_check_script    = open ("Check_sol.py", "w")
             self.obj_func_calc_script       = open ("obj_func.py", "w")
+            self.constraint_check_script    = open ("Check_sol.py", "w")    
             self.constraint_num = int(0)
             self.print_vars ()
             self.print_obj_function ()
             self.gen_p()
             self.gen_all_constraints ()
+            self.LP_output_file.close ()
+            self.constraint_check_script.close ()
         if (run_brute_force):
             self.min_cost = float ('inf')
             self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
@@ -212,6 +215,7 @@ class toy_example (object):
             self.brute_force_by_n ()
             if (self.min_cost == float ('inf')):
                 print ('Did not find a feasible sol')
+                printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(self.chain_target_delay[0]))
                 return
             self.sol_to_loc_alloc (self.best_n)
             self.print_sol()
@@ -234,7 +238,7 @@ class toy_example (object):
     def gen_all_constraints (self):
         """
         Generate all the constraints. 
-        """
+        """ 
         printf (self.constraint_check_script, 'def Check_sol (X):\n')
         printf (self.constraint_check_script, '\t"""\n\tCheck whether a solution for the LP problem satisfies all the constraints\n\t"""\n')
         self.gen_leq1_constraints ()

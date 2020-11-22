@@ -119,8 +119,8 @@ class toy_example (object):
         
         self.verbose                = verbose
         self.uniform_link_capacity  = 20
-        self.uniform_cpu_capacity   = 3
-        self.uniform_link_delay     = 2
+        self.uniform_cpu_capacity   = 5
+        self.uniform_link_delay     = 1
 
         use_custom_netw = True
         if (use_custom_netw == True):
@@ -177,7 +177,11 @@ class toy_example (object):
         # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
 
         self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
-        
+                   
+    def run (self, uniform_mig_cost, chain_target_delay = 9, gen_LP = True, run_brute_force = True):
+                
+        self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
+        self.mig_cost                       = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
         if (self.verbose == 1):
             printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
             printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
@@ -190,28 +194,25 @@ class toy_example (object):
             printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n' .format (self.theta_times_traffic_in))
             printf (self.cfg_output_file, 'traffic back to user = {}\n' .format (self.traffic_out_of_chain))
             printf (self.cfg_output_file, 'path delay = \n{}\n' .format (self.servers_path_delay))
-            # printf (self.cfg_output_file, 'chain_target_delay = {}\n' .format (self.chain_target_delay))
-            
-    def run (self, chain_target_delay = 0, gen_LP = True, run_brute_force = True):
-                
+            printf (self.cfg_output_file, 'chain_target_delay = {}\n\n' .format (self.chain_target_delay))
+
         self.gen_n()
-        self.chain_target_delay         = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         if (gen_LP):
             self.LP_output_file             = open ("../res/custom_tree.LP", "w")
             self.constraint_check_script    = open ("Check_sol.py", "w")
             self.obj_func_calc_script       = open ("obj_func.py", "w")
             self.constraint_check_script    = open ("Check_sol.py", "w")    
-            self.constraint_num = int(0)
+            self.constraint_num             = int(0)
             self.print_vars ()
-            self.print_obj_function ()
             self.gen_p()
+            self.print_obj_function ()
             self.gen_all_constraints ()
             self.LP_output_file.close ()
             self.constraint_check_script.close ()
         if (run_brute_force):
-            self.min_cost = float ('inf')
-            self.best_nxt_cpu_alloc_of_vnf = np.array (self.NUM_OF_VNFs)
-            self.best_nxt_loc_of_vnf       = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
+            self.min_cost                   = float ('inf')
+            self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
+            self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_by_n ()
             if (self.min_cost == float ('inf')):
                 print ('Did not find a feasible sol')
@@ -680,14 +681,7 @@ class toy_example (object):
                     # if (comp_delay > self.VM_target_delay[v]): # Too high perf' degradation
                     #     continue 
                      
-                    total_delay = comp_delay + 2 * self.servers_path_delay [s] [self.PoA_of_vnf[v]]
-                    # Check for per-VM target delay - currently unused
-                    # if (total_delay > self.VM_target_delay[v]): # Too high perf' degradation
-                    #     continue
-                    
                     cost =  a
-                    # To include the VM's target delay in the cost, unco
-                    # cost += total_delay / self.VM_target_delay[v] 
                     if (mig):
                         cost += self.mig_cost[v]
                     
@@ -706,7 +700,7 @@ class toy_example (object):
                     list_of_ids.append (id)
                     
                     if (self.verbose == 2):
-                        printf (self.cfg_output_file, item)
+                        print (item)
                     id +=1 
             
                 self.ids_of_y_vs.append ({'v' : v, 's' : s, 'ids' : list_of_ids})
@@ -733,8 +727,8 @@ class toy_example (object):
         Print the solution found
         """
         
-        printf (self.res_output_file, '\t{:.0f} & {:.0f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
-                (self.chain_target_delay[0], self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
+        printf (self.res_output_file, '\t{:.2f} & {:.2f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
+                (self.mig_cost[0], self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
 #         printf (self.cfg_output_file, 'min cost = {}, VM loc = {} cpu alloc = {} \n'  .format 
 #                 (self.min_cost, self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
 

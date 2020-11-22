@@ -721,6 +721,7 @@ class toy_example (object):
             if (cost < self.min_cost):
                 self.min_cost = cost
                 self.best_n = sol
+                r
 
     def print_sol (self):
         """

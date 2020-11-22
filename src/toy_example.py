@@ -119,8 +119,8 @@ class toy_example (object):
         
         self.verbose                = verbose
         self.uniform_link_capacity  = 20
-        self.uniform_cpu_capacity   = 5
-        self.uniform_link_delay     = 1
+        self.uniform_cpu_capacity   = 3
+        self.uniform_link_delay     = 2
 
         use_custom_netw = True
         if (use_custom_netw == True):
@@ -178,10 +178,12 @@ class toy_example (object):
 
         self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
                    
-    def run (self, uniform_mig_cost, chain_target_delay = 9, gen_LP = True, run_brute_force = True):
+    def run (self, uniform_mig_cost, chain_target_delay = 19, gen_LP = True, run_brute_force = True):
                 
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         self.mig_cost                       = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
+        print ('self.mig_cost = ', self.mig_cost, 'chain_target_delay = ', self.chain_target_delay)
+        
         if (self.verbose == 1):
             printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
             printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
@@ -213,10 +215,10 @@ class toy_example (object):
             self.min_cost                   = float ('inf')
             self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-            self.brute_force_by_n ()
+            self.brute_force_sa_pow_v ()
             if (self.min_cost == float ('inf')):
                 print ('Did not find a feasible sol')
-                printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(self.chain_target_delay[0]))
+                printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(self.mig_cost[0]))
                 return
             self.sol_to_loc_alloc (self.best_n)
             self.print_sol()
@@ -711,6 +713,47 @@ class toy_example (object):
             for item in self.ids_of_y_vs:
                 printf (self.cfg_output_file, '{}\n' .format (item))
      
+     
+     
+    def inc_array (self, ar, min_val, max_val):
+        """
+        input: an array, in which all elements are within [min_val, max_val]
+        output: the same array, where the value is incremented by 1 
+        """
+        for idx in range (ar.size-1, -1, -1):
+            if (ar[idx] < max_val):
+                ar[idx] += 1
+                return ar
+            ar[idx] = min_val
+        return ar 
+     
+    def brute_force_sa_pow_v (self):
+        """
+        Brute-force check of all combination which let each VM use exactly one server, and exactly a single value of CPU power.
+        That is, each VM selects exactly 1 of its s*a relevant entries in self.n to be 1.
+        """
+        # Each VNF can have exactly one related decision var set.
+        # choice_of_VNF_v[v] will be set iff in the current checked sol
+         
+        sa                      = self.NUM_OF_SERVERS * self.uniform_cpu_capacity # s times a
+        vsa                     = sa * np.arange (self.NUM_OF_VNFs) 
+        choice_of_VNF_v         = np.zeros (self.NUM_OF_VNFs, dtype = 'uint32') 
+        num_of_decision_vars    = len (self.n)
+                                                        
+        for __ in range (sa ** self.NUM_OF_VNFs): 
+        
+            sol = np.zeros (num_of_decision_vars)
+            for v in range (self.NUM_OF_VNFs):
+                sol[vsa[v] + choice_of_VNF_v[v]] = 1
+            if ( not (Check_sol.Check_sol (sol)) ): # if Solve is not feasible
+                continue
+            cost = obj_func.obj_func (sol)
+            if (cost < self.min_cost):
+                self.min_cost = cost
+                self.best_n = sol
+                
+            choice_of_VNF_v = self.inc_array (choice_of_VNF_v, 0, sa-1) 
+        
 
     def brute_force_by_n (self):
         self.min_cost = float ('inf')
@@ -721,7 +764,6 @@ class toy_example (object):
             if (cost < self.min_cost):
                 self.min_cost = cost
                 self.best_n = sol
-                r
 
     def print_sol (self):
         """

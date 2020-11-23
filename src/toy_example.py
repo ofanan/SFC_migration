@@ -64,7 +64,6 @@ class toy_example (object):
 
         self.NUM_OF_SERVERS             = 3
         self.NUM_OF_USERS               = 1
-        self.NUM_OF_PoA                 = 1
         self.NUM_OF_LINKS               = 4
         self.capacity_of_link           = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
         self.capacity_of_link[0][1]     = self.uniform_link_capacity
@@ -81,7 +80,6 @@ class toy_example (object):
         self.G                  = nx.generators.classic.balanced_tree (r=3, h=2) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
         self.NUM_OF_USERS       = 2
-        self.NUM_OF_PoA         = 2
 
         self.servers_path_delay = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) # $$$ TBD: fix links' delay, and calc servers_path_delay accordingly
         self.servers_path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
@@ -127,19 +125,18 @@ class toy_example (object):
         else:
             self.gen_parameterized_tree()
             
-        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_PoA, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_USERS, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
-        self.cur_loc_of_vnf         = [0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
-        self.cur_cpu_alloc_of_vnf   = [2, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
+        self.cur_loc_of_vnf         = [0, 0] #[0, 0, 0, 1]# [0, 0, 0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_cpu_alloc_of_vnf   = [1, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
-        self.mig_cost               = [3, 4] #5 * np.ones (self.NUM_OF_VNFs) # np.random.rand (self.NUM_OF_VNFs)         
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = [0.8, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
+        self.traffic_in             = [0.5, 0.9] #, 0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
@@ -177,10 +174,10 @@ class toy_example (object):
 
         self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
                    
-    def run (self, uniform_link_delay = 1, uniform_mig_cost = 2, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
+    def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
                 
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
-        self.mig_cost                       = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
+        self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
         self.servers_path_delay             *= uniform_link_delay
         
         if (self.verbose == 1):
@@ -216,7 +213,7 @@ class toy_example (object):
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_sa_pow_v ()
             #self.brute_force_by_n ()
-            self.print_sol (uniform_link_delay)
+            self.print_sol (chain_target_delay)
         
     def calc_paths_of_links (self):
         """

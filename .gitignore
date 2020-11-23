@@ -2,4 +2,6 @@
 /.vscode/*
 /res/*
 /src/__pycache*
+src/Check_sol.py
+src/obj_func.py
 /.pydevproject

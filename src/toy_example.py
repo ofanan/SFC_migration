@@ -18,11 +18,11 @@ class toy_example (object):
   
         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
         #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
-        self.servers_path_delay  = self.uniform_link_delay * np.array ([
+        self.servers_path_delay  = np.array ([
                                    [0, 1, 2],
                                    [1, 0, 1],
                                    [2, 1, 0]
-                                  ]) 
+                                  ], dtype = float) 
     
         
         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
@@ -119,8 +119,7 @@ class toy_example (object):
         
         self.verbose                = verbose
         self.uniform_link_capacity  = 20
-        self.uniform_cpu_capacity   = 3
-        self.uniform_link_delay     = 2
+        self.uniform_cpu_capacity   = 5
 
         use_custom_netw = True
         if (use_custom_netw == True):
@@ -140,7 +139,7 @@ class toy_example (object):
         self.mig_cost               = [3, 4] #5 * np.ones (self.NUM_OF_VNFs) # np.random.rand (self.NUM_OF_VNFs)         
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = [0.1, 0.5] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
+        self.traffic_in             = [0.8, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
@@ -178,11 +177,11 @@ class toy_example (object):
 
         self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
                    
-    def run (self, uniform_mig_cost, chain_target_delay = 19, gen_LP = True, run_brute_force = True):
+    def run (self, uniform_link_delay = 1, uniform_mig_cost = 2, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
                 
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         self.mig_cost                       = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
-        print ('self.mig_cost = ', self.mig_cost, 'chain_target_delay = ', self.chain_target_delay)
+        self.servers_path_delay             *= uniform_link_delay
         
         if (self.verbose == 1):
             printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
@@ -200,7 +199,7 @@ class toy_example (object):
 
         self.gen_n()
         if (gen_LP):
-            self.LP_output_file             = open ("../res/custom_tree.LP", "w")
+            self.prb_output_file             = open ("../res/custom_tree.prb", "w")
             self.constraint_check_script    = open ("Check_sol.py", "w")
             self.obj_func_calc_script       = open ("obj_func.py", "w")
             self.constraint_check_script    = open ("Check_sol.py", "w")    
@@ -209,19 +208,15 @@ class toy_example (object):
             self.gen_p()
             self.print_obj_function ()
             self.gen_all_constraints ()
-            self.LP_output_file.close ()
+            self.prb_output_file.close ()
             self.constraint_check_script.close ()
         if (run_brute_force):
             self.min_cost                   = float ('inf')
             self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_sa_pow_v ()
-            if (self.min_cost == float ('inf')):
-                print ('Did not find a feasible sol')
-                printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(self.mig_cost[0]))
-                return
-            self.sol_to_loc_alloc (self.best_n)
-            self.print_sol()
+            #self.brute_force_by_n ()
+            self.print_sol (uniform_link_delay)
         
     def calc_paths_of_links (self):
         """
@@ -250,7 +245,7 @@ class toy_example (object):
         self.calc_paths_of_links ()
         self.gen_link_cap_constraints ()
         self.gen_chain_delay_constraints ()
-        printf (self.LP_output_file, '\nend;\n')
+        printf (self.prb_output_file, '\nend;\n')
         printf (self.constraint_check_script, '\n\n\treturn True\n')
 
 
@@ -259,12 +254,12 @@ class toy_example (object):
         Print the var' ranges constraints: each var should be <=1  
         """
         for __ in self.n:
-            printf (self.LP_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n\n' .format (self.constraint_num, __['id'], __['id']) )
+            printf (self.prb_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n\n' .format (self.constraint_num, __['id'], __['id']) )
             
             # The Python script doesn't really need these constraints, as anyway it checks only binary values for the decision variables. Hence, it's commented out.
             # printf (self.constraint_check_script, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
             self.constraint_num += 1
-        printf (self.LP_output_file, '\n')
+        printf (self.prb_output_file, '\n')
 
     
     def gen_chain_delay_constraints (self):
@@ -334,7 +329,7 @@ class toy_example (object):
         """
         Print the constraints of maximum link's capacity in a LP format
         """
-        printf (self.LP_output_file, '\n')
+        printf (self.prb_output_file, '\n')
         for l in self.list_of_links:
             link_l_avail_bw                  = self.capacity_of_link[l[0], l[1]]
             list_of_decision_vars_in_lin_eq  = [] # The decision vars that will appear in the relevant lin' constraint 
@@ -431,7 +426,7 @@ class toy_example (object):
                   list_of_coefs_in_mult_eq = None, first_decision_vars_in_mult_eq = None, scnd_decision_vars_in_mult_eq = None):
         """
         Print the obtained inequality into two output files: 
-        self.LP_output_file - write to this file the inequality in a Linear-Prog. format, e.g.: 
+        self.prb_output_file - write to this file the inequality in a Linear-Prog. format, e.g.: 
             3*X1 + 2*X2 <= 5
         self.constraint_check_script - write to this file the inequality as a Python-code that returns false if the inequlity isn't satisfied, e.g.
             if (3*X[1] + 2*X[2] > 5):
@@ -439,7 +434,7 @@ class toy_example (object):
                 
         """
         
-        printf (self.LP_output_file, 'subject to {}_C{}: ' .format (constraint_name, self.constraint_num))
+        printf (self.prb_output_file, 'subject to {}_C{}: ' .format (constraint_name, self.constraint_num))
         printf (self.constraint_check_script, '\t# {}_C{}:\n\tif (' .format (constraint_name, self.constraint_num))
         self.constraint_num += 1
 
@@ -453,9 +448,9 @@ class toy_example (object):
                 if (is_first): 
                     is_first = False
                 else: # before for any further component, add the "+" sign
-                    printf (self.LP_output_file, '+ ')
+                    printf (self.prb_output_file, '+ ')
                     printf (self.constraint_check_script, '+ ')
-                printf (self.LP_output_file, '{:.4f}*X{}*X{} ' .format (
+                printf (self.prb_output_file, '{:.4f}*X{}*X{} ' .format (
                     list_of_coefs_in_mult_eq        [decision_var_idx],  
                     first_decision_vars_in_mult_eq  [decision_var_idx],
                     scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
@@ -472,19 +467,19 @@ class toy_example (object):
             if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
                 continue
             if (not(is_first)): # for any component beside the first one, need to add the "+" sign
-                printf (self.LP_output_file, '+ ')
+                printf (self.prb_output_file, '+ ')
                 printf (self.constraint_check_script, '+ ')
             else:
                 is_first = False
                 
-            printf (self.LP_output_file, '{:.4f}*X{} ' .format (
+            printf (self.prb_output_file, '{:.4f}*X{} ' .format (
                 list_of_coefs_in_lin_eq         [decision_var_idx],  
                 list_of_decision_vars_in_lin_eq [decision_var_idx]))
             printf (self.constraint_check_script, '{:.4f}*X[{}] ' .format (
                 list_of_coefs_in_lin_eq         [decision_var_idx],  
                 list_of_decision_vars_in_lin_eq [decision_var_idx]))
                
-        printf (self.LP_output_file, '<= {};\n\n' .format (constant))
+        printf (self.prb_output_file, '<= {};\n\n' .format (constant))
         printf (self.constraint_check_script, '> {}):\n\t\treturn False\n\n' .format (constant))
         
             
@@ -493,7 +488,7 @@ class toy_example (object):
         Print the constraints of maximum server's CPU capacity in a LP format
         """
 
-        printf (self.LP_output_file, '\n')        
+        printf (self.prb_output_file, '\n')        
         for s in range (self.NUM_OF_SERVERS):
 
             # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
@@ -515,7 +510,7 @@ class toy_example (object):
                 if (item['coef'] == 0):
                     continue  
                 if (is_first):
-                    printf (self.LP_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.constraint_num, item['coef'], item['id']))
+                    printf (self.prb_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.constraint_num, item['coef'], item['id']))
                     printf (self.constraint_check_script, '\t#max_cpu_C{}\n\tif ({}*X[{}] ' .format (self.constraint_num, item['coef'], item['id']))
                     self.constraint_num += 1
                     is_first = False
@@ -523,9 +518,9 @@ class toy_example (object):
                     coef = item['coef']
                     sign = '+' if (coef > 0) else '-'
                     abs_coef = abs(coef)
-                    printf (self.LP_output_file,          '{} {}*X{} ' .format (sign, abs_coef, item['id']))
+                    printf (self.prb_output_file,          '{} {}*X{} ' .format (sign, abs_coef, item['id']))
                     printf (self.constraint_check_script, '{} {}*X[{}] '  .format (sign, abs_coef, item['id']))
-            printf (self.LP_output_file, ' <= {};\n' .format (server_s_available_cap))
+            printf (self.prb_output_file, ' <= {};\n' .format (server_s_available_cap))
             printf (self.constraint_check_script, ' > {}):\n\t\treturn False\n\n' .format (server_s_available_cap))
 
 
@@ -538,17 +533,17 @@ class toy_example (object):
         v = -1 
         for item in self.n:
             if (item['v'] == v): #Already seen decision var' related to this VM
-                printf (self.LP_output_file, '+ X{}' .format (item['id']))
+                printf (self.prb_output_file, '+ X{}' .format (item['id']))
                 printf (self.constraint_check_script, '+ X[{}]' .format (item['id']))
             else: # First time observing decision var' related to this VM
                 if (v > -1):
-                    printf (self.LP_output_file, ' = 1;\n' )
+                    printf (self.prb_output_file, ' = 1;\n' )
                     printf (self.constraint_check_script, ' == 1)):\n\t\treturn False\n' )
-                printf (self.LP_output_file, 'subject to single_alloc_C{}:   X{} ' .format (self.constraint_num, item['id'])) 
+                printf (self.prb_output_file, 'subject to single_alloc_C{}:   X{} ' .format (self.constraint_num, item['id'])) 
                 printf (self.constraint_check_script, '\tif (not (X[{}] ' .format (item['id']))
                 v = item['v']
             self.constraint_num += 1
-        printf (self.LP_output_file, ' = 1;\n\n' )
+        printf (self.prb_output_file, ' = 1;\n\n' )
         printf (self.constraint_check_script, ' == 1)):\n\t\treturn False\n\n' )
                
     def print_vars (self):
@@ -556,26 +551,26 @@ class toy_example (object):
         Print the decision variables. Each variable is printed with the constraints that it's >=0  
         """
         for __ in self.n:
-            printf (self.LP_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
-        printf (self.LP_output_file, '\n')
+            printf (self.prb_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
+        printf (self.prb_output_file, '\n')
 
 
     def print_obj_function (self):
         """
         Print the objective function in a standard LP form (linear combination of the decision variables)
         """
-        printf (self.LP_output_file, 'minimize z:   ')
+        printf (self.prb_output_file, 'minimize z:   ')
         printf (self.obj_func_calc_script, 'def obj_func (X):\n')
         printf (self.obj_func_calc_script, '\t"""\n\tCalculate the objective function, given a feasible solution.\n\t"""\n\treturn ')
         is_first_item = True
         for item in self.n:
             if (not (is_first_item)):
-                printf (self.LP_output_file, ' + ')
+                printf (self.prb_output_file, ' + ')
                 printf (self.obj_func_calc_script, ' + ')
-            printf (self.LP_output_file,            '{:.4f}*X{}' .format (item['cost'], item ['id']) ) 
+            printf (self.prb_output_file,            '{:.4f}*X{}' .format (item['cost'], item ['id']) ) 
             printf (self.obj_func_calc_script,   '{:.4f}*X[{}]' .format (item['cost'], item ['id']) ) 
             is_first_item = False
-        printf (self.LP_output_file, ';\n\n')
+        printf (self.prb_output_file, ';\n\n')
         printf (self.obj_func_calc_script, '\n')
     
     def sol_to_loc_alloc (self, sol):
@@ -745,12 +740,11 @@ class toy_example (object):
             sol = np.zeros (num_of_decision_vars)
             for v in range (self.NUM_OF_VNFs):
                 sol[vsa[v] + choice_of_VNF_v[v]] = 1
-            if ( not (Check_sol.Check_sol (sol)) ): # if Solve is not feasible
-                continue
-            cost = obj_func.obj_func (sol)
-            if (cost < self.min_cost):
-                self.min_cost = cost
-                self.best_n = sol
+            if (Check_sol.Check_sol (sol)): # if Solve is not feasible
+                cost = obj_func.obj_func (sol)
+                if (cost < self.min_cost):
+                    self.min_cost = cost
+                    self.best_n = sol
                 
             choice_of_VNF_v = self.inc_array (choice_of_VNF_v, 0, sa-1) 
         
@@ -765,13 +759,18 @@ class toy_example (object):
                 self.min_cost = cost
                 self.best_n = sol
 
-    def print_sol (self):
+    def print_sol (self, running_parameter):
         """
         Print the solution found
         """
+        if (self.min_cost == float ('inf')):
+            print ('Did not find a feasible sol')
+            printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(running_parameter))
+            return
+        self.sol_to_loc_alloc (self.best_n)
         
-        printf (self.res_output_file, '\t{:.2f} & {:.2f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
-                (self.mig_cost[0], self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
+        printf (self.res_output_file, '\t{:.1f} & {:.1f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
+                (running_parameter, self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
 #         printf (self.cfg_output_file, 'min cost = {}, VM loc = {} cpu alloc = {} \n'  .format 
 #                 (self.min_cost, self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
 

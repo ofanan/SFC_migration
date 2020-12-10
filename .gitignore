@@ -1,7 +1,9 @@
 .project
 /.vscode/*
 /res/*
+/old/*
 /src/__pycache*
 src/Check_sol.py
 src/obj_func.py
 /.pydevproject
+/src/tmp.txt

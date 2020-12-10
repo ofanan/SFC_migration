@@ -2,6 +2,8 @@ import networkx as nx
 import numpy as np
 import math
 import itertools 
+# import cplex
+# import docplex
 
 from printf import printf
 from LP_file_parser import LP_file_parser
@@ -136,7 +138,7 @@ class toy_example (object):
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = [0.5, 0.9] #, 0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
+        self.traffic_in             = [0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
@@ -175,6 +177,17 @@ class toy_example (object):
         self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
                    
     def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
+             
+#         cplex_solver = cplex.Cplex()
+#         out = cplex_solver.set_results_stream (None)
+#         out = cplex_solver.set_log_stream(None)
+#         cplex_solver.read("example.mps")
+#         cplex_solver.solve()
+#         cplex_solver.solution.get_status_string()
+        
+        self.write_to_prb_file = False # When true, will write outputs to a .prb file
+        self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
+        self.write_to_mod_file = True  # When true, will write to a .mod file, fitting to IBM CPlex solver       
                 
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
@@ -196,24 +209,32 @@ class toy_example (object):
 
         self.gen_n()
         if (gen_LP):
-            self.prb_output_file             = open ("../res/custom_tree.prb", "w")
-            self.constraint_check_script    = open ("Check_sol.py", "w")
-            self.obj_func_calc_script       = open ("obj_func.py", "w")
-            self.constraint_check_script    = open ("Check_sol.py", "w")    
-            self.constraint_num             = int(0)
-            self.print_vars ()
-            self.gen_p()
+            
+            # prb_output_file will use a standard format of LP, as in: https://online-optimizer.appspot.com/?model=builtin:default.mod
+            # with the addition of quadratic components (e.g. X1 * X3). 
+            self.prb_output_file            = open ("../res/custom_tree.prb", "w")           
+            self.constraint_check_by_Py     = open ("Check_sol.py", "w") # Will write to this file a Python function which returns true iff a given sol is feasible
+            if (self.write_to_py_file):
+                self.obj_func_by_Py         = open ("obj_func.py", "w")  # Will write to this file a Python function returning the cost of a given feasible sol
+            if (self.write_to_mod_file):
+                self.mod_output_file        = open ("../../Cplex/short/try.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+            self.constraint_num             = int(0)                     # A running number for counting the constraints   
+            self.print_vars ()                                           # Write the problem's variables
+            self.gen_p()                                                
             self.print_obj_function ()
             self.gen_all_constraints ()
             self.prb_output_file.close ()
-            self.constraint_check_script.close ()
+            self.constraint_check_by_Py.close ()
         if (run_brute_force):
             self.min_cost                   = float ('inf')
             self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_sa_pow_v ()
-            #self.brute_force_by_n ()
-            self.print_sol (chain_target_delay)
+            ones = [i for i in range (len(self.best_n)) if self.best_n[i]==1]
+            print (ones)
+            exit ()
+
+            self.print_sol_to_tex (chain_target_delay)
         
     def calc_paths_of_links (self):
         """
@@ -234,35 +255,48 @@ class toy_example (object):
         """
         Generate all the constraints. 
         """ 
-        printf (self.constraint_check_script, 'def Check_sol (X):\n')
-        printf (self.constraint_check_script, '\t"""\n\tCheck whether a solution for the LP problem satisfies all the constraints\n\t"""\n')
+        if (self.write_to_py_file):
+            printf (self.constraint_check_by_Py, 'def Check_sol (X):\n')
+            printf (self.constraint_check_by_Py, '\t"""\n\tCheck whether a solution for the LP problem satisfies all the constraints\n\t"""\n')
+        
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, 'subject to {\n\n')
+        
         self.gen_leq1_constraints ()
         self.gen_single_alloc_constraints ()
         self.gen_cpu_cap_constraints ()
         self.calc_paths_of_links ()
         self.gen_link_cap_constraints ()
         self.gen_chain_delay_constraints ()
-        printf (self.prb_output_file, '\nend;\n')
-        printf (self.constraint_check_script, '\n\n\treturn True\n')
-
+        if (self.write_to_prb_file):
+            printf (self.prb_output_file, '\nend;\n')
+        if (self.write_to_py_file):
+            printf (self.constraint_check_by_Py, '\n\n\treturn True\n')
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, '\n}\n\n')
 
     def gen_leq1_constraints (self):
         """
         Print the var' ranges constraints: each var should be <=1  
         """
-        for __ in self.n:
-            printf (self.prb_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n\n' .format (self.constraint_num, __['id'], __['id']) )
-            
-            # The Python script doesn't really need these constraints, as anyway it checks only binary values for the decision variables. Hence, it's commented out.
-            # printf (self.constraint_check_script, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
-            self.constraint_num += 1
-        printf (self.prb_output_file, '\n')
+        if (self.write_to_prb_file):
+            for __ in self.n:
+                printf (self.prb_output_file, 'subject to X_leq1_C{}: 1*X{} <= 1;\n\n' .format (self.constraint_num, __['id'], __['id']) )
+                
+                # The Python script doesn't really need these constraints, as anyway it checks only binary values for the decision variables. Hence, it's commented out.
+                # printf (self.constraint_check_by_Py, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
+                self.constraint_num += 1
+            printf (self.prb_output_file, '\n')
 
     
     def gen_chain_delay_constraints (self):
         """
         Print the constraints of maximum delay of each chain in a LP format
         """
+        
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, '\t// Chain delay constraints\n')
+
         for chain_num in range (self.NUM_OF_CHAINS):
             list_of_decision_vars_in_lin_eq  = [] # The decision vars that will appear in the relevant lin' constraint 
             list_of_coefs_in_lin_eq          = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
@@ -326,7 +360,10 @@ class toy_example (object):
         """
         Print the constraints of maximum link's capacity in a LP format
         """
-        printf (self.prb_output_file, '\n')
+        if (self.write_to_prb_file):
+            printf (self.prb_output_file, '\n')
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, '\t //Link capacity constraints\n')
         for l in self.list_of_links:
             link_l_avail_bw                  = self.capacity_of_link[l[0], l[1]]
             list_of_decision_vars_in_lin_eq  = [] # The decision vars that will appear in the relevant lin' constraint 
@@ -334,16 +371,16 @@ class toy_example (object):
             first_decision_vars_in_mult_eq   = [] # The first decision vars that will appear in the relevant multiplicative constraint 
             scnd_decision_vars_in_mult_eq    = [] # The scnd decision vars that will appear in the relevant multiplicative constraint
             list_of_coefs_in_mult_eq         = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
-            
+             
             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
                 list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] 
-
+ 
             # Consider the BW from the PoA to the first VM in each chain
             for v0 in self.v0: # for each VNF which is the first in its chain
                 for s in range(self.NUM_OF_SERVERS):
                     if ( not( [self.PoA_of_vnf[v0], s] in list_of_paths_using_link_l)): # The path (PoA(v0), s) doesn't use link l
                         continue
-                    
+                     
                     # Now we know that the path from V0's PoA to s uses link l
                     if (self.x[v0][s]): # v0 is already located on server s 
                         link_l_avail_bw -= self.traffic_in[v0]
@@ -352,14 +389,14 @@ class toy_example (object):
                              for id in y_vs['ids']:                             
                                  list_of_decision_vars_in_lin_eq.append (id) 
                                  list_of_coefs_in_lin_eq.        append (self.traffic_in[v0])
-            
+             
             # Consider the BW from the last VM in each chain to the PoA 
             for chain in range (self.NUM_OF_CHAINS): # for each VNF which is the last in its chain
                 v_inf = self.v_inf[chain]
                 for s in range(self.NUM_OF_SERVERS):
                     if ( not( [s, self.PoA_of_vnf[v_inf]] in list_of_paths_using_link_l)): # The path (s, PoA(v_inf)) doesn't use link l
                         continue
-                    
+                     
                     # Now we know that the path from s to v_inf's PoA uses link l
                     traffic_out = self.traffic_out_of_chain [chain]
                     if (self.x[v_inf][s]): # if x_{vs} == 1, namely v_inf is already located on server s 
@@ -372,7 +409,7 @@ class toy_example (object):
                                 else:
                                     list_of_decision_vars_in_lin_eq.append (id) 
                                     list_of_coefs_in_lin_eq.        append (traffic_out)
-
+ 
             # Consider the bw due to traffic along the chain
             for v in self.v_not_inf: # For every VNF that is not last in its chain
                 vpp = self.vpp[v]    # vpp is the next VM in that chain
@@ -380,7 +417,7 @@ class toy_example (object):
                     for s_prime in range (self.NUM_OF_SERVERS): # for every possible location of vpp (the next VM in the chain)
                         if (s == s_prime or ( not( [s, s_prime] in list_of_paths_using_link_l))): # # if v and vpp are scheduled to the same server, no bw created for the traffic from v to vpp; if the path (s, s') doesn't use link l, it doesn't generate a new component for this constraint 
                             continue
-                
+                 
                         if (self.x[v][s] and self.x[vpp][s_prime]): # the path s --> s' is used already in the cur allocation
                             link_l_avail_bw -= self.theta_times_traffic_in[vpp]
                         else:            # the path s --> s' is NOT used by the cur allocation. Need to extract all the decision variables that imply using this path
@@ -388,21 +425,21 @@ class toy_example (object):
                                 for id_v in y_s['ids']:     
                                     for y_s_prime in list (filter (lambda item : item['v'] == vpp and item['s'] == s_prime, self.ids_of_y_vs) ):
                                         for id_vpp in y_s_prime['ids']:     
-                                    
+                                     
                                             first_decision_vars_in_mult_eq.append (id_v) 
                                             scnd_decision_vars_in_mult_eq. append (id_vpp)
                                             list_of_coefs_in_mult_eq.      append (self.theta_times_traffic_in[vpp])
-
-            
-            
+ 
+             
+             
             # Consider the bw due to migrations
             for v in range (self.NUM_OF_VNFs):
                 for mig_src in range (self.NUM_OF_SERVERS):
                     for mig_dst in range (self.NUM_OF_SERVERS):
-                         
+                          
                         if (mig_dst == mig_src or not ([mig_src, mig_dst] in list_of_paths_using_link_l) or self.x[v][mig_src] == 0):
                             continue
-                         
+                          
                         for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == mig_dst, self.ids_of_y_vs) ):
                             for id in y_vs['ids']:     
                                 if (id in list_of_decision_vars_in_lin_eq): # Already seen, and wrote a coef', for this decision var, for this inequality
@@ -410,166 +447,338 @@ class toy_example (object):
                                 else:
                                     list_of_decision_vars_in_lin_eq.append (id) 
                                     list_of_coefs_in_lin_eq.append         (self.mig_bw[v])
-                                    
-
+                                     
+ 
             # Print the constraint obtained for this link
             if (len(list_of_decision_vars_in_lin_eq) == 0 and len(list_of_coefs_in_mult_eq) == 0): #No one uses this link --> no constraints
                 continue
-            
+             
             self.print_eq ('link_cap', list_of_coefs_in_lin_eq, list_of_decision_vars_in_lin_eq, link_l_avail_bw,
                            list_of_coefs_in_mult_eq, first_decision_vars_in_mult_eq, scnd_decision_vars_in_mult_eq)         
-            
+              
     def print_eq (self, constraint_name, list_of_coefs_in_lin_eq, list_of_decision_vars_in_lin_eq, constant, 
                   list_of_coefs_in_mult_eq = None, first_decision_vars_in_mult_eq = None, scnd_decision_vars_in_mult_eq = None):
         """
         Print the obtained inequality into two output files: 
         self.prb_output_file - write to this file the inequality in a Linear-Prog. format, e.g.: 
             3*X1 + 2*X2 <= 5
-        self.constraint_check_script - write to this file the inequality as a Python-code that returns false if the inequlity isn't satisfied, e.g.
+        self.constraint_check_by_Py - write to this file the inequality as a Python-code that returns false if the inequlity isn't satisfied, e.g.
             if (3*X[1] + 2*X[2] > 5):
                 return False
-                
+                  
         """
-        
-        printf (self.prb_output_file, 'subject to {}_C{}: ' .format (constraint_name, self.constraint_num))
-        printf (self.constraint_check_script, '\t# {}_C{}:\n\tif (' .format (constraint_name, self.constraint_num))
-        self.constraint_num += 1
-
-        is_first = True
-        if (not (list_of_coefs_in_mult_eq == None)): # If there exist multiplicative components in the inequality
-            # Print the mult' constraint obtained for this chain
-            for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
-                if (list_of_coefs_in_mult_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
+          
+        if (self.write_to_prb_file):
+            printf (self.prb_output_file, 'subject to {}_C{}: ' .format (constraint_name, self.constraint_num))
+            self.constraint_num += 1
+     
+            is_first = True
+            if (not (list_of_coefs_in_mult_eq == None)): # If there exist multiplicative components in the inequality
+                # Print the mult' constraint obtained for this chain
+                for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
+                    if (list_of_coefs_in_mult_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
+                        continue
+     
+                    if (is_first): 
+                        is_first = False
+                    else: # before for any further component, add the "+" sign
+                        printf (self.prb_output_file, '+ ')
+                    printf (self.prb_output_file, '{:.4f}*X{}*X{} ' .format (
+                        list_of_coefs_in_mult_eq        [decision_var_idx],  
+                        first_decision_vars_in_mult_eq  [decision_var_idx],
+                        scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
+             
+            # For convenience, order the decision vars to appear in an increasing ID # order            
+            list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
+            list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
+             
+            for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)): 
+                if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
                     continue
-
-                if (is_first): 
-                    is_first = False
-                else: # before for any further component, add the "+" sign
+                if (not(is_first)): # for any component beside the first one, need to add the "+" sign
                     printf (self.prb_output_file, '+ ')
-                    printf (self.constraint_check_script, '+ ')
-                printf (self.prb_output_file, '{:.4f}*X{}*X{} ' .format (
-                    list_of_coefs_in_mult_eq        [decision_var_idx],  
-                    first_decision_vars_in_mult_eq  [decision_var_idx],
-                    scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
-                printf (self.constraint_check_script, '{:.4f}*X[{}]*X[{}] ' .format (
-                    list_of_coefs_in_mult_eq        [decision_var_idx],  
-                    first_decision_vars_in_mult_eq  [decision_var_idx],
-                    scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
-        
-        # For convenience, order the decision vars to appear in an increasing ID # order            
-        list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
-        list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
-        
-        for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)): 
-            if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
-                continue
-            if (not(is_first)): # for any component beside the first one, need to add the "+" sign
-                printf (self.prb_output_file, '+ ')
-                printf (self.constraint_check_script, '+ ')
-            else:
-                is_first = False
-                
-            printf (self.prb_output_file, '{:.4f}*X{} ' .format (
-                list_of_coefs_in_lin_eq         [decision_var_idx],  
-                list_of_decision_vars_in_lin_eq [decision_var_idx]))
-            printf (self.constraint_check_script, '{:.4f}*X[{}] ' .format (
-                list_of_coefs_in_lin_eq         [decision_var_idx],  
-                list_of_decision_vars_in_lin_eq [decision_var_idx]))
-               
-        printf (self.prb_output_file, '<= {};\n\n' .format (constant))
-        printf (self.constraint_check_script, '> {}):\n\t\treturn False\n\n' .format (constant))
-        
-            
+                else:
+                    is_first = False
+                     
+                printf (self.prb_output_file, '{:.4f}*X{} ' .format (
+                    list_of_coefs_in_lin_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_lin_eq [decision_var_idx]))
+                    
+            printf (self.prb_output_file, '<= {};\n\n' .format (constant))
+          
+  
+        if (self.write_to_py_file):
+            printf (self.constraint_check_by_Py, '\t# {}_C{}:\n\tif (' .format (constraint_name, self.constraint_num))
+            self.constraint_num += 1
+     
+            is_first = True
+            if (not (list_of_coefs_in_mult_eq == None)): # If there exist multiplicative components in the inequality
+                # Print the mult' constraint obtained for this chain
+                for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
+                    if (list_of_coefs_in_mult_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
+                        continue
+     
+                    if (is_first): 
+                        is_first = False
+                    else: # before for any further component, add the "+" sign
+                        printf (self.constraint_check_by_Py, '+ ')
+                    printf (self.constraint_check_by_Py, '{:.4f}*X[{}]*X[{}] ' .format (
+                        list_of_coefs_in_mult_eq        [decision_var_idx],  
+                        first_decision_vars_in_mult_eq  [decision_var_idx],
+                        scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
+             
+            # For convenience, order the decision vars to appear in an increasing ID # order            
+            list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
+            list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
+             
+            for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)): 
+                if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
+                    continue
+                if (not(is_first)): # for any component beside the first one, need to add the "+" sign
+                    printf (self.constraint_check_by_Py, '+ ')
+                else:
+                    is_first = False
+                     
+                printf (self.constraint_check_by_Py, '{:.4f}*X[{}] ' .format (
+                    list_of_coefs_in_lin_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_lin_eq [decision_var_idx]))
+                    
+            printf (self.constraint_check_by_Py, '> {}):\n\t\treturn False\n\n' .format (constant))
+  
+        if (self.write_to_mod_file):
+            self.constraint_num += 1
+     
+            is_first = True
+            if (not (list_of_coefs_in_mult_eq == None)): # If there exist multiplicative components in the inequality
+                # Print the mult' constraint obtained for this chain
+                for decision_var_idx in range (len(first_decision_vars_in_mult_eq)): 
+                    if (list_of_coefs_in_mult_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
+                        continue
+     
+                    if (is_first): 
+                        is_first = False
+                    else: # before for any further component, add the "+" sign
+                        printf (self.mod_output_file, '+ ')
+                    printf (self.mod_output_file, '{:.4f}*X[{}]*X[{}] ' .format (
+                        list_of_coefs_in_mult_eq        [decision_var_idx],  
+                        first_decision_vars_in_mult_eq  [decision_var_idx],
+                        scnd_decision_vars_in_mult_eq   [decision_var_idx]))           
+             
+            # For convenience, order the decision vars to appear in an increasing ID # order            
+            list_of_coefs_in_lin_eq = [list_of_coefs_in_lin_eq[i] for i in np.argsort(list_of_decision_vars_in_lin_eq)]
+            list_of_decision_vars_in_lin_eq = np.sort (list_of_decision_vars_in_lin_eq)
+             
+            for decision_var_idx in range (len(list_of_decision_vars_in_lin_eq)): 
+                if (list_of_coefs_in_lin_eq [decision_var_idx] == 0): # coefficient is 0 --> may skip this component
+                    continue
+                if (not(is_first)): # for any component beside the first one, need to add the "+" sign
+                    printf (self.mod_output_file, '+ ')
+                else:
+                    is_first = False
+                     
+                printf (self.mod_output_file, '{:.4f}*X[{}] ' .format (
+                    list_of_coefs_in_lin_eq         [decision_var_idx],  
+                    list_of_decision_vars_in_lin_eq [decision_var_idx]))
+                    
+            printf (self.mod_output_file, '<= {};\n\n' .format (constant))
+
     def gen_cpu_cap_constraints (self):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
         """
 
-        printf (self.prb_output_file, '\n')        
-        for s in range (self.NUM_OF_SERVERS):
+        if (self.write_to_prb_file):
+            printf (self.prb_output_file, '\n')        
+            for s in range (self.NUM_OF_SERVERS):
+    
+                # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
+                for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                    item['coef'] = item['a']
+    
+                # Consider the CPU consumed by all VMs that are currently assigned to servers (by p_{vsa} parameters)
+                server_s_available_cap = self.cpu_capacity_of_server[s]
+                for v in range (self.NUM_OF_VNFs):
+                    if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
+                        a_cur = self.cur_cpu_alloc_of_vnf[v]
+                        server_s_available_cap -= a_cur
+                        for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
+                            item['coef'] -= a_cur 
+                            
+                # Print the data we have collected (all the non-zero coefficients)
+                is_first = True
+                for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                    if (item['coef'] == 0):
+                        continue  
+                    if (is_first):
+                        printf (self.prb_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.constraint_num, item['coef'], item['id']))
+                        self.constraint_num += 1
+                        is_first = False
+                    else: 
+                        coef = item['coef']
+                        sign = '+' if (coef > 0) else '-'
+                        abs_coef = abs(coef)
+                        printf (self.prb_output_file,          '{} {}*X{} ' .format (sign, abs_coef, item['id']))
+                printf (self.prb_output_file, ' <= {};\n' .format (server_s_available_cap))
 
-            # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
-            for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
-                item['coef'] = item['a']
+        if (self.write_to_py_file):
+            for s in range (self.NUM_OF_SERVERS):
+    
+                # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
+                for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                    item['coef'] = item['a']
+    
+                # Consider the CPU consumed by all VMs that are currently assigned to servers (by p_{vsa} parameters)
+                server_s_available_cap = self.cpu_capacity_of_server[s]
+                for v in range (self.NUM_OF_VNFs):
+                    if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
+                        a_cur = self.cur_cpu_alloc_of_vnf[v]
+                        server_s_available_cap -= a_cur
+                        for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
+                            item['coef'] -= a_cur 
+                            
+                # Print the data we have collected (all the non-zero coefficients)
+                is_first = True
+                for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                    if (item['coef'] == 0):
+                        continue  
+                    if (is_first):
+                        printf (self.constraint_check_by_Py, '\t#max_cpu_C{}\n\tif ({}*X[{}] ' .format (self.constraint_num, item['coef'], item['id']))
+                        self.constraint_num += 1
+                        is_first = False
+                    else: 
+                        coef = item['coef']
+                        sign = '+' if (coef > 0) else '-'
+                        abs_coef = abs(coef)
+                        printf (self.constraint_check_by_Py, '{} {}*X[{}] '  .format (sign, abs_coef, item['id']))
+                printf (self.constraint_check_by_Py, ' > {}):\n\t\treturn False\n\n' .format (server_s_available_cap))
 
-            # Consider the CPU consumed by all VMs that are currently assigned to servers (by p_{vsa} parameters)
-            server_s_available_cap = self.cpu_capacity_of_server[s]
-            for v in range (self.NUM_OF_VNFs):
-                if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
-                    a_cur = self.cur_cpu_alloc_of_vnf[v]
-                    server_s_available_cap -= a_cur
-                    for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
-                        item['coef'] -= a_cur 
-                        
-            # Print the data we have collected (all the non-zero coefficients)
-            is_first = True
-            for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
-                if (item['coef'] == 0):
-                    continue  
-                if (is_first):
-                    printf (self.prb_output_file, 'subject to max_cpu_C{}: {}*X{} ' .format (self.constraint_num, item['coef'], item['id']))
-                    printf (self.constraint_check_script, '\t#max_cpu_C{}\n\tif ({}*X[{}] ' .format (self.constraint_num, item['coef'], item['id']))
-                    self.constraint_num += 1
-                    is_first = False
-                else: 
-                    coef = item['coef']
-                    sign = '+' if (coef > 0) else '-'
-                    abs_coef = abs(coef)
-                    printf (self.prb_output_file,          '{} {}*X{} ' .format (sign, abs_coef, item['id']))
-                    printf (self.constraint_check_script, '{} {}*X[{}] '  .format (sign, abs_coef, item['id']))
-            printf (self.prb_output_file, ' <= {};\n' .format (server_s_available_cap))
-            printf (self.constraint_check_script, ' > {}):\n\t\treturn False\n\n' .format (server_s_available_cap))
 
-
-
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, '\t// CPU capacity constraints\n')
+            for s in range (self.NUM_OF_SERVERS):
+    
+                # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
+                for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                    item['coef'] = item['a']
+    
+                # Consider the CPU consumed by all VMs that are currently assigned to servers (by p_{vsa} parameters)
+                server_s_available_cap = self.cpu_capacity_of_server[s]
+                for v in range (self.NUM_OF_VNFs):
+                    if (self.cur_loc_of_vnf[v] == s): # VM v is already using server s
+                        a_cur = self.cur_cpu_alloc_of_vnf[v]
+                        server_s_available_cap -= a_cur
+                        for item in list (filter (lambda item : item['s'] == s and item['v']==v, self.n)):
+                            item['coef'] -= a_cur 
+                            
+                # Print the data we have collected (all the non-zero coefficients)
+                is_first = True
+                for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
+                    if (item['coef'] == 0):
+                        continue  
+                    if (is_first):
+                        printf (self.mod_output_file, '\t{}*X[{}] ' .format (self.constraint_num, item['coef'], item['id']))
+                        self.constraint_num += 1
+                        is_first = False
+                    else: 
+                        coef = item['coef']
+                        sign = '+' if (coef > 0) else '-'
+                        abs_coef = abs(coef)
+                        printf (self.mod_output_file, '{} {}*X[{}] '  .format (sign, abs_coef, item['id']))
+                printf (self.mod_output_file, ' <= {};\n' .format (server_s_available_cap))
+            printf (self.mod_output_file, '\n')
 
     def gen_single_alloc_constraints (self):
         """
         Print the constraint of a single allocation for each VM in a LP format
         """
-        v = -1 
-        for item in self.n:
-            if (item['v'] == v): #Already seen decision var' related to this VM
-                printf (self.prb_output_file, '+ X{}' .format (item['id']))
-                printf (self.constraint_check_script, '+ X[{}]' .format (item['id']))
-            else: # First time observing decision var' related to this VM
-                if (v > -1):
-                    printf (self.prb_output_file, ' = 1;\n' )
-                    printf (self.constraint_check_script, ' == 1)):\n\t\treturn False\n' )
-                printf (self.prb_output_file, 'subject to single_alloc_C{}:   X{} ' .format (self.constraint_num, item['id'])) 
-                printf (self.constraint_check_script, '\tif (not (X[{}] ' .format (item['id']))
-                v = item['v']
-            self.constraint_num += 1
-        printf (self.prb_output_file, ' = 1;\n\n' )
-        printf (self.constraint_check_script, ' == 1)):\n\t\treturn False\n\n' )
+        if (self.write_to_prb_file):
+            v = -1 
+            for item in self.n:
+                if (item['v'] == v): #Already seen decision var' related to this VM
+                    printf (self.prb_output_file, '+ X{}' .format (item['id']))
+                else: # First time observing decision var' related to this VM
+                    if (v > -1):
+                        printf (self.prb_output_file, ' = 1;\n' )
+                    printf (self.prb_output_file, 'subject to single_alloc_C{}:   X{} ' .format (self.constraint_num, item['id'])) 
+                    v = item['v']
+                self.constraint_num += 1
+            printf (self.prb_output_file, ' = 1;\n\n' )
                
+        if (self.write_to_py_file):
+            v = -1 
+            for item in self.n:
+                if (item['v'] == v): #Already seen decision var' related to this VM
+                    printf (self.constraint_check_by_Py, '+ X[{}]' .format (item['id']))
+                else: # First time observing decision var' related to this VM
+                    if (v > -1):
+                        printf (self.constraint_check_by_Py, ' == 1)):\n\t\treturn False\n' )
+                    printf (self.constraint_check_by_Py, '\tif (not (X[{}] ' .format (item['id']))
+                    v = item['v']
+                self.constraint_num += 1
+            printf (self.constraint_check_by_Py, ' == 1)):\n\t\treturn False\n\n' )
+
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, '\t// Single allocation constraints\n\t')
+            v = -1 
+            for item in self.n:
+                if (item['v'] == v): #Already seen decision var' related to this VM
+                    printf (self.mod_output_file, '+ X[{}]' .format (item['id']))
+                else: # First time observing decision var' related to this VM
+                    if (v > -1):
+                        printf (self.mod_output_file, ' == 1;\n\t' )
+                    printf (self.mod_output_file, 'X[{}] ' .format (item['id']))
+                    v = item['v']
+                self.constraint_num += 1
+            printf (self.mod_output_file, ' == 1;\n\n')
+
     def print_vars (self):
         """
         Print the decision variables. Each variable is printed with the constraints that it's >=0  
         """
-        for __ in self.n:
-            printf (self.prb_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
-        printf (self.prb_output_file, '\n')
-
+        if (self.write_to_prb_file):
+            for __ in self.n:
+                printf (self.prb_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
+            printf (self.prb_output_file, '\n')
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, 'int num_of_dvars = {};\n' .format (len(self.n)))
+            printf (self.mod_output_file, 'range dvar_indices = 0..num_of_dvars-1;\n')
+            printf (self.mod_output_file, 'dvar boolean X[dvar_indices];\n\n')
 
     def print_obj_function (self):
         """
         Print the objective function in a standard LP form (linear combination of the decision variables)
         """
-        printf (self.prb_output_file, 'minimize z:   ')
-        printf (self.obj_func_calc_script, 'def obj_func (X):\n')
-        printf (self.obj_func_calc_script, '\t"""\n\tCalculate the objective function, given a feasible solution.\n\t"""\n\treturn ')
-        is_first_item = True
-        for item in self.n:
-            if (not (is_first_item)):
-                printf (self.prb_output_file, ' + ')
-                printf (self.obj_func_calc_script, ' + ')
-            printf (self.prb_output_file,            '{:.4f}*X{}' .format (item['cost'], item ['id']) ) 
-            printf (self.obj_func_calc_script,   '{:.4f}*X[{}]' .format (item['cost'], item ['id']) ) 
-            is_first_item = False
-        printf (self.prb_output_file, ';\n\n')
-        printf (self.obj_func_calc_script, '\n')
-    
+        if (self.write_to_prb_file):
+            printf (self.prb_output_file, 'minimize z:   ')
+            is_first_item = True
+            for item in self.n:
+                if (not (is_first_item)):
+                    printf (self.prb_output_file, ' + ')
+                printf (self.prb_output_file,            '{:.4f}*X{}' .format (item['cost'], item ['id']) ) 
+                is_first_item = False
+            printf (self.prb_output_file, ';\n\n')
+
+        if (self.write_to_py_file):
+            printf (self.obj_func_by_Py, 'def obj_func (X):\n')
+            printf (self.obj_func_by_Py, '\t"""\n\tCalculate the objective function, given a feasible solution.\n\t"""\n\treturn ')
+            is_first_item = True
+            for item in self.n:
+                if (not (is_first_item)):
+                    printf (self.obj_func_by_Py, ' + ')
+                printf (self.obj_func_by_Py,   '{:.4f}*X[{}]' .format (item['cost'], item ['id']) ) 
+                is_first_item = False
+            printf (self.obj_func_by_Py, '\n')
+
+        if (self.write_to_mod_file):
+            printf (self.mod_output_file, 'minimize ')
+            is_first_item = True
+            for item in self.n:
+                if (not (is_first_item)):
+                    printf (self.mod_output_file, ' + ')
+                printf (self.mod_output_file,   '{:.4f}*X[{}]' .format (item['cost'], item ['id']) ) 
+                is_first_item = False
+            printf (self.mod_output_file, ';\n\n')
+   
     def sol_to_loc_alloc (self, sol):
         """
         Translate a sol' to the optimization prob', given as a multi-dimensional binary vector n_{vsa}, to two vectors:
@@ -756,19 +965,24 @@ class toy_example (object):
                 self.min_cost = cost
                 self.best_n = sol
 
-    def print_sol (self, running_parameter):
+    def print_non_zero_indices_in_best_sol (self):
         """
-        Print the solution found
+        Print a list of the indices of "1"s in the best sol' found
+        """
+
+    
+    
+    def print_sol_to_tex (self, running_parameter):
+        """
+        Print the solution found to a .tex table
         """
         if (self.min_cost == float ('inf')):
             print ('Did not find a feasible sol')
             printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(running_parameter))
             return
-        self.sol_to_loc_alloc (self.best_n)
         
+        self.sol_to_loc_alloc (self.best_n)
         printf (self.res_output_file, '\t{:.1f} & {:.1f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
                 (running_parameter, self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
-#         printf (self.cfg_output_file, 'min cost = {}, VM loc = {} cpu alloc = {} \n'  .format 
-#                 (self.min_cost, self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
-
         
+

@@ -7,3 +7,8 @@ src/Check_sol.py
 src/obj_func.py
 /.pydevproject
 /src/tmp.txt
+/src/old/Buses.py
+/src/old/MyBuses.mod
+/src/old/MyBuses.py
+/src/old/shorter.mod
+/src/old/zootupleset.mod

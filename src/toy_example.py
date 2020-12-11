@@ -115,6 +115,9 @@ class toy_example (object):
        
         
     def __init__ (self, verbose = -1):
+        """
+        Init a toy example - topology (e.g., chains, VMs, target delays etc.).
+        """
         
         self.verbose                = verbose
         self.uniform_link_capacity  = 20
@@ -185,17 +188,14 @@ class toy_example (object):
 
                    
     def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
-             
-#         cplex_solver = cplex.Cplex()
-#         out = cplex_solver.set_results_stream (None)
-#         out = cplex_solver.set_log_stream(None)
-#         cplex_solver.read("example.mps")
-#         cplex_solver.solve()
-#         cplex_solver.solution.get_status_string()
+        """
+        generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
+        """
         
-        self.write_to_prb_file = False # When true, will write outputs to a .prb file
-        self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
-        self.write_to_mod_file = True  # When true, will write to a .mod file, fitting to IBM CPlex solver       
+        self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
+        self.write_to_py_file  = False # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
+        self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
+        self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
                 
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
@@ -226,6 +226,8 @@ class toy_example (object):
                 self.obj_func_by_Py         = open ("obj_func.py", "w")  # Will write to this file a Python function returning the cost of a given feasible sol
             if (self.write_to_mod_file):
                 self.mod_output_file        = open ("../../Cplex/short/try.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+            if (self.write_to_lp_file):
+                self.lp_output_file        = open ("../../Cplex/short/try.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
             self.constraint_num             = int(0)                     # A running number for counting the constraints   
             self.print_vars ()                                           # Write the problem's variables
             self.gen_p()                                                
@@ -256,7 +258,12 @@ class toy_example (object):
                      
     def gen_all_constraints (self):
         """
-        Generate all the constraints. 
+        Generate all the constraints for the problem, and print them to output files.
+        Supported output file formats are:
+        - ".mod" - for running by Cplex.
+        - ".py"  - for running as a Python program.
+        - ".prb" - for running as a LP problem by the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
+        - ".lp" - Cplex ".lp" format, that can be run by a Python api. 
         """ 
         if (self.write_to_py_file):
             printf (self.constraint_check_by_Py, 'def Check_sol (X):\n')
@@ -1001,6 +1008,10 @@ class toy_example (object):
         
 
     def brute_force_by_n (self):
+        """
+        Perform a brute-force check of all combinations of the decision var's n.
+        There're v*s*a of entries for n, henceforth there're 2^{v * s * a} possible combinations.
+        """
         self.min_cost = float ('inf')
         for sol in itertools.product ([0,1],repeat = len (self.n)):
             if ( not (Check_sol.Check_sol (sol)) ):

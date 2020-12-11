@@ -82,7 +82,7 @@ class toy_example (object):
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
         self.NUM_OF_USERS       = 2
 
-        self.servers_path_delay = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) # $$$ TBD: fix links' delay, and calc servers_path_delay accordingly
+        self.servers_path_delay = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) 
         self.servers_path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
 
         shortest_path = nx.shortest_path(self.G)
@@ -156,12 +156,15 @@ class toy_example (object):
         self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
 
-        self.vnf_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
+        self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
+        self.theta_times_traffic_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_times_traffic_in_chain[c][j] will hold theta[v] * lambda[v], where v is the j-th VM in chain c
         v = 0
         for chain_num in range (self.NUM_OF_CHAINS):
-            self.vnf_in_chain[chain_num] = []
+            self.vnf_in_chain                 [chain_num] = []
+            self.theta_times_traffic_in_chain [chain_num] = []
             for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
-                self.vnf_in_chain[chain_num].append (v)
+                self.vnf_in_chain                [chain_num].append (v)
+                self.theta_times_traffic_in_chain[chain_num].append (self.theta_times_traffic_in[v]) 
                 if (idx_in_chain == 0):
                     self.v0[chain_num] = v 
                 if (idx_in_chain == self.num_of_vnfs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
@@ -215,6 +218,8 @@ class toy_example (object):
             printf (self.cfg_output_file, 'path delay = \n{}\n' .format (self.servers_path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n' .format (self.chain_target_delay))
 
+        self.gen_static_r()
+        exit ()
         self.gen_n()
         if (gen_LP):
             
@@ -868,7 +873,7 @@ class toy_example (object):
         return cost
             
              
-    def gen_r (self):
+    def gen_static_r (self):
         """
         Generate the r vector decision variable.
         r (H, vec(D), vec(mu)) will indicate that a solution implies allocating VM[j] of chain H on D[j], with CPU allocation mu[j].
@@ -887,19 +892,39 @@ class toy_example (object):
         id = int (0)
         
         for chain_num in range (self.NUM_OF_CHAINS):
-            chain_loc   = np.zeros (self.num_of_vnfs_in_chain[chain_num], dtype = 'uint16') # chain_loc[j] will hold a suggested the server that VM[j] in this chain will use, if this decision var will be 1
-            for __ in range (self.NUM_OF_SERVERS^self.self.num_of_vnfs_in_chain[chain_num]): # loop over all possible allocations
+            
+            chain_len = self.num_of_vnfs_in_chain[chain_num]
+            min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
+            max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * self.NUM_OF_VNFs # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
+            locations = min_loc_vals.copy ()
+            for __ in range (self.NUM_OF_SERVERS ^ chain_len): # loop over all possible locations of VMs of chain_num in servers
                
-                chain_alloc = np.ones (self.num_of_vnfs_in_chain, dtype = 'uint16') # chain_alloc[j] will hold the amount of CPU allocated to VM[j] in this chain, if this decision var will be 1 
-                
+                min_alloc_vals = np.ones  (chain_len, dtype = 'uint8')
+                max_alloc_vals = np.array ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
 
+                alloc          = min_alloc_vals.copy () 
+                
                 while True:
-                    print ('rgrg')
-                    
-                    chain_alloc = inc_array ()
-                    break            
-                    #for __ in range (sum(self.cpu_capacity_of_server ^self.self.num_of_vnfs_in_chain[chain_num]): # loop over all possible allocations
-            #for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
+
+                    self.r.append (
+                        {
+                        'id'            : id,
+                        'locations'     : locations,
+                        'allocations'   : alloc,
+                        'static delay'  : sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + \
+                                          sum (self.servers_path_delay [locations[i]] [locations[i+1]]            for i in range (chain_len-1)),
+                        'static cost'   : sum (alloc[i]                                                           for i in range (chain_len))                
+                        }
+                    )                
+
+                    alloc = self.inc_array (alloc, min_alloc_vals, max_alloc_vals)
+                    id += 1 
+
+                    if (np.array_equal (alloc, min_alloc_vals)): # finished looping over all possible alloc
+                        break
+                locations = self.inc_array(locations, min_loc_vals, max_loc_vals)
+                if (np.array_equal (locations, min_loc_vals)): # finished looping over all combinations.
+                    return
               
     def gen_n (self):
         """"
@@ -918,7 +943,6 @@ class toy_example (object):
         id = int (0)
         
         # Loop over all combinations of v, s, and a
-#         self.list_of_migrating_VMs = []
         for v in range (self.NUM_OF_VNFs):
             for s in range (self.NUM_OF_SERVERS):
                 mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is s different than v's current location, this implies a mig'

@@ -218,9 +218,10 @@ class toy_example (object):
             printf (self.cfg_output_file, 'path delay = \n{}\n' .format (self.servers_path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n' .format (self.chain_target_delay))
 
-        self.gen_static_r()
+        self.gen_static_r  ()
+#         self.mark_migrations_in_r ()
         exit ()
-        self.gen_n()
+        #self.gen_n()
         if (gen_LP):
             
             # prb_output_file will use a standard format of LP, as in: https://online-optimizer.appspot.com/?model=builtin:default.mod
@@ -235,8 +236,8 @@ class toy_example (object):
                 self.lp_output_file        = open ("../../Cplex/short/try.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
             self.constraint_num             = int(0)                     # A running number for counting the constraints   
             self.print_vars ()                                           # Write the problem's variables
-            self.gen_p()                                                
-            self.print_obj_function ()
+            # self.gen_p ()                                                
+            self.gen_obj_function ()
             self.gen_all_constraints ()
             self.prb_output_file.close ()
             self.constraint_check_by_Py.close ()
@@ -759,7 +760,7 @@ class toy_example (object):
             printf (self.mod_output_file, 'range dvar_indices = 0..num_of_dvars-1;\n')
             printf (self.mod_output_file, 'dvar boolean X[dvar_indices];\n\n')
 
-    def print_obj_function (self):
+    def gen_obj_function (self):
         """
         Print the objective function in a standard LP form (linear combination of the decision variables)
         """
@@ -896,21 +897,22 @@ class toy_example (object):
             chain_len = self.num_of_vnfs_in_chain[chain_num]
             min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
             max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * self.NUM_OF_VNFs # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
-            locations = min_loc_vals.copy ()
-            for __ in range (self.NUM_OF_SERVERS ^ chain_len): # loop over all possible locations of VMs of chain_num in servers
+            locations = np.zeros (chain_len, dtype = 'uint16') 
+            while True:
                
                 min_alloc_vals = np.ones  (chain_len, dtype = 'uint8')
                 max_alloc_vals = np.array ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
 
-                alloc          = min_alloc_vals.copy () 
+                alloc          = np.ones  (chain_len, dtype = 'uint8') 
                 
                 while True:
 
                     self.r.append (
                         {
                         'id'            : id,
-                        'locations'     : locations,
-                        'allocations'   : alloc,
+                        'chain num'     : chain_num,
+                        'locations'     : locations.copy (),
+                        'allocations'   : alloc.copy(),
                         'static delay'  : sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + \
                                           sum (self.servers_path_delay [locations[i]] [locations[i+1]]            for i in range (chain_len-1)),
                         'static cost'   : sum (alloc[i]                                                           for i in range (chain_len))                
@@ -920,11 +922,32 @@ class toy_example (object):
                     alloc = self.inc_array (alloc, min_alloc_vals, max_alloc_vals)
                     id += 1 
 
-                    if (np.array_equal (alloc, min_alloc_vals)): # finished looping over all possible alloc
+                    if (np.array_equal (alloc, min_alloc_vals)):  # finished looping over all possible alloc
                         break
                 locations = self.inc_array(locations, min_loc_vals, max_loc_vals)
-                if (np.array_equal (locations, min_loc_vals)): # finished looping over all combinations.
-                    return
+                if (np.array_equal (locations, min_loc_vals)): # finished looping over all possible alloc
+                    break
+        
+        for __ in (self.r):
+            print ('item = ', __)
+              
+              
+    def mark_migrations_in_r (self):
+        """
+        Add to the decision variable r the dynamic parts, relating to the mig
+        """
+        for chain_num in range (self.NUM_OF_CHAINS):
+            
+            chain_len = self.num_of_vnfs_in_chain[chain_num]
+            
+            cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)])
+            
+            for r_dict in (list (filter (lambda item : item['chain num'] == chain_num, self.r))):
+
+                # r_dict['indices of migrating VMs'] = ( [i for i in range (chain_len) if cur_loc[i] != r_dict['locations'[i]] ] ) # mig will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+                
+                print ('r_dict = ', r_dict)
+              
               
     def gen_n (self):
         """"

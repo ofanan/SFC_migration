@@ -6,7 +6,6 @@ import itertools
 # import docplex
 
 from printf import printf
-from LP_file_parser import LP_file_parser
 import Check_sol
 import obj_func
 from _overlapped import NULL
@@ -175,6 +174,15 @@ class toy_example (object):
         # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
 
         self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
+
+#     def calc_chain_netw_delay (self):
+#         """
+#         calculate the network delay along a given chain. 
+#         This delay is the sum of the netw' delays along the chain only.
+#         It doesn't include nor the delay to / from the PoA, neither the computation delay.  
+#         """
+#         netw_delay_along_chain = sum ()
+
                    
     def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
              
@@ -230,11 +238,6 @@ class toy_example (object):
             self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_sa_pow_v ()
-            ones = [i for i in range (len(self.best_n)) if self.best_n[i]==1]
-            print (ones)
-            exit ()
-
-            self.print_sol_to_tex (chain_target_delay)
         
     def calc_paths_of_links (self):
         """
@@ -857,11 +860,50 @@ class toy_example (object):
             cost += sum (item['cost'] for item in self.n if (item['v'] == v and item['s'] == s and item['a'] == a))
         return cost
             
+             
+    def gen_r (self):
+        """
+        Generate the r vector decision variable.
+        r (H, vec(D), vec(mu)) will indicate that a solution implies allocating VM[j] of chain H on D[j], with CPU allocation mu[j].
+        r is a list of dicts, where each dictionary includes the fields:
+        - ID 
+        - my_chain - the chain of this var.
+        - D - a list of |H| servers.
+        - mu - a list of |H| integers, each of them between 1 and C, where C is the maximum possible CPU capacity.
+        - static_cost - computation cost for using this allocation, independently of the current state. 
+        - static_bw - bw cost for using these VMs' locations, independently of the current state.
+        - mig - a list of |H| integers, where mig[j]==1 iff D[v] != current location of VM v.
+        - cost - cost of using this allocation.
+        """         
+        self.r = []
+        self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
+        id = int (0)
+        
+        for chain_num in range (self.NUM_OF_CHAINS):
+            chain_loc   = np.zeros (self.num_of_vnfs_in_chain[chain_num], dtype = 'uint16') # chain_loc[j] will hold a suggested the server that VM[j] in this chain will use, if this decision var will be 1
+            for __ in range (self.NUM_OF_SERVERS^self.self.num_of_vnfs_in_chain[chain_num]): # loop over all possible allocations
+               
+                chain_alloc = np.ones (self.num_of_vnfs_in_chain, dtype = 'uint16') # chain_alloc[j] will hold the amount of CPU allocated to VM[j] in this chain, if this decision var will be 1 
+                
+
+                while True:
+                    print ('rgrg')
+                    
+                    chain_alloc = inc_array ()
+                    break            
+                    #for __ in range (sum(self.cpu_capacity_of_server ^self.self.num_of_vnfs_in_chain[chain_num]): # loop over all possible allocations
+            #for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
               
     def gen_n (self):
         """"
-        Calculate the cost of a feasible solution, given by its nxt_loc_of_vnf (y) and nxt_cpu_alloc (\beta_{vs}), and assuming that the perf' deg' was already calculated.
-        Note that it's only for a feasible sol', as the calculation uses the array self.perf_deg_of_vnf, that should have been calculated by is_feasible() 
+        Generate the n vector indication variables.
+        n(v,s,a) == 1 will indicate allocation VM v on server s with a CPU units. 
+        Each entry in the list "n" will be a dictionary, containing the fields:
+        - ID
+        - v, s, a of this decision var
+        - mig - will be True iff such an allocation implies a migration of VM v
+        - comp_delay - the computation delay implied by using this var
+        - cost - to be used later, when formulating the LP
         """
 
         self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
@@ -918,14 +960,14 @@ class toy_example (object):
      
     def inc_array (self, ar, min_val, max_val):
         """
-        input: an array, in which all elements are within [min_val, max_val]
+        input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
         output: the same array, where the value is incremented by 1 
         """
         for idx in range (ar.size-1, -1, -1):
-            if (ar[idx] < max_val):
+            if (ar[idx] < max_val[idx]):
                 ar[idx] += 1
                 return ar
-            ar[idx] = min_val
+            ar[idx] = min_val[idx]
         return ar 
      
     def brute_force_sa_pow_v (self):
@@ -938,7 +980,10 @@ class toy_example (object):
          
         sa                      = self.NUM_OF_SERVERS * self.uniform_cpu_capacity # s times a
         vsa                     = sa * np.arange (self.NUM_OF_VNFs) 
-        choice_of_VNF_v         = np.zeros (self.NUM_OF_VNFs, dtype = 'uint32') 
+        ar_of_min_vals             = np.zeros (self.NUM_OF_VNFs, dtype = 'uint16')
+        ar_of_max_vals          = np.ones  (self.NUM_OF_VNFs, dtype = 'uint16') * (sa-1)
+        
+        choice_of_VNF_v         = ar_of_min_vals.copy () 
         num_of_decision_vars    = len (self.n)
                                                         
         for __ in range (sa ** self.NUM_OF_VNFs): 
@@ -952,7 +997,7 @@ class toy_example (object):
                     self.min_cost = cost
                     self.best_n = sol
                 
-            choice_of_VNF_v = self.inc_array (choice_of_VNF_v, 0, sa-1) 
+            choice_of_VNF_v = self.inc_array (choice_of_VNF_v, ar_of_min_vals, ar_of_max_vals) 
         
 
     def brute_force_by_n (self):

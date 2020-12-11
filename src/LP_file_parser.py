@@ -2,8 +2,8 @@ import numpy as np
 import itertools 
 import re
 
+# Parse a file of MY LP format. Extract the constraints. Currently unused
 class LP_file_parser (object):
-    
     
     def parse_lin_comb (self, lin_comb_string):
         filtered = filter(None, re.split("[, \-+]+", lin_comb_string))
@@ -31,7 +31,7 @@ class LP_file_parser (object):
     
     def parse_LP_file (self, input_file_name):
         """
-        Parse a file of a LP format. Extract the constraints.
+        Parse a file of my LP format. Extract the constraints. Currently unused
         """
         
         self.input_file  = open ("../res/" + input_file_name,  "r")

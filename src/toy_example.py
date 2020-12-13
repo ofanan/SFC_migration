@@ -905,6 +905,9 @@ class toy_example (object):
 
                 alloc          = np.ones  (chain_len, dtype = 'uint8') 
                 
+                # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
+                static_netw_delay = sum (self.servers_path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
+                
                 while True:
 
                     self.r.append (
@@ -913,8 +916,7 @@ class toy_example (object):
                         'chain num'     : chain_num,
                         'locations'     : locations.copy (),
                         'allocations'   : alloc.copy(),
-                        'static delay'  : sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + \
-                                          sum (self.servers_path_delay [locations[i]] [locations[i+1]]            for i in range (chain_len-1)),
+                        'static delay'  : sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + static_netw_delay,
                         'static cost'   : sum (alloc[i]                                                           for i in range (chain_len))                
                         }
                     )                
@@ -924,7 +926,7 @@ class toy_example (object):
 
                     if (np.array_equal (alloc, min_alloc_vals)):  # finished looping over all possible alloc
                         break
-                locations = self.inc_array(locations, min_loc_vals, max_loc_vals)
+                locations = self.inc_array(locations  , min_loc_vals, max_loc_vals)
                 if (np.array_equal (locations, min_loc_vals)): # finished looping over all possible alloc
                     break
         
@@ -943,8 +945,11 @@ class toy_example (object):
             cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)])
             
             for r_dict in (list (filter (lambda item : item['chain num'] == chain_num, self.r))):
-
-                # r_dict['indices of migrating VMs'] = ( [i for i in range (chain_len) if cur_loc[i] != r_dict['locations'[i]] ] ) # mig will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+                # cur_loc[i], r_dict['locations'[i]]
+                r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['locations'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) # mig will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+                
+                # Calc the total chain delay, inc. to/from PoA, and insert to dynamic_r only those which comply with the target chain delay.
+                # Add to the cost the mig' cost
                 
                 print ('r_dict = ', r_dict)
               
@@ -1089,3 +1094,26 @@ class toy_example (object):
                 (running_parameter, self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
         
 
+if __name__ == "__main__":
+    my_toy_example = toy_example (verbose = 1)
+    my_toy_example.run (chain_target_delay = 5, gen_LP = True,  run_brute_force = False) # Generate code for the LP
+    # if (len(sys.argv) > 2):  # run a parameterized sim'   
+    #     chain_target_delay = float (str(sys.argv[2]))
+    #         
+    #     if (str(sys.argv[1])=="G"): # G --> Gen problem. "S" --> Solve problem
+    #         my_toy_example.run (chain_target_delay = chain_target_delay, gen_LP = True,  run_brute_force = False) # Generate code for the LP
+    #     else:
+    #         my_toy_example.run (chain_target_delay = chain_target_delay, gen_LP = False, run_brute_force = True)  # Brute-force solve the LP
+    # else:
+    #     if (str(sys.argv[1])=="G"): # G --> Gen problem. "S" --> Solve problem
+    #         my_toy_example.run (gen_LP = True,  run_brute_force = False) # Generate code for the LP
+    #     else:
+    #         my_toy_example.run (gen_LP = False, run_brute_force = True)  # Brute-force solve the LP
+    # 
+    # alloc = [3, 1, 2]
+    # traffic_in = [1, 0.5, 1]
+    # 
+    # comp_delay = sum ([1 / (alloc[i] * traffic_in[i]) for i in range (3)])
+    # 
+    # print ('comp_delay = ', comp_delay)
+    

@@ -219,7 +219,7 @@ class toy_example (object):
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n' .format (self.chain_target_delay))
 
         self.gen_static_r  ()
-#         self.mark_migrations_in_r ()
+#         self.calc_dynamic_r ()
         exit ()
         #self.gen_n()
         if (gen_LP):
@@ -879,7 +879,6 @@ class toy_example (object):
         Generate the r vector decision variable.
         r (H, vec(D), vec(mu)) will indicate that a solution implies allocating VM[j] of chain H on D[j], with CPU allocation mu[j].
         r is a list of dicts, where each dictionary includes the fields:
-        - ID 
         - my_chain - the chain of this var.
         - D - a list of |H| servers.
         - mu - a list of |H| integers, each of them between 1 and C, where C is the maximum possible CPU capacity.
@@ -888,9 +887,8 @@ class toy_example (object):
         - mig - a list of |H| integers, where mig[j]==1 iff D[v] != current location of VM v.
         - cost - cost of using this allocation.
         """         
-        self.r = []
+        self.static_r = []
         self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
-        id = int (0)
         
         for chain_num in range (self.NUM_OF_CHAINS):
             
@@ -908,15 +906,21 @@ class toy_example (object):
                 # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
                 static_netw_delay = sum (self.servers_path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
                 
+                if (static_netw_delay > self.chain_target_delay[chain_num]): # skip suggested allocations with too long chain delay.
+                    continue
+                
                 while True:
 
-                    self.r.append (
+                    static_delay = sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + static_netw_delay
+                    if (static_delay > self.chain_target_delay[chain_num]):
+                        continue
+
+                    self.static_r.append (
                         {
-                        'id'            : id,
                         'chain num'     : chain_num,
                         'locations'     : locations.copy (),
                         'allocations'   : alloc.copy(),
-                        'static delay'  : sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + static_netw_delay,
+                        'static delay'  : static_delay,
                         'static cost'   : sum (alloc[i]                                                           for i in range (chain_len))                
                         }
                     )                
@@ -930,26 +934,56 @@ class toy_example (object):
                 if (np.array_equal (locations, min_loc_vals)): # finished looping over all possible alloc
                     break
         
-        for __ in (self.r):
+        for __ in (self.static_r):
             print ('item = ', __)
               
               
-    def mark_migrations_in_r (self):
+    def calc_dynamic_r (self):
         """
-        Add to the decision variable r the dynamic parts, relating to the mig
+
+        Add to the decision variable r the dynamic parts, that is, the parts relating to the mig and the updated PoA
         """
+        id = int (0)
+        self.static_r = []
+
         for chain_num in range (self.NUM_OF_CHAINS):
             
             chain_len = self.num_of_vnfs_in_chain[chain_num]
             
             cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)])
             
-            for r_dict in (list (filter (lambda item : item['chain num'] == chain_num, self.r))):
-                # cur_loc[i], r_dict['locations'[i]]
-                r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['locations'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) # mig will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+            for r_dict in (list (filter (lambda item : item['chain num'] == chain_num, self.static_r))):
                 
-                # Calc the total chain delay, inc. to/from PoA, and insert to dynamic_r only those which comply with the target chain delay.
-                # Add to the cost the mig' cost
+                delay = r_dict['static delay'] + \
+                        self.servers_path_delay [self.PoA_of_user [chain_num]] [r_dict['locations'][0]] + \
+                        self.servers_path_delay [r_dict['locations'][-1]]      [self.PoA_of_user [chain_num]]
+                
+                if (delay > self.chain_target_delay[chain_num]): # Verify the chain delay constraint by skipping suggested allocations with too long chain delay. 
+                    continue   
+                cost = r_dict['static cost'] 
+                indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+
+                list_of_migrating_src_dst_pairs = []
+                
+                for i in indices_of_migrating_VMs:
+                    list_of_migrating_src_dst_pairs.append ([cur_loc[i], r_dict['locations'][i]])
+                    cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
+                    
+                # TBD: write the cost func'
+                        #r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['locations'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) 
+                
+                self.dynamic_r.append (
+                    {
+                    'id'            : id,
+                    'chain num'     : chain_num,
+                    'locations'     : r_dict['locations'].  copy (),
+                    'allocations'   : r_dict['allocations'].copy(),
+                    'delay'         : delay,
+                    'list_of_migrating_src_dst_pairs' : list_of_migrating_src_dst_pairs
+                    }
+                )                
+                
+                id += 1
                 
                 print ('r_dict = ', r_dict)
               

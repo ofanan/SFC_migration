@@ -194,7 +194,7 @@ class toy_example (object):
 #         netw_delay_along_chain = sum ()
 
                    
-    def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 15, gen_LP = True, run_brute_force = True):
+    def run (self, uniform_link_delay = 1, uniform_mig_cost = 3, chain_target_delay = 15, gen_LP = True, run_brute_force = True):
         """
         generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
         """
@@ -740,8 +740,8 @@ class toy_example (object):
             for s in range (self.NUM_OF_SERVERS):
                 is_first = True
                 
-                decision_vars_using_this_server = list (filter (lambda item: s in item['locations'], self.dynamic_r))
-                for r_dict in decision_vars_using_this_server: # for each decision var' that schedules at least one VM to s
+                # decision_vars_using_this_server = list (filter (lambda item: s in item['locations'], self.dynamic_r))
+                for r_dict in self.dynamic_r: # for each decision var' 
                     chain_num   = r_dict['chain num']
                     coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
                     for i in range (len (r_dict['locations'])): # for every VM in the chain scheduled by this decision var
@@ -751,6 +751,9 @@ class toy_example (object):
                         elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
                             coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
 
+                    if (coef == 0):
+                        continue
+
                     if (is_first):
                         printf (self.lp_output_file, ' c{}: ' .format (self.constraint_num))
                         self.constraint_num += 1
@@ -759,8 +762,8 @@ class toy_example (object):
                         printf (self.lp_output_file, ' + ')
                     printf (self.lp_output_file, '{}x{}' .format (coef, r_dict['id'])) 
                 
-                if (len (decision_vars_using_this_server) > 0): # Discard cases where all suggested allocations using this server are infeasible: in such cases there's no constraint to print 
-                    printf (self.lp_output_file, ' <= {}\n\n' .format (self.cpu_capacity_of_server[s]))
+                # if (len (decision_vars_using_this_server) > 0): # Discard cases where all suggested allocations using this server are infeasible: in such cases there's no constraint to print
+                printf (self.lp_output_file, ' <= {}\n\n' .format (self.cpu_capacity_of_server[s]))
                 # server_s_available_cap = self.cpu_capacity_of_server[s]
                 
 

@@ -243,6 +243,8 @@ class toy_example (object):
             
             self.constraint_num             = int(0)                     # A running number for counting the constraints   
             self.calc_dynamic_r ()
+            if (self.write_to_lp_file):
+                printf (self.lp_output_file, '\n\nSubject To')
             self.gen_leq1_constraints    ()
             self.gen_cpu_cap_constraints ()
             exit ()
@@ -317,7 +319,7 @@ class toy_example (object):
             printf (self.prb_output_file, '\n')
         
         elif (self.write_to_lp_file):
-            printf (self.lp_output_file, '\n\nSubject To')
+            printf (self.lp_output_file, '\n\n\ single chain allocation constraints\n')
             id = 0  
             for chain_num in range (self.NUM_OF_CHAINS):
                 printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
@@ -733,12 +735,39 @@ class toy_example (object):
             printf (self.mod_output_file, '\n')
         
         if (self.write_to_lp_file):
-            printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n')
-            for s in range (self.NUM_OF_SERVERS):
-                server_s_available_cap = self.cpu_capacity_of_server[s]
+            printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n\n')
 
-#                 for r_dict in self.dynamic_r:
-#                     indices_of_VMs_using_s = ([i for i in self.range(self.len([r_dict['locations']]) if r_dict['locations'][i]] == s)
+            for s in range (self.NUM_OF_SERVERS):
+                is_first = True
+                
+                decision_vars_using_this_server = list (filter (lambda item: s in item['locations'], self.dynamic_r))
+                for r_dict in decision_vars_using_this_server: # for each decision var' that schedules at least one VM to s
+                    chain_num   = r_dict['chain num']
+                    coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
+                    for i in range (len (r_dict['locations'])): # for every VM in the chain scheduled by this decision var
+                        # v = self.vnf_in_chain[chain_num][i]  
+                        if (r_dict['locations'][i] == s): # if this VM is scheduled to use s...
+                            coef += r_dict['alloc'][i]      # add the scheduled allocation to the coef'
+                        elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
+                            coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
+
+                    if (is_first):
+                        printf (self.lp_output_file, ' c{}: ' .format (self.constraint_num))
+                        self.constraint_num += 1
+                        is_first = False
+                    else:
+                        printf (self.lp_output_file, ' + ')
+                    printf (self.lp_output_file, '{}x{}' .format (coef, r_dict['id'])) 
+                
+                if (len (decision_vars_using_this_server) > 0): # Discard cases where all suggested allocations using this server are infeasible: in such cases there's no constraint to print 
+                    printf (self.lp_output_file, ' <= {}\n\n' .format (self.cpu_capacity_of_server[s]))
+                # server_s_available_cap = self.cpu_capacity_of_server[s]
+                
+
+#                     indices_of_VMs_using_s = ([i for i in self.range(self.len([r_dict['locations']])) if r_dict['locations'][i]] == s)
+#                     for i in indices_of_VMs_using_s: # for each of the VMs in this chain which is scheduled to use s by this sol'
+#                         if i in r_dict['indices_of_migrating_VMs']: # if this VM is scheduled to migrate
+#                             coef += r_dict['alloc'][i]  
                     
 
     def gen_single_alloc_constraints (self):
@@ -1035,7 +1064,7 @@ class toy_example (object):
                         printf (self.debug_output_file, '\nlocation = {}, alloc = {}. infeasible dynamic delay: {:.2f}' .format (r_dict['locations'], r_dict['alloc'], delay))
                     continue   
                 cost = r_dict['static cost'] 
-                indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+                indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
 
                 list_of_migrating_src_dst_pairs = []
                 
@@ -1059,8 +1088,9 @@ class toy_example (object):
                     'id'            : id,
                     'chain num'     : chain_num,
                     'locations'     : r_dict['locations'].  copy (),
-                    'alloc'   : r_dict['alloc'].copy(),
+                    'alloc'         : r_dict['alloc'].copy(),
                     'delay'         : delay,
+                    'indices_of_migrating_VMs' : indices_of_migrating_VMs,
                     'list_of_migrating_src_dst_pairs' : list_of_migrating_src_dst_pairs
                     }
                 )                

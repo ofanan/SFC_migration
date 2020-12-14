@@ -24,5 +24,5 @@ def solve_problem_by_Cplex (input_file_name, num_of_vars):
     printf (output_file, '\n')
 
 if __name__ == "__main__":
-    solve_problem_by_Cplex ('shorter.lp', 2)
+    solve_problem_by_Cplex ('../res/problem.lp', 2)
 

@@ -243,6 +243,8 @@ class toy_example (object):
             
             self.constraint_num             = int(0)                     # A running number for counting the constraints   
             self.calc_dynamic_r ()
+            self.gen_leq1_constraints    ()
+            self.gen_cpu_cap_constraints ()
             exit ()
             if (self.write_to_prb_file or self.write_to_mod_file):
                 self.print_vars ()                                          
@@ -313,6 +315,23 @@ class toy_example (object):
                 # printf (self.constraint_check_by_Py, '\tif (X[{}] > 1):\n\t\treturn False\n\n' .format (__['id']))
                 self.constraint_num += 1
             printf (self.prb_output_file, '\n')
+        
+        elif (self.write_to_lp_file):
+            printf (self.lp_output_file, '\n\nSubject To')
+            id = 0  
+            for chain_num in range (self.NUM_OF_CHAINS):
+                printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
+                is_first = True
+                while (id < self.last_id_in_chain[chain_num]):
+                    if (is_first):
+                        is_first = False
+                    else:
+                        printf (self.lp_output_file, ' + ')
+                    printf (self.lp_output_file, 'x{}' .format (id)) 
+                    id += 1
+                printf (self.lp_output_file, ' = 1')
+                self.constraint_num += 1
+        
 
     
     def gen_chain_delay_constraints (self):
@@ -712,6 +731,15 @@ class toy_example (object):
                         printf (self.mod_output_file, '{} {}*X[{}] '  .format (sign, abs_coef, item['id']))
                 printf (self.mod_output_file, ' <= {};\n' .format (server_s_available_cap))
             printf (self.mod_output_file, '\n')
+        
+        if (self.write_to_lp_file):
+            printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n')
+            for s in range (self.NUM_OF_SERVERS):
+                server_s_available_cap = self.cpu_capacity_of_server[s]
+
+#                 for r_dict in self.dynamic_r:
+#                     indices_of_VMs_using_s = ([i for i in self.range(self.len([r_dict['locations']]) if r_dict['locations'][i]] == s)
+                    
 
     def gen_single_alloc_constraints (self):
         """
@@ -1041,21 +1069,6 @@ class toy_example (object):
             
             self.last_id_in_chain[chain_num] = id
             
-        if (self.write_to_lp_file):
-            printf (self.lp_output_file, '\n\nSubject To')
-            id = 0  
-            for chain_num in range (self.NUM_OF_CHAINS):
-                printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
-                is_first = True
-                while (id < self.last_id_in_chain[chain_num]):
-                    if (is_first):
-                        is_first = False
-                    else:
-                        printf (self.lp_output_file, ' + ')
-                    printf (self.lp_output_file, 'x{}' .format (id)) 
-                    id += 1
-                printf (self.lp_output_file, ' == 1')
-                self.constraint_num += 1
         
         
     def gen_n (self):

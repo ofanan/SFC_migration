@@ -987,8 +987,8 @@ class toy_example (object):
                 # dominant_alloc will hold a list of dominant alloc for the suggested locations. If an allocation is subdominant, we don't need to consider it at all.
                 # For instance, if the allocation 
                 # dominant_alloc = []                                    
-                min_alloc_vals = np.ones  (chain_len, dtype = 'uint8')
-                max_alloc_vals = np.array ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
+                min_alloc_vals = np.asarray ([math.ceil(self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)], dtype = 'uint8')
+                max_alloc_vals = np.array   ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
                 alloc          = max_alloc_vals.copy () # Will be reset to the minimal allocation to examine upon the first iteration
 
                 while True:

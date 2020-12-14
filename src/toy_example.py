@@ -129,8 +129,8 @@ class toy_example (object):
         else:
             self.gen_parameterized_tree()
             
-        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS) # np.random.randint(self.NUM_OF_USERS, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
-        self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype='uint8')
+        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS, dtype = 'uint16') # np.random.randint(self.NUM_OF_USERS, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype ='uint8')
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
@@ -179,8 +179,12 @@ class toy_example (object):
         # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
         # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
 
-        self.cfg_output_file           = open ("../res/custom_tree.cfg", "w")
-
+        self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
+        self.write_to_py_file  = False # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
+        self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
+        self.write_to_cfg_file = True
+        self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
+                
 #     def calc_chain_netw_delay (self):
 #         """
 #         calculate the network delay along a given chain. 
@@ -190,52 +194,58 @@ class toy_example (object):
 #         netw_delay_along_chain = sum ()
 
                    
-    def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 5, gen_LP = True, run_brute_force = True):
+    def run (self, uniform_link_delay = 2, uniform_mig_cost = 3, chain_target_delay = 15, gen_LP = True, run_brute_force = True):
         """
         generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
         """
         
-        self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
-        self.write_to_py_file  = False # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
-        self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
-        self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
-                
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
         self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
         self.servers_path_delay             *= uniform_link_delay
         
         if (self.verbose == 1):
-            printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
-            printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
-            printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
-            printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
-            printf (self.cfg_output_file, 'mig cost = {}\n' .format (self.mig_cost))
+            self.debug_output_file = open ('../res/debug.res', 'w')
+
+        if (self.write_to_cfg_file): # Write the static params
+            self.cfg_output_file = open ("../res/custom_tree.cfg", "w")           
             printf (self.cfg_output_file, 'lambda_v = {}\n' .format (self.traffic_in))
-            printf (self.cfg_output_file, 'uniform cpu capacities = {}\n' .format (self.uniform_cpu_capacity))
+            printf (self.cfg_output_file, 'uniform cpu capacities = {}\n'  .format (self.uniform_cpu_capacity))
             printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
-            printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n' .format (self.theta_times_traffic_in))
-            printf (self.cfg_output_file, 'traffic back to user = {}\n' .format (self.traffic_out_of_chain))
-            printf (self.cfg_output_file, 'path delay = \n{}\n' .format (self.servers_path_delay))
-            printf (self.cfg_output_file, 'chain_target_delay = {}\n\n' .format (self.chain_target_delay))
+            printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n'  .format (self.theta_times_traffic_in))
+            printf (self.cfg_output_file, 'traffic back to user = {}\n'    .format (self.traffic_out_of_chain))
+            printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.servers_path_delay))
+            printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
 
         self.gen_static_r  ()
-#         self.calc_dynamic_r ()
-        exit ()
+
+
         #self.gen_n()
         if (gen_LP):
             
-            # prb_output_file will use a standard format of LP, as in: https://online-optimizer.appspot.com/?model=builtin:default.mod
+            # prb_output_file will use the format of LP, used in: https://online-optimizer.appspot.com/?model=builtin:default.mod
             # with the addition of quadratic components (e.g. X1 * X3). 
-            self.prb_output_file            = open ("../res/custom_tree.prb", "w")           
-            self.constraint_check_by_Py     = open ("Check_sol.py", "w") # Will write to this file a Python function which returns true iff a given sol is feasible
+            if (self.write_to_prb_file):
+                self.prb_output_file        = open ("../res/custom_tree.prb", "w")           
             if (self.write_to_py_file):
                 self.obj_func_by_Py         = open ("obj_func.py", "w")  # Will write to this file a Python function returning the cost of a given feasible sol
+                self.constraint_check_by_Py = open ("Check_sol.py", "w") # Will write to this file a Python function which returns true iff a given sol is feasible
             if (self.write_to_mod_file):
-                self.mod_output_file        = open ("../../Cplex/short/try.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+                self.mod_output_file        = open ("../../Cplex/short/demo.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
             if (self.write_to_lp_file):
-                self.lp_output_file        = open ("../../Cplex/short/try.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+                self.lp_output_file         = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+
+            if (self.write_to_cfg_file):
+                printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
+                printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
+                printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
+                printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
+                printf (self.cfg_output_file, 'mig cost = {}\n' .format (self.mig_cost))
+            
             self.constraint_num             = int(0)                     # A running number for counting the constraints   
-            self.print_vars ()                                           # Write the problem's variables
+            self.calc_dynamic_r ()
+            exit ()
+            if (self.write_to_prb_file or self.write_to_mod_file):
+                self.print_vars ()                                          
             # self.gen_p ()                                                
             self.gen_obj_function ()
             self.gen_all_constraints ()
@@ -895,56 +905,90 @@ class toy_example (object):
             chain_len = self.num_of_vnfs_in_chain[chain_num]
             min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
             max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * self.NUM_OF_VNFs # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
-            locations = np.zeros (chain_len, dtype = 'uint16') 
+            locations    = max_loc_vals.copy () # Will be reset to the first location to examine upon the first iteration 
             while True:
                
-                min_alloc_vals = np.ones  (chain_len, dtype = 'uint8')
-                max_alloc_vals = np.array ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
-
-                alloc          = np.ones  (chain_len, dtype = 'uint8') 
                 
+                locations = self.inc_array (locations  , min_loc_vals, max_loc_vals)
+               
                 # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
                 static_netw_delay = sum (self.servers_path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
                 
-                if (static_netw_delay > self.chain_target_delay[chain_num]): # skip suggested allocations with too long chain delay.
+                if (self.verbose == 1):
+                    printf (self.debug_output_file, '\n\nlocations = {}\n********************' .format (locations))
+
+                if (static_netw_delay > self.chain_target_delay[chain_num]): # skip suggested alloc with too long chain delay.
+                    if (self.verbose == 1):
+                        printf (self.debug_output_file, 'Infeasible netw delay\n' .format (locations))
+                    if (np.array_equal (locations, max_loc_vals)): # finished iterating over all possible locations
+                        break
                     continue
-                
+
+                # dominant_alloc will hold a list of dominant alloc for the suggested locations. If an allocation is subdominant, we don't need to consider it at all.
+                # For instance, if the allocation 
+                # dominant_alloc = []                                    
+                min_alloc_vals = np.ones  (chain_len, dtype = 'uint8')
+                max_alloc_vals = np.array ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
+                alloc          = max_alloc_vals.copy () # Will be reset to the minimal allocation to examine upon the first iteration
+
                 while True:
+
+                    alloc = self.inc_array (alloc, min_alloc_vals, max_alloc_vals)
+
+                    if (self.verbose == 1):
+                        printf (self.debug_output_file, '\nalloc = {} ' .format (alloc))
 
                     static_delay = sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + static_netw_delay
                     if (static_delay > self.chain_target_delay[chain_num]):
+                        if (self.verbose == 1):
+                            printf (self.debug_output_file, 'infeasible static delay' .format (alloc))
+                        if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
+                            break
                         continue
-
+                    
+                    # Discard suggested alloc that disobey the static cpu consumption constraints
+                    broke_CPU_cap_constraint = False
+                    for s in np.unique(locations): # for each server scheduled to use at least one of the VMs in this chain
+                        if (sum ([alloc[i] for i in ([j for j in range (chain_len) if locations[j] == s])]) > self.cpu_capacity_of_server[s]):
+                            broke_CPU_cap_constraint = True
+                            if (self.verbose == 1):
+                                printf (self.debug_output_file, 'infeasible cpu capacity' .format (alloc))
+                            continue
+                    
+                    if (broke_CPU_cap_constraint):
+                        if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
+                            break
+                        continue 
+                        
+                    # Now we know that this allocation is statically feasible
+                    
+                        
                     self.static_r.append (
                         {
                         'chain num'     : chain_num,
                         'locations'     : locations.copy (),
-                        'allocations'   : alloc.copy(),
+                        'alloc'   : alloc.copy(),
                         'static delay'  : static_delay,
                         'static cost'   : sum (alloc[i]                                                           for i in range (chain_len))                
                         }
                     )                
 
-                    alloc = self.inc_array (alloc, min_alloc_vals, max_alloc_vals)
-                    id += 1 
-
-                    if (np.array_equal (alloc, min_alloc_vals)):  # finished looping over all possible alloc
+                    if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
                         break
-                locations = self.inc_array(locations  , min_loc_vals, max_loc_vals)
-                if (np.array_equal (locations, min_loc_vals)): # finished looping over all possible alloc
+                if (np.array_equal (locations, max_loc_vals)): # finished iterating over all possible locations
                     break
         
-        for __ in (self.static_r):
-            print ('item = ', __)
-              
-              
     def calc_dynamic_r (self):
         """
 
         Add to the decision variable r the dynamic parts, that is, the parts relating to the mig and the updated PoA
         """
         id = int (0)
-        self.static_r = []
+        self.dynamic_r = []
+        self.last_id_in_chain = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint16')
+
+        if (self.write_to_lp_file):
+            printf (self.lp_output_file, 'Minimize\n obj: ')
 
         for chain_num in range (self.NUM_OF_CHAINS):
             
@@ -958,7 +1002,9 @@ class toy_example (object):
                         self.servers_path_delay [self.PoA_of_user [chain_num]] [r_dict['locations'][0]] + \
                         self.servers_path_delay [r_dict['locations'][-1]]      [self.PoA_of_user [chain_num]]
                 
-                if (delay > self.chain_target_delay[chain_num]): # Verify the chain delay constraint by skipping suggested allocations with too long chain delay. 
+                if (delay > self.chain_target_delay[chain_num]): # Verify the chain delay constraint by skipping suggested alloc with too long chain delay. 
+                    if (self.verbose == 1):
+                        printf (self.debug_output_file, '\nlocation = {}, alloc = {}. infeasible dynamic delay: {:.2f}' .format (r_dict['locations'], r_dict['alloc'], delay))
                     continue   
                 cost = r_dict['static cost'] 
                 indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
@@ -968,26 +1014,50 @@ class toy_example (object):
                 for i in indices_of_migrating_VMs:
                     list_of_migrating_src_dst_pairs.append ([cur_loc[i], r_dict['locations'][i]])
                     cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
-                    
-                # TBD: write the cost func'
-                        #r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['locations'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) 
                 
+                if (self.write_to_lp_file):
+                    if (id > 0):
+                        printf (self.lp_output_file, ' + ')
+                    printf (self.lp_output_file, '{}x{}' .format (cost, id))
+    
+                    #r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['locations'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['locations'][i] ] ) 
+                
+                if (self.verbose == 1):
+                    printf (self.debug_output_file, '\nid = {}, location = {}, alloc = {}, cost = {}' 
+                            .format (id, r_dict['locations'], r_dict['alloc'], cost))
+                    
                 self.dynamic_r.append (
                     {
                     'id'            : id,
                     'chain num'     : chain_num,
                     'locations'     : r_dict['locations'].  copy (),
-                    'allocations'   : r_dict['allocations'].copy(),
+                    'alloc'   : r_dict['alloc'].copy(),
                     'delay'         : delay,
                     'list_of_migrating_src_dst_pairs' : list_of_migrating_src_dst_pairs
                     }
                 )                
                 
                 id += 1
-                
-                print ('r_dict = ', r_dict)
-              
-              
+            
+            self.last_id_in_chain[chain_num] = id
+            
+        if (self.write_to_lp_file):
+            printf (self.lp_output_file, '\n\nSubject To')
+            id = 0  
+            for chain_num in range (self.NUM_OF_CHAINS):
+                printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
+                is_first = True
+                while (id < self.last_id_in_chain[chain_num]):
+                    if (is_first):
+                        is_first = False
+                    else:
+                        printf (self.lp_output_file, ' + ')
+                    printf (self.lp_output_file, 'x{}' .format (id)) 
+                    id += 1
+                printf (self.lp_output_file, ' == 1')
+                self.constraint_num += 1
+        
+        
     def gen_n (self):
         """"
         Generate the n vector indication variables.
@@ -1009,9 +1079,9 @@ class toy_example (object):
             for s in range (self.NUM_OF_SERVERS):
                 mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is s different than v's current location, this implies a mig'
                 list_of_ids = []
-                for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity allocations), which cause infinite comp' delay
+                for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity alloc), which cause infinite comp' delay
                     denominator = a - self.theta_times_traffic_in[v] 
-                    if (denominator <= 0): # skip too small values of a (capacity allocations), which cause infinite comp' delay
+                    if (denominator <= 0): # skip too small values of a (capacity alloc), which cause infinite comp' delay
                         continue
  
                     comp_delay = 1/denominator

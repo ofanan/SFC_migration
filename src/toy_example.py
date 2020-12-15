@@ -140,7 +140,7 @@ class toy_example (object):
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = [0.5, 0.9, 1] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
+        self.traffic_in             = [0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
@@ -638,7 +638,7 @@ class toy_example (object):
         This function uses the "r" decision variables, in which each single variable determines both the location (servers)
         and the allocation (CPU capacities) of a full chain.
         """
-        printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n\n')
+        printf (self.lp_output_file, '\n\n\ Link capacity constraints\n\n')
         
         for l in self.list_of_links:
             list_of_decision_vars_in_link_l_eq = [] # The decision vars that will appear in the relevant lin' constraint 
@@ -647,21 +647,22 @@ class toy_example (object):
             for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
                 list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] 
 
-            coef = np.zeros (len(self.dynamic_r)) #coef[i] will hold the coefficient of the variable with id==i in dynami_r 
+            coef = np.zeros (len(self.dynamic_r)) #coef[i] will hold the coefficient of the variable with id==i in dynami_r
+            done = np.zeros (len(self.dynamic_r), dtype = 'bool') # done[i] will be true iff we already calculated the coef' of dynamic_r with id == i for this link's cap' constraint Eq.  
             for r_dict in self.dynamic_r:
                 
-                chain_num = r_dict['chain num']
-                chain_len = self.num_of_vnfs_in_chain[chain_num]
                 id        = r_dict['id']
+                if (done[id]):
+                    continue
+                chain_num = r_dict['chain_num']
+                chain_len = self.num_of_vnfs_in_chain[chain_num]
 
-                # Collect all the paths along the scheduled chain's locations that use link l
-#                 for path in ( [ [r_dict['location'][i], r_dict['location'][i+1]] for i in range (chain_len-1)]):
-#                     if path in list_of_paths_using_link_l:
+                # Consider the BW requirements of all the paths along the scheduled chain's locations that use link l
                 for i in range (chain_len-1):
                     if [r_dict['location'][i], r_dict['location'][i+1]]  in list_of_paths_using_link_l:
                         coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][i+1]]
 
-                # Check weather the scheduled path from the PoA to the first VM in the chain is using link l  
+                # Check wether the scheduled path from the PoA to the first VM in the chain is using link l  
                 if ( [self.PoA_of_user[chain_num], r_dict['location'][0]] in list_of_paths_using_link_l): # if the path from the PoA to the first VM in the chain uses link l
                     coef[id] += self.traffic_in[self.vnf_in_chain[chain_num][0]]
 
@@ -677,15 +678,29 @@ class toy_example (object):
                     v = self.vnf_in_chain[chain_num][i] # refer to this VNF as v 
                     if ([self.cur_loc_of_vnf [v], r_dict['location'][i]] in list_of_paths_using_link_l): # if the path between this VM's current location, and scheduled location, uses link l. 
                         coef[id] += self.mig_bw[v] # Consider the mig' bw
-                    #print ('path = (', self.cur_loc_of_vnf [v], ', ', self.cur_loc_of_vnf[self.vpp[v])#, ')')
-                    print (self.cur_loc_of_vnf [v], self.cur_loc_of_vnf[self.vpp[v]])
-                    if ([self.cur_loc_of_vnf [v], self.cur_loc_of_vnf[self.vpp[v]]] in list_of_paths_using_link_l): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
+                    if (i < chain_len-1 and ([self.cur_loc_of_vnf [v], self.cur_loc_of_vnf[self.vpp[v]]] in list_of_paths_using_link_l)): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
                         coef[id] += self.traffic_in [self.vpp[v]]
+
+                if (0 in indices_of_migrating_VMs and # if the first VM in the chain migrated
+                   ( [self.PoA_of_user[chain_num], self.cur_loc_of_vnf[self.vnf_in_chain[chain_num][0]]] in list_of_paths_using_link_l)): # if its old path uses link l
+                    coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][0]]
+                    
+                if (chain_len in indices_of_migrating_VMs and # if the last VM in the chain migrated
+                   ( [self.cur_loc_of_vnf[self.vnf_in_chain[chain_num][-1]], self.PoA_of_user[chain_num]] in list_of_paths_using_link_l)): # if its old path uses link l
+                    coef[id] += self.traffic_out_of_chain [chain_num]
+                    
+                # All r decision variables suggesting the same location for this chain (regardless of the different allocation values)
+                # will have identical coefficients. So assign these coefficients, and mark them as 'done'     
+                for r_with_identical_location in (list (filter (lambda item : 
+                    item['chain_num']==r_dict['chain_num'] and (item['location'] == r_dict['location']).all(), self.dynamic_r))):
+                    coef[r_with_identical_location['id']] = coef[id]
+                    done[r_with_identical_location['id']] = True
+            
+                    
             
             # Now print the inequality constraint for this link
             
-
-            list_of_non_zero_coefs = ( [i for i in range (len(coef)) if coef[i] != 0]  ) 
+            list_of_non_zero_coefs = ( [i for i in range (len(coef)) if coef[i] != 0]  )
             
             if (len (list_of_non_zero_coefs) == 0): # No non-zeros coef's, namely, no one uses / will be using this link 
                 continue
@@ -694,22 +709,15 @@ class toy_example (object):
             for id in list_of_non_zero_coefs:
 
                 if (is_first):
-                    printf (self.lp_output_file, ' c{}: ' .format (self.constraint_num))
+                    printf (self.lp_output_file, ' c{}_link_{}_{}: ' .format (self.constraint_num, l[0], l[1]))
                     self.constraint_num += 1
                     is_first = False
                 else:
                     printf (self.lp_output_file, ' + ')
                 printf (self.lp_output_file, '{}x{}' .format (coef[id], id)) 
             
-            print ('link l = ', l)
-            #printf (self.lp_output_file, ' <= {}\n\n' .format (self.capacity_of_link[l]))
+            printf (self.lp_output_file, ' <= {}\n\n' .format (self.capacity_of_link[l[0]][l[1]]))
 
-            
-            
-#             if (np.count_nonzero(coef)==0): #  
-#                 continue
-#                 
-#             for ()
             
     def gen_cpu_cap_constraints (self):
         """
@@ -824,7 +832,7 @@ class toy_example (object):
                 
                 # decision_vars_using_this_server = list (filter (lambda item: s in item['location'], self.dynamic_r))
                 for r_dict in self.dynamic_r: # for each decision var' 
-                    chain_num   = r_dict['chain num']
+                    chain_num   = r_dict['chain_num']
                     coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
                     for i in range (len (r_dict['location'])): # for every VM in the chain scheduled by this decision var
                         # v = self.vnf_in_chain[chain_num][i]  
@@ -1097,7 +1105,7 @@ class toy_example (object):
                         
                     self.static_r.append (
                         {
-                        'chain num'     : chain_num,
+                        'chain_num'     : chain_num,
                         'location'     : locations.copy (),
                         'alloc'   : alloc.copy(),
                         'static delay'  : static_delay,
@@ -1128,7 +1136,7 @@ class toy_example (object):
             
             cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)])
             
-            for r_dict in (list (filter (lambda item : item['chain num'] == chain_num, self.static_r))):
+            for r_dict in (list (filter (lambda item : item['chain_num'] == chain_num, self.static_r))):
                 
                 delay = r_dict['static delay'] + \
                         self.servers_path_delay [self.PoA_of_user [chain_num]] [r_dict['location'][0]] + \
@@ -1178,7 +1186,7 @@ class toy_example (object):
                 self.dynamic_r.append (
                     {
                     'id'            : id,
-                    'chain num'     : chain_num,
+                    'chain_num'     : chain_num,
                     'location'     : r_dict['location'].  copy (),
                     'alloc'         : r_dict['alloc'].copy(),
                     'delay'         : delay,

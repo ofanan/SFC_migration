@@ -20,6 +20,7 @@ def solve_problem_by_Cplex (input_file_name):
     status  = sol.get_status()
     printf (output_file, 'Sol status = {}\n' .format (status))
     printf (output_file, 'Solution value  = {:.2f}\n' .format (sol.get_objective_value()))
+    print  (             'lp sol cost = {:.2f}\n' .format (sol.get_objective_value()))
     printf (output_file, '\nList of non-zeros decision variables\n************************************\n' .format (sol.get_objective_value()))
     list_of_set_vars = []
     for var in problem.variables.get_names():

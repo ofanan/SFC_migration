@@ -1230,13 +1230,13 @@ class toy_example (object):
                 self.min_cost = cost
                 self.best_n = sol
 
-    def init_problem (self, uniform_link_delay = 1, uniform_mig_cost = 3, chain_target_delay = 15):
+    def init_problem (self, uniform_link_delay = 1, uniform_mig_cost = 0.1, chain_target_delay = 15):
         """
         generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
         """
         
         self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
-        self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
+        self.mig_cost                       = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
         self.servers_path_delay             *= uniform_link_delay
         
         if (self.verbose == 1):
@@ -1309,7 +1309,7 @@ class toy_example (object):
     def run_and_compare_lp_vs_brute_force (self):
         self.run_brute_force()
         self.lp_sol_to_loc_alloc (solve_problem_by_Cplex ('../res/problem.lp'))
-        print ('Brute force: loc = ', self.nxt_loc_of_vnf, ', alloc = ', self.nxt_cpu_alloc_of_vnf)
+        print ('Brute force: loc = ', self.nxt_loc_of_vnf, ', alloc = ', self.nxt_cpu_alloc_of_vnf, ', cost = ', self.min_cost)
         print ('Cplex: loc = ', self.lp_nxt_loc_of_vnf, ', alloc = ', self.lp_nxt_cpu_alloc_of_vnf)
 
      
@@ -1367,8 +1367,6 @@ if __name__ == "__main__":
 #     my_toy_example = toy_example (verbose = 1)
 #     my_toy_example.init_problem   ()
 #     my_toy_example.gen_py_problem ()
-
-#     my_toy_example.init_problem   ()
 
     my_toy_example = toy_example (verbose = 1)
     my_toy_example.init_problem  ()

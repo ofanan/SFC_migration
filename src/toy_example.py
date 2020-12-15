@@ -2,13 +2,12 @@ import networkx as nx
 import numpy as np
 import math
 import itertools 
-# import cplex
-# import docplex
 
 from printf import printf
 import Check_sol
 import obj_func
 from _overlapped import NULL
+from solve_problem_by_Cplex import solve_problem_by_Cplex
 
 class toy_example (object):
     
@@ -242,6 +241,7 @@ class toy_example (object):
                 printf (self.cfg_output_file, 'mig cost = {}\n' .format (self.mig_cost))
             
             self.constraint_num             = int(0)                     # A running number for counting the constraints   
+
             self.calc_dynamic_r ()
             if (self.write_to_lp_file):
                 printf (self.lp_output_file, '\n\nSubject To')
@@ -250,19 +250,21 @@ class toy_example (object):
             self.calc_paths_of_links ()
             self.gen_link_cap_constraints_to_lp()
             printf (self.lp_output_file, "\nEnd\n")
-            exit ()
-            if (self.write_to_prb_file or self.write_to_mod_file):
-                self.print_vars ()                                          
-            # self.gen_p ()                                                
-            self.gen_obj_function ()
-            self.gen_all_constraints ()
-            self.prb_output_file.close ()
-            self.constraint_check_by_Py.close ()
+
+            self.gen_p ()                                                
+#             if (self.write_to_prb_file or self.write_to_mod_file or self.write_to_py_file):
+#                 self.print_vars ()                                          
+#                 self.gen_obj_function ()
+#                 self.gen_all_constraints ()
+#                 self.prb_output_file.close ()
+#                 self.constraint_check_by_Py.close ()
+        set_vars_in_cpx_sol = asolve_problem_by_Cplex ('../res/problem.lp')
         if (run_brute_force):
             self.min_cost                   = float ('inf')
             self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_sa_pow_v ()
+        
         
     def calc_paths_of_links (self):
         """
@@ -685,7 +687,7 @@ class toy_example (object):
                    ( [self.PoA_of_user[chain_num], self.cur_loc_of_vnf[self.vnf_in_chain[chain_num][0]]] in list_of_paths_using_link_l)): # if its old path uses link l
                     coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][0]]
                     
-                if (chain_len in indices_of_migrating_VMs and # if the last VM in the chain migrated
+                if (chain_len-1 in indices_of_migrating_VMs and # if the last VM in the chain migrated
                    ( [self.cur_loc_of_vnf[self.vnf_in_chain[chain_num][-1]], self.PoA_of_user[chain_num]] in list_of_paths_using_link_l)): # if its old path uses link l
                     coef[id] += self.traffic_out_of_chain [chain_num]
                     
@@ -721,7 +723,7 @@ class toy_example (object):
             
     def gen_cpu_cap_constraints (self):
         """
-        Print the constraints of maximum server's CPU capacity in a LP format
+        Print the constraints of maximum server's CPU capacity in various formats
         """
 
         if (self.write_to_prb_file):
@@ -947,7 +949,25 @@ class toy_example (object):
                 is_first_item = False
             printf (self.mod_output_file, ';\n\n')
    
-    def sol_to_loc_alloc (self, sol):
+    def lp_sol_to_loc_alloc (self, list_of_set_vars):
+        """
+        Translate a sol' to the optimization prob', given as a list of ids of the set decision binary vars "r_dynamic" set, and translates it to:
+        lp_nxt_loc_of_vnf[v]     - will be s iff VNF v is scheduled to server s
+        lp_nxt_cpu_loc_of_vnf[v] - will be a iff a is assigned a units of CPU
+        """
+        
+        self.lp_nxt_loc_of_vnf         = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
+        self.lp_nxt_cpu_alloc_of_vnf   = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
+        
+
+        for id in list_of_set_vars:
+            for item in list (filter (lambda item : item['id'] == id, self.dynamic_r) ):
+                chain_num = item['chain_num']
+                for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):                      
+                    self.lp_nxt_loc_of_vnf       [self.vnf_in_chain[chain_num][idx_in_chain]] = item['location'][idx_in_chain]
+                    self.lp_nxt_cpu_alloc_of_vnf [self.vnf_in_chain[chain_num][idx_in_chain]] = item['alloc']   [idx_in_chain]
+                
+    def n_vsa_sol_to_loc_alloc (self, sol):
         """
         Translate a sol' to the optimization prob', given as a multi-dimensional binary vector n_{vsa}, to two vectors:
         nxt_loc_of_vnf[v] - will be s iff VNF v is scheduled to server s
@@ -1335,7 +1355,7 @@ class toy_example (object):
             printf (self.res_output_file, '\t{:.0f} & N/A & No feasible solution \\tabularnewline \hline \n' .format(running_parameter))
             return
         
-        self.sol_to_loc_alloc (self.best_n)
+        self.n_vsa_sol_to_loc_alloc (self.best_n)
         printf (self.res_output_file, '\t{:.1f} & {:.1f} & VM loc = {} cpu alloc = {} \\tabularnewline \hline \n' .format 
                 (running_parameter, self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
         

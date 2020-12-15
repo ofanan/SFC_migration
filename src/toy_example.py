@@ -258,13 +258,17 @@ class toy_example (object):
 #                 self.gen_all_constraints ()
 #                 self.prb_output_file.close ()
 #                 self.constraint_check_by_Py.close ()
-        set_vars_in_cpx_sol = asolve_problem_by_Cplex ('../res/problem.lp')
+        self.lp_sol_to_loc_alloc (solve_problem_by_Cplex ('../res/problem.lp'))
         if (run_brute_force):
             self.min_cost                   = float ('inf')
             self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
             self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
             self.brute_force_sa_pow_v ()
-        
+            self.n_vsa_sol_to_loc_alloc (self.best_n)
+
+        print ('Brute force: loc = ', self.nxt_loc_of_vnf, ', alloc = ', self.nxt_cpu_alloc_of_vnf)
+        print ('Cplex: loc = ', self.lp_nxt_loc_of_vnf, ', alloc = ', self.lp_nxt_cpu_alloc_of_vnf)
+
         
     def calc_paths_of_links (self):
         """

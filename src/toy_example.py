@@ -179,7 +179,7 @@ class toy_example (object):
         # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
 
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
-        self.write_to_py_file  = False # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
+        self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
         self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
         self.write_to_cfg_file = True
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
@@ -192,84 +192,7 @@ class toy_example (object):
 #         """
 #         netw_delay_along_chain = sum ()
 
-                   
-    def run (self, uniform_link_delay = 1, uniform_mig_cost = 3, chain_target_delay = 15, gen_LP = True, run_brute_force = True):
-        """
-        generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
-        """
-        
-        self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
-        self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
-        self.servers_path_delay             *= uniform_link_delay
-        
-        if (self.verbose == 1):
-            self.debug_output_file = open ('../res/debug.res', 'w')
-
-        if (self.write_to_cfg_file): # Write the static params
-            self.cfg_output_file = open ("../res/custom_tree.cfg", "w")           
-            printf (self.cfg_output_file, 'lambda_v = {}\n' .format (self.traffic_in))
-            printf (self.cfg_output_file, 'uniform cpu capacities = {}\n'  .format (self.uniform_cpu_capacity))
-            printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
-            printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n'  .format (self.theta_times_traffic_in))
-            printf (self.cfg_output_file, 'traffic back to user = {}\n'    .format (self.traffic_out_of_chain))
-            printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.servers_path_delay))
-            printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
-
-        self.gen_static_r  ()
-
-
-        #self.gen_n()
-        if (gen_LP):
-            
-            # prb_output_file will use the format of LP, used in: https://online-optimizer.appspot.com/?model=builtin:default.mod
-            # with the addition of quadratic components (e.g. X1 * X3). 
-            if (self.write_to_prb_file):
-                self.prb_output_file        = open ("../res/custom_tree.prb", "w")           
-            if (self.write_to_py_file):
-                self.obj_func_by_Py         = open ("obj_func.py", "w")  # Will write to this file a Python function returning the cost of a given feasible sol
-                self.constraint_check_by_Py = open ("Check_sol.py", "w") # Will write to this file a Python function which returns true iff a given sol is feasible
-            if (self.write_to_mod_file):
-                self.mod_output_file        = open ("../../Cplex/short/demo.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
-            if (self.write_to_lp_file):
-                self.lp_output_file         = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
-
-            if (self.write_to_cfg_file):
-                printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
-                printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
-                printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
-                printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
-                printf (self.cfg_output_file, 'mig cost = {}\n' .format (self.mig_cost))
-            
-            self.constraint_num             = int(0)                     # A running number for counting the constraints   
-
-            self.calc_dynamic_r ()
-            if (self.write_to_lp_file):
-                printf (self.lp_output_file, '\n\nSubject To')
-            self.gen_leq1_constraints    ()
-            self.gen_cpu_cap_constraints ()
-            self.calc_paths_of_links ()
-            self.gen_link_cap_constraints_to_lp()
-            printf (self.lp_output_file, "\nEnd\n")
-
-            self.gen_p ()                                                
-#             if (self.write_to_prb_file or self.write_to_mod_file or self.write_to_py_file):
-#                 self.print_vars ()                                          
-#                 self.gen_obj_function ()
-#                 self.gen_all_constraints ()
-#                 self.prb_output_file.close ()
-#                 self.constraint_check_by_Py.close ()
-        self.lp_sol_to_loc_alloc (solve_problem_by_Cplex ('../res/problem.lp'))
-        if (run_brute_force):
-            self.min_cost                   = float ('inf')
-            self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
-            self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
-            self.brute_force_sa_pow_v ()
-            self.n_vsa_sol_to_loc_alloc (self.best_n)
-
-        print ('Brute force: loc = ', self.nxt_loc_of_vnf, ', alloc = ', self.nxt_cpu_alloc_of_vnf)
-        print ('Cplex: loc = ', self.lp_nxt_loc_of_vnf, ', alloc = ', self.lp_nxt_cpu_alloc_of_vnf)
-
-        
+      
     def calc_paths_of_links (self):
         """
         Given self.links_of_path (list of links which appear in each path), 
@@ -327,21 +250,21 @@ class toy_example (object):
                 self.constraint_num += 1
             printf (self.prb_output_file, '\n')
         
-        elif (self.write_to_lp_file):
-            printf (self.lp_output_file, '\n\n\ single chain allocation constraints\n')
-            id = 0  
-            for chain_num in range (self.NUM_OF_CHAINS):
-                printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
-                is_first = True
-                while (id < self.last_id_in_chain[chain_num]):
-                    if (is_first):
-                        is_first = False
-                    else:
-                        printf (self.lp_output_file, ' + ')
-                    printf (self.lp_output_file, 'x{}' .format (id)) 
-                    id += 1
-                printf (self.lp_output_file, ' = 1')
-                self.constraint_num += 1
+    def gen_leq1_constraints_lp (self):
+        printf (self.lp_output_file, '\n\n\ single chain allocation constraints\n')
+        id = 0  
+        for chain_num in range (self.NUM_OF_CHAINS):
+            printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
+            is_first = True
+            while (id < self.last_id_in_chain[chain_num]):
+                if (is_first):
+                    is_first = False
+                else:
+                    printf (self.lp_output_file, ' + ')
+                printf (self.lp_output_file, 'x{}' .format (id)) 
+                id += 1
+            printf (self.lp_output_file, ' = 1')
+            self.constraint_num += 1
         
 
     
@@ -638,7 +561,7 @@ class toy_example (object):
                     
             printf (self.mod_output_file, '<= {};\n\n' .format (constant))
 
-    def gen_link_cap_constraints_to_lp (self):
+    def gen_link_cap_constraints_lp (self):
         """
         Print link capacity constraints to a .lp cplex format file.
         This function uses the "r" decision variables, in which each single variable determines both the location (servers)
@@ -830,35 +753,38 @@ class toy_example (object):
                 printf (self.mod_output_file, ' <= {};\n' .format (server_s_available_cap))
             printf (self.mod_output_file, '\n')
         
-        if (self.write_to_lp_file):
-            printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n\n')
+    def gen_cpu_cap_constraints_lp (self):
+        """
+        Print the constraints of maximum server's CPU capacity in lp Cplex format
+        """
+        printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n\n')
 
-            for s in range (self.NUM_OF_SERVERS):
-                is_first = True
-                
-                # decision_vars_using_this_server = list (filter (lambda item: s in item['location'], self.dynamic_r))
-                for r_dict in self.dynamic_r: # for each decision var' 
-                    chain_num   = r_dict['chain_num']
-                    coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
-                    for i in range (len (r_dict['location'])): # for every VM in the chain scheduled by this decision var
-                        # v = self.vnf_in_chain[chain_num][i]  
-                        if (r_dict['location'][i] == s): # if this VM is scheduled to use s...
-                            coef += r_dict['alloc'][i]      # add the scheduled allocation to the coef'
-                        elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
-                            coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
+        for s in range (self.NUM_OF_SERVERS):
+            is_first = True
+            
+            # decision_vars_using_this_server = list (filter (lambda item: s in item['location'], self.dynamic_r))
+            for r_dict in self.dynamic_r: # for each decision var' 
+                chain_num   = r_dict['chain_num']
+                coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
+                for i in range (len (r_dict['location'])): # for every VM in the chain scheduled by this decision var
+                    # v = self.vnf_in_chain[chain_num][i]  
+                    if (r_dict['location'][i] == s): # if this VM is scheduled to use s...
+                        coef += r_dict['alloc'][i]      # add the scheduled allocation to the coef'
+                    elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
+                        coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
 
-                    if (coef == 0):
-                        continue
+                if (coef == 0):
+                    continue
 
-                    if (is_first):
-                        printf (self.lp_output_file, ' c{}: ' .format (self.constraint_num))
-                        self.constraint_num += 1
-                        is_first = False
-                    else:
-                        printf (self.lp_output_file, ' + ')
-                    printf (self.lp_output_file, '{}x{}' .format (coef, r_dict['id'])) 
-                
-                printf (self.lp_output_file, ' <= {}\n\n' .format (self.cpu_capacity_of_server[s]))
+                if (is_first):
+                    printf (self.lp_output_file, ' c{}: ' .format (self.constraint_num))
+                    self.constraint_num += 1
+                    is_first = False
+                else:
+                    printf (self.lp_output_file, ' + ')
+                printf (self.lp_output_file, '{}x{}' .format (coef, r_dict['id'])) 
+            
+            printf (self.lp_output_file, ' <= {}\n\n' .format (self.cpu_capacity_of_server[s]))
                     
 
     def gen_single_alloc_constraints (self):
@@ -952,43 +878,7 @@ class toy_example (object):
                 printf (self.mod_output_file,   '{:.4f}*X[{}]' .format (item['cost'], item ['id']) ) 
                 is_first_item = False
             printf (self.mod_output_file, ';\n\n')
-   
-    def lp_sol_to_loc_alloc (self, list_of_set_vars):
-        """
-        Translate a sol' to the optimization prob', given as a list of ids of the set decision binary vars "r_dynamic" set, and translates it to:
-        lp_nxt_loc_of_vnf[v]     - will be s iff VNF v is scheduled to server s
-        lp_nxt_cpu_loc_of_vnf[v] - will be a iff a is assigned a units of CPU
-        """
-        
-        self.lp_nxt_loc_of_vnf         = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
-        self.lp_nxt_cpu_alloc_of_vnf   = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
-        
 
-        for id in list_of_set_vars:
-            for item in list (filter (lambda item : item['id'] == id, self.dynamic_r) ):
-                chain_num = item['chain_num']
-                for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):                      
-                    self.lp_nxt_loc_of_vnf       [self.vnf_in_chain[chain_num][idx_in_chain]] = item['location'][idx_in_chain]
-                    self.lp_nxt_cpu_alloc_of_vnf [self.vnf_in_chain[chain_num][idx_in_chain]] = item['alloc']   [idx_in_chain]
-                
-    def n_vsa_sol_to_loc_alloc (self, sol):
-        """
-        Translate a sol' to the optimization prob', given as a multi-dimensional binary vector n_{vsa}, to two vectors:
-        nxt_loc_of_vnf[v] - will be s iff VNF v is scheduled to server s
-        nxt_cpu_loc_of_vnf[v] - will be a iff a is assigned a units of CPU
-        """
-        
-        self.nxt_loc_of_vnf         = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
-        self.nxt_cpu_alloc_of_vnf   = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
-        
-        set_ids = [i for i, entry in enumerate(sol) if entry == 1]
-
-        for id in set_ids:
-            for item in list (filter (lambda item : item['id'] == id, self.n)):
-                self.nxt_loc_of_vnf       [item['v']] = item['s']
-                self.nxt_cpu_alloc_of_vnf [item['v']] = item['a']
-                
-    
     def gen_p (self):
         """
         Generate self.p (present CPU allocation params) based on the values of self.cur_loc_of_vnf and self.cur_cpu_alloc_of_vnf
@@ -1029,10 +919,7 @@ class toy_example (object):
                 tmp_list = list (filter (lambda item : item ['v'] == v and item['s'] == s, self.p))
                 if (sum (item['val'] for item in tmp_list)==1):
                     self.x[v][s] = True
-#                 self.x.append ({'v' : v, 
-#                              's' : s, 
-#                              'val' : True if (sum (item['val'] for item in tmp_list)==1) else False}
-#                              ) 
+
             
     def calc_cost_by_n (self):
         """
@@ -1309,7 +1196,7 @@ class toy_example (object):
          
         sa                      = self.NUM_OF_SERVERS * self.uniform_cpu_capacity # s times a
         vsa                     = sa * np.arange (self.NUM_OF_VNFs) 
-        ar_of_min_vals             = np.zeros (self.NUM_OF_VNFs, dtype = 'uint16')
+        ar_of_min_vals          = np.zeros (self.NUM_OF_VNFs, dtype = 'uint16')
         ar_of_max_vals          = np.ones  (self.NUM_OF_VNFs, dtype = 'uint16') * (sa-1)
         
         choice_of_VNF_v         = ar_of_min_vals.copy () 
@@ -1343,12 +1230,124 @@ class toy_example (object):
                 self.min_cost = cost
                 self.best_n = sol
 
-    def print_non_zero_indices_in_best_sol (self):
+    def init_problem (self, uniform_link_delay = 1, uniform_mig_cost = 3, chain_target_delay = 15):
         """
-        Print a list of the indices of "1"s in the best sol' found
+        generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
         """
+        
+        self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
+        self.mig_cost                       = [3, 4] #uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
+        self.servers_path_delay             *= uniform_link_delay
+        
+        if (self.verbose == 1):
+            self.debug_output_file = open ('../res/debug.res', 'w')
 
-    
+        if (self.write_to_cfg_file): # Write the static params
+            self.cfg_output_file = open ("../res/custom_tree.cfg", "w")           
+            printf (self.cfg_output_file, 'lambda_v = {}\n' .format (self.traffic_in))
+            printf (self.cfg_output_file, 'uniform cpu capacities = {}\n'  .format (self.uniform_cpu_capacity))
+            printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
+            printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n'  .format (self.theta_times_traffic_in))
+            printf (self.cfg_output_file, 'traffic back to user = {}\n'    .format (self.traffic_out_of_chain))
+            printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.servers_path_delay))
+            printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
+
+        self.gen_n()
+
+                   
+    def gen_py_problem (self):
+        """
+        Generate python / .prb / equation solver's format output files, describing the problem
+        """
+            
+        # prb_output_file will use the format of LP, used in: https://online-optimizer.appspot.com/?model=builtin:default.mod
+        # with the addition of quadratic components (e.g. X1 * X3). 
+        if (self.write_to_prb_file):
+            self.prb_output_file        = open ("../res/custom_tree.prb", "w")           
+        if (self.write_to_py_file):
+            self.obj_func_by_Py         = open ("obj_func.py", "w")  # Will write to this file a Python function returning the cost of a given feasible sol
+            self.constraint_check_by_Py = open ("Check_sol.py", "w") # Will write to this file a Python function which returns true iff a given sol is feasible
+        if (self.write_to_mod_file):
+            self.mod_output_file        = open ("../../Cplex/short/demo.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+
+        if (self.write_to_cfg_file):
+            printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
+            printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
+            printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
+            printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
+            printf (self.cfg_output_file, 'mig cost = {}\n' .format (self.mig_cost))
+        
+        self.constraint_num             = int(0)                     # A running number for counting the constraints   
+        self.gen_p ()                                                
+        if (self.write_to_prb_file or self.write_to_mod_file or self.write_to_py_file):
+            self.print_vars ()                                          
+            self.gen_obj_function ()
+            self.gen_all_constraints ()
+            self.constraint_check_by_Py.close ()
+        
+    def gen_lp_problem (self):
+
+        self.lp_output_file         = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+        self.constraint_num  = int(0)                     # A running number for counting the constraints   
+        self.gen_static_r  ()
+        self.calc_dynamic_r ()
+        if (self.write_to_lp_file):
+            printf (self.lp_output_file, '\n\nSubject To')
+        self.gen_leq1_constraints_lp    ()
+        self.gen_cpu_cap_constraints_lp ()
+        self.calc_paths_of_links ()
+        self.gen_link_cap_constraints_lp()
+        printf (self.lp_output_file, "\nEnd\n")
+
+    def run_brute_force (self):
+        self.min_cost                   = float ('inf')
+        self.best_nxt_cpu_alloc_of_vnf  = np.array (self.NUM_OF_VNFs)
+        self.best_nxt_loc_of_vnf        = np.array (self.NUM_OF_VNFs)   # nxt_loc_of_vnf[v] will hold the id of the server planned to host VNF v
+        self.brute_force_sa_pow_v ()
+        self.n_vsa_sol_to_loc_alloc (self.best_n)
+
+    def run_and_compare_lp_vs_brute_force (self):
+        self.run_brute_force()
+        self.lp_sol_to_loc_alloc (solve_problem_by_Cplex ('../res/problem.lp'))
+        print ('Brute force: loc = ', self.nxt_loc_of_vnf, ', alloc = ', self.nxt_cpu_alloc_of_vnf)
+        print ('Cplex: loc = ', self.lp_nxt_loc_of_vnf, ', alloc = ', self.lp_nxt_cpu_alloc_of_vnf)
+
+     
+    def lp_sol_to_loc_alloc (self, list_of_set_vars):
+        """
+        Translate a sol' to the optimization prob', given as a list of ids of the set decision binary vars "r_dynamic" set, and translates it to:
+        lp_nxt_loc_of_vnf[v]     - will be s iff VNF v is scheduled to server s
+        lp_nxt_cpu_loc_of_vnf[v] - will be a iff a is assigned a units of CPU
+        """
+        
+        self.lp_nxt_loc_of_vnf         = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
+        self.lp_nxt_cpu_alloc_of_vnf   = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
+        
+
+        for id in list_of_set_vars:
+            for item in list (filter (lambda item : item['id'] == id, self.dynamic_r) ):
+                chain_num = item['chain_num']
+                for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):                      
+                    self.lp_nxt_loc_of_vnf       [self.vnf_in_chain[chain_num][idx_in_chain]] = item['location'][idx_in_chain]
+                    self.lp_nxt_cpu_alloc_of_vnf [self.vnf_in_chain[chain_num][idx_in_chain]] = item['alloc']   [idx_in_chain]
+                
+    def n_vsa_sol_to_loc_alloc (self, sol):
+        """
+        Translate a sol' to the optimization prob', given as a multi-dimensional binary vector n_{vsa}, to two vectors:
+        nxt_loc_of_vnf[v] - will be s iff VNF v is scheduled to server s
+        nxt_cpu_loc_of_vnf[v] - will be a iff a is assigned a units of CPU
+        """
+        
+        self.nxt_loc_of_vnf         = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
+        self.nxt_cpu_alloc_of_vnf   = np.empty (self.NUM_OF_VNFs, dtype = np.uint16)
+        
+        set_ids = [i for i, entry in enumerate(sol) if entry == 1]
+
+        for id in set_ids:
+            for item in list (filter (lambda item : item['id'] == id, self.n)):
+                self.nxt_loc_of_vnf       [item['v']] = item['s']
+                self.nxt_cpu_alloc_of_vnf [item['v']] = item['a']
+                
     
     def print_sol_to_tex (self, running_parameter):
         """
@@ -1365,20 +1364,30 @@ class toy_example (object):
         
 
 if __name__ == "__main__":
+#     my_toy_example = toy_example (verbose = 1)
+#     my_toy_example.init_problem   ()
+#     my_toy_example.gen_py_problem ()
+
+#     my_toy_example.init_problem   ()
+
     my_toy_example = toy_example (verbose = 1)
-    my_toy_example.run (chain_target_delay = 5, gen_LP = True,  run_brute_force = False) # Generate code for the LP
+    my_toy_example.init_problem  ()
+    my_toy_example.gen_lp_problem ()
+    my_toy_example.run_and_compare_lp_vs_brute_force()
+
+    
     # if (len(sys.argv) > 2):  # run a parameterized sim'   
     #     chain_target_delay = float (str(sys.argv[2]))
     #         
     #     if (str(sys.argv[1])=="G"): # G --> Gen problem. "S" --> Solve problem
-    #         my_toy_example.run (chain_target_delay = chain_target_delay, gen_LP = True,  run_brute_force = False) # Generate code for the LP
+    #         my_toy_example.run (chain_target_delay = chain_target_delay, gen_py_problem = True,  run_brute_force = False) # Generate code for the LP
     #     else:
-    #         my_toy_example.run (chain_target_delay = chain_target_delay, gen_LP = False, run_brute_force = True)  # Brute-force solve the LP
+    #         my_toy_example.run (chain_target_delay = chain_target_delay, gen_py_problem = False, run_brute_force = True)  # Brute-force solve the LP
     # else:
     #     if (str(sys.argv[1])=="G"): # G --> Gen problem. "S" --> Solve problem
-    #         my_toy_example.run (gen_LP = True,  run_brute_force = False) # Generate code for the LP
+    #         my_toy_example.run (gen_py_problem = True,  run_brute_force = False) # Generate code for the LP
     #     else:
-    #         my_toy_example.run (gen_LP = False, run_brute_force = True)  # Brute-force solve the LP
+    #         my_toy_example.run (gen_py_problem = False, run_brute_force = True)  # Brute-force solve the LP
     # 
     # alloc = [3, 1, 2]
     # traffic_in = [1, 0.5, 1]

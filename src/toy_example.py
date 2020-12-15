@@ -629,6 +629,42 @@ class toy_example (object):
                     
             printf (self.mod_output_file, '<= {};\n\n' .format (constant))
 
+    def gen_link_cap_constraints_to_lp (self):
+        """
+        Print link capacity constraints to a .lp cplex format file.
+        This function uses the "r" decision variables, in which each single variable determines both the location (servers)
+        and the allocation (CPU capacities) of a full chain.
+        """
+        printf (self.lp_output_file, '\n\n\ CPU capacity constraints\n\n')
+        
+        for l in self.list_of_links:
+            list_of_decision_vars_in_link_l_eq = [] # The decision vars that will appear in the relevant lin' constraint 
+            list_of_coefs_in_link_l_eq         = [] # coefficients of the decision vars that will appear in the relevant lin' constraint           
+            
+            for list_of_paths_using_link_l in list (filter (lambda item : item['link'] == l, self.paths_of_link)):
+                list_of_paths_using_link_l = list_of_paths_using_link_l['paths'] 
+
+            coef = np.zeros (len(self.dynamic_r)) #coef[i] will hold the coefficient of the variable with id==i in dynami_r 
+            for dict_r in self.dynamic_r:
+                
+                chain_num = dict_r['chain num']
+                chain_len = self.num_of_vnfs_in_chain[chain_num]
+                id        = dict_r['id']
+                # collect all the BW used for migrating VMs determined by this variable
+                
+                # Collect all the paths along the scheduled chain's locations that use link l
+                for path in ( [ [dict_r['location'][i], dict_r['location'][i+1]] for i in range (chain_len-1)]):
+                    if path in list_of_paths_using_link_l:
+                        coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][i+1]]
+
+                for i in range (self.num_of_vnfs_in_chain[chain_num]): # for every VM in the chain
+                    v = self.vnf_in_chain[chain_num][i] # refer to this VNF as v 
+                    if (cur_loc [v] != r_dict['locations'][i]): # if this VM is scheduled to migrate
+                        if ([cur_loc [v], r_dict['locations'][i]] in list_of_paths_using_link_l): # if the path between this VM's current location, and scheduled location, uses link l. If this VM isn't scheduled to migrate, this path is an empty path [s,s], that doesn't use any link.
+                            coef[id] += self.mig_bw[v]
+                            if ([cur_loc [v], cur_loc[self.vpp[v]]] in list_of_paths_using_link_l): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
+                                coef += self.traffic_in [self.vpp[v]]
+            
     def gen_cpu_cap_constraints (self):
         """
         Print the constraints of maximum server's CPU capacity in a LP format
@@ -762,15 +798,7 @@ class toy_example (object):
                         printf (self.lp_output_file, ' + ')
                     printf (self.lp_output_file, '{}x{}' .format (coef, r_dict['id'])) 
                 
-                # if (len (decision_vars_using_this_server) > 0): # Discard cases where all suggested allocations using this server are infeasible: in such cases there's no constraint to print
                 printf (self.lp_output_file, ' <= {}\n\n' .format (self.cpu_capacity_of_server[s]))
-                # server_s_available_cap = self.cpu_capacity_of_server[s]
-                
-
-#                     indices_of_VMs_using_s = ([i for i in self.range(self.len([r_dict['locations']])) if r_dict['locations'][i]] == s)
-#                     for i in indices_of_VMs_using_s: # for each of the VMs in this chain which is scheduled to use s by this sol'
-#                         if i in r_dict['indices_of_migrating_VMs']: # if this VM is scheduled to migrate
-#                             coef += r_dict['alloc'][i]  
                     
 
     def gen_single_alloc_constraints (self):
@@ -950,12 +978,10 @@ class toy_example (object):
         r (H, vec(D), vec(mu)) will indicate that a solution implies allocating VM[j] of chain H on D[j], with CPU allocation mu[j].
         r is a list of dicts, where each dictionary includes the fields:
         - my_chain - the chain of this var.
-        - D - a list of |H| servers.
-        - mu - a list of |H| integers, each of them between 1 and C, where C is the maximum possible CPU capacity.
-        - static_cost - computation cost for using this allocation, independently of the current state. 
-        - static_bw - bw cost for using these VMs' locations, independently of the current state.
-        - mig - a list of |H| integers, where mig[j]==1 iff D[v] != current location of VM v.
-        - cost - cost of using this allocation.
+        - locations - a list (possibly) with repetitions of |H| servers, where locations[i] is destined to host VM i in this chain. 
+        - alloc - a list of |H| integers, where alloc[i] is the CPU allocated for host VM i in this chain.
+        - static_cost - computation cost for using this allocation, independently of the current state (namely, no mig' cost is counted). 
+        - static delay - The delay along the chain + computation delay. The only thing missing for the full chain delay is the delay to / from the PoA, which is unknown statically.
         """         
         self.static_r = []
         self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
@@ -987,7 +1013,7 @@ class toy_example (object):
                 # dominant_alloc will hold a list of dominant alloc for the suggested locations. If an allocation is subdominant, we don't need to consider it at all.
                 # For instance, if the allocation 
                 # dominant_alloc = []                                    
-                min_alloc_vals = np.asarray ([math.ceil(self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)], dtype = 'uint8')
+                min_alloc_vals = np.asarray ([math.ceil(self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)], dtype = 'uint8') # Built-in application of the finite computation delay constraint: the CPU allocation must be at least theta[v] * traffic_in[v]
                 max_alloc_vals = np.array   ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
                 alloc          = max_alloc_vals.copy () # Will be reset to the minimal allocation to examine upon the first iteration
 
@@ -1013,7 +1039,7 @@ class toy_example (object):
                             broke_CPU_cap_constraint = True
                             if (self.verbose == 1):
                                 printf (self.debug_output_file, 'infeasible cpu capacity' .format (alloc))
-                            continue
+                            break
                     
                     if (broke_CPU_cap_constraint):
                         if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
@@ -1062,17 +1088,34 @@ class toy_example (object):
                         self.servers_path_delay [self.PoA_of_user [chain_num]] [r_dict['locations'][0]] + \
                         self.servers_path_delay [r_dict['locations'][-1]]      [self.PoA_of_user [chain_num]]
                 
-                if (delay > self.chain_target_delay[chain_num]): # Verify the chain delay constraint by skipping suggested alloc with too long chain delay. 
+                # Discard decision variables that disobey the chain delay constraint 
+                if (delay > self.chain_target_delay[chain_num]):  
                     if (self.verbose == 1):
                         printf (self.debug_output_file, '\nlocation = {}, alloc = {}. infeasible dynamic delay: {:.2f}' .format (r_dict['locations'], r_dict['alloc'], delay))
                     continue   
-                cost = r_dict['static cost'] 
-                indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
 
-                list_of_migrating_src_dst_pairs = []
-                
-                for i in indices_of_migrating_VMs:
-                    list_of_migrating_src_dst_pairs.append ([cur_loc[i], r_dict['locations'][i]])
+                # Discard decision variables that disobey the CPU capacity constraints 
+                for s in range (self.NUM_OF_SERVERS):
+                    broke_CPU_cap_constraint = False
+                    
+                    # decision_vars_using_this_server = list (filter (lambda item: s in item['locations'], self.dynamic_r))
+                    coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
+                    for i in range (len (r_dict['locations'])): # for every VM in the chain scheduled by this decision var
+                        if (r_dict['locations'][i] == s): # if this VM is scheduled to use s...
+                            coef += r_dict['alloc'][i]      # add the scheduled allocation to the coef'
+                        elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
+                            coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
+                    if (coef > self.cpu_capacity_of_server[s]): # even this decision var' alone, without other decision vars', requires too high CPU capacity from server s
+                        broke_CPU_cap_constraint = True
+                        break
+                    
+                if (broke_CPU_cap_constraint):
+                    continue 
+
+                cost = r_dict['static cost'] 
+                #indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+
+                for i in [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['locations'][i] ]: #for every i in the list of the indices of the VMs in that chain, that are scheduled to migrate
                     cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
                 
                 if (self.write_to_lp_file):
@@ -1093,8 +1136,7 @@ class toy_example (object):
                     'locations'     : r_dict['locations'].  copy (),
                     'alloc'         : r_dict['alloc'].copy(),
                     'delay'         : delay,
-                    'indices_of_migrating_VMs' : indices_of_migrating_VMs,
-                    'list_of_migrating_src_dst_pairs' : list_of_migrating_src_dst_pairs
+                    #'indices_of_migrating_VMs' : indices_of_migrating_VMs,
                     }
                 )                
                 

@@ -140,7 +140,7 @@ class toy_example (object):
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = [0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v").
+        self.traffic_in             = [0.5, 0.9, 1] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
@@ -426,7 +426,7 @@ class toy_example (object):
             for v0 in self.v0: # for each VNF which is the first in its chain
                 for s in range(self.NUM_OF_SERVERS):
                     if ( not( [self.PoA_of_vnf[v0], s] in list_of_paths_using_link_l)): # The path (PoA(v0), s) doesn't use link l
-                        continue
+                        continue 
                      
                     # Now we know that the path from V0's PoA to s uses link l
                     if (self.x[v0][s]): # v0 is already located on server s 
@@ -650,20 +650,59 @@ class toy_example (object):
                 chain_num = dict_r['chain num']
                 chain_len = self.num_of_vnfs_in_chain[chain_num]
                 id        = dict_r['id']
-                # collect all the BW used for migrating VMs determined by this variable
-                
+
                 # Collect all the paths along the scheduled chain's locations that use link l
                 for path in ( [ [dict_r['location'][i], dict_r['location'][i+1]] for i in range (chain_len-1)]):
                     if path in list_of_paths_using_link_l:
                         coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][i+1]]
 
-                for i in range (self.num_of_vnfs_in_chain[chain_num]): # for every VM in the chain
+                # Check weather the scheduled path from the PoA to the first VM in the chain is using link l  
+                if ( [self.PoA_of_user[chain_num], dict_r['locations'][0]] in list_of_paths_using_link_l): # if the path from the PoA to the first VM in the chain uses link l
+                    coef[id] += self.traffic_in[self.vnf_in_chain[chain_num][0]]
+
+                # Consider the scheduled path from the last VM in the chain the PoA  is using link l  
+                if ( [dict_r['locations'][-1], self.PoA_of_user[chain_num]] in list_of_paths_using_link_l): # if the scheduled path from the last VM in the chain the PoA is using link l  
+                    coef[id] += self.traffic_out_of_chain[chain_num]
+
+                # Now account for migrations
+                indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['locations'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
+                                           
+
+                for i in indices_of_migrating_VMs: # for every VM in the chain
                     v = self.vnf_in_chain[chain_num][i] # refer to this VNF as v 
-                    if (cur_loc [v] != r_dict['locations'][i]): # if this VM is scheduled to migrate
-                        if ([cur_loc [v], r_dict['locations'][i]] in list_of_paths_using_link_l): # if the path between this VM's current location, and scheduled location, uses link l. If this VM isn't scheduled to migrate, this path is an empty path [s,s], that doesn't use any link.
-                            coef[id] += self.mig_bw[v]
-                            if ([cur_loc [v], cur_loc[self.vpp[v]]] in list_of_paths_using_link_l): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
-                                coef += self.traffic_in [self.vpp[v]]
+                    if ([cur_loc [v], r_dict['locations'][i]] in list_of_paths_using_link_l): # if the path between this VM's current location, and scheduled location, uses link l. 
+                        coef[id] += self.mig_bw[v] # Consider the mig' bw
+                    if ([cur_loc [v], cur_loc[self.vpp[v]]] in list_of_paths_using_link_l): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
+                        coef[id] += self.traffic_in [self.vpp[v]]
+            
+            # Now print the inequality constraint for this link
+            
+
+            list_of_non_zero_coefs = ( [i for i in range (len(coef)) if coef[i] != 0]  ) 
+            
+            if (len (list_of_non_zero_coefs) == 0): # No non-zeros coef's, namely, no one uses / will be using this link 
+                continue
+            
+            is_first = True
+            for id in list_of_non_zero_coefs:
+
+                if (is_first):
+                    printf (self.lp_output_file, ' c{}: ' .format (self.constraint_num))
+                    self.constraint_num += 1
+                    is_first = False
+                else:
+                    printf (self.lp_output_file, ' + ')
+                printf (self.lp_output_file, '{}x{}' .format (coef[id], id)) 
+            
+            print ('link l = ', l)
+            #printf (self.lp_output_file, ' <= {}\n\n' .format (self.capacity_of_link[l]))
+
+            
+            
+#             if (np.count_nonzero(coef)==0): #  
+#                 continue
+#                 
+#             for ()
             
     def gen_cpu_cap_constraints (self):
         """
@@ -673,7 +712,7 @@ class toy_example (object):
         if (self.write_to_prb_file):
             printf (self.prb_output_file, '\n')        
             for s in range (self.NUM_OF_SERVERS):
-    
+     
                 # Consider the CPU consumed by all VMs that will be assigned to servers (by n_{vsa} decision variables)
                 for item in list (filter (lambda item:  item['s'] == s, self.n )): # for each decision var' related to server s
                     item['coef'] = item['a']

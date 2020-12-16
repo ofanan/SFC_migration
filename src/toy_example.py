@@ -1283,11 +1283,14 @@ class toy_example (object):
             self.gen_all_constraints ()
             self.constraint_check_by_Py.close ()
         
-    def gen_lp_problem (self):
+    def gen_static_lp_problem (self):
 
-        self.lp_output_file         = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+        self.lp_output_file  = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
         self.constraint_num  = int(0)                     # A running number for counting the constraints   
         self.gen_static_r  ()
+
+    def gen_dynamic_lp_problem (self):
+
         self.calc_dynamic_r ()
         if (self.write_to_lp_file):
             printf (self.lp_output_file, '\n\nSubject To')
@@ -1367,19 +1370,30 @@ if __name__ == "__main__":
     #my_toy_example.init_problem   ()
     #my_toy_example.gen_py_problem ()
 
+    lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
+    
+    # Gen static LP problem
+    t = time.time()
     my_toy_example = toy_example (verbose = 1)
     my_toy_example.init_problem  ()
-    my_toy_example.gen_lp_problem ()
-    t = time.time()
-    my_toy_example.run_lp_Cplex()
-    lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
-    printf (lp_time_summary_file, 'V = {}, S = {}, C = {}, h = {}, elapsed time = {}\n' .format 
+    my_toy_example.gen_static_lp_problem ()
+    printf (lp_time_summary_file, 'V = {}, S = {}, C = {}, k = {}\n****************************\nGen static LP took {:.4f} seconds\n' .format 
            (my_toy_example.NUM_OF_VNFs, 
             my_toy_example.NUM_OF_SERVERS, 
             my_toy_example.cpu_capacity_of_server[0],
             my_toy_example.num_of_vnfs_in_chain[0],
-            time.time() - t
+            float (time.time() - t)
             ))
+
+    # Gen dynamic LP problem
+    t = time.time()
+    my_toy_example.gen_dynamic_lp_problem ()
+    printf (lp_time_summary_file, 'Gen dynamic LP took {:.4f} seconds\n' .format (float (time.time() - t)))
+
+    # Solve the LP problem
+    t = time.time()
+    my_toy_example.run_lp_Cplex()
+    printf (lp_time_summary_file, 'Solving the LP took {:.4f} seconds\n' .format (float (time.time() - t)))
 
     # if (len(sys.argv) > 2):  # run a parameterized sim'   
     #     chain_target_delay = float (str(sys.argv[2]))

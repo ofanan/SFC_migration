@@ -122,7 +122,7 @@ class toy_example (object):
         self.uniform_link_capacity  = 20
         self.uniform_cpu_capacity   = 5
 
-        use_custom_netw = True
+        use_custom_netw = False
         if (use_custom_netw == True):
             self.gen_custom_three_nodes_tree()
         else:
@@ -133,13 +133,13 @@ class toy_example (object):
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
-        self.cur_loc_of_vnf         = [0, 0] #[0, 0, 0, 1]# [0, 0, 0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
-        self.cur_cpu_alloc_of_vnf   = [1, 1] #2 * np.ones (self.NUM_OF_VNFs)                                  # Initially, allocate each VNs uniform amount CPU units
+        self.cur_loc_of_vnf         = np.zeros (self.NUM_OF_SERVERS, dtype = 'uint16') #[0, 0, 0, 1]# [0, 0, 0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_cpu_alloc_of_vnf   = np.ones  (self.NUM_OF_VNFs, dtype = 'uint8')                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = [0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
+        self.traffic_in             = 0.5 * np.ones (self.NUM_OF_VNFs) #[0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 1 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
 
@@ -955,7 +955,7 @@ class toy_example (object):
             
             chain_len = self.num_of_vnfs_in_chain[chain_num]
             min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
-            max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * self.NUM_OF_VNFs # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
+            max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * (self.NUM_OF_SERVERS-1) # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
             locations    = max_loc_vals.copy () # Will be reset to the first location to examine upon the first iteration 
             while True:
                
@@ -1230,7 +1230,7 @@ class toy_example (object):
                 self.min_cost = cost
                 self.best_n = sol
 
-    def init_problem (self, uniform_link_delay = 1, uniform_mig_cost = 0.1, chain_target_delay = 15):
+    def init_problem (self, uniform_link_delay = 1, uniform_mig_cost = 0.1, chain_target_delay = 2):
         """
         generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
         """
@@ -1306,9 +1306,10 @@ class toy_example (object):
         self.brute_force_sa_pow_v ()
         self.n_vsa_sol_to_loc_alloc (self.best_n)
 
-    def run_and_compare_lp_vs_brute_force (self):
-        self.run_brute_force()
+    def run_lp_Cplex (self):
         self.lp_sol_to_loc_alloc (solve_problem_by_Cplex ('../res/problem.lp'))
+
+    def compare_lp_to_brute_force_sol (self):
         print ('Brute force: loc = ', self.nxt_loc_of_vnf, ', alloc = ', self.nxt_cpu_alloc_of_vnf, ', cost = ', self.min_cost)
         print ('Cplex: loc = ', self.lp_nxt_loc_of_vnf, ', alloc = ', self.lp_nxt_cpu_alloc_of_vnf)
 
@@ -1364,16 +1365,15 @@ class toy_example (object):
         
 
 if __name__ == "__main__":
-#     my_toy_example = toy_example (verbose = 1)
-#     my_toy_example.init_problem   ()
-#     my_toy_example.gen_py_problem ()
+    #my_toy_example = toy_example (verbose = 1)
+    #my_toy_example.init_problem   ()
+    #my_toy_example.gen_py_problem ()
 
     my_toy_example = toy_example (verbose = 1)
     my_toy_example.init_problem  ()
     my_toy_example.gen_lp_problem ()
-    my_toy_example.run_and_compare_lp_vs_brute_force()
+    my_toy_example.run_lp_Cplex()
 
-    
     # if (len(sys.argv) > 2):  # run a parameterized sim'   
     #     chain_target_delay = float (str(sys.argv[2]))
     #         

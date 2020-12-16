@@ -1045,7 +1045,8 @@ class toy_example (object):
             
             chain_len = self.num_of_vnfs_in_chain[chain_num]
             
-            cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)])
+            #cur_loc[i] will hold the current location of the i-th VNF in this chain
+            cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)]) 
             
             for r_dict in (list (filter (lambda item : item['chain_num'] == chain_num, self.static_r))):
                 
@@ -1080,13 +1081,13 @@ class toy_example (object):
                 cost = r_dict['static cost'] 
                 #indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['location'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
 
-                for i in [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['location'][i] ]: #for every i in the list of the indices of the VMs in that chain, that are scheduled to migrate
+                for i in [i for i in range (chain_len) if cur_loc [i] != r_dict['location'][i] ]: #for every i in the list of indices of VMs in this chain, that are scheduled to migrate
                     cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
                 
                 if (self.write_to_lp_file):
                     if (id > 0):
                         printf (self.lp_output_file, ' + ')
-                    printf (self.lp_output_file, '{}x{}' .format (cost, id))
+                    printf (self.lp_output_file, '{:.4f}x{}' .format (cost, id))
     
                     #r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['location'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['location'][i] ] ) 
                 

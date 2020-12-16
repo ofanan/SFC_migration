@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 import math
 import itertools 
+import time
 
 from printf import printf
 import Check_sol
@@ -1079,7 +1080,6 @@ class toy_example (object):
                     continue 
 
                 cost = r_dict['static cost'] 
-                #indices_of_migrating_VMs = ( [i for i in range (chain_len) if cur_loc [self.vnf_in_chain[chain_num][i]] != r_dict['location'][i] ] ) # indices_of_migrating_VMs will hold a list of the indices of the VMs in that chain, that are scheduled to migrate
 
                 for i in [i for i in range (chain_len) if cur_loc [i] != r_dict['location'][i] ]: #for every i in the list of indices of VMs in this chain, that are scheduled to migrate
                     cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
@@ -1088,9 +1088,7 @@ class toy_example (object):
                     if (id > 0):
                         printf (self.lp_output_file, ' + ')
                     printf (self.lp_output_file, '{:.4f}x{}' .format (cost, id))
-    
-                    #r_dict['migs src dst pairs'] = ( [ [cur_loc[i], r_dict['location'][i]] for i in range (chain_len) if cur_loc[i] != r_dict['location'][i] ] ) 
-                
+                   
                 if (self.verbose == 1):
                     printf (self.debug_output_file, '\nid = {}, location = {}, alloc = {}, cost = {}' 
                             .format (id, r_dict['location'], r_dict['alloc'], cost))
@@ -1102,7 +1100,6 @@ class toy_example (object):
                     'location'     : r_dict['location'].  copy (),
                     'alloc'         : r_dict['alloc'].copy(),
                     'delay'         : delay,
-                    #'indices_of_migrating_VMs' : indices_of_migrating_VMs,
                     }
                 )                
                 
@@ -1373,7 +1370,16 @@ if __name__ == "__main__":
     my_toy_example = toy_example (verbose = 1)
     my_toy_example.init_problem  ()
     my_toy_example.gen_lp_problem ()
+    t = time.time()
     my_toy_example.run_lp_Cplex()
+    lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
+    printf (lp_time_summary_file, 'V = {}, S = {}, C = {}, h = {}, elapsed time = {}\n' .format 
+           (my_toy_example.NUM_OF_VNFs, 
+            my_toy_example.NUM_OF_SERVERS, 
+            my_toy_example.cpu_capacity_of_server[0],
+            my_toy_example.num_of_vnfs_in_chain[0],
+            time.time() - t
+            ))
 
     # if (len(sys.argv) > 2):  # run a parameterized sim'   
     #     chain_target_delay = float (str(sys.argv[2]))

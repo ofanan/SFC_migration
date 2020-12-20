@@ -18,8 +18,8 @@ class toy_example (object):
         """
   
         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
-        #servers_path_delay[i][j] holds the netw' delay of the path from server i to server j
-        self.servers_path_delay  = np.array ([
+        #path_delay[i][j] holds the netw' delay of the path from server i to server j
+        self.path_delay  = np.array ([
                                    [0, 1, 2],
                                    [1, 0, 1],
                                    [2, 1, 0]
@@ -78,13 +78,15 @@ class toy_example (object):
         """
         Generate a parameterized regular three-nodes tree (root and 2 leaves). 
         """
-        self.G                  = nx.generators.classic.balanced_tree (r=3, h=2) # Generate a tree of height h where each node has r children.
+        self.G                  = nx.generators.classic.balanced_tree (r=2, h=2) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
         self.NUM_OF_USERS       = 2
 
-        self.servers_path_delay = np.array ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) 
-        self.servers_path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
+        self.path_delay = np.empty ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
+        # self.path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
+        # self.path_delay = 0.5 * np.ones ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) 
 
+        uniform_link_delay = 1
         shortest_path = nx.shortest_path(self.G)
 
         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
@@ -92,6 +94,7 @@ class toy_example (object):
         for s in range (self.NUM_OF_SERVERS):
             row_in_links_of_path = []
             for d in range (self.NUM_OF_SERVERS):
+                self.path_delay[s][d] = uniform_link_delay * len (shortest_path[s][d]) - 1 
                 if (s == d):
                     row_in_links_of_path.append([]) # no links in the path 
                     continue
@@ -102,7 +105,6 @@ class toy_example (object):
 
             self.links_of_path.append (row_in_links_of_path)
         
-        self.NUM_OF_LINKS = self.G.number_of_edges()
         self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
         
         # Generate from each undiretional edge in the tree 2 directional edges. Assign all links capacity = self.uniform_link_capacity
@@ -129,7 +131,7 @@ class toy_example (object):
         else:
             self.gen_parameterized_tree()
             
-        self.PoA_of_user            = 2 * np.ones (self.NUM_OF_USERS, dtype = 'uint16') # np.random.randint(self.NUM_OF_USERS, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
+        self.PoA_of_user            = 4 * np.ones (self.NUM_OF_USERS, dtype = 'uint16') # np.random.randint(self.NUM_OF_USERS, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
         self.num_of_vnfs_in_chain   = 2 * np.ones (self.NUM_OF_USERS, dtype ='uint8')
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
@@ -251,11 +253,11 @@ class toy_example (object):
                 self.constraint_num += 1
             printf (self.prb_output_file, '\n')
         
-    def gen_leq1_constraints_lp (self):
+    def gen_single_chain_alloc_constraints_lp (self):
         printf (self.lp_output_file, '\n\n\ single chain allocation constraints\n')
         id = 0  
         for chain_num in range (self.NUM_OF_CHAINS):
-            printf (self.lp_output_file, '\n c{}: ' .format (self.constraint_num))
+            printf (self.lp_output_file, '\n\n c{}: ' .format (self.constraint_num))
             is_first = True
             while (id < self.last_id_in_chain[chain_num]):
                 if (is_first):
@@ -267,7 +269,11 @@ class toy_example (object):
             printf (self.lp_output_file, ' = 1')
             self.constraint_num += 1
         
-
+    def gen_bounds_lp (self):
+        printf (self.lp_output_file, '\nBounds\n')
+        for id in range (len(self.dynamic_r)):
+            printf (self.lp_output_file, ' 0 <= x{} <= 1\n' .format (id))
+        
     
     def gen_chain_delay_constraints (self):
         """
@@ -303,14 +309,14 @@ class toy_example (object):
                     for s in range (self.NUM_OF_SERVERS):
                         for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
                             for id in y_vs['ids']: 
-                                list_of_coefs_in_lin_eq [list_of_decision_vars_in_lin_eq.index(id)] += self.servers_path_delay[self.PoA_of_vnf[v]][s] 
+                                list_of_coefs_in_lin_eq [list_of_decision_vars_in_lin_eq.index(id)] += self.path_delay[self.PoA_of_vnf[v]][s] 
                      
                 # Consider the delay from the PoA from the last VNF in this chain to the PoA
                 if (idx_in_chain == len(self.vnf_in_chain[chain_num])-1): # v is the last VNF in this chain. Not Elsif, because it can be both the first and last in its chain.
                     for s in range (self.NUM_OF_SERVERS):
                         for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
                             for id in y_vs['ids']: 
-                                list_of_coefs_in_lin_eq [list_of_decision_vars_in_lin_eq.index(id)] += self.servers_path_delay[s][self.PoA_of_vnf[v]]
+                                list_of_coefs_in_lin_eq [list_of_decision_vars_in_lin_eq.index(id)] += self.path_delay[s][self.PoA_of_vnf[v]]
                                 
                     continue # The last vnf in its chain has no netw' delay to the next VNF in the chain
                 
@@ -328,7 +334,7 @@ class toy_example (object):
                                 
                                         first_decision_vars_in_mult_eq.append   (id_v) 
                                         scnd_decision_vars_in_mult_eq.append    (id_vpp)
-                                        list_of_coefs_in_mult_eq.append         (self.servers_path_delay[s][s_prime])
+                                        list_of_coefs_in_mult_eq.append         (self.path_delay[s][s_prime])
                         
                 
                 
@@ -964,7 +970,7 @@ class toy_example (object):
                 locations = self.inc_array (locations  , min_loc_vals, max_loc_vals)
                
                 # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
-                static_netw_delay = sum (self.servers_path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
+                static_netw_delay = sum (self.path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
                 
                 if (self.verbose == 1):
                     printf (self.debug_output_file, '\n\nlocations = {}\n********************' .format (locations))
@@ -1052,8 +1058,8 @@ class toy_example (object):
             for r_dict in (list (filter (lambda item : item['chain_num'] == chain_num, self.static_r))):
                 
                 delay = r_dict['static delay'] + \
-                        self.servers_path_delay [self.PoA_of_user [chain_num]] [r_dict['location'][0]] + \
-                        self.servers_path_delay [r_dict['location'][-1]]      [self.PoA_of_user [chain_num]]
+                        self.path_delay [self.PoA_of_user [chain_num]] [r_dict['location'][0]] + \
+                        self.path_delay [r_dict['location'][-1]]      [self.PoA_of_user [chain_num]]
                 
                 # Discard decision variables that disobey the chain delay constraint 
                 if (delay > self.chain_target_delay[chain_num]):  
@@ -1228,14 +1234,13 @@ class toy_example (object):
                 self.min_cost = cost
                 self.best_n = sol
 
-    def init_problem (self, uniform_link_delay = 1, uniform_mig_cost = 0.1, chain_target_delay = 2):
+    def init_problem (self, uniform_mig_cost = 6, chain_target_delay = 3):
         """
         generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
         """
         
-        self.chain_target_delay             = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
-        self.mig_cost                       = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
-        self.servers_path_delay             *= uniform_link_delay
+        self.chain_target_delay  = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
+        self.mig_cost            = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
         
         if (self.verbose == 1):
             self.debug_output_file = open ('../res/debug.res', 'w')
@@ -1247,8 +1252,9 @@ class toy_example (object):
             printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
             printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n'  .format (self.theta_times_traffic_in))
             printf (self.cfg_output_file, 'traffic back to user = {}\n'    .format (self.traffic_out_of_chain))
-            printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.servers_path_delay))
+            printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
+            printf (self.cfg_output_file, 'migration costs = {}\n\n'       .format (self.chain_target_delay))
 
         self.gen_n()
 
@@ -1294,10 +1300,11 @@ class toy_example (object):
         self.calc_dynamic_r ()
         if (self.write_to_lp_file):
             printf (self.lp_output_file, '\n\nSubject To')
-        self.gen_leq1_constraints_lp    ()
+        self.gen_single_chain_alloc_constraints_lp    ()
         self.gen_cpu_cap_constraints_lp ()
         self.calc_paths_of_links ()
         self.gen_link_cap_constraints_lp()
+        self.gen_bounds_lp ()
         printf (self.lp_output_file, "\nEnd\n")
 
     def run_brute_force (self):
@@ -1366,8 +1373,8 @@ class toy_example (object):
         
 
 if __name__ == "__main__":
-    #my_toy_example = toy_example (verbose = 1)
-    #my_toy_example.init_problem   ()
+    my_toy_example = toy_example (verbose = 0)
+    my_toy_example.init_problem   ()
     #my_toy_example.gen_py_problem ()
 
     lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
@@ -1384,7 +1391,7 @@ if __name__ == "__main__":
             my_toy_example.num_of_vnfs_in_chain[0],
             float (time.time() - t)
             ))
-
+ 
     # Gen dynamic LP problem
     t = time.time()
     my_toy_example.gen_dynamic_lp_problem ()

@@ -12,67 +12,67 @@ from solve_problem_by_Cplex import solve_problem_by_Cplex
 
 class toy_example (object):
     
-    def gen_custom_three_nodes_tree (self):
-        """
-        generate a custom three-nodes tree (root and 2 leaves). 
-        """
-  
-        self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
-        #path_delay[i][j] holds the netw' delay of the path from server i to server j
-        self.path_delay  = np.array ([
-                                   [0, 1, 2],
-                                   [1, 0, 1],
-                                   [2, 1, 0]
-                                  ], dtype = float) 
-    
-        
-        # self.links_of_path[s][d] will contain the list of links found in the path from s to d
-        self.links_of_path = [
-            [
-                [],
-                [[0,1]],
-                [[0,1], [1,2]]
-            ],
-            [
-                [[1,0]],
-                [],
-                [[1,2]]  
-            ],
-            [
-                [[2,1],[1,0]],
-                [[2,1]],
-                []
-            ]
-        ]
-        
-#         self.paths_of_link = [ # self.paths_of_link[i][j] will contain a list of the paths [s,d] which use link (i,j)
+#     def gen_custom_three_nodes_tree (self):
+#         """
+#         generate a custom three-nodes tree (root and 2 leaves). 
+#         """
+#   
+#         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
+#         #path_delay[i][j] holds the netw' delay of the path from server i to server j
+#         self.path_delay  = np.array ([
+#                                    [0, 1, 2],
+#                                    [1, 0, 1],
+#                                    [2, 1, 0]
+#                                   ], dtype = float) 
+#     
+#         
+#         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
+#         self.links_of_path = [
 #             [
-#                 [],               # list of paths in which l(0,0) appears 
-#                 [ [0,1], [0,2] ], # list of paths in which l(0,1) appears
-#                 []                # list of paths in which l(0,2) appears
+#                 [],
+#                 [[0,1]],
+#                 [[0,1], [1,2]]
 #             ],
 #             [
-#                 [ [1,0], [2,0] ], # list of paths in which l(1,0) appears 
-#                 [],               # list of paths in which l(1,1) appears
-#                 [ [0,2], [1,2]]                # list of paths in which l(1,2) appears
+#                 [[1,0]],
+#                 [],
+#                 [[1,2]]  
 #             ],
 #             [
-#                 [],               # list of paths in which l(2,0) appears 
-#                 [ [2,1], [2,0] ], # list of paths in which l(2,1) appears
-#                 []                # list of paths in which l(2,2) appears
+#                 [[2,1],[1,0]],
+#                 [[2,1]],
+#                 []
 #             ]
 #         ]
-
-        self.NUM_OF_SERVERS             = 3
-        self.NUM_OF_USERS               = 1
-        self.NUM_OF_LINKS               = 4
-        self.capacity_of_link           = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
-        self.capacity_of_link[0][1]     = self.uniform_link_capacity
-        self.capacity_of_link[1][0]     = self.uniform_link_capacity
-        self.capacity_of_link[1][2]     = self.uniform_link_capacity
-        self.capacity_of_link[2][1]     = self.uniform_link_capacity
-        self.NUM_OF_CHAINS              = self.NUM_OF_USERS
-        self.res_output_file            = open ("../res/custom_tree.res", "a")
+#         
+# #         self.paths_of_link = [ # self.paths_of_link[i][j] will contain a list of the paths [s,d] which use link (i,j)
+# #             [
+# #                 [],               # list of paths in which l(0,0) appears 
+# #                 [ [0,1], [0,2] ], # list of paths in which l(0,1) appears
+# #                 []                # list of paths in which l(0,2) appears
+# #             ],
+# #             [
+# #                 [ [1,0], [2,0] ], # list of paths in which l(1,0) appears 
+# #                 [],               # list of paths in which l(1,1) appears
+# #                 [ [0,2], [1,2]]                # list of paths in which l(1,2) appears
+# #             ],
+# #             [
+# #                 [],               # list of paths in which l(2,0) appears 
+# #                 [ [2,1], [2,0] ], # list of paths in which l(2,1) appears
+# #                 []                # list of paths in which l(2,2) appears
+# #             ]
+# #         ]
+# 
+#         self.NUM_OF_SERVERS             = 3
+#         self.NUM_OF_USERS               = 1
+#         self.NUM_OF_LINKS               = 4
+#         self.capacity_of_link           = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
+#         self.capacity_of_link[0][1]     = self.uniform_link_capacity
+#         self.capacity_of_link[1][0]     = self.uniform_link_capacity
+#         self.capacity_of_link[1][2]     = self.uniform_link_capacity
+#         self.capacity_of_link[2][1]     = self.uniform_link_capacity
+#         self.NUM_OF_CHAINS              = self.NUM_OF_USERS
+#         self.res_output_file            = open ("../res/custom_tree.res", "a")
 
     def gen_parameterized_tree (self):
         """
@@ -80,7 +80,7 @@ class toy_example (object):
         """
         self.G                  = nx.generators.classic.balanced_tree (r=2, h=2) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
-        self.NUM_OF_USERS       = 2
+        self.NUM_OF_USERS       = 4
 
         self.path_delay = np.empty ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
         # self.path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
@@ -136,7 +136,7 @@ class toy_example (object):
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
 
-        self.cur_loc_of_vnf         = np.zeros (self.NUM_OF_SERVERS, dtype = 'uint16') #[0, 0, 0, 1]# [0, 0, 0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_loc_of_vnf         = 3 * np.ones (self.NUM_OF_VNFs, dtype = 'uint16') #[0, 0, 0, 1]# [0, 0, 0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
         self.cur_cpu_alloc_of_vnf   = np.ones  (self.NUM_OF_VNFs, dtype = 'uint8')                                  # Initially, allocate each VNs uniform amount CPU units
 
         self.mig_bw                 = 5 * np.ones (self.NUM_OF_VNFs)
@@ -1134,7 +1134,7 @@ class toy_example (object):
         # Loop over all combinations of v, s, and a
         for v in range (self.NUM_OF_VNFs):
             for s in range (self.NUM_OF_SERVERS):
-                mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is s different than v's current location, this implies a mig'
+                mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is different from v's current location, this implies a mig'
                 list_of_ids = []
                 for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity alloc), which cause infinite comp' delay
                     denominator = a - self.theta_times_traffic_in[v] 
@@ -1254,7 +1254,9 @@ class toy_example (object):
             printf (self.cfg_output_file, 'traffic back to user = {}\n'    .format (self.traffic_out_of_chain))
             printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
-            printf (self.cfg_output_file, 'migration costs = {}\n\n'       .format (self.chain_target_delay))
+            printf (self.cfg_output_file, 'migration costs = {}\n\n'       .format (self.mig_cost))
+            printf (self.cfg_output_file, 'cur location = {}\n\n'          .format (self.cur_loc_of_vnf))
+            printf (self.cfg_output_file, 'cur CPU alloc = {}\n\n'         .format (self.cur_cpu_alloc_of_vnf))
 
         self.gen_n()
 
@@ -1274,13 +1276,6 @@ class toy_example (object):
         if (self.write_to_mod_file):
             self.mod_output_file        = open ("../../Cplex/short/demo.mod", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
 
-        if (self.write_to_cfg_file):
-            printf (self.cfg_output_file, 'PoA = {}\n' .format (self.PoA_of_user))
-            printf (self.cfg_output_file, 'cur VM loc = {}\n' .format (self.cur_loc_of_vnf))
-            printf (self.cfg_output_file, 'cur CPU alloc = {}\n' .format (self.cur_cpu_alloc_of_vnf))
-            printf (self.cfg_output_file, 'mig bw = {}\n' .format (self.mig_bw))
-            printf (self.cfg_output_file, 'mig cost = {}\n' .format (self.mig_cost))
-        
         self.constraint_num             = int(0)                     # A running number for counting the constraints   
         self.gen_p ()                                                
         if (self.write_to_prb_file or self.write_to_mod_file or self.write_to_py_file):
@@ -1373,16 +1368,13 @@ class toy_example (object):
         
 
 if __name__ == "__main__":
-    my_toy_example = toy_example (verbose = 0)
-    my_toy_example.init_problem   ()
-    #my_toy_example.gen_py_problem ()
-
     lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
     
     # Gen static LP problem
     t = time.time()
     my_toy_example = toy_example (verbose = 1)
     my_toy_example.init_problem  ()
+    #my_toy_example.gen_py_problem ()
     my_toy_example.gen_static_lp_problem ()
     printf (lp_time_summary_file, 'V = {}, S = {}, C = {}, k = {}\n****************************\nGen static LP took {:.4f} seconds\n' .format 
            (my_toy_example.NUM_OF_VNFs, 

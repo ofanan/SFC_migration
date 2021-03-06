@@ -12,81 +12,19 @@ from solve_problem_by_Cplex import solve_problem_by_Cplex
 
 class toy_example (object):
     
-#     def gen_custom_three_nodes_tree (self):
-#         """
-#         generate a custom three-nodes tree (root and 2 leaves). 
-#         """
-#   
-#         self.list_of_links = [ [0,1], [1,0], [1,2], [2,1] ]
-#         #path_delay[i][j] holds the netw' delay of the path from server i to server j
-#         self.path_delay  = np.array ([
-#                                    [0, 1, 2],
-#                                    [1, 0, 1],
-#                                    [2, 1, 0]
-#                                   ], dtype = float) 
-#     
-#         
-#         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
-#         self.links_of_path = [
-#             [
-#                 [],
-#                 [[0,1]],
-#                 [[0,1], [1,2]]
-#             ],
-#             [
-#                 [[1,0]],
-#                 [],
-#                 [[1,2]]  
-#             ],
-#             [
-#                 [[2,1],[1,0]],
-#                 [[2,1]],
-#                 []
-#             ]
-#         ]
-#         
-# #         self.paths_of_link = [ # self.paths_of_link[i][j] will contain a list of the paths [s,d] which use link (i,j)
-# #             [
-# #                 [],               # list of paths in which l(0,0) appears 
-# #                 [ [0,1], [0,2] ], # list of paths in which l(0,1) appears
-# #                 []                # list of paths in which l(0,2) appears
-# #             ],
-# #             [
-# #                 [ [1,0], [2,0] ], # list of paths in which l(1,0) appears 
-# #                 [],               # list of paths in which l(1,1) appears
-# #                 [ [0,2], [1,2]]                # list of paths in which l(1,2) appears
-# #             ],
-# #             [
-# #                 [],               # list of paths in which l(2,0) appears 
-# #                 [ [2,1], [2,0] ], # list of paths in which l(2,1) appears
-# #                 []                # list of paths in which l(2,2) appears
-# #             ]
-# #         ]
-# 
-#         self.NUM_OF_SERVERS             = 3
-#         self.NUM_OF_USERS               = 1
-#         self.NUM_OF_LINKS               = 4
-#         self.capacity_of_link           = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
-#         self.capacity_of_link[0][1]     = self.uniform_link_capacity
-#         self.capacity_of_link[1][0]     = self.uniform_link_capacity
-#         self.capacity_of_link[1][2]     = self.uniform_link_capacity
-#         self.capacity_of_link[2][1]     = self.uniform_link_capacity
-#         self.NUM_OF_CHAINS              = self.NUM_OF_USERS
-#         self.res_output_file            = open ("../res/custom_tree.res", "a")
-
     def gen_parameterized_tree (self):
         """
         Generate a parameterized regular three-nodes tree (root and 2 leaves). 
         """
-        self.G                  = nx.generators.classic.balanced_tree (r=2, h=2) # Generate a tree of height h where each node has r children.
+        self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
-        self.NUM_OF_USERS       = 4
+        
+        self.G = self.G.to_directed()
 
         self.path_delay = np.empty ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
         # self.path_delay = np.random.rand (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS) 
         # self.path_delay = 0.5 * np.ones ((self.NUM_OF_SERVERS, self.NUM_OF_SERVERS)) 
 
-        uniform_link_delay = 1
         shortest_path = nx.shortest_path(self.G)
 
         # self.links_of_path[s][d] will contain the list of links found in the path from s to d
@@ -94,28 +32,56 @@ class toy_example (object):
         for s in range (self.NUM_OF_SERVERS):
             row_in_links_of_path = []
             for d in range (self.NUM_OF_SERVERS):
-                self.path_delay[s][d] = uniform_link_delay * len (shortest_path[s][d]) - 1 
+                self.path_delay[s][d] = self.uniform_link_delay * len (shortest_path[s][d]) - 1 
                 if (s == d):
                     row_in_links_of_path.append([]) # no links in the path 
                     continue
                 path_from_s_to_d = []
-                for link_src_node in range (len(shortest_path[s][d])-1):
-                    path_from_s_to_d.append ([shortest_path[s][d][link_src_node], shortest_path[s][d][link_src_node+1]])
+                for hop_num in range (len(shortest_path[s][d])-1):
+                    path_from_s_to_d.append ((shortest_path[s][d][hop_num], shortest_path[s][d][hop_num+1]))
                 row_in_links_of_path.append (path_from_s_to_d)
 
             self.links_of_path.append (row_in_links_of_path)
         
-        self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
-        
-        # Generate from each undiretional edge in the tree 2 directional edges. Assign all links capacity = self.uniform_link_capacity
-        self.list_of_links = []
-        for edge in self.G.edges:
-            self.capacity_of_link[edge[0]][edge[1]] = self.uniform_link_capacity
-            self.capacity_of_link[edge[1]][edge[0]] = self.uniform_link_capacity
-            self.list_of_links.append ([edge[0], edge[1]])
-            self.list_of_links.append ([edge[1], edge[0]])
+        leaves = [x for x in self.G.nodes() if self.G.out_degree(x)==1 and self.G.in_degree(x)==1]
 
-       
+        self.leaves = []
+        for leaf in leaves: 
+            self.leaves.append ({'leaf'         : leaf,
+                                 'path to root' : shortest_path[leaf][0]                
+                                })            
+            
+        print (self.leaves)
+
+        shortest_path = nx.shortest_path(self.G)
+        # $$$ May remove all the paths of non-descending nodes.
+        # $$$ In general, we're interested only in leaf-to-root snakes. 
+        
+        # self.capacity_of_link = np.zeros ( (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
+        
+        # Generate from each un-diretional edge in the tree 2 directional edges. Assign for each link its cap', and a list of paths using it
+        self.links = [] #self.links will 
+        for edge in self.G.edges: 
+            self.add_link(edge[1], edge[0])
+
+        print (self.G.edges)
+        print (self.links)
+        del (self.G)
+        # print (self.capacity_of_link)
+        # print (capacity_of_link0)
+        exit (0)
+        
+    def add_link (self, s, d):
+        paths_using_this_link = []
+        for src in range (self.NUM_OF_SERVERS):
+            for dst in range (self.NUM_OF_SERVERS): 
+                if ((s,d) in self.links_of_path[src][dst]): # Does link appear in the path from src to dst
+                    paths_using_this_link.append ((src, dst)) # Yep --> append it to the list of paths in which this link appears
+        self.links.append ({'s'                     : s, # src vertex of this link
+                           'd'                      : d, # dst vertex of this link
+                           'cap'                    : self.uniform_link_capacity,
+                           'paths using this link'  : paths_using_this_link
+                            })
         
     def __init__ (self, verbose = -1):
         """
@@ -123,29 +89,33 @@ class toy_example (object):
         """
         
         self.verbose                = verbose
+        
+        # Network parameters
+        self.tree_height            = 2
+        self.children_per_node      = 2 # num of children of every non-leaf node
         self.uniform_link_capacity  = 100
         self.uniform_cpu_capacity   = 1
-
-        use_custom_netw = False
-        if (use_custom_netw == True):
-            self.gen_custom_three_nodes_tree()
-        else:
-            self.gen_parameterized_tree()
-            
+        self.uniform_link_delay     = 1
+        self.max_chain_len          = 2
+                
+        # Users parameters
         self.PoA_of_user            = [4, 4, 5, 5] #4 * np.ones (self.NUM_OF_USERS, dtype = 'uint16') # np.random.randint(self.NUM_OF_USERS, size = self.NUM_OF_USERS) # PoA_of_user[u] will hold the PoA of the user using chain u       
-        self.num_of_vnfs_in_chain   = 4 * np.ones (self.NUM_OF_USERS, dtype ='uint8')
+        self.NUM_OF_USERS           = len(self.PoA_of_user)
+        self.num_of_vnfs_in_chain   = self.max_chain_len * np.ones (self.NUM_OF_USERS, dtype ='uint8')
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
-
-        self.cur_loc_of_vnf         = 4 * np.ones (self.NUM_OF_VNFs, dtype = 'uint16') #[0, 0, 0, 1]# [0, 0, 0, 0] # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
+        self.cur_loc_of_vnf         = 4 * np.ones (self.NUM_OF_VNFs, dtype = 'uint16') # np.random.randint(self.NUM_OF_SERVERS, size = self.NUM_OF_VNFs) # Initially, allocate VMs on random VMs
         self.cur_cpu_alloc_of_vnf   = np.ones  (self.NUM_OF_VNFs, dtype = 'uint8')                                  # Initially, allocate each VNs uniform amount CPU units
+               
 
-        self.mig_bw                 = 2 * np.ones (self.NUM_OF_VNFs)
+        self.gen_parameterized_tree ()
         self.cpu_capacity_of_server = self.uniform_cpu_capacity * np.ones (self.NUM_OF_SERVERS, dtype='uint8')     
+            
         self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
         self.traffic_in             = 0.1 * np.ones (self.NUM_OF_VNFs) #[0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
         self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
         self.traffic_out_of_chain   = 0.2 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
+        self.theta_times_traffic_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_times_traffic_in_chain[c][j] will hold theta[v] * lambda[v], where v is the j-th VM in chain c
 
         # Calculate v^+ of each VNF v.
         # vpp(v) will hold the idx of the next VNF in the same chain.
@@ -157,7 +127,6 @@ class toy_example (object):
         self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
 
         self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
-        self.theta_times_traffic_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_times_traffic_in_chain[c][j] will hold theta[v] * lambda[v], where v is the j-th VM in chain c
         v = 0
         for chain_num in range (self.NUM_OF_CHAINS):
             self.vnf_in_chain                 [chain_num] = []
@@ -197,14 +166,14 @@ class toy_example (object):
     def calc_paths_of_links (self):
         """
         Given self.links_of_path (list of links which appear in each path), 
-        calculate self.paths_of_link (links of path in which each  link appears).
+        calculate self.paths_of_link (list of paths in which each link appears).
         """
         self.paths_of_link = [] #np.empty(shape = (self.NUM_OF_SERVERS, self.NUM_OF_SERVERS), dtype = object)
         for link in self.list_of_links:
             paths = []
             for src in range (self.NUM_OF_SERVERS):
                 for dst in range (self.NUM_OF_SERVERS): 
-                    if (link in self.links_of_path[src][dst]): # Does think link appear in the path from src to dst
+                    if (link in self.links_of_path[src][dst]): # Does link appear in the path from src to dst
                         paths.append ([src, dst]) # Yep --> append it to the list of paths in which this link appears
             self.paths_of_link.append ({'link' : link, 'paths' : paths}) 
                         
@@ -330,7 +299,7 @@ class toy_example (object):
                     for s_prime in range (self.NUM_OF_SERVERS): # for every possible location of vpp (the next VM in the chain)
                         if (s == s_prime): # if v and vpp are scheduled to the same server, no netw' delay between them
                             continue
-                        
+                         
                         for y_s in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ):
                             for id_v in y_s['ids']:     
                                 for y_s_prime in list (filter (lambda item : item['v'] == vpp and item['s'] == s_prime, self.ids_of_y_vs) ):
@@ -420,25 +389,7 @@ class toy_example (object):
                                             scnd_decision_vars_in_mult_eq. append (id_vpp)
                                             list_of_coefs_in_mult_eq.      append (self.theta_times_traffic_in[vpp])
  
-             
-             
-            # Consider the bw due to migrations
-            for v in range (self.NUM_OF_VNFs):
-                for mig_src in range (self.NUM_OF_SERVERS):
-                    for mig_dst in range (self.NUM_OF_SERVERS):
-                          
-                        if (mig_dst == mig_src or not ([mig_src, mig_dst] in list_of_paths_using_link_l) or self.x[v][mig_src] == 0):
-                            continue
-                          
-                        for y_vs in list (filter (lambda item : item['v'] == v and item['s'] == mig_dst, self.ids_of_y_vs) ):
-                            for id in y_vs['ids']:     
-                                if (id in list_of_decision_vars_in_lin_eq): # Already seen, and wrote a coef', for this decision var, for this inequality
-                                    list_of_coefs_in_lin_eq [list_of_decision_vars_in_lin_eq.index(id)] += self.mig_bw[v] 
-                                else:
-                                    list_of_decision_vars_in_lin_eq.append (id) 
-                                    list_of_coefs_in_lin_eq.append         (self.mig_bw[v])
-                                     
- 
+                         
             # Print the constraint obtained for this link
             if (len(list_of_decision_vars_in_lin_eq) == 0 and len(list_of_coefs_in_mult_eq) == 0): #No one uses this link --> no constraints
                 continue
@@ -616,8 +567,6 @@ class toy_example (object):
 
                 for i in indices_of_migrating_VMs: # for every VM in the chain
                     v = self.vnf_in_chain[chain_num][i] # refer to this VNF as v 
-                    if ([self.cur_loc_of_vnf [v], r_dict['location'][i]] in list_of_paths_using_link_l): # if the path between this VM's current location, and scheduled location, uses link l. 
-                        coef[id] += self.mig_bw[v] # Consider the mig' bw
                     if (i < chain_len-1 and ([self.cur_loc_of_vnf [v], self.cur_loc_of_vnf[self.vpp[v]]] in list_of_paths_using_link_l)): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
                         coef[id] += self.traffic_in [self.vpp[v]]
 
@@ -1025,15 +974,14 @@ class toy_example (object):
                         continue 
                         
                     # Now we know that this allocation is statically feasible
-                    
-                        
+                                            
                     self.static_r.append (
                         {
                         'chain_num'     : chain_num,
-                        'location'     : locations.copy (),
-                        'alloc'   : alloc.copy(),
+                        'location'      : locations.copy (),
+                        'alloc'         : alloc.copy(),
                         'static delay'  : static_delay,
-                        'static cost'   : sum (alloc[i]                                                           for i in range (chain_len))                
+                        'static cost'   : sum (alloc[i] for i in range (chain_len))                
                         }
                     )                
 
@@ -1261,7 +1209,6 @@ class toy_example (object):
             printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
             printf (self.cfg_output_file, 'migration costs = {}\n\n'       .format (self.mig_cost))
-            printf (self.cfg_output_file, 'migration BW = {}\n\n'          .format (self.mig_bw))
             printf (self.cfg_output_file, 'cur location = {}\n\n'          .format (self.cur_loc_of_vnf))
             printf (self.cfg_output_file, 'cur CPU alloc = {}\n\n'         .format (self.cur_cpu_alloc_of_vnf))
 

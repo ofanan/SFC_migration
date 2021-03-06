@@ -15,10 +15,16 @@ def solve_problem_by_Cplex (input_file_name):
 
     output_file = open ('../res/' + input_file_name.split(".lp")[0] + '.cpx.sol', "w")
     problem = cplex.Cplex (input_file_name) 
-    problem.solve ()
+    problem.solve () #TimeLimit=1000?
+
+    
     sol     = problem.solution
-    status  = sol.get_status()
-    printf (output_file, 'Sol status = {}\n' .format (status))
+    print  ('\n***********************\nSol status: {}\n***********************\n' .format (sol.get_status_string()))
+    sol_status_string = sol.get_status_string()
+    printf (output_file, 'Sol status: {}\n' .format (sol_status_string))
+    if (sol_status_string == 'infeasible'):
+        return None
+    
     printf (output_file, 'Solution value  = {:.2f}\n' .format (sol.get_objective_value()))
     print  (             'lp sol cost = {:.2f}\n' .format (sol.get_objective_value()))
     printf (output_file, '\nList of non-zeros decision variables\n************************************\n' .format (sol.get_objective_value()))

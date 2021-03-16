@@ -10,37 +10,10 @@ import Check_sol
 import obj_func
 from _overlapped import NULL
 from solve_problem_by_Cplex import solve_problem_by_Cplex
+from networkx.algorithms.threshold import shortest_path
 
 class toy_example (object):
     
-    def gen_parameterized_tree (self):
-        """
-        Generate a parameterized regular three-nodes tree (root and 2 leaves). 
-        """
-        self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
-        self.NUM_OF_SERVERS     = self.G.number_of_nodes()
-        
-        self.G = self.G.to_directed()
-
-        shortest_path = nx.shortest_path(self.G)
-
-        self.leaves = [x for x in self.G.nodes() if self.G.out_degree(x)==1 and self.G.in_degree(x)==1]
-
-        for leaf in self.leaves: 
-            self.G.nodes[leaf]['path to root'] = shortest_path[leaf][0]            
-            for lvl in range (len(shortest_path[leaf][0])):
-                self.G.nodes[shortest_path[leaf][0][lvl]]['lvl'] = lvl
-                self.G.nodes[shortest_path[leaf][0][lvl]]['CPU cap'] = 3 * lvl
-            
-        for edge in self.G.edges: 
-            self.G[edge[0]][edge[1]]['delay'] = Lmax / self.uniform_link_capacity + self.uniform_Tpd
-            # paths_using_this_edge = []
-            # for src in range (self.NUM_OF_SERVERS):
-                # for dst in range (self.NUM_OF_SERVERS): 
-                    # if ((edge[0],edge[1]) in links_of_path[src][dst]): # Does link appear in the path from src to dst
-                        # paths_using_this_edge.append ((src, dst)) # Yep --> append it to the list of paths in which this link appears
-            # self.G[edge[0]][edge[1]]['paths using this edge'] = paths_using_this_edge
-
     def __init__ (self, verbose = -1):
         """
         Init a toy example - topology (e.g., chains, VMs, target delays etc.).
@@ -54,28 +27,37 @@ class toy_example (object):
         self.uniform_link_capacity  = 100
         self.Lmax                   = 1
         self.uniform_Tpd            = 1
-        self.uniform_bkt_size       = 1 # \sigma_u
         self.uniform_cpu_capacity   = 1
         self.max_chain_len          = 2
         self.gen_parameterized_tree ()
                 
         # Users parameters
         self.NUM_OF_USERS           = 2*len(self.leaves)
+        self.uniform_sigma_u        = 1 # bkt size
+        self.sigma_u                = self.uniform_sigma_u * np.ones (self.NUM_OF_CHAINS) 
         self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
-        print (self.PoA_of_user)
-        exit (0)
-
-        self.num_of_vnfs_in_chain   = self.max_chain_len * np.ones (self.NUM_OF_USERS, dtype ='uint8')
+        for leaf in self.leaves:
+            self.G.nodes[leaf]['my chains'] = [i for i in range(self.NUM_OF_USERS) if self.PoA_of_user[i] == leaf]
+        
         self.NUM_OF_CHAINS          = self.NUM_OF_USERS
+        self.num_of_vnfs_in_chain   = self.max_chain_len * np.ones (self.NUM_OF_CHAINS, dtype ='uint8')
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
         self.cur_loc_of_vnf         = self.PoA_of_user
 
-        self.theta                  = np.ones (self.NUM_OF_VNFs) #cpu units to process one unit of data
-        self.traffic_in             = 0.1 * np.ones (self.NUM_OF_VNFs) #[0.5, 0.9] #traffic_in[v] is the bw of v's input traffic ("\lambda_v"). The last entry is the traffic from the chain back to the user.
-        self.theta_times_traffic_in = self.theta * self.traffic_in [0:self.NUM_OF_VNFs]
-        self.traffic_out_of_chain   = 0.2 * np.ones (self.NUM_OF_USERS) #traffic_out_of_chain[c] will hold the output traffic (amount of traffic back to the user) of chain c 
-        self.theta_times_traffic_in_chain = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_times_traffic_in_chain[c][j] will hold theta[v] * lambda[v], where v is the j-th VM in chain c
-        self.input_burst_delay      = self.uniform_bkt_size / self.traffic_in 
+        self.uniform_lambda_v       = 0.1
+        self.uniform_theta_v        = 0.1
+        self.lambda_v               = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.lambda_v[c][i] will hold a the input traffics ("lambda_v") of the i-th VNF in chain c 
+        self.theta_v                = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_v [c][i] will hold a list of the input required work per traffic ("theta_v") of the i-th VNF in chain c                        
+        for chain in self.NUM_OF_CHAINS:
+            self.lambda_v [chain_num] = []
+            for v in range (self.num_of_vnfs_in_chain[chain]+1):
+                self.lambda_v[chain_num].append (self.uniform_lambda_v)
+                self.theta_v [chain_num].append (self.uniform_theta_v)
+        self.theta_times_lambda_v   = self.theta * self.lambda_v [0:self.NUM_OF_VNFs]
+        self.input_burst_delay      = self.uniform_bkt_size / self.lambda_v 
+
+        self.chain_target_delay     = 10 * np.ones (self.NUM_OF_CHAINS)
+        self.mig_cost               = 5  * np.ones (self.NUM_OF_VNFs)
 
         # Calculate v^+ of each VNF v.
         # vpp(v) will hold the idx of the next VNF in the same chain.
@@ -90,10 +72,10 @@ class toy_example (object):
         v = 0
         for chain_num in range (self.NUM_OF_CHAINS):
             self.vnf_in_chain                 [chain_num] = []
-            self.theta_times_traffic_in_chain [chain_num] = []
+            self.theta_times_lambda_v_chain [chain_num] = []
             for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
                 self.vnf_in_chain                [chain_num].append (v)
-                self.theta_times_traffic_in_chain[chain_num].append (self.theta_times_traffic_in[v]) 
+                self.theta_times_lambda_v_chain[chain_num].append (self.theta_times_lambda_v[v]) 
                 if (idx_in_chain == 0):
                     self.v0[chain_num] = v 
                 if (idx_in_chain == self.num_of_vnfs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
@@ -114,14 +96,243 @@ class toy_example (object):
         self.write_to_cfg_file = True
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
                 
-#     def calc_chain_netw_delay (self):
-#         """
-#         calculate the network delay along a given chain. 
-#         This delay is the sum of the netw' delays along the chain only.
-#         It doesn't include nor the delay to / from the PoA, neither the computation delay.  
-#         """
-#         netw_delay_along_chain = sum ()
-                     
+    def gen_parameterized_tree (self):
+        """
+        Generate a parameterized regular three-nodes tree (root and 2 leaves). 
+        """
+        self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
+        self.NUM_OF_SERVERS     = self.G.number_of_nodes()
+        
+        self.G = self.G.to_directed()
+
+        shortest_path = nx.shortest_path(self.G)
+
+        self.leaves = [x for x in self.G.nodes() if self.G.out_degree(x)==1 and self.G.in_degree(x)==1]
+
+        for leaf in self.leaves: 
+            self.G.nodes[leaf]['path to root'] = shortest_path[leaf][0]            
+            for lvl in range (len(shortest_path[leaf][0])):
+                self.G.nodes[shortest_path[leaf][0][lvl]]['lvl'] = lvl
+                self.G.nodes[shortest_path[leaf][0][lvl]]['CPU cap'] = 3 * lvl
+            
+        # Calculate edge propagation delays    
+        for edge in self.G.edges: 
+            self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
+            # paths_using_this_edge = []
+            # for src in range (self.NUM_OF_SERVERS):
+                # for dst in range (self.NUM_OF_SERVERS): 
+                    # if ((edge[0],edge[1]) in links_of_path[src][dst]): # Does link appear in the path from src to dst
+                        # paths_using_this_edge.append ((src, dst)) # Yep --> append it to the list of paths in which this link appears
+            # self.G[edge[0]][edge[1]]['paths using this edge'] = paths_using_this_edge
+
+        # self.path_delay[s][d] holds the prop' delay of the path from server s to server d
+        self.path_delay = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
+        for s in range (self.NUM_OF_SERVERS):
+            for d in range (self.NUM_OF_SERVERS):
+                if (s == d):
+                    continue
+                self.path_delay[s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['delay'] for hop in range (len(shortest_path[s][d])-1))
+                # print ('s = ', s, 'd = ', d, 'path delay = ', self.path_delay[s][d])
+         
+    def gen_lp_problem (self, leaf):
+        """
+        Generate a CPLEX LP problem for the given leaf number.
+        The problem uses the global numbering for nodes, edges and variables numbers.
+        """
+
+        my_chain_nums = self.G.nodes[leaf]['my chains'] # list of chain belonging to this leaf
+        if (len (my_chain_nums)== 0):
+            return
+        
+        # print ('my chain numbers are', my_chain_nums)
+        r = [] # The binary decision variable
+        ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
+        my_servers = self.G.nodes[leaf]['path to root'] # servers on the path from this leaf to the root
+        
+        for chain in my_chain_nums:
+            chain_len = self.num_of_vnfs_in_chain[chain]
+            min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
+            max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * (len (my_servers)-1)  
+            locations    = max_loc_vals.copy () # Will be reset to the first location to examine upon the first iteration 
+
+            while True:
+                
+                locations = self.inc_array (locations  , min_loc_vals, max_loc_vals)
+               
+                # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
+                # netw_delay = sum (self.path_delay[locations[i]] [locations[i+1]] for i in range (chain_len-1)) + 
+                             # self.sigma_u * sum (1 / self.lambda_v[chain_num][i+1] for i in range (chain_len-1) 
+                            # if location[i] != location[i+1])
+             
+                exit (0)
+             
+    def gen_static_r (self):
+        """
+        Generate the r vector decision variable.
+        r (H, vec(D), vec(mu)) will indicate that a solution implies allocating VM[j] of chain H on D[j], with CPU allocation mu[j].
+        r is a list of dicts, where each dictionary includes the fields:
+        - my_chain - the chain of this var.
+        - locations - a list (possibly) with repetitions of |H| servers, where locations[i] is destined to host VM i in this chain. 
+        - alloc - a list of |H| integers, where alloc[i] is the CPU allocated for host VM i in this chain.
+        - static_cost - computation cost for using this allocation, independently of the current state (namely, no mig' cost is counted). 
+        - static delay - The delay along the chain + computation delay. The only thing missing for the full chain delay is the delay to / from the PoA, which is unknown statically.
+        """         
+        self.static_r = []
+        self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
+        
+        for chain_num in range (self.NUM_OF_CHAINS):
+            
+            chain_len = self.num_of_vnfs_in_chain[chain_num]
+            min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
+            max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * (self.NUM_OF_SERVERS-1) # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
+            locations    = max_loc_vals.copy () # Will be reset to the first location to examine upon the first iteration 
+            while True:
+                
+                locations = self.inc_array (locations  , min_loc_vals, max_loc_vals)
+               
+                # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
+                static_netw_delay = sum (self.path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
+                
+                if (self.verbose == 1):
+                    printf (self.debug_output_file, '\n\nlocations = {}\n********************' .format (locations))
+
+                if (static_netw_delay > self.chain_target_delay[chain_num]): # skip suggested alloc with too long chain delay.
+                    if (self.verbose == 1):
+                        printf (self.debug_output_file, 'Infeasible netw delay\n' .format (locations))
+                    if (np.array_equal (locations, max_loc_vals)): # finished iterating over all possible locations
+                        break
+                    continue
+
+                # dominant_alloc will hold a list of dominant alloc for the suggested locations. If an allocation is subdominant, we don't need to consider it at all.
+                # For instance, if the allocation 
+                # dominant_alloc = []                                    
+                min_alloc_vals = np.asarray ([math.ceil(self.theta_times_lambda_v_chain[chain_num][i]) for i in range (chain_len)], dtype = 'uint8') # Built-in application of the finite computation delay constraint: the CPU allocation must be at least theta[v] * lambda_v[v]
+                max_alloc_vals = np.array   ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
+                alloc          = max_alloc_vals.copy () # Will be reset to the minimal allocation to examine upon the first iteration
+
+                while True:
+
+                    alloc = self.inc_array (alloc, min_alloc_vals, max_alloc_vals)
+
+                    if (self.verbose == 1):
+                        printf (self.debug_output_file, '\nalloc = {} ' .format (alloc))
+
+                    static_delay = sum ( [1 / (alloc[i] - self.theta_times_lambda_v_chain[chain_num][i]) for i in range (chain_len)]) + static_netw_delay
+                    if (static_delay > self.chain_target_delay[chain_num]):
+                        if (self.verbose == 1):
+                            printf (self.debug_output_file, 'infeasible static delay' .format (alloc))
+                        if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
+                            break
+                        continue
+                    
+                    # Discard suggested alloc that disobey the static cpu consumption constraints
+                    broke_CPU_cap_constraint = False
+                    for s in np.unique(locations): # for each server scheduled to use at least one of the VMs in this chain
+                        if (sum ([alloc[i] for i in ([j for j in range (chain_len) if locations[j] == s])]) > self.cpu_capacity_of_server[s]):
+                            broke_CPU_cap_constraint = True
+                            if (self.verbose == 1):
+                                printf (self.debug_output_file, 'infeasible cpu capacity' .format (alloc))
+                            break
+                    
+                    if (broke_CPU_cap_constraint):
+                        if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
+                            break
+                        continue 
+                        
+                    # Now we know that this allocation is statically feasible
+                                            
+                    self.static_r.append (
+                        {
+                        'chain_num'     : chain_num,
+                        'location'      : locations.copy (),
+                        'alloc'         : alloc.copy(),
+                        'static delay'  : static_delay,
+                        'static cost'   : sum (alloc[i] for i in range (chain_len))                
+                        }
+                    )                
+
+                    if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
+                        break
+                if (np.array_equal (locations, max_loc_vals)): # finished iterating over all possible locations
+                    break
+        
+    def calc_dynamic_r (self):
+        """
+
+        Add to the decision variable r the dynamic parts, that is, the parts relating to the mig and the updated PoA
+        """
+        id = int (0)
+        self.dynamic_r = []
+        self.last_id_in_chain = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint16')
+
+        if (self.write_to_lp_file):
+            printf (self.lp_output_file, 'Minimize\n obj: ')
+
+        for chain_num in range (self.NUM_OF_CHAINS):
+            
+            chain_len = self.num_of_vnfs_in_chain[chain_num]
+            
+            #cur_loc[i] will hold the current location of the i-th VNF in this chain
+            cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)]) 
+            
+            for r_dict in (list (filter (lambda item : item['chain_num'] == chain_num, self.static_r))):
+                
+                delay = r_dict['static delay'] + \
+                        self.path_delay [self.PoA_of_user [chain_num]] [r_dict['location'][0]] + \
+                        self.path_delay [r_dict['location'][-1]]      [self.PoA_of_user [chain_num]]
+                
+                # Discard decision variables that disobey the chain delay constraint 
+                if (delay > self.chain_target_delay[chain_num]):  
+                    if (self.verbose == 1):
+                        printf (self.debug_output_file, '\nlocation = {}, alloc = {}. infeasible dynamic delay: {:.2f}' .format (r_dict['location'], r_dict['alloc'], delay))
+                    continue   
+
+                # Discard decision variables that disobey the CPU capacity constraints 
+                for s in range (self.NUM_OF_SERVERS):
+                    broke_CPU_cap_constraint = False
+                    
+                    # decision_vars_using_this_server = list (filter (lambda item: s in item['location'], self.dynamic_r))
+                    coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
+                    for i in range (len (r_dict['location'])): # for every VM in the chain scheduled by this decision var
+                        if (r_dict['location'][i] == s): # if this VM is scheduled to use s...
+                            coef += r_dict['alloc'][i]      # add the scheduled allocation to the coef'
+                        elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
+                            coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
+                    if (coef > self.cpu_capacity_of_server[s]): # even this decision var' alone, without other decision vars', requires too high CPU capacity from server s
+                        broke_CPU_cap_constraint = True
+                        break
+                    
+                if (broke_CPU_cap_constraint):
+                    continue 
+
+                cost = r_dict['static cost'] 
+
+                for i in [i for i in range (chain_len) if cur_loc [i] != r_dict['location'][i] ]: #for every i in the list of indices of VMs in this chain, that are scheduled to migrate
+                    cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
+                
+                if (self.write_to_lp_file):
+                    if (id > 0):
+                        printf (self.lp_output_file, ' + ')
+                    printf (self.lp_output_file, '{:.4f}x{}' .format (cost, id))
+                   
+                if (self.verbose == 1):
+                    printf (self.debug_output_file, '\nid = {}, location = {}, alloc = {}, cost = {}' 
+                            .format (id, r_dict['location'], r_dict['alloc'], cost))
+                    
+                self.dynamic_r.append (
+                    {
+                    'id'            : id,
+                    'chain_num'     : chain_num,
+                    'location'     : r_dict['location'].  copy (),
+                    'alloc'         : r_dict['alloc'].copy(),
+                    'delay'         : delay,
+                    }
+                )                
+                
+                id += 1
+            
+            self.last_id_in_chain[chain_num] = id
+
     def gen_all_constraints (self):
         """
         Generate all the constraints for the problem, and print them to output files.
@@ -286,12 +497,12 @@ class toy_example (object):
                      
                     # Now we know that the path from V0's PoA to s uses link l
                     if (self.x[v0][s]): # v0 is already located on server s 
-                        link_l_avail_bw -= self.traffic_in[v0]
+                        link_l_avail_bw -= self.lambda_v[v0]
                     else: # v0 is NOT currently located on server s
                          for y_vs in list (filter (lambda item : item['v'] == v0 and item['s'] == s, self.ids_of_y_vs) ):
                              for id in y_vs['ids']:                             
                                  list_of_decision_vars_in_lin_eq.append (id) 
-                                 list_of_coefs_in_lin_eq.        append (self.traffic_in[v0])
+                                 list_of_coefs_in_lin_eq.        append (self.lambda_v[v0])
              
             # Consider the BW from the last VM in each chain to the PoA 
             for chain in range (self.NUM_OF_CHAINS): # for each VNF which is the last in its chain
@@ -322,7 +533,7 @@ class toy_example (object):
                             continue
                  
                         if (self.x[v][s] and self.x[vpp][s_prime]): # the path s --> s' is used already in the cur allocation
-                            link_l_avail_bw -= self.theta_times_traffic_in[vpp]
+                            link_l_avail_bw -= self.theta_times_lambda_v[vpp]
                         else:            # the path s --> s' is NOT used by the cur allocation. Need to extract all the decision variables that imply using this path
                             for y_s in list (filter (lambda item : item['v'] == v and item['s'] == s, self.ids_of_y_vs) ): #re
                                 for id_v in y_s['ids']:     
@@ -331,7 +542,7 @@ class toy_example (object):
                                      
                                             first_decision_vars_in_mult_eq.append (id_v) 
                                             scnd_decision_vars_in_mult_eq. append (id_vpp)
-                                            list_of_coefs_in_mult_eq.      append (self.theta_times_traffic_in[vpp])
+                                            list_of_coefs_in_mult_eq.      append (self.theta_times_lambda_v[vpp])
  
                          
             # Print the constraint obtained for this link
@@ -495,11 +706,11 @@ class toy_example (object):
                 # Consider the BW requirements of all the paths along the scheduled chain's locations that use link l
                 for i in range (chain_len-1):
                     if [r_dict['location'][i], r_dict['location'][i+1]]  in list_of_paths_using_link_l:
-                        coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][i+1]]
+                        coef[id] += self.lambda_v [self.vnf_in_chain[chain_num][i+1]]
 
                 # Check wether the scheduled path from the PoA to the first VM in the chain is using link l  
                 if ( [self.PoA_of_user[chain_num], r_dict['location'][0]] in list_of_paths_using_link_l): # if the path from the PoA to the first VM in the chain uses link l
-                    coef[id] += self.traffic_in[self.vnf_in_chain[chain_num][0]]
+                    coef[id] += self.lambda_v[self.vnf_in_chain[chain_num][0]]
 
                 # Consider the scheduled path from the last VM in the chain the PoA  is using link l  
                 if ( [r_dict['location'][-1], self.PoA_of_user[chain_num]] in list_of_paths_using_link_l): # if the scheduled path from the last VM in the chain the PoA is using link l  
@@ -512,11 +723,11 @@ class toy_example (object):
                 for i in indices_of_migrating_VMs: # for every VM in the chain
                     v = self.vnf_in_chain[chain_num][i] # refer to this VNF as v 
                     if (i < chain_len-1 and ([self.cur_loc_of_vnf [v], self.cur_loc_of_vnf[self.vpp[v]]] in list_of_paths_using_link_l)): # if v is scheduled to migrate, and the path from v to v++ in the current location uses link l  
-                        coef[id] += self.traffic_in [self.vpp[v]]
+                        coef[id] += self.lambda_v [self.vpp[v]]
 
                 if (0 in indices_of_migrating_VMs and # if the first VM in the chain migrated
                    ( [self.PoA_of_user[chain_num], self.cur_loc_of_vnf[self.vnf_in_chain[chain_num][0]]] in list_of_paths_using_link_l)): # if its old path uses link l
-                    coef[id] += self.traffic_in [self.vnf_in_chain[chain_num][0]]
+                    coef[id] += self.lambda_v [self.vnf_in_chain[chain_num][0]]
                     
                 if (chain_len-1 in indices_of_migrating_VMs and # if the last VM in the chain migrated
                    ( [self.cur_loc_of_vnf[self.vnf_in_chain[chain_num][-1]], self.PoA_of_user[chain_num]] in list_of_paths_using_link_l)): # if its old path uses link l
@@ -843,238 +1054,7 @@ class toy_example (object):
         return cost
             
              
-    def gen_static_r (self):
-        """
-        Generate the r vector decision variable.
-        r (H, vec(D), vec(mu)) will indicate that a solution implies allocating VM[j] of chain H on D[j], with CPU allocation mu[j].
-        r is a list of dicts, where each dictionary includes the fields:
-        - my_chain - the chain of this var.
-        - locations - a list (possibly) with repetitions of |H| servers, where locations[i] is destined to host VM i in this chain. 
-        - alloc - a list of |H| integers, where alloc[i] is the CPU allocated for host VM i in this chain.
-        - static_cost - computation cost for using this allocation, independently of the current state (namely, no mig' cost is counted). 
-        - static delay - The delay along the chain + computation delay. The only thing missing for the full chain delay is the delay to / from the PoA, which is unknown statically.
-        """         
-        self.static_r = []
-        self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
-        
-        for chain_num in range (self.NUM_OF_CHAINS):
             
-            chain_len = self.num_of_vnfs_in_chain[chain_num]
-            min_loc_vals = np.zeros (chain_len, dtype = 'uint16') # minimal possible values for servers' locations: allocate all VMs in this chain in server 0  
-            max_loc_vals = np.ones  (chain_len, dtype = 'uint16') * (self.NUM_OF_SERVERS-1) # maximal value for the loc' var, namely a vector which implies that all VMs in this chain are allocated to the highest-idx server.  
-            locations    = max_loc_vals.copy () # Will be reset to the first location to examine upon the first iteration 
-            while True:
-               
-                
-                locations = self.inc_array (locations  , min_loc_vals, max_loc_vals)
-               
-                # static_netw_delay will hold the netw delay along the whole suggested chain's location, from the 1st to the last VM in the chain.
-                static_netw_delay = sum (self.path_delay [locations[i]] [locations[i+1]] for i in range (chain_len-1))
-                
-                if (self.verbose == 1):
-                    printf (self.debug_output_file, '\n\nlocations = {}\n********************' .format (locations))
-
-                if (static_netw_delay > self.chain_target_delay[chain_num]): # skip suggested alloc with too long chain delay.
-                    if (self.verbose == 1):
-                        printf (self.debug_output_file, 'Infeasible netw delay\n' .format (locations))
-                    if (np.array_equal (locations, max_loc_vals)): # finished iterating over all possible locations
-                        break
-                    continue
-
-                # dominant_alloc will hold a list of dominant alloc for the suggested locations. If an allocation is subdominant, we don't need to consider it at all.
-                # For instance, if the allocation 
-                # dominant_alloc = []                                    
-                min_alloc_vals = np.asarray ([math.ceil(self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)], dtype = 'uint8') # Built-in application of the finite computation delay constraint: the CPU allocation must be at least theta[v] * traffic_in[v]
-                max_alloc_vals = np.array   ([self.cpu_capacity_of_server[locations[i]] for i in range (chain_len)], dtype = 'uint8')
-                alloc          = max_alloc_vals.copy () # Will be reset to the minimal allocation to examine upon the first iteration
-
-                while True:
-
-                    alloc = self.inc_array (alloc, min_alloc_vals, max_alloc_vals)
-
-                    if (self.verbose == 1):
-                        printf (self.debug_output_file, '\nalloc = {} ' .format (alloc))
-
-                    static_delay = sum ( [1 / (alloc[i] - self.theta_times_traffic_in_chain[chain_num][i]) for i in range (chain_len)]) + static_netw_delay
-                    if (static_delay > self.chain_target_delay[chain_num]):
-                        if (self.verbose == 1):
-                            printf (self.debug_output_file, 'infeasible static delay' .format (alloc))
-                        if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
-                            break
-                        continue
-                    
-                    # Discard suggested alloc that disobey the static cpu consumption constraints
-                    broke_CPU_cap_constraint = False
-                    for s in np.unique(locations): # for each server scheduled to use at least one of the VMs in this chain
-                        if (sum ([alloc[i] for i in ([j for j in range (chain_len) if locations[j] == s])]) > self.cpu_capacity_of_server[s]):
-                            broke_CPU_cap_constraint = True
-                            if (self.verbose == 1):
-                                printf (self.debug_output_file, 'infeasible cpu capacity' .format (alloc))
-                            break
-                    
-                    if (broke_CPU_cap_constraint):
-                        if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
-                            break
-                        continue 
-                        
-                    # Now we know that this allocation is statically feasible
-                                            
-                    self.static_r.append (
-                        {
-                        'chain_num'     : chain_num,
-                        'location'      : locations.copy (),
-                        'alloc'         : alloc.copy(),
-                        'static delay'  : static_delay,
-                        'static cost'   : sum (alloc[i] for i in range (chain_len))                
-                        }
-                    )                
-
-                    if (np.array_equal (alloc, max_alloc_vals)):  # finished iterating over all possible alloc
-                        break
-                if (np.array_equal (locations, max_loc_vals)): # finished iterating over all possible locations
-                    break
-        
-    def calc_dynamic_r (self):
-        """
-
-        Add to the decision variable r the dynamic parts, that is, the parts relating to the mig and the updated PoA
-        """
-        id = int (0)
-        self.dynamic_r = []
-        self.last_id_in_chain = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint16')
-
-        if (self.write_to_lp_file):
-            printf (self.lp_output_file, 'Minimize\n obj: ')
-
-        for chain_num in range (self.NUM_OF_CHAINS):
-            
-            chain_len = self.num_of_vnfs_in_chain[chain_num]
-            
-            #cur_loc[i] will hold the current location of the i-th VNF in this chain
-            cur_loc = np.array ( [ self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] for i in range (chain_len)]) 
-            
-            for r_dict in (list (filter (lambda item : item['chain_num'] == chain_num, self.static_r))):
-                
-                delay = r_dict['static delay'] + \
-                        self.path_delay [self.PoA_of_user [chain_num]] [r_dict['location'][0]] + \
-                        self.path_delay [r_dict['location'][-1]]      [self.PoA_of_user [chain_num]]
-                
-                # Discard decision variables that disobey the chain delay constraint 
-                if (delay > self.chain_target_delay[chain_num]):  
-                    if (self.verbose == 1):
-                        printf (self.debug_output_file, '\nlocation = {}, alloc = {}. infeasible dynamic delay: {:.2f}' .format (r_dict['location'], r_dict['alloc'], delay))
-                    continue   
-
-                # Discard decision variables that disobey the CPU capacity constraints 
-                for s in range (self.NUM_OF_SERVERS):
-                    broke_CPU_cap_constraint = False
-                    
-                    # decision_vars_using_this_server = list (filter (lambda item: s in item['location'], self.dynamic_r))
-                    coef = 0 # coefficient of the current decision var' in the current CPU cap' equation
-                    for i in range (len (r_dict['location'])): # for every VM in the chain scheduled by this decision var
-                        if (r_dict['location'][i] == s): # if this VM is scheduled to use s...
-                            coef += r_dict['alloc'][i]      # add the scheduled allocation to the coef'
-                        elif (self.cur_loc_of_vnf [self.vnf_in_chain[chain_num][i]] == s): # this VM isn't scheduled to use s, but currently it's using s
-                            coef += self.cur_cpu_alloc_of_vnf[self.vnf_in_chain[chain_num][i]]
-                    if (coef > self.cpu_capacity_of_server[s]): # even this decision var' alone, without other decision vars', requires too high CPU capacity from server s
-                        broke_CPU_cap_constraint = True
-                        break
-                    
-                if (broke_CPU_cap_constraint):
-                    continue 
-
-                cost = r_dict['static cost'] 
-
-                for i in [i for i in range (chain_len) if cur_loc [i] != r_dict['location'][i] ]: #for every i in the list of indices of VMs in this chain, that are scheduled to migrate
-                    cost += self.mig_cost[self.vnf_in_chain[chain_num][i]]
-                
-                if (self.write_to_lp_file):
-                    if (id > 0):
-                        printf (self.lp_output_file, ' + ')
-                    printf (self.lp_output_file, '{:.4f}x{}' .format (cost, id))
-                   
-                if (self.verbose == 1):
-                    printf (self.debug_output_file, '\nid = {}, location = {}, alloc = {}, cost = {}' 
-                            .format (id, r_dict['location'], r_dict['alloc'], cost))
-                    
-                self.dynamic_r.append (
-                    {
-                    'id'            : id,
-                    'chain_num'     : chain_num,
-                    'location'     : r_dict['location'].  copy (),
-                    'alloc'         : r_dict['alloc'].copy(),
-                    'delay'         : delay,
-                    }
-                )                
-                
-                id += 1
-            
-            self.last_id_in_chain[chain_num] = id
-            
-        
-        
-    def gen_n (self):
-        """"
-        Generate the n vector indication variables.
-        n(v,s,a) == 1 will indicate allocation VM v on server s with a CPU units. 
-        Each entry in the list "n" will be a dictionary, containing the fields:
-        - ID
-        - v, s, a of this decision var
-        - mig - will be True iff such an allocation implies a migration of VM v
-        - comp_delay - the computation delay implied by using this var
-        - cost - to be used later, when formulating the LP
-        """
-
-        self.n = [] # "n" decision variable, defining the scheduled server and CPU alloc' of each VM.
-        self.ids_of_y_vs = [] # will hold the IDs of all the n_vsa decision vars related to server s and VM v 
-        id = int (0)
-        
-        # Loop over all combinations of v, s, and a
-        for v in range (self.NUM_OF_VNFs):
-            for s in range (self.NUM_OF_SERVERS):
-                mig = True if (s != self.cur_loc_of_vnf[v]) else False # if s is different from v's current location, this implies a mig'
-                list_of_ids = []
-                for a in range (math.ceil (self.theta_times_traffic_in[v]), self.cpu_capacity_of_server[s]+1): # skip too small values of a (capacity alloc), which cause infinite comp' delay
-                    denominator = a - self.theta_times_traffic_in[v] 
-                    if (denominator <= 0): # skip too small values of a (capacity alloc), which cause infinite comp' delay
-                        continue
- 
-                    comp_delay = 1/denominator
-                    # Check for per-VM target delay - currently unused
-                    # if (comp_delay > self.VM_target_delay[v]): # Too high perf' degradation
-                    #     continue 
-                     
-                    cost =  a
-                    if (mig):
-                        cost += self.mig_cost[v]
-                    
-                    item = {
-                        'v'          : int(v), 
-                        's'          : int(s),
-                        'a'          : int(a),
-                        'id'         : id,
-                        'comp delay' : comp_delay,
-                        'mig'        : mig,
-                        'cost'       : cost
-                    }
-                    
-                    self.n.append (item)                
-                    
-                    list_of_ids.append (id)
-                    
-                    if (self.verbose == 2):
-                        print (item)
-                    id +=1 
-            
-                self.ids_of_y_vs.append ({'v' : v, 's' : s, 'ids' : list_of_ids})
-    
-
-        if (self.verbose == 2):
-            printf (self.cfg_output_file, 'self.n =\n')
-            for item in self.ids_of_y_vs:
-                printf (self.cfg_output_file, '{}\n' .format (item))
-     
-     
      
     def inc_array (self, ar, min_val, max_val):
         """
@@ -1134,31 +1114,27 @@ class toy_example (object):
 
     def init_problem (self, uniform_mig_cost = 6, chain_target_delay = 100):
         """
-        generate a LP formulation for a problem, and / or solve it by either a brute-force approach, or by Cplex / approximation alg' / random sol'.
+        Write logs to output files.
+        Reset counter of constraint num.
         """
-        
-        self.chain_target_delay  = chain_target_delay * np.ones (self.NUM_OF_CHAINS)
-        self.mig_cost            = uniform_mig_cost * np.ones (self.NUM_OF_VNFs)
-        
+               
         if (self.verbose == 1):
             self.debug_output_file = open ('../res/debug.res', 'w')
 
         if (self.write_to_cfg_file): # Write the static params
             self.cfg_output_file = open ("../res/custom_tree.cfg", "w")           
-            printf (self.cfg_output_file, 'lambda_v = {}\n' .format (self.traffic_in))
+            printf (self.cfg_output_file, 'lambda_v = {}\n'                .format (self.lambda_v))
             printf (self.cfg_output_file, 'uniform cpu capacities = {}\n'  .format (self.uniform_cpu_capacity))
             printf (self.cfg_output_file, 'uniform link capacities = {}\n' .format (self.uniform_link_capacity))
-            printf (self.cfg_output_file, 'theta_times_traffic_in = {}\n'  .format (self.theta_times_traffic_in))
+            printf (self.cfg_output_file, 'theta_times_lambda_v = {}\n'    .format (self.theta_times_lambda_v))
             printf (self.cfg_output_file, 'traffic back to user = {}\n'    .format (self.traffic_out_of_chain))
-            printf (self.cfg_output_file, 'path delay = \n{}\n'            .format (self.path_delay))
             printf (self.cfg_output_file, 'chain_target_delay = {}\n\n'    .format (self.chain_target_delay))
             printf (self.cfg_output_file, 'migration costs = {}\n\n'       .format (self.mig_cost))
             printf (self.cfg_output_file, 'cur location = {}\n\n'          .format (self.cur_loc_of_vnf))
-            printf (self.cfg_output_file, 'cur CPU alloc = {}\n\n'         .format (self.cur_cpu_alloc_of_vnf))
+        self.lp_output_file  = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
+        self.constraint_num  = int(0)                     # A running number for counting the constraints   
 
-        self.gen_n()
 
-                   
     def gen_py_problem (self):
         """
         Generate python / .prb / equation solver's format output files, describing the problem
@@ -1182,13 +1158,7 @@ class toy_example (object):
             self.gen_all_constraints ()
             self.constraint_check_by_Py.close ()
         
-    def gen_static_lp_problem (self):
-
-        self.lp_output_file  = open ("../res/problem.lp", "w") # Will write to this file an IBM CPlex' .mod file, describing the problem
-        self.constraint_num  = int(0)                     # A running number for counting the constraints   
-        self.gen_static_r  ()
-
-    def gen_dynamic_lp_problem (self):
+    def gen_lp_problem_old (self):
 
         self.calc_dynamic_r ()
         if (self.write_to_lp_file):
@@ -1268,26 +1238,54 @@ class toy_example (object):
                 (running_parameter, self.min_cost,  self.nxt_loc_of_vnf, self.nxt_cpu_alloc_of_vnf))
         
 
+        
+
+def check_greedy_alg ():
+    
+    theta_v_lambda_v    = np.array ([0.1, 0.3, 0.9]) #, 0.5, 0.7, 0.9]
+    max_cpu             = 2
+    max_budget          = max_cpu * len (theta_v_lambda_v) 
+    
+    greedy_delay        = np.zeros (max_budget)
+    bf_delay            = float ("inf") * np.ones (max_budget)
+    
+    mu                  = np.ones (len (theta_v_lambda_v))
+    budget              = sum (mu)
+    
+    # Calculate bf-delays
+    while (budget <= max_budget):
+        budget   = sum (mu)
+        bf_delay = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu))) 
+        #if ()
+    
+    
+    # Calculate greedy delays
+    while (budget <= max_budget):
+
+        greedy_delay = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu)))        
+        argmax = np.argmax (np.array ([1 / (mu[i] - theta_v_lambda_v[i]) - 1 / (mu[i] + 1 - theta_v_lambda_v[i]) for i in range(len(mu))]))
+        mu[argmax] = mu[argmax] + 1
+        budget     = budget     + 1 
+        
+    
 if __name__ == "__main__":
+    check_greedy_alg ()
+    exit (0)
     lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
     
     # Gen static LP problem
     t = time.time()
     my_toy_example = toy_example (verbose = 0)
+
     my_toy_example.init_problem  ()
-    #my_toy_example.gen_py_problem ()
-    my_toy_example.gen_static_lp_problem ()
-    printf (lp_time_summary_file, '\nV = {}, S = {}, C = {}, k = {}\n****************************\nGen static LP took {:.4f} seconds\n' .format 
-           (my_toy_example.NUM_OF_VNFs, 
-            my_toy_example.NUM_OF_SERVERS, 
-            my_toy_example.cpu_capacity_of_server[0],
-            my_toy_example.num_of_vnfs_in_chain[0],
-            float (time.time() - t)
-            ))
  
     # Gen dynamic LP problem
     t = time.time()
-    my_toy_example.gen_dynamic_lp_problem ()
+    for leaf in my_toy_example.leaves:
+        my_toy_example.gen_lp_problem(leaf)
+        
+    
+    my_toy_example.gen_lp_problem_old ()
     printf (lp_time_summary_file, 'Gen dynamic LP took {:.4f} seconds\n' .format (float (time.time() - t)))
 
     # Solve the LP problem

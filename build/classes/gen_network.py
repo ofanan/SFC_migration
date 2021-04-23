@@ -19,45 +19,43 @@ class SFC_mig_simulator (object):
     def gen_APs (self):
         """
         Use the input about the users' mobility to generate data of the users' access points along the simulation.
-        The input data is read from the file self.mob_file. The output data is written to the file self.ap_file
+        The input data is read from the file mob_file. The output data is written to the file self.ap_file
         """
         mob_file_name = "res.loc"
-        self.mob_file = open ("../res/" + mob_file_name,  "r")
         self.ap_file  = open ("../res/" + mob_file_name.split(".")[0] + ".ap", "w")  
-       
-        printf (self.ap_file, '// File format:\ntime = t: (1,a1),(2,a2), ...\nwhere aX is the Point-of-Access of user X at time t\n')
-# #         lines = (line for line in lines if line)       # Discard blank lines
-#         print (lines(0))
-#         if (lines[0].split(" ")[1] == "city_size"):
-#             max_X, max_Y = line.split(" ")[3], line.split(" ")[4]
-        
-        lines = (line.rstrip() for line in self.mob_file) # "lines" contains all lines in input file
-        max_X, max_Y = 100, 100
-        if (max_X != max_Y):
-            print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
-            exit
+        with open ("../res/" + mob_file_name,  "r") as mob_file:
+            line = mob_file.readline().rstrip()
+            max_X, max_Y = float(line.split(" ")[3]), float(line.split(" ")[5])
+            if (max_X != max_Y):
+                print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
+                
+            printf (self.ap_file, '// File format:\ntime = t: (1,a1),(2,a2), ...\nwhere aX is the Point-of-Access of user X at time t\n')
+    
+            num_of_APs_in_row = math.sqrt (len(self.leaves)) #$$$ cast to int, floor  
+            cell_X_edge = max_X / num_of_APs_in_row
+            cell_Y_edge = cell_X_edge
             
-        num_of_APs_in_row = math.sqrt (len(self.leaves)) #$$$ cast to int, floor  
-        cell_X_edge = max_X / num_of_APs_in_row
-        cell_Y_edge = cell_X_edge
-        
-        for line in (line for line in lines if line):
-        
-            # Discard lines with comments / verbose data
-            if (line.split ("//")[0] == ""):
-                continue
+            while line:
+                        
+                line = mob_file.readline()#.rstrip()
+                
+                # Discard lines with comments / verbose data
+                if (line.split ("//")[0] == ""):
+                    continue
+                
+                splitted_line = line.split (" ")
+                if (splitted_line[0] == "time"):
+                    printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
+                    continue
+                
+                if (splitted_line[0] == "node"):
+                    X, Y = float(splitted_line[2]), float(splitted_line[3])
+                    ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
+                    printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
+                    continue
             
-            splitted_line = line.split (" ")
-            if (splitted_line[0] == "time"):
-                printf(self.ap_file, "\n{}: " .format (line))
-                continue
-            
-            if (splitted_line[0] == "node"):
-                X, Y = 97, 50 #splitted_line[2], splitted_line[3], cast to int
-                ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
-                printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
-                continue
-            
+                printf(self.ap_file, "\n" )
+
             
 
     

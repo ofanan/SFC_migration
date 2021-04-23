@@ -12,3 +12,5 @@ src/obj_func.py
 /src/old/MyBuses.py
 /src/old/shorter.mod
 /src/old/zootupleset.mod
+/nbproject/*
+/dist/*

@@ -27,7 +27,7 @@ public class Simulation {
 	// The simulator will print the nodes' locations once in intervalBetweenLocationUpdates. 
 	private double intervalBetweenLocationUpdates = 1;
 
-	public String outputFileName = "citymob.res";
+	public String outputFileName = "../res/res.loc";
 
     /*
      * Random numbers generator
@@ -231,6 +231,7 @@ public class Simulation {
             currentTime += TIME_INTERVAL;
              
             updateNodesPositions();
+//            System.out.println(System.getProperty("user.dir"));
             if (currentTime % intervalBetweenLocationUpdates == 0) {
             	MyConfig.writeStringToFile (outputFileName, String.format("time = %.0f\n", currentTime));
                 for (int i = 0; i < NODES; i++) {

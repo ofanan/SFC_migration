@@ -8,10 +8,12 @@
 
 import java.util.ArrayList;
 
+import sim.*;
 import sim.PointOfInterest;
 import sim.ScenarioCreationException;
 import sim.Simulation;
 
+//java -classpath C:\Users\ofanan\Documents\GitHub\SFC_migration\build\classes HelloWorld
 /**
  *
  * @author Manuel Fogué Cortés

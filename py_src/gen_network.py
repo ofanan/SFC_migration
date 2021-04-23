@@ -33,6 +33,12 @@ class toy_example (object):
             for lvl in range (len(shortest_path[leaf][0])):
                 self.G.nodes[shortest_path[leaf][0][lvl]]['lvl'] = lvl
                 self.G.nodes[shortest_path[leaf][0][lvl]]['CPU cap'] = 3 * lvl
+        
+        # # Iterate over all children of node i
+        # for n in self.G.neighbors(i):
+        #     if (n > i):
+        #         print (n)
+        # exit
             
         # Calculate edge propagation delays    
         for edge in self.G.edges: 
@@ -84,6 +90,7 @@ class toy_example (object):
         self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
         for leaf in self.leaves:
             self.G.nodes[leaf]['my chains'] = [i for i in range(self.NUM_OF_USERS) if self.PoA_of_user[i] == leaf]
+                
         
         self.num_of_vnfs_in_chain   = self.max_chain_len * np.ones (self.NUM_OF_CHAINS, dtype ='uint8')
         self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
@@ -160,17 +167,11 @@ class toy_example (object):
         """
         total_cost = 0
         for chain in range(self.NUM_OF_CHAINS):
-            cost = self.CPU_cost[self.chain_nxt_loc[chain]] * self.chain_nxt_total_alloc[chain] + \
+            total_cost += self.CPU_cost[self.chain_nxt_loc[chain]] * self.chain_nxt_total_alloc[chain] + \
                         self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
                         self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.num_of_vnfs_in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
-            print ('cur loc = {}, nxt loc = {}, PoA = {}, cost = {}' .format(
-                    self.chain_cur_loc[chain],
-                    self.chain_nxt_loc[chain],
-                    self.PoA_of_user[chain],
-                    cost
-                    ))
-
+        exit
             
     def print_vars (self):
         """

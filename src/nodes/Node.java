@@ -188,7 +188,7 @@ public class Node {
      * Prints node position 
      */
     public void printNodePos (String outputFileName) {
-        MyConfig.writeStringToFile (outputFileName, String.format("node %d: %.1f, %.1f\n", index, currentPosition.getX(), currentPosition.getX()));
+        MyConfig.writeStringToFile (outputFileName, String.format("node %d %.1f %.1f\n", index, currentPosition.getX(), currentPosition.getX()));
     }
     
     

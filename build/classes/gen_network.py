@@ -25,11 +25,11 @@ class SFC_mig_simulator (object):
         self.ap_file  = open ("../res/" + mob_file_name.split(".")[0] + ".ap", "w")  
         with open ("../res/" + mob_file_name,  "r") as mob_file:
             line = mob_file.readline().rstrip()
-            max_X, max_Y = float(line.split(" ")[3]), float(line.split(" ")[5])
+            max_X, max_Y = float(line.split(" ")[1]), float(line.split(" ")[3])
             if (max_X != max_Y):
                 print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
                 
-            printf (self.ap_file, '// File format:\ntime = t: (1,a1),(2,a2), ...\nwhere aX is the Point-of-Access of user X at time t\n')
+            printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
     
             num_of_APs_in_row = math.sqrt (len(self.leaves)) #$$$ cast to int, floor  
             cell_X_edge = max_X / num_of_APs_in_row

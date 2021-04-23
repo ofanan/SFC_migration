@@ -9,10 +9,57 @@ from printf import printf
 import Check_sol
 import obj_func
 from _overlapped import NULL
-from solve_problem_by_Cplex import solve_problem_by_Cplex
+# from solve_problem_by_Cplex import solve_problem_by_Cplex
 from networkx.algorithms.threshold import shortest_path
+from cmath import sqrt
+from numpy import int
 
-class toy_example (object):
+class SFC_mig_simulator (object):
+    
+    def gen_APs (self):
+        """
+        Use the input about the users' mobility to generate data of the users' access points along the simulation.
+        The input data is read from the file self.mob_file. The output data is written to the file self.ap_file
+        """
+        mob_file_name = "res.loc"
+        self.mob_file = open ("../res/" + mob_file_name,  "r")
+        self.ap_file  = open ("../res/" + mob_file_name.split(".")[0] + ".ap", "w")  
+       
+        printf (self.ap_file, '// File format:\ntime = t: (1,a1),(2,a2), ...\nwhere aX is the Point-of-Access of user X at time t\n')
+# #         lines = (line for line in lines if line)       # Discard blank lines
+#         print (lines(0))
+#         if (lines[0].split(" ")[1] == "city_size"):
+#             max_X, max_Y = line.split(" ")[3], line.split(" ")[4]
+        
+        lines = (line.rstrip() for line in self.mob_file) # "lines" contains all lines in input file
+        max_X, max_Y = 100, 100
+        if (max_X != max_Y):
+            print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
+            exit
+            
+        num_of_APs_in_row = math.sqrt (len(self.leaves)) #$$$ cast to int, floor  
+        cell_X_edge = max_X / num_of_APs_in_row
+        cell_Y_edge = cell_X_edge
+        
+        for line in (line for line in lines if line):
+        
+            # Discard lines with comments / verbose data
+            if (line.split ("//")[0] == ""):
+                continue
+            
+            splitted_line = line.split (" ")
+            if (splitted_line[0] == "time"):
+                printf(self.ap_file, "\n{}: " .format (line))
+                continue
+            
+            if (splitted_line[0] == "node"):
+                X, Y = 97, 50 #splitted_line[2], splitted_line[3], cast to int
+                ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
+                printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
+                continue
+            
+            
+
     
     def gen_parameterized_tree (self):
         """
@@ -239,24 +286,25 @@ if __name__ == "__main__":
     
     # Gen static LP problem
     t = time.time()
-    my_toy_example = toy_example (verbose = 0)
-    my_toy_example.calc_SS_sol_total_cost ()
-    # my_toy_example.check_greedy_alg ()
+    my_simulator = SFC_mig_simulator (verbose = 0)
+    my_simulator.gen_APs()
+    # my_simulator.calc_SS_sol_total_cost ()
+    # my_simulator.check_greedy_alg ()
     # exit (0)
     #
-    # my_toy_example.init_problem  ()
+    # my_simulator.init_problem  ()
     #
     # # Gen dynamic LP problem
     # t = time.time()
-    # for leaf in my_toy_example.leaves:
-        # my_toy_example.gen_lp_problem(leaf)
+    # for leaf in my_simulator.leaves:
+        # my_simulator.gen_lp_problem(leaf)
         #
         #
-    # my_toy_example.gen_lp_problem_old ()
+    # my_simulator.gen_lp_problem_old ()
     # printf (lp_time_summary_file, 'Gen dynamic LP took {:.4f} seconds\n' .format (float (time.time() - t)))
     #
     # # Solve the LP problem
     # t = time.time()
-    # my_toy_example.run_lp_Cplex()
+    # my_simulator.run_lp_Cplex()
     # printf (lp_time_summary_file, 'Solving the LP took {:.4f} seconds\n' .format (float (time.time() - t)))
 

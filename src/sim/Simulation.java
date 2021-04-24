@@ -227,7 +227,8 @@ public class Simulation {
         
         // Node movements
         currentTime = 0;
-    	MyConfig.overwriteStringToFile (outputFileName, String.format("MAX_X %.0f MAX_Y %.0f\n", MAX_X, MAX_Y));
+    	MyConfig.overwriteStringToFile (outputFileName, "// Users mobility - output by Citymob\n");
+    	MyConfig.writeStringToFile (outputFileName, String.format("MAX_X %.0f MAX_Y %.0f\n", MAX_X, MAX_Y));
         while (getCurrentTime() < MAX_TIME) {
             currentTime += TIME_INTERVAL;
              

@@ -16,49 +16,125 @@ from numpy import int
 
 class SFC_mig_simulator (object):
     
+                
+    def gen_users_data (self):
+        """
+        Read the input about the users (target delay, traffic), and write it to the appropriate fields in self.
+        The input data is read from the file self.users_loc_file_name. 
+        """
+        usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r") 
+        for line in usrs_data_file: 
+    
+            # Ignore comments lines
+            if (line.split ("//")[0] == ""):
+                continue
+
+            splitted_line = line.split (" ")
+
+            if (splitted_line[0] == "num_of_users"): 
+                self.NUM_OF_USERS = int (line.split("=")[1].rstrip())
+                continue 
+
+            self.theta_times_lambda_of_usr = np.empty(self.NUM_OF_USERS, dtype=object)
+            self.target_delay_of_usr       = np.empty(self.NUM_OF_USERS, dtype=object)
+            if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
+                u = int(splitted_line[0].split("u")[1])
+                
+                if (splitted_line[1] == "theta_times_lambda"):              
+                    theta_times_lambda = line.split("=")[1].rstrip().split(",")
+                    self.theta_times_lambda_of_usr[u] = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
+        
+                if (splitted_line[1] == "target_delay"):              
+                    self.target_delay_of_usr[u] = float (line.split("=")[1].rstrip())
+                    print (self.target_delay_of_usr[u]) 
+                    exit ()
+        # # Users parameters
+        # self.NUM_OF_CHAINS          = self.NUM_OF_USERS
+        # self.uniform_sigma_u        = 1 # bkt size
+        # self.sigma_u                = self.uniform_sigma_u * np.ones (self.NUM_OF_CHAINS) 
+        # self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
+        #
+        #
+        # # Calculate v^+ of each VNF v.
+        # # self.vpp[v] will hold the idx of the next VNF in the same chain.
+        # # if v is the last VNF in its chain, then self.vpp[v] will hold the PoA of this chain's user  
+        # self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
+        # self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
+        # self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
+        # self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
+        # self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
+        #
+        # self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
+        # v = 0
+        # for chain_num in range (self.NUM_OF_CHAINS):
+        #     self.vnf_in_chain                 [chain_num] = []
+        #     # self.theta_times_lambda_v_chain [chain_num] = []
+        #     for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
+        #         self.vnf_in_chain                [chain_num].append (v)
+        #         # self.theta_times_lambda_v_chain[chain_num].append (self.theta_times_lambda_v[v]) 
+        #         if (idx_in_chain == 0):
+        #             self.v0[chain_num] = v 
+        #         if (idx_in_chain == self.num_of_vnfs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
+        #             self.v_inf[chain_num] = v
+        #             self.vpp [v] = self.PoA_of_user[chain_num]
+        #         else: # Not the last VM in the chain
+        #             self.v_not_inf.append(v)
+        #             self.vpp [v] = v+1 
+        #         self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
+        #         v += 1
+        #
+        # # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
+        # # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
+        #
+        # self.VNF_mig_cost           = 10  * np.ones (self.NUM_OF_VNFs)
+        # self.chain_mig_cost         = np.zeros (self.NUM_OF_USERS)
+        # for chain in range (self.NUM_OF_CHAINS):
+        #     self.chain_mig_cost[chain] = sum (self.VNF_mig_cost[v] for v in self.vnf_in_chain[chain])
+        #
+        # # A Single-Server (per chain) solution for the problem 
+        # self.chain_nxt_loc          = 4 * np.ones (self.NUM_OF_CHAINS, dtype ='uint8') #self.PoA_of_user 
+        # self.chain_nxt_total_alloc = 7 * np.ones (self.NUM_OF_CHAINS) # total CPU allocation of the chain
+                
     def gen_APs (self):
         """
-        Use the input about the users' mobility to generate data of the users' access points along the simulation.
-        The input data is read from the file mob_file. The output data is written to the file self.ap_file
+        Read the input about the users delay, and write the appropriate user-to-PoA connections to the file self.ap_file
+        The input data is read from the file self.users_loc_file_name.          
         """
-        mob_file_name = "res.loc"
-        self.ap_file  = open ("../res/" + mob_file_name.split(".")[0] + ".ap", "w")  
-        with open ("../res/" + mob_file_name,  "r") as mob_file:
-            line = mob_file.readline().rstrip()
-            max_X, max_Y = float(line.split(" ")[1]), float(line.split(" ")[3])
-            if (max_X != max_Y):
-                print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
-                
-            printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
-    
-            num_of_APs_in_row = math.sqrt (len(self.leaves)) #$$$ cast to int, floor  
+        self.ap_file  = open ("../res/" + self.users_loc_file_name.split(".")[0] + ".ap", "w+")  
+        usrs_loc_file = open ("../res/" + self.users_loc_file_name,  "r") 
+        printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
+            
+        for line in usrs_loc_file: 
+        
+            # Ignore comments lines
+            if (line.split ("//")[0] == ""):
+                continue
+
+            splitted_line = line.split (" ")
+
+            if (splitted_line[0] == 'MAX_X'):
+                max_X, max_Y = float(splitted_line[1]), float(splitted_line[3])
+                if (max_X != max_Y):
+                    print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
+                    exit ()
+            
+            num_of_APs_in_row = math.sqrt (self.num_of_leaves) #$$$ cast to int, floor  
             cell_X_edge = max_X / num_of_APs_in_row
             cell_Y_edge = cell_X_edge
             
-            while line:
-                        
-                line = mob_file.readline()#.rstrip()
-                
-                # Discard lines with comments / verbose data
-                if (line.split ("//")[0] == ""):
-                    continue
-                
-                splitted_line = line.split (" ")
-                if (splitted_line[0] == "time"):
-                    printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
-                    continue
-                
-                if (splitted_line[0] == "node"):
-                    X, Y = float(splitted_line[2]), float(splitted_line[3])
-                    ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
-                    printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
-                    continue
+            if (splitted_line[0] == "time"):
+                printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
+                continue
+        
+            if (splitted_line[0] == "node"):
+                X, Y = float(splitted_line[2]), float(splitted_line[3])
+                ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
+                printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
+                continue
             
-                printf(self.ap_file, "\n" )
+        printf(self.ap_file, "\n")
 
             
-
-    
     def gen_parameterized_tree (self):
         """
         Generate a parameterized regular three-nodes tree (root and 2 leaves). 
@@ -70,15 +146,17 @@ class SFC_mig_simulator (object):
 
         shortest_path = nx.shortest_path(self.G)
 
-        self.leaves = [x for x in self.G.nodes() if self.G.out_degree(x)==1 and self.G.in_degree(x)==1]
 
-        # Calculate for each leaf its path to the root, and for each edge the CPU cap'.
-        for leaf in self.leaves: 
-            self.G.nodes[leaf]['path to root'] = shortest_path[leaf][0]            
-            for lvl in range (len(shortest_path[leaf][0])):
-                self.G.nodes[shortest_path[leaf][0][lvl]]['lvl'] = lvl
-                self.G.nodes[shortest_path[leaf][0][lvl]]['CPU cap'] = 3 * lvl
-        
+        # levelize the tree (assuming a balanced tree) 
+        root = 0 # In networkx, the ID of the root is 0
+        self.num_of_leaves = 0
+        for s in self.G.nodes(): # for every server
+            if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
+                self.num_of_leaves += 1
+                self.G.nodes[s]['lvl'] = 0 # Yep --> its lvl is 0
+                for lvl in range (len(shortest_path[s][0])):
+                    self.G.nodes[shortest_path[s][root][lvl]]['lvl'] = lvl # assume here a balanced tree
+                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cap'] = 3 * (lvl+1)                
         # # Iterate over all children of node i
         # for n in self.G.neighbors(i):
         #     if (n > i):
@@ -88,7 +166,7 @@ class SFC_mig_simulator (object):
         # Calculate edge propagation delays    
         for edge in self.G.edges: 
             self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
-            self.G[edge[0]][edge[1]]['cost']  = self.Lmax / self.uniform_link_cost
+            self.G[edge[0]][edge[1]]['cost']  = self.uniform_link_cost
             # paths_using_this_edge = []
             # for src in range (self.NUM_OF_SERVERS):
                 # for dst in range (self.NUM_OF_SERVERS): 
@@ -107,7 +185,7 @@ class SFC_mig_simulator (object):
                 self.path_bw_cost [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['cost']  for hop in range (len(shortest_path[s][d])-1))
                 
         self.CPU_cost = self.uniform_CPU_cost * np.ones (self.NUM_OF_SERVERS)  
-                
+        
     def __init__ (self, verbose = -1):
         """
         Init a toy example - topology (e.g., chains, VMs, target delays etc.).
@@ -121,90 +199,21 @@ class SFC_mig_simulator (object):
         self.uniform_link_capacity  = 100
         self.Lmax                   = 1
         self.uniform_Tpd            = 1
-        self.uniform_cpu_capacity   = 1
         self.uniform_link_cost      = 1
         self.uniform_CPU_cost       = 1
         self.max_chain_len          = 2
+        self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users
+        self.users_loc_file_name = "res.loc"  #input file containing the locations of all users along the simulation
         self.gen_parameterized_tree ()
-                
-        # Users parameters
-        self.NUM_OF_USERS           = int(2*len(self.leaves))
-        self.NUM_OF_CHAINS          = self.NUM_OF_USERS
-        self.uniform_sigma_u        = 1 # bkt size
-        self.sigma_u                = self.uniform_sigma_u * np.ones (self.NUM_OF_CHAINS) 
-        self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
-        for leaf in self.leaves:
-            self.G.nodes[leaf]['my chains'] = [i for i in range(self.NUM_OF_USERS) if self.PoA_of_user[i] == leaf]
-                
-        
-        self.num_of_vnfs_in_chain   = self.max_chain_len * np.ones (self.NUM_OF_CHAINS, dtype ='uint8')
-        self.NUM_OF_VNFs            = sum (self.num_of_vnfs_in_chain).astype ('uint')
-        self.cur_loc_of_vnf         = self.PoA_of_user
-        self.chain_cur_loc          = self.PoA_of_user
-
-        self.uniform_lambda_v       = 0.1
-        self.uniform_theta_v        = 0.1
-        self.uniform_bkt_size       = 100
-        self.lambda_v               = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.lambda_v[c][i] will hold a the input traffics ("lambda_v") of the i-th VNF in chain c 
-        self.theta_v                = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_v [c][i] will hold a list of the input required work per traffic ("theta_v") of the i-th VNF in chain c                        
-        self.theta_times_lambda_v   = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.theta_v [c][i] will hold a list of the input required work per traffic ("theta_v") of the i-th VNF in chain c                        
-        for chain_num in range(self.NUM_OF_CHAINS):
-            self.lambda_v             [chain_num] = []
-            self.theta_v              [chain_num] = []
-            self.theta_times_lambda_v [chain_num] = []
-            for v in range (self.num_of_vnfs_in_chain[chain_num]+1):
-                self.lambda_v             [chain_num].append (self.uniform_lambda_v)
-                self.theta_v              [chain_num].append (self.uniform_theta_v)
-                self.theta_times_lambda_v [chain_num].append ([a*b for a, b in zip (self.lambda_v[chain_num], self.theta_v[chain_num])])
-
-
-        self.chain_target_delay     = 10 * np.ones (self.NUM_OF_CHAINS)
-
-        # Calculate v^+ of each VNF v.
-        # self.vpp[v] will hold the idx of the next VNF in the same chain.
-        # if v is the last VNF in its chain, then self.vpp[v] will hold the PoA of this chain's user  
-        self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
-        self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
-        self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
-        self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
-        self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
-
-        self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
-        v = 0
-        for chain_num in range (self.NUM_OF_CHAINS):
-            self.vnf_in_chain                 [chain_num] = []
-            # self.theta_times_lambda_v_chain [chain_num] = []
-            for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
-                self.vnf_in_chain                [chain_num].append (v)
-                # self.theta_times_lambda_v_chain[chain_num].append (self.theta_times_lambda_v[v]) 
-                if (idx_in_chain == 0):
-                    self.v0[chain_num] = v 
-                if (idx_in_chain == self.num_of_vnfs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
-                    self.v_inf[chain_num] = v
-                    self.vpp [v] = self.PoA_of_user[chain_num]
-                else: # Not the last VM in the chain
-                    self.v_not_inf.append(v)
-                    self.vpp [v] = v+1 
-                self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
-                v += 1
-       
-        # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
-        # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
-
-        self.VNF_mig_cost           = 10  * np.ones (self.NUM_OF_VNFs)
-        self.chain_mig_cost         = np.zeros (self.NUM_OF_USERS)
-        for chain in range (self.NUM_OF_CHAINS):
-            self.chain_mig_cost[chain] = sum (self.VNF_mig_cost[v] for v in self.vnf_in_chain[chain])
-
+        self.gen_users_data ()
+        self.gen_APs ()
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
         self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
         self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
         self.write_to_cfg_file = True
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
 
-        # A Single-Server (per chain) solution for the problem 
-        self.chain_nxt_loc          = 4 * np.ones (self.NUM_OF_CHAINS, dtype ='uint8') #self.PoA_of_user 
-        self.chain_nxt_total_alloc = 7 * np.ones (self.NUM_OF_CHAINS) # total CPU allocation of the chain
+                
 
     def calc_SS_sol_total_cost (self):
         """
@@ -285,7 +294,6 @@ if __name__ == "__main__":
     # Gen static LP problem
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = 0)
-    my_simulator.gen_APs()
     # my_simulator.calc_SS_sol_total_cost ()
     # my_simulator.check_greedy_alg ()
     # exit (0)

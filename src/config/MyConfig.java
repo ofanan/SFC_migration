@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
+// Accessory functions to write to a file. 
 public class MyConfig {
 
 	  // Write a given string to a given output fileName. If file exists - delete it, and start from a fresh file 

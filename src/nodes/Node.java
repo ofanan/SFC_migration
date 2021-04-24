@@ -185,7 +185,7 @@ public class Node {
     
     
     /*
-     * Prints node position 
+     * $$$ Prints node (SFC's user) position to a ".loc" file 
      */
     public void printNodePos (String outputFileName) {
         MyConfig.writeStringToFile (outputFileName, String.format("node %d %.1f %.1f\n", index, currentPosition.getX(), currentPosition.getX()));

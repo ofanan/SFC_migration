@@ -23,6 +23,8 @@ class SFC_mig_simulator (object):
         The input data is read from the file self.users_loc_file_name. 
         """
         usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r") 
+        self.theta_times_lambda_of_usr = np.empty(1, dtype=list)
+        self.target_delay_of_usr       = np.empty(1, dtype=float)
         for line in usrs_data_file: 
     
             # Ignore comments lines
@@ -35,8 +37,8 @@ class SFC_mig_simulator (object):
                 self.NUM_OF_USERS = int (line.split("=")[1].rstrip())
                 continue 
 
-            self.theta_times_lambda_of_usr = np.empty(self.NUM_OF_USERS, dtype=object)
-            self.target_delay_of_usr       = np.empty(self.NUM_OF_USERS, dtype=object)
+            self.theta_times_lambda_of_usr = np.resize (self.theta_times_lambda_of_usr, self.NUM_OF_USERS)
+            self.target_delay_of_usr       = np.resize (self.target_delay_of_usr, self.NUM_OF_USERS)
             if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
                 u = int(splitted_line[0].split("u")[1])
                 
@@ -46,24 +48,23 @@ class SFC_mig_simulator (object):
         
                 if (splitted_line[1] == "target_delay"):              
                     self.target_delay_of_usr[u] = float (line.split("=")[1].rstrip())
-                    print (self.target_delay_of_usr[u]) 
-                    exit ()
-        # # Users parameters
-        # self.NUM_OF_CHAINS          = self.NUM_OF_USERS
-        # self.uniform_sigma_u        = 1 # bkt size
-        # self.sigma_u                = self.uniform_sigma_u * np.ones (self.NUM_OF_CHAINS) 
+                  
+        
+        self.NUM_OF_VNFs = sum ([len(u) for u in self.theta_times_lambda_of_usr])
+        print ("num of VNFs = ", self.NUM_OF_VNFs)
+        print ('target delays = ', self.target_delay_of_usr)
+        exit ()
         # self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
-        #
-        #
-        # # Calculate v^+ of each VNF v.
-        # # self.vpp[v] will hold the idx of the next VNF in the same chain.
-        # # if v is the last VNF in its chain, then self.vpp[v] will hold the PoA of this chain's user  
+              
+        # Calculate v^+ of each VNF v.
+        # self.vpp[v] will hold the idx of the next VNF in the same chain.
+        # if v is the last VNF in its chain, then self.vpp[v] will hold the PoA of this chain's user  
         # self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
         # self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
         # self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
         # self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
         # self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
-        #
+        
         # self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
         # v = 0
         # for chain_num in range (self.NUM_OF_CHAINS):

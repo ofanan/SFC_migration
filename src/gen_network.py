@@ -22,9 +22,13 @@ class SFC_mig_simulator (object):
         Read the input about the users (target delay, traffic), and write it to the appropriate fields in self.
         The input data is read from the file self.users_loc_file_name. 
         """
-        usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r") 
-        self.theta_times_lambda_of_usr = np.empty(1, dtype=list)
-        self.target_delay_of_usr       = np.empty(1, dtype=float)
+        usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
+        self.users = np.array (1, dtype=object)
+        self.NUM_OF_VMs = 0
+        self.theta_times_lambda_of_usr = np.empty (1, dtype=list)
+        self.target_delay_of_usr       = np.empty (1, dtype=float)
+        self.mig_cost_of_usr           = np.empty (1, dtype=float)
+        
         for line in usrs_data_file: 
     
             # Ignore comments lines
@@ -34,48 +38,63 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
 
             if (splitted_line[0] == "num_of_users"): 
-                self.NUM_OF_USERS = int (line.split("=")[1].rstrip())
+                self.users = np.resize (np.resize, int (line.split("=")[1].rstrip()))
+                self.NUM_OF_USERS  = int (line.split("=")[1].rstrip())
+                self.NUM_OF_CHAINS = self.NUM_OF_USERS
                 continue 
 
             self.theta_times_lambda_of_usr = np.resize (self.theta_times_lambda_of_usr, self.NUM_OF_USERS)
             self.target_delay_of_usr       = np.resize (self.target_delay_of_usr, self.NUM_OF_USERS)
+            # self.mig_cost_of_usr           = np.resize (self.mig_cost_of_usr, (self.NUM_OF_USERS, self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
             if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
                 u = int(splitted_line[0].split("u")[1])
                 
                 if (splitted_line[1] == "theta_times_lambda"):              
                     theta_times_lambda = line.split("=")[1].rstrip().split(",")
                     self.theta_times_lambda_of_usr[u] = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
+                    self.users[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
+                    self.NUM_OF_VMs += len (theta_times_lambda)
         
-                if (splitted_line[1] == "target_delay"):              
+                elif (splitted_line[1] == "target_delay"):              
                     self.target_delay_of_usr[u] = float (line.split("=")[1].rstrip())
+                    self.users[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
-        
-        self.NUM_OF_VNFs = sum ([len(u) for u in self.theta_times_lambda_of_usr])
-        print ("num of VNFs = ", self.NUM_OF_VNFs)
-        print ('target delays = ', self.target_delay_of_usr)
+                # elif (splitted_line[1] == "mig_cost"):  
+                #     mig_cost = line.split("=")[1].rstrip().split(",")
+                #     self.mig_cost_of_usr[u] = [self.mig_cost_of_usr[u].fill (7)]  #(float (line.split("=")[1].rstrip()))
+                #     print (self.mig_cost_of_usr[u])
+                #     exit ()
+
+                    
+        print (self.NUM_OF_VMs)        
+        print (self.users)
+        # print ("num of VNFs = ", self.NUM_OF_VMs)
+        # print ('target delays = ', self.target_delay_of_usr)
         exit ()
-        # self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
               
+        # The code below may be un-commented and ran only once we know the PoAs, as they're dummy VMs in the chain. 
+        # Also, the code is relevant only for non-SS solutions.
         # Calculate v^+ of each VNF v.
         # self.vpp[v] will hold the idx of the next VNF in the same chain.
         # if v is the last VNF in its chain, then self.vpp[v] will hold the PoA of this chain's user  
-        # self.vpp                    = np.zeros (self.NUM_OF_VNFs, dtype = 'uint')
-        # self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
-        # self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
-        # self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
-        # self.PoA_of_vnf = np.zeros (self.NUM_OF_VNFs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
+        # self.vpp                    = np.zeros (self.NUM_OF_VMs, dtype = 'uint')
+        #self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
+        #self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
+        #self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
+        #self.PoA_of_vnf = np.zeros (self.NUM_OF_VMs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
+        # self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
         
         # self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
         # v = 0
         # for chain_num in range (self.NUM_OF_CHAINS):
         #     self.vnf_in_chain                 [chain_num] = []
         #     # self.theta_times_lambda_v_chain [chain_num] = []
-        #     for idx_in_chain in range (self.num_of_vnfs_in_chain[chain_num]):
+        #     for idx_in_chain in range (self.NUM_OF_VMs_in_chain[chain_num]):
         #         self.vnf_in_chain                [chain_num].append (v)
         #         # self.theta_times_lambda_v_chain[chain_num].append (self.theta_times_lambda_v[v]) 
         #         if (idx_in_chain == 0):
         #             self.v0[chain_num] = v 
-        #         if (idx_in_chain == self.num_of_vnfs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
+        #         if (idx_in_chain == self.NUM_OF_VMs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
         #             self.v_inf[chain_num] = v
         #             self.vpp [v] = self.PoA_of_user[chain_num]
         #         else: # Not the last VM in the chain
@@ -83,12 +102,9 @@ class SFC_mig_simulator (object):
         #             self.vpp [v] = v+1 
         #         self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
         #         v += 1
-        #
-        # # self.mig_comp_delay  = np.ones (self.NUM_OF_VNFs)     # self.mig_comp_delay[v] hold the migration's computational cost of VM v. Currently unused.
-        # # self.mig_data       = 0 * np.ones (self.NUM_OF_VNFs) # self.mig_data[v] amount of data units to transfer during the migration of VM v. Currently unused.
-        #
-        # self.VNF_mig_cost           = 10  * np.ones (self.NUM_OF_VNFs)
-        # self.chain_mig_cost         = np.zeros (self.NUM_OF_USERS)
+        
+        # self.VNF_mig_cost           = 10  * np.ones (self.NUM_OF_VMs)
+        self.chain_mig_cost         = np.zeros (self.NUM_OF_USERS)
         # for chain in range (self.NUM_OF_CHAINS):
         #     self.chain_mig_cost[chain] = sum (self.VNF_mig_cost[v] for v in self.vnf_in_chain[chain])
         #
@@ -224,7 +240,7 @@ class SFC_mig_simulator (object):
         for chain in range(self.NUM_OF_CHAINS):
             total_cost += self.CPU_cost[self.chain_nxt_loc[chain]] * self.chain_nxt_total_alloc[chain] + \
                         self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
-                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.num_of_vnfs_in_chain[chain]] + \
+                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.NUM_OF_VMs_in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
         exit
             

@@ -15,8 +15,52 @@ from cmath import sqrt
 from numpy import int
 
 class SFC_mig_simulator (object):
+
+    def check_greedy_alg (self):
+        
+        theta_v_lambda_v    = np.array ([0.1, 0.3, 0.5, 0.7, 0.9]) 
+        max_alloc           = 2 * np.ones (len (theta_v_lambda_v), dtype = 'int8')
+        
+        max_budget          = sum (max_alloc) 
+        
+        greedy_delay        = float ("inf") * np.ones (max_budget+1)
+        bf_delay            = float ("inf") * np.ones (max_budget+1)
+        
+        B0                  = np.array ([math.ceil(theta_v_lambda_v[i]) for i in range (len(theta_v_lambda_v))]) # minimal feasible budget
+        mu                  = B0.copy ()
+        budget              = sum (mu)
+        
+        # Calculate bf-delays
+        while (budget < max_budget):
+            budget   = int(sum (mu))
+            delay = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu))) 
+            bf_delay[budget] = min(bf_delay[budget], delay) 
+            mu = self.inc_array (mu, B0, max_alloc) 
+        
+        print (' bf_delay = ', bf_delay)
+        
+        # Calculate greedy delays
+        mu                  = B0.copy ()
+        budget              = sum (mu)
+        while (budget <= max_budget):
     
-                
+            greedy_delay[budget] = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu)))        
+            argmax = np.argmax (np.array ([1 / (mu[i] - theta_v_lambda_v[i]) - 1 / (mu[i] + 1 - theta_v_lambda_v[i]) for i in range(len(mu))]))
+            mu[argmax] = mu[argmax] + 1
+            budget     = budget     + 1 
+            
+        print (' greedy_delay = ', greedy_delay)
+        
+
+    def calc_CPU_alloc (self): 
+        """
+        calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
+        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
+        """
+        for u in self.users:
+            slack = [self.users[1]['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]  
+
+        exit ()
     def gen_users_data (self):
         """
         Read the input about the users (target delay, traffic), and write it to the appropriate fields in self.
@@ -26,8 +70,6 @@ class SFC_mig_simulator (object):
         self.users = np.array (1, dtype=object)
         self.NUM_OF_VMs = 0
         self.theta_times_lambda_of_usr = np.empty (1, dtype=list)
-        self.target_delay_of_usr       = np.empty (1, dtype=float)
-        self.mig_cost_of_usr           = np.empty (1, dtype=float)
         
         for line in usrs_data_file: 
     
@@ -43,35 +85,26 @@ class SFC_mig_simulator (object):
                 self.NUM_OF_CHAINS = self.NUM_OF_USERS
                 continue 
 
-            self.theta_times_lambda_of_usr = np.resize (self.theta_times_lambda_of_usr, self.NUM_OF_USERS)
-            self.target_delay_of_usr       = np.resize (self.target_delay_of_usr, self.NUM_OF_USERS)
-            # self.mig_cost_of_usr           = np.resize (self.mig_cost_of_usr, (self.NUM_OF_USERS, self.NUM_OF_SERVERS, self.NUM_OF_SERVERS))
             if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
                 u = int(splitted_line[0].split("u")[1])
                 
                 if (splitted_line[1] == "theta_times_lambda"):              
                     theta_times_lambda = line.split("=")[1].rstrip().split(",")
-                    self.theta_times_lambda_of_usr[u] = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
                     self.users[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
                     self.NUM_OF_VMs += len (theta_times_lambda)
         
                 elif (splitted_line[1] == "target_delay"):              
-                    self.target_delay_of_usr[u] = float (line.split("=")[1].rstrip())
                     self.users[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
+                elif (splitted_line[1] == "mig_cost"):              
+                    self.users[u]['mig cost'] = float (line.split("=")[1].rstrip())
                 # elif (splitted_line[1] == "mig_cost"):  
                 #     mig_cost = line.split("=")[1].rstrip().split(",")
                 #     self.mig_cost_of_usr[u] = [self.mig_cost_of_usr[u].fill (7)]  #(float (line.split("=")[1].rstrip()))
                 #     print (self.mig_cost_of_usr[u])
                 #     exit ()
 
-                    
-        print (self.NUM_OF_VMs)        
-        print (self.users)
-        # print ("num of VNFs = ", self.NUM_OF_VMs)
-        # print ('target delays = ', self.target_delay_of_usr)
-        exit ()
-              
+                                  
         # The code below may be un-commented and ran only once we know the PoAs, as they're dummy VMs in the chain. 
         # Also, the code is relevant only for non-SS solutions.
         # Calculate v^+ of each VNF v.
@@ -103,12 +136,7 @@ class SFC_mig_simulator (object):
         #         self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
         #         v += 1
         
-        # self.VNF_mig_cost           = 10  * np.ones (self.NUM_OF_VMs)
-        self.chain_mig_cost         = np.zeros (self.NUM_OF_USERS)
-        # for chain in range (self.NUM_OF_CHAINS):
-        #     self.chain_mig_cost[chain] = sum (self.VNF_mig_cost[v] for v in self.vnf_in_chain[chain])
-        #
-        # # A Single-Server (per chain) solution for the problem 
+        # A Single-Server (per chain) solution for the problem 
         # self.chain_nxt_loc          = 4 * np.ones (self.NUM_OF_CHAINS, dtype ='uint8') #self.PoA_of_user 
         # self.chain_nxt_total_alloc = 7 * np.ones (self.NUM_OF_CHAINS) # total CPU allocation of the chain
                 
@@ -167,19 +195,21 @@ class SFC_mig_simulator (object):
         # levelize the tree (assuming a balanced tree) 
         root = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves = 0
+        self.cpu_cost_at_root = 3^self.tree_height
         for s in self.G.nodes(): # for every server
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.num_of_leaves += 1
                 self.G.nodes[s]['lvl'] = 0 # Yep --> its lvl is 0
-                for lvl in range (len(shortest_path[s][0])):
+                for lvl in range (self.tree_height):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl'] = lvl # assume here a balanced tree
                     self.G.nodes[shortest_path[s][root][lvl]]['CPU cap'] = 3 * (lvl+1)                
+                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cost'] = 3 * (self.tree_height - lvl)                
         # # Iterate over all children of node i
         # for n in self.G.neighbors(i):
         #     if (n > i):
         #         print (n)
         # exit
-            
+                    
         # Calculate edge propagation delays    
         for edge in self.G.edges: 
             self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
@@ -201,8 +231,11 @@ class SFC_mig_simulator (object):
                 self.path_delay   [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['delay'] for hop in range (len(shortest_path[s][d])-1))
                 self.path_bw_cost [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['cost']  for hop in range (len(shortest_path[s][d])-1))
                 
-        self.CPU_cost = self.uniform_CPU_cost * np.ones (self.NUM_OF_SERVERS)  
-        
+        # calculate the network delay from a leaf to a node in each level,  
+        # assuming that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
+        leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
+        self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
+
     def __init__ (self, verbose = -1):
         """
         Init a toy example - topology (e.g., chains, VMs, target delays etc.).
@@ -217,20 +250,18 @@ class SFC_mig_simulator (object):
         self.Lmax                   = 1
         self.uniform_Tpd            = 1
         self.uniform_link_cost      = 1
-        self.uniform_CPU_cost       = 1
         self.max_chain_len          = 2
         self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users
         self.users_loc_file_name = "res.loc"  #input file containing the locations of all users along the simulation
         self.gen_parameterized_tree ()
         self.gen_users_data ()
         self.gen_APs ()
+        self.calc_CPU_alloc()
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
         self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
         self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
         self.write_to_cfg_file = True
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
-
-                
 
     def calc_SS_sol_total_cost (self):
         """
@@ -270,41 +301,6 @@ class SFC_mig_simulator (object):
         return ar 
      
           
-    def check_greedy_alg (self):
-        
-        theta_v_lambda_v    = np.array ([0.1, 0.3, 0.5, 0.7, 0.9]) 
-        max_alloc           = 2 * np.ones (len (theta_v_lambda_v), dtype = 'int8')
-        
-        max_budget          = sum (max_alloc) 
-        
-        greedy_delay        = float ("inf") * np.ones (max_budget+1)
-        bf_delay            = float ("inf") * np.ones (max_budget+1)
-        
-        B0                  = np.array ([math.ceil(theta_v_lambda_v[i]) for i in range (len(theta_v_lambda_v))]) # minimal feasible budget
-        mu                  = B0.copy ()
-        budget              = sum (mu)
-        
-        # Calculate bf-delays
-        while (budget < max_budget):
-            budget   = int(sum (mu))
-            delay = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu))) 
-            bf_delay[budget] = min(bf_delay[budget], delay) 
-            mu = self.inc_array (mu, B0, max_alloc) 
-        
-        print (' bf_delay = ', bf_delay)
-        
-        # Calculate greedy delays
-        mu                  = B0.copy ()
-        budget              = sum (mu)
-        while (budget <= max_budget):
-    
-            greedy_delay[budget] = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu)))        
-            argmax = np.argmax (np.array ([1 / (mu[i] - theta_v_lambda_v[i]) - 1 / (mu[i] + 1 - theta_v_lambda_v[i]) for i in range(len(mu))]))
-            mu[argmax] = mu[argmax] + 1
-            budget     = budget     + 1 
-            
-        print (' greedy_delay = ', greedy_delay)
-        
 if __name__ == "__main__":
     lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
     

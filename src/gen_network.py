@@ -57,8 +57,18 @@ class SFC_mig_simulator (object):
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
         The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
         """
+        max_alloc_per_VM = 100
+
         for u in self.users:
-            slack = [self.users[1]['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]  
+            slack = [u['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
+            mu    = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
+            u['req cpu'] = float ('inf') * np.ones (len(mu))
+            for lvl in range (self.tree_height+1): 
+                while (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) > slack[lvl]): # while the delay is above the slack delay for this lvl 
+        
+                    argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
+                    mu[argmax] = mu[argmax] + 1
+                u['req cpu'][lvl] = sum (mu)
 
         exit ()
     def gen_users_data (self):
@@ -69,7 +79,6 @@ class SFC_mig_simulator (object):
         usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
         self.users = np.array (1, dtype=object)
         self.NUM_OF_VMs = 0
-        self.theta_times_lambda_of_usr = np.empty (1, dtype=list)
         
         for line in usrs_data_file: 
     
@@ -248,7 +257,7 @@ class SFC_mig_simulator (object):
         self.children_per_node      = 2 # num of children of every non-leaf node
         self.uniform_link_capacity  = 100
         self.Lmax                   = 1
-        self.uniform_Tpd            = 1
+        self.uniform_Tpd            = 5
         self.uniform_link_cost      = 1
         self.max_chain_len          = 2
         self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users

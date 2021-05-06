@@ -57,18 +57,23 @@ class SFC_mig_simulator (object):
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
         The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
         """
-        max_alloc_per_VM = 100
-
         for u in self.users:
             slack = [u['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
             mu    = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
             u['req cpu'] = float ('inf') * np.ones (len(mu))
-            for lvl in range (self.tree_height+1): 
-                while (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) > slack[lvl]): # while the delay is above the slack delay for this lvl 
-        
+            req_cpu = sum (mu)
+            lvl = 0 
+            while lvl in range (self.tree_height+1):
+                while (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) > slack[lvl]): # while the delay is above the slack delay, and we don't exceed the CPU cap of this lvl 
                     argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
-                u['req cpu'][lvl] = sum (mu)
+                    req_cpu += 1
+                    if (req_cpu > self.CPU_cap_at_lvl[lvl]): # the CPU cap at this lvl doesn't suffice for allocating this user's chain -> by the monotone-feasibility assumption, cannot allocate also in any higher lvl
+                        lvl = self.tree_height+1
+                        break
+                # can successfully allocate this user on this lvl
+                u['req cpu'][lvl] = req_cpu
+            print (u['req cpu'])
 
         exit ()
     def gen_users_data (self):
@@ -195,6 +200,8 @@ class SFC_mig_simulator (object):
         """
         self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
+        self.CPU_cap_at_lvl  = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
+        self.CPU_cost_at_lvl = [3 * (self.tree_height - lvl) for lvl in range (self.tree_height+1)]                
         
         self.G = self.G.to_directed()
 
@@ -210,9 +217,9 @@ class SFC_mig_simulator (object):
                 self.num_of_leaves += 1
                 self.G.nodes[s]['lvl'] = 0 # Yep --> its lvl is 0
                 for lvl in range (self.tree_height):
-                    self.G.nodes[shortest_path[s][root][lvl]]['lvl'] = lvl # assume here a balanced tree
-                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cap'] = 3 * (lvl+1)                
-                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cost'] = 3 * (self.tree_height - lvl)                
+                    self.G.nodes[shortest_path[s][root][lvl]]['lvl']      = lvl # assume here a balanced tree
+                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']  = self.CPU_cap_at_lvl[lvl]                
+                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cost'] = self.CPU_cost_at_lvl[lvl]                
         # # Iterate over all children of node i
         # for n in self.G.neighbors(i):
         #     if (n > i):

@@ -10,27 +10,41 @@ from printf import printf
 
 class my_mobility_simulator (object):
 
-    calc_min_mov = lambda u, dim          : abs(0.5*self.edge - self.user[u]['loc'][dim]) # caclulate the min move required to verify that the user switches to another PoA
-    calc_dst     = lambda u, min_mov, dim : (self.user[u]['loc'][dim] + np.random.rand () * (0.5*self.edge - min_mov)) % self.edge 
-    calc_arr_t   = lambda u, dst, dim     : abs (dst - self.user[u]['loc'][dim]) / self.users[u]['speed']
-    lambda_func_try = lambda x : x 
+    min_mov   = lambda self, u, dim          : abs(0.5*self.edge - self.user[u]['loc'][dim]) # caclulate the min move required to verify that the user switches to another AP
+    direction = lambda self, u, dim       : 1 if (self.user[u]['loc'][dim] < 0.5 * self. edge) else -1
+    dst       = lambda self, direction    : 0.5 * self.edge * (1 + np.random.rand () * direction) #if (self.user[u]['loc'][dim] < 0.5 * self.edge) else 0.5 * self.edge * (1 - np.random.rand ())  
+    arr_t     = lambda self, u, dst, dim     : abs (dst - self.user[u]['loc'][dim]) / self.user[u]['speed']
+    nxt_loc   = lambda self, u, dst, dim     : [ self.user[u]['loc'][self.X], dst] if (dim == self.X) else [dst, self.user[u]['loc'][self.X] ]  
+    mig_t     = lambda self, u, min_mov      : min_mov / self.user[u]['speed']
+    nxt_ap    = lambda self, u, direction, dim : self.user[u]['ap'] + direction if dim == self.X else self.user[u]['ap'] + 2 * direction 
+#     nxt_ap  = lambda self, u, dim          : 2 * int(self.user[u]['ap'] / 2) + 1 - int (self.user[u]['ap'] % 2) if (dim == x) else \
+      
             
     def move_user (self, u):
         
-        print ('lambda = ', lambda_func_try (x))
-        # dim     = random.getrandbits(1) # dimension of nxt movement (either self.X or self.Y)
-        # min_mov = calc_min_mov (u, dim)
-        # dst     = calc_dst     (u, min_mov, dim)  
-        # self.eventQ.append ({'event type'   : self.arrive,
-        #                      'nxt loc'      : [self.user[u]['loc'][self.x], dst],
-        #                      'time'         : calc_arr_t (u, dst, dim)
-        #                      })
+        #dim     = random.getrandbits(1) # dimension of nxt movement (either self.X or self.Y)
+        dim = self.Y
+        min_mov   = self.min_mov (u, dim) # minimal move required to verify that the user switches to another AP
+        direction = self.direction (u, dim)
+        dst       = self.dst     (direction)  # destination of movement
+#         print ('cur loc = ', self.user[u]['loc'][self.X], 'min mov = ', min_mov, 'dst = ', dst)
+#         self.eventQ.append ({'event type'   : self.arrive,
+#                              'nxt loc'      : self.nxt_loc (u, dst, dim),
+#                              'time'         : self.arr_t (u, dst, dim)
+#                              })
+        
+        self.eventQ.append ({'event type'   : self.mig,
+                             'time'         : self.mig_t (u, dim), 
+                             'nxt AP'       : self.nxt_ap (u, direction, dim)
+                             })
+        print ('cur ap = ', self.user[u]['ap'])
+        print (self.eventQ)
         # time    =  
         # if (dim == self.X):  
         #
         #     # add an event for the arrival of the user to its dest
         #     self.eventQ.append ({'event type'   : self.arrive,
-        #                          'dst'          : calc_dst (u, min_mov, dim)
+        #                          'dst'          : dst (u, min_mov, dim)
         #                          'time'         : min_move / self.speed_of_user[u],
         #                          })
         #
@@ -58,7 +72,7 @@ class my_mobility_simulator (object):
         self.user = [{} for u in range (self.NUM_OF_user)]
         for u in range (self.NUM_OF_user):
             self.user[u] = {'speed' : 30 + 5*u, 'loc'   : np.random.rand (2) * self.edge}
-            self.user[u]['PoA'] = 2 * int (self.user[u]['loc'][self.Y] / (0.5*self.edge)) + int (self.user[u]['loc'][self.X] / (0.5*self.edge))
+            self.user[u]['ap'] = 2 * int (self.user[u]['loc'][self.Y] / (0.5*self.edge)) + int (self.user[u]['loc'][self.X] / (0.5*self.edge))
         
         self.eventQ = []
         self.cur_time = 0

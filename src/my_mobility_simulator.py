@@ -10,23 +10,36 @@ from printf import printf
 
 class my_mobility_simulator (object):
 
+    calc_min_mov = lambda u, dim          : abs(0.5*self.edge - self.user[u]['loc'][dim]) # caclulate the min move required to verify that the user switches to another PoA
+    calc_dst     = lambda u, min_mov, dim : (self.user[u]['loc'][dim] + np.random.rand () * (0.5*self.edge - min_mov)) % self.edge 
+    calc_arr_t   = lambda u, dst, dim     : abs (dst - self.user[u]['loc'][dim]) / self.users[u]['speed']
+    lambda_func_try = lambda x : x 
+            
     def move_user (self, u):
         
-        gamad = self.X
-        if (gamad == self.X): #(random.getrandbits(1) == self.X): 
-            
-            # add an event for the arrival of the user to its dest
-            min_move = abs(0.5*self.edge - self.cur_loc_of_usr[u][self.X]) 
-            self.eventQ.append ({'time' : min_move / self.speed_of_user[u],
-                                 'event type' : self.arrive})
-            
-            dst = (self.cur_loc_of_usr[u][self.X] + np.random.rand () * (0.5*self.edge - min_move)) % self.edge 
-            #print (np.random.rand () * (0.5*self.edge - min_move))
-            print (dst)
-            # self.eventQ.append ({'time : '
-            #                     })
-        else:
-            print ('y')
+        print ('lambda = ', lambda_func_try (x))
+        # dim     = random.getrandbits(1) # dimension of nxt movement (either self.X or self.Y)
+        # min_mov = calc_min_mov (u, dim)
+        # dst     = calc_dst     (u, min_mov, dim)  
+        # self.eventQ.append ({'event type'   : self.arrive,
+        #                      'nxt loc'      : [self.user[u]['loc'][self.x], dst],
+        #                      'time'         : calc_arr_t (u, dst, dim)
+        #                      })
+        # time    =  
+        # if (dim == self.X):  
+        #
+        #     # add an event for the arrival of the user to its dest
+        #     self.eventQ.append ({'event type'   : self.arrive,
+        #                          'dst'          : calc_dst (u, min_mov, dim)
+        #                          'time'         : min_move / self.speed_of_user[u],
+        #                          })
+        #
+        #     #print (np.random.rand () * (0.5*self.edge - min_move))
+        #     print (dst)
+        #     # self.eventQ.append ({'time : '
+        #     #                     })
+        # else:
+        #     print ('y')
 
 
     def simulate (self):
@@ -35,10 +48,17 @@ class my_mobility_simulator (object):
     
     def __init__ (self):
         
-        self.edge = 100 # edge of the rectangle in which users move 
-        self.NUM_OF_USERS  = 3
-        self.speed_of_user  = np.array ([(30 + 5*i) for i in range (self.NUM_OF_USERS)])
-        self.cur_loc_of_usr = np.random.rand (self.NUM_OF_USERS, 2) * self.edge 
+        self.edge = 100 # edge of the rectangle in which user move 
+        self.NUM_OF_user  = 3
+
+        # self.user = np.empty(self.NUM_OF_user, dytpe = 'object')
+        # moving direction (either X or Y)
+        self.X = 0
+        self.Y = 1
+        self.user = [{} for u in range (self.NUM_OF_user)]
+        for u in range (self.NUM_OF_user):
+            self.user[u] = {'speed' : 30 + 5*u, 'loc'   : np.random.rand (2) * self.edge}
+            self.user[u]['PoA'] = 2 * int (self.user[u]['loc'][self.Y] / (0.5*self.edge)) + int (self.user[u]['loc'][self.X] / (0.5*self.edge))
         
         self.eventQ = []
         self.cur_time = 0
@@ -47,15 +67,12 @@ class my_mobility_simulator (object):
         self.mig    = True
         self.arrive = False
         
-        # moving direction (either X or Y)
-        self.X = 0
-        self.Y = 1
  
-        print (np.random.choice (a=[False, True], size=(self.NUM_OF_USERS)))
+        # print (np.random.choice (a=[False, True], size=(self.NUM_OF_user)))
 
 
         
-        # for u in range (self.NUM_OF_USERS):
+        # for u in range (self.NUM_OF_user):
         #     self.eventQ.append ({'time'       : 5,
         #                          'event type' : self.mig}
         #

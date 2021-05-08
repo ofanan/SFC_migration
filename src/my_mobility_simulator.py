@@ -8,6 +8,15 @@ import random
 from printf import printf
 
 class my_mobility_simulator (object):
+    """
+    Event-driven mobility simulator.
+    Initial locations of users are picked u.a.r. from a rectangle.
+    Next, each user moves each time in the direction of either +x, -x, +y, or -y.
+    The area is covered by sub-rectangles, each covered exclusively by a single Access Point (AP).
+    The simulator verifies that users always stay within the large rectangle, 
+    and that the next location is always within the territory of an AP different from its current one.
+    Each time a user switches AP, the assignment of all users to APs is printed to an output file.
+    """
 
     ap        = lambda self, u                  : 2 * int (self.user[u]['loc'][self.Y] / (0.5*self.edge)) + int (self.user[u]['loc'][self.X] / (0.5*self.edge))
     min_mov   = lambda self, u, dim             : abs(0.5*self.edge - self.user[u]['loc'][dim]) # caclulate the min move required to verify that the user switches to another AP
@@ -42,7 +51,8 @@ class my_mobility_simulator (object):
                              })
         
         nxt_ap = self.nxt_ap (u, direction, dim)
-        print ('u = {}, cur loc = {}, cur ap = {}, direction = {}, dim = {}, nxt ap = {}' .format (u, self.user[u]['loc'], self.user[u]['ap'], direction, dim, nxt_ap))
+        print ('time = {:.4f}, u = {}, cur loc = {}, cur ap = {}, direction = {}, dim = {}, nxt ap = {}' .format 
+               (self.cur_time, u, self.user[u]['loc'], self.user[u]['ap'], direction, dim, nxt_ap))
         if (nxt_ap > 3):
             exit ()
         self.eventQ.append ({'event type'   : self.mig,
@@ -90,13 +100,14 @@ class my_mobility_simulator (object):
                 self.eventQ = sorted (self.eventQ, key = lambda event : event['time'])
                 event = self.eventQ.pop (0)
                 self.cur_time = event['time']
+                cur_usr = event['user']  
         
                 if (event['event type'] == self.mig):
-                    self.user[event['user']]['ap'] = event['nxt AP']
+                    self.user[cur_usr]['ap'] = event['nxt AP']
                     self.print_APs ()
                 else:
-                    self.user[event['user']]['loc'] = event['nxt loc']
-                    self.move_user(u)
+                    self.user[cur_usr]['loc'] = event['nxt loc']
+                    self.move_user(cur_usr)
         
             if (self.cur_time > self.max_time):
                 exit ()           
@@ -104,8 +115,7 @@ class my_mobility_simulator (object):
     def __init__ (self):
         
         self.edge = 100 # edge of the rectangle in which user move [m]
-        self.NUM_OF_USERS  = 3
-        self.maxt_time = 1
+        self.NUM_OF_USERS  = 5
         self.output_file = open ("../res/my_mob_sim.ap",  "w")
 
 
@@ -119,7 +129,7 @@ class my_mobility_simulator (object):
         
         self.eventQ = []
         self.cur_time = 0
-        self.max_time = 10
+        self.max_time = 20
         
         # Constant, denoting the types of events (either migration, or arrival to the destination) 
         self.mig    = True

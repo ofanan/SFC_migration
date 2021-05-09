@@ -72,7 +72,7 @@ class my_mobility_simulator (object):
     def print_locs (self):
         printf (self.loc_output_file, 'time = {:.4f} : \n' .format (self.cur_time)) 
         for u in range(self.NUM_OF_USERS):
-            printf (self.loc_output_file, 'user {} ({:.1f},{:.1f})\n' .format (u, self.user[u]['loc'][self.X], self.user[u]['loc'][self.Y]))
+            printf (self.loc_output_file, 'user {} {:.1f} {:.1f}\n' .format (u, self.user[u]['loc'][self.X], self.user[u]['loc'][self.Y]))
         printf (self.loc_output_file, '\n')    
 
     def print_APs (self):
@@ -94,8 +94,11 @@ class my_mobility_simulator (object):
         """
 
         printf (self.ap_output_file,  '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n\n')
+        printf (self.loc_output_file, '// Users mobility - output by mobility_simulator.py\n')
         printf (self.loc_output_file, '// File format:\n//time = t:\n')
-        printf (self.loc_output_file, '// user U (X, Y)\n//where (X,Y) is the location of user U at time t\n\n')
+        printf (self.loc_output_file, '// user U (X, Y)\n//where (X,Y) is the location of user U at time t\n')
+        printf (self.loc_output_file, '// the simulation is done in a rectangle of size MAX_X * MAX_Y, where\n')       
+        printf (self.loc_output_file, 'MAX_X {:.0f} MAX_Y {:.0f}\n\n' .format(self.edge, self.edge))
 
         # Schedule initial event for typing users' locations 
         self.eventQ.append ({'event type' : EVENT_T_PRINT_LOCS,
@@ -138,8 +141,8 @@ class my_mobility_simulator (object):
         
         self.edge = 100 # edge of the rectangle in which user move [m]
         self.NUM_OF_USERS  = 5
-        self.ap_output_file  = open ("my_mob_sim.ap",  "w")
-        self.loc_output_file = open ("my_mob_sim.loc", "w")
+        self.ap_output_file  = open ("../res/my_mob_sim.ap",  "w")
+        self.loc_output_file = open ("../res/my_mob_sim.loc", "w")
 
         # Constant, denoting the moving direction (either X or Y)
         self.X = 0

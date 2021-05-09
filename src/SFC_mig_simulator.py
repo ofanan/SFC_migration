@@ -177,7 +177,7 @@ class SFC_mig_simulator (object):
                     print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
                     exit ()
             
-            num_of_APs_in_row = math.sqrt (self.num_of_leaves) #$$$ cast to int, floor  
+            num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
             cell_X_edge = max_X / num_of_APs_in_row
             cell_Y_edge = cell_X_edge
             
@@ -185,7 +185,7 @@ class SFC_mig_simulator (object):
                 printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
                 continue
         
-            if (splitted_line[0] == "node"):
+            if (splitted_line[0] == "user"):
                 X, Y = float(splitted_line[2]), float(splitted_line[3])
                 ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
                 printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
@@ -261,14 +261,14 @@ class SFC_mig_simulator (object):
         
         # Network parameters
         self.tree_height            = 2
-        self.children_per_node      = 2 # num of children of every non-leaf node
+        self.children_per_node      = 4 # num of children of every non-leaf node
         self.uniform_link_capacity  = 100
         self.Lmax                   = 1
         self.uniform_Tpd            = 5
         self.uniform_link_cost      = 1
         self.max_chain_len          = 2
         self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users
-        self.users_loc_file_name = "res.loc"  #input file containing the locations of all users along the simulation
+        self.users_loc_file_name = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
         self.gen_parameterized_tree ()
         self.gen_users_data ()
         self.gen_APs ()

@@ -17,4 +17,6 @@ src/obj_func.py
 /build/*
 /build/classes/*
 /bin/*
+.classpath
+build.xml
 

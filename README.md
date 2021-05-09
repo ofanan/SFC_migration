@@ -22,4 +22,4 @@ The main simulator, implemented mainly in the file SFC_mig_simulator.py, knows h
 When SFC_mig_simulator reads an ".ap" file, it uses the AP hard-coded in that file.
 When SFC_mig_simulator reads a ".loc" file, it calculates the AP covering the current location of each user, where the number of APs is a parameter, that may be also larger than 4. 
 
-Further documentation is within the code files.
+Further documentation can be found within the code files.

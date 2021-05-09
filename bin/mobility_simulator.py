@@ -7,6 +7,11 @@ import random
 
 from printf import printf
 
+# Constant, denoting the types of events (either migration, or arrival to the destination) 
+EVENT_T_MIG        = 0 # A user arrived to area covered by another AP - need to migrate
+EVENT_T_ARRIVE     = 1 # A user arrived to its destination. Need to write the new location, and schedule a new movement
+EVENT_T_PRINT_LOCS = 2 # A periodical event, for printing the locations of all users.
+
 class my_mobility_simulator (object):
     """
     Event-driven mobility simulator.
@@ -44,18 +49,14 @@ class my_mobility_simulator (object):
         min_mov   = self.min_mov   (u, dim) # minimal move required to verify that the user switches to another AP
         direction = self.direction (u, dim) # either +1 (increasing) or -1 (decreasing)
         dst       = self.dst       (direction)  # destination of movement
-        self.eventQ.append ({'event type'   : self.arrive,
+        self.eventQ.append ({'event type'   : EVENT_T_ARRIVE,
                              'time'         : self.arr_t (u, dst, dim),
                              'nxt loc'      : self.nxt_loc (u, dst, dim),
                              'user'         : u
                              })
         
         nxt_ap = self.nxt_ap (u, direction, dim)
-        print ('time = {:.4f}, u = {}, cur loc = {}, cur ap = {}, direction = {}, dim = {}, nxt ap = {}' .format 
-               (self.cur_time, u, self.user[u]['loc'], self.user[u]['ap'], direction, dim, nxt_ap))
-        if (nxt_ap > 3):
-            exit ()
-        self.eventQ.append ({'event type'   : self.mig,
+        self.eventQ.append ({'event type'   : EVENT_T_MIG,
                              'time'         : self.mig_t (u, min_mov), 
                              'nxt AP'       : self.nxt_ap (u, direction, dim),
                              'user'         : u
@@ -68,13 +69,18 @@ class my_mobility_simulator (object):
         for event in self.eventQ:
             print (event)
 
+    def print_locs (self):
+        printf (self.loc_output_file, 'time = {:.4f} : \n' .format (self.cur_time)) 
+        for u in range(self.NUM_OF_USERS):
+            printf (self.loc_output_file, 'user {} ({:.1f},{:.1f})\n' .format (u, self.user[u]['loc'][self.X], self.user[u]['loc'][self.Y]))
+        printf (self.loc_output_file, '\n')    
 
     def print_APs (self):
         
-        printf (self.output_file, 'time = {:.4f} : ' .format (self.cur_time)) 
+        printf (self.ap_output_file, 'time = {:.4f} : ' .format (self.cur_time)) 
         for u in range(self.NUM_OF_USERS):
-            printf (self.output_file, '({},{})' .format (u, self.user[u]['ap']))
-        printf (self.output_file, '\n')
+            printf (self.ap_output_file, '({},{})' .format (u, self.user[u]['ap']))
+        printf (self.ap_output_file, '\n')
             
     def simulate (self):
         """
@@ -87,8 +93,15 @@ class my_mobility_simulator (object):
                 - If needed, schedule future events
         """
 
-        printf (self.output_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n\n')
+        printf (self.ap_output_file,  '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n\n')
+        printf (self.loc_output_file, '// File format:\n//time = t:\n')
+        printf (self.loc_output_file, '// user U (X, Y)\n//where (X,Y) is the location of user U at time t\n\n')
 
+        # Schedule initial event for typing users' locations 
+        self.eventQ.append ({'event type' : EVENT_T_PRINT_LOCS,
+                                 'time'   : 0})                 
+           
+        # Start move the users   
         for u in range(self.NUM_OF_USERS):
             self.move_user (u)
     
@@ -100,24 +113,33 @@ class my_mobility_simulator (object):
                 self.eventQ = sorted (self.eventQ, key = lambda event : event['time'])
                 event = self.eventQ.pop (0)
                 self.cur_time = event['time']
-                cur_usr = event['user']  
         
-                if (event['event type'] == self.mig):
+                if (event['event type'] == EVENT_T_MIG):
+                    cur_usr = event['user']  
                     self.user[cur_usr]['ap'] = event['nxt AP']
                     self.print_APs ()
-                else:
+                elif (event['event type'] == EVENT_T_ARRIVE):
+                    cur_usr = event['user']  
                     self.user[cur_usr]['loc'] = event['nxt loc']
                     self.move_user(cur_usr)
+                elif (event['event type'] == EVENT_T_PRINT_LOCS):
+                    self.print_locs ()
+                    self.eventQ.append ({'event type' : EVENT_T_PRINT_LOCS,
+                                         'time'         : self.cur_time + self.T_BETWEEN_PRINT_LOCS
+                                        })                    
+                else:
+                    print ('Error: unsupported event type')
+                    exit ()
         
-            if (self.cur_time > self.max_time):
+            if (self.cur_time > self.MAX_TIME):
                 exit ()           
     
     def __init__ (self):
         
         self.edge = 100 # edge of the rectangle in which user move [m]
         self.NUM_OF_USERS  = 5
-        self.output_file = open ("../res/my_mob_sim.ap",  "w")
-
+        self.ap_output_file  = open ("my_mob_sim.ap",  "w")
+        self.loc_output_file = open ("my_mob_sim.loc", "w")
 
         # Constant, denoting the moving direction (either X or Y)
         self.X = 0
@@ -129,12 +151,8 @@ class my_mobility_simulator (object):
         
         self.eventQ = []
         self.cur_time = 0
-        self.max_time = 20
-        
-        # Constant, denoting the types of events (either migration, or arrival to the destination) 
-        self.mig    = True
-        self.arrive = False
-        
+        self.MAX_TIME = 20
+        self.T_BETWEEN_PRINT_LOCS = 1 # time between sequencing prints of all users' locations        
 
 if __name__ == "__main__":
     sim = my_mobility_simulator ()

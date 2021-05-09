@@ -3,13 +3,14 @@ import itertools
 import re
 
 # Parse a file of MY LP format. Extract the constraints. Currently unused
-class cityMob_output_parser (object):
+class LP_file_parser (object):
     
     def parse_lin_comb (self, lin_comb_string):
         filtered = filter(None, re.split("[, \-+]+", lin_comb_string))
         for item in filtered:
             print (item)
         
+    
     
     def parse_line (self, line):
         splitted_line = line.split (" ")

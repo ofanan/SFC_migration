@@ -13,7 +13,7 @@ By default, output files are written to a sibling directory named "../res". If y
 
 Whenever a user crosses to another quarter, the simulator prints to a file the time, and the number of the quarter currently covering each user. The number of the quarter may be interpreted as an Access Point (AP) that covers this quarter, and therefore the extension of this output file is ".ap". 
 
-In addition, once in a second, the simulator outputs to a file with the extension ".loc" (for "locations"), the current location (by means of X,Y coordinates) of all the users. This output format allows a larger time for migrations to finish before deciding on new migrations. In addition, it allows for simulating more then 4 APs (see below). 
+In addition, once in a second, the simulator outputs to a file with the extension ".loc" the current location (by means of X,Y coordinates) of all the users. This output format allows a larger time for migrations to finish before deciding on new migrations. In addition, it allows for simulating more then 4 APs (see below). 
 
 # Mobility simulator input files
 The main simulator, implemented mainly in the file SFC_mig_simulator.py, knows how to parse both ".ap" files; and ".loc" files. 

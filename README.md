@@ -16,7 +16,7 @@ Whenever a user crosses to another quarter, the simulator prints to a file the t
 
 In addition, once in a second, the simulator outputs to a file with the extension ".loc" the current location (by means of X,Y coordinates) of all the users. This output format allows a larger time for migrations to finish before deciding on new migrations. In addition, it allows for simulating more then 4 APs (see below). 
 
-# Mobility simulator input files
+# Migration simulator input files
 The main simulator, implemented mainly in the file SFC_mig_simulator.py, knows how to parse both ".ap" files; and ".loc" files. 
 
 When SFC_mig_simulator reads an ".ap" file, it uses the AP hard-coded in that file.

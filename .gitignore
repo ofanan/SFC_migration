@@ -16,4 +16,5 @@ src/obj_func.py
 /dist/*
 /build/*
 /build/classes/*
+/bin/*
 

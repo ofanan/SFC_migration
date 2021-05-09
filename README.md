@@ -1,6 +1,7 @@
 ## Service Function Chains Migration
 
 This project provides simulator tools to test scenarios and algorithms for the migration of Service Function Chains (SFC). 
+The code files are in the directory "src". Sample result files are in the directory "res".
 
 # Mobility simulator
 

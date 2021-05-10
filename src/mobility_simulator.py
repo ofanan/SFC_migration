@@ -14,8 +14,8 @@ X = 0
 # Constant, denoting the types of events (either migration, or arrival to the destination) 
 EVENT_T_MIG        = 0 # A usr arrived to area covered by another AP - need to migrate
 EVENT_T_START_MOV  = 1 # A usr should start moving
-EVENT_T_ARRIVE     = 2 # A usr arrived to its destination. Need to write the new location, and schedule a new movement
-EVENT_T_PRINT_LOCS = 3 # A periodical event, for printing the locations of all usrs.
+EVENT_T_ARRIVE     = 2 # A usr should arrive to its destination. Need to write the new location, and schedule a new movement
+EVENT_T_PERIODICAL = 3 # A periodical event, e.g., for printing the current APs of all usrs.
 
 class my_mobility_simulator (object):
     """
@@ -28,22 +28,16 @@ class my_mobility_simulator (object):
     Each time a usr switches AP, the assignment of all usrs to APs is printed to an output file.
     """
 
-    #ap        = lambda self, usr                  : 2 * int (usr['loc'][self.Y] / (0.5*self.edge)) + int (self.usr[u]['loc'][self.X] / (0.5*self.edge))
-    min_mov   = lambda self, u, dim              : abs(0.5*self.edge - self.usr[u]['loc'][dim]) # caclulate the min move required to verify that the usr switches to another AP
     arr_t     = lambda self, cur_loc, dst, speed : self.cur_time + math.sqrt (pow(cur_loc[X] - dst[X], 2) + pow(cur_loc[Y] - dst[Y], 2)) / speed
-    nxt_loc   = lambda self, u, dst, dim         : [dst, self.usr[u]['loc'][self.Y]] if (dim == self.X) else [self.usr[u]['loc'][self.X], dst]  
-    mig_t     = lambda self, u, min_mov          : self.cur_time + min_mov / self.usr[u]['max speed']
+    nxt_loc   = lambda self, u, dst, dim         : [dst, self.usr[u]['loc'][Y]] if (dim == X) else [self.usr[u]['loc'][X], dst]  
     loc2ap    = lambda self, loc : int (math.floor ((loc[Y] / self.cell_edge) ) * self.num_of_APs_in_row + math.floor ((loc[X] / self.cell_edge) )) 
       
     def start_mov_usr (self, usr):
         """
-        Start a move of a usr.
-        The usr moves in parallel to either the X or the Y axis (chosen u.a.r.). 
-        The function verifies that the destination is within the coverage area of an Access Point (AP) that differs from the current access point.  
-        This includes generating and inserting 2 event into the events queue:
-        1. Event for the migration - scheduled for the time when the usr enters the coverage area of another AP.
-        2. Event for the arrival of the usr to its destination.
-        The exact destination point is chosen randomly.
+        Start a move of a usr: 
+        - Pick the destination (usr['final loc']) u.a.r from the area
+        - Generate an event for the arrival to the destination, and insert it into the eventQ.
+        - If the destination is within the coverage area of another AP, generate an additional event, for the migration to that AP.
         """
 
         usr['final loc'] = self.edge * np.random.rand (2)  # destination of movement
@@ -54,22 +48,37 @@ class my_mobility_simulator (object):
                              })
         if (usr['final ap' ] == usr['cur ap']): # the move is within the coverage of the current AP - no need to schedule additional events 
             return
-        
         theta = np.arctan (abs( (usr['final loc'][Y] - usr['cur loc'][Y]) / (usr['final loc'][X] - usr['cur loc'][X]) )) # angle of progression
-        usr['speed'] = [math.cos(theta)*usr['max speed'], math.sin(theta)*usr['max speed']]  #Projection of the speed on the X, Y, direction
-        
-        if (usr['final loc'][X] > )
-        
-        self.eventQ.append ({'event type'   : EVENT_T_MIG,
-                             'time'         : self.mig_t (usr, min_mov), 
-                             'usr'         : usr
-                             })
+        usr['speed'] = np.array ([math.cos(theta)*usr['max speed'], math.sin(theta)*usr['max speed']])  #Projection of the speed on the X, Y, direction
+        self.mov_usr (usr)
 
-    def nxt_ap (self):
-        """
-        calculate the next AP
-        """
-            
+    def mov_usr (self, usr):        
+        # usr['cur loc'] = usr['nxt loc']
+        # usr['cur loc']   = [46, 33]
+        # usr['final loc'] = [49, 28]
+        # self.cell_edge = 10
+        # usr['speed'] = [5, 5]
+        time_to_mig = np.ones(2) * np.inf
+        for dim in (X,Y): # for each dimension
+            lower_borderline = self.cell_edge * math.floor(usr['cur loc'][dim] / self.cell_edge)
+            offset = usr['cur loc'][dim] % self.cell_edge # offset of the usr's current location within its current cell
+            if (usr['final loc'][dim] < lower_borderline):
+                time_to_mig[dim] = offset / usr['speed'][dim]
+            elif (usr['final loc'][dim] > lower_borderline + self.cell_edge):
+                time_to_mig[dim] = (self.cell_edge - offset) / usr['speed'][dim]
+
+        # if (min (time_to_mig) == np.inf): # the final destination is within the current cell - no need to schedule a future mig' event
+        #     return
+        # dim = index (min(time_to_mig)) # the closest migration event is a result of the projection of the move towards this dimenstion
+        time_to_mig = min (time_to_mig)
+        if (time_to_mig == np.inf): # the final destination is within the current cell - no need to schedule a future mig' event
+            return
+        usr['nxt loc'] = usr['cur loc'] + usr['speed'] * time_to_mig
+        self.eventQ.append ({'event type'   : EVENT_T_MIG,
+                             'time'         : self.cur_time + time_to_mig,
+                             'usr'          : usr
+                             })    
+        
     def print_eventQ (self):
         """
         Print the event queue. Used for debugging
@@ -79,14 +88,14 @@ class my_mobility_simulator (object):
 
     def print_locs (self):
         printf (self.loc_output_file, 'time = {:.4f} : \n' .format (self.cur_time)) 
-        for u in range(self.NUM_OF_usrS):
-            printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (u, self.usr[u]['loc'][self.X], self.usr[u]['loc'][self.Y]))
+        for u in range(self.NUM_OF_USRS):
+            printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (u, self.usr[u]['cur loc'][X], self.usr[u]['cur loc'][Y]))
         printf (self.loc_output_file, '\n')    
 
     def print_APs (self):
         
         printf (self.ap_output_file, 'time = {:.4f} : ' .format (self.cur_time)) 
-        for u in range(self.NUM_OF_usrS):
+        for u in range(self.NUM_OF_USRS):
             printf (self.ap_output_file, '({},{})' .format (u, self.usr[u]['cur ap']))
         printf (self.ap_output_file, '\n')
             
@@ -109,11 +118,11 @@ class my_mobility_simulator (object):
         printf (self.loc_output_file, 'MAX_X {:.0f} MAX_Y {:.0f}\n\n' .format(self.edge, self.edge))
 
         # Schedule initial event for typing usrs' locations 
-        self.eventQ.append ({'event type' : EVENT_T_PRINT_LOCS,
+        self.eventQ.append ({'event type' : EVENT_T_PERIODICAL,
                                  'time'   : 0})                 
            
         # Start move the usrs   
-        for u in range(self.NUM_OF_usrS):
+        for u in range(self.NUM_OF_USRS):
             self.start_mov_usr (self.usr[u])
     
         while (1):
@@ -126,24 +135,24 @@ class my_mobility_simulator (object):
                 self.cur_time = event['time']
         
                 if (event['event type'] == EVENT_T_MIG):
-                    usr        = event['usr']  
-                    usr ['cur ap']  = event['nxt AP']
-                    usr ['cur loc'] = event['nxt loc']
+                    usr             = event['usr']  
+                    usr ['cur loc'] = usr['nxt loc']
+                    usr ['cur ap']  = self.loc2ap (usr['cur loc'])
                     self.print_APs ()
-                    self.mov_usr (usr)
+                    self.mov_usr (usr) 
                 elif (event['event type'] == EVENT_T_ARRIVE):
                     usr = event['usr']  
-                    usr ['cur loc'] = event['nxt loc']
+                    usr ['cur loc'] = usr['final loc']
                     self.eventQ.append ({'event type' : EVENT_T_START_MOV,
-                                         'time'       : self.cur_time + np.random.rand () * (self.usr[event['usr']]['max stnd time'] - self.usr[event['usr']]['min stnd time']),
+                                         'time'       : self.cur_time + np.random.rand () * (usr['max stnd time'] - usr['min stnd time']),
                                          'usr'        : usr
                                          })
                 elif (event['event type'] == EVENT_T_START_MOV):
                     self.start_mov_usr(event['usr'])
-                elif (event['event type'] == EVENT_T_PRINT_LOCS):
+                elif (event['event type'] == EVENT_T_PERIODICAL):
                     self.print_locs ()
-                    self.eventQ.append ({'event type' : EVENT_T_PRINT_LOCS,
-                                         'time'         : self.cur_time + self.T_BETWEEN_PRINT_LOCS
+                    self.eventQ.append ({'event type' : EVENT_T_PERIODICAL,
+                                         'time'         : self.cur_time + self.T_BETWEEN_PERIODICAL_EVENTS
                                         })                    
                 else:
                     print ('Error: unsupported event type')
@@ -157,15 +166,12 @@ class my_mobility_simulator (object):
         self.edge = 100 # edge of the rectangle in which usr move [m]
         self.num_of_APs_in_row = 2   
         self.cell_edge = self.edge / self.num_of_APs_in_row
-        self.NUM_OF_usrS  = 5
+        self.NUM_OF_USRS  = 5
         self.ap_output_file  = open ("../res/my_mob_sim.ap",  "w")
         self.loc_output_file = open ("../res/my_mob_sim.loc", "w")
 
-        # Constant, denoting the moving direction (either X or Y)
-        self.X = 0
-        self.Y = 1
-        self.usr = [{} for u in range (self.NUM_OF_usrS)]
-        for u in range (self.NUM_OF_usrS):
+        self.usr = [{} for u in range (self.NUM_OF_USRS)]
+        for u in range (self.NUM_OF_USRS):
             self.usr[u] = {'max speed'      : (30 + 5*u)/ 3.6, 
                             'cur loc'       : np.random.rand (2) * self.edge,
                             'min stnd time' : 0.5,
@@ -177,7 +183,7 @@ class my_mobility_simulator (object):
         self.cur_time = 0
         self.MAX_TIME = 20
 
-        self.T_BETWEEN_PRINT_LOCS = 1 # time between sequencing prints of all usrs' locations        
+        self.T_BETWEEN_PERIODICAL_EVENTS = 1 # time between sequencing prints of all usrs' locations        
 
 if __name__ == "__main__":
     sim = my_mobility_simulator ()

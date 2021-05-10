@@ -5,8 +5,7 @@ import itertools
 import time
 import random
 
-from printf import printf
-# from numpy.f2py.crackfortran import verbose
+from printf import printf # a patch for easy format-printing into files.
 
 # Constant for indices of X and Y in vectors' coordinates
 Y = 1
@@ -29,15 +28,25 @@ EPSILON = 0.0001
 class my_mobility_simulator (object):
     """
     Event-driven mobility simulator.
-    Initial locations of usrs are picked u.a.r. from a rectangle.
-    Next, each usr moves each time in the direction of either +x, -x, +y, or -y.
-    The area is covered by sub-rectangles, each covered exclusively by a single Access Point (AP).
-    The simulator verifies that usrs always stay within the large rectangle, 
-    and that the next location is always within the territory of an AP different from its current one.
-    Each time a usr switches AP, the assignment of all usrs to APs is printed to an output file.
+    Users randomly move within a square, using a random waypoint model.
+    The square in which users move is partitioned into an n X n grid of squares, where each square is exclusively covered by a single Access Point (AP).
+
+    Each time a user enters an area covered by an AP different from his current AP, an event happens.
+    
+    Output: 
+    The current APs serving all users are written to a file when either 
+    1. A migration event happens (namely, a user enters an area covered by an AP different from his current AP).
+    2. Periodically.  
+    It is possible to select the level of "verbose", that is, whether the output file is written either upon 1 and/or 2 from above.
+     
+
+    By default, output files are written to a sibling directory named "../res". If you don't have, please generate such a directory. 
+    The extension of the output file is ".ap", for Access Point.
     """
 
+    # Calculate the arrival time, given the current location, the destination and the speed.
     arr_t     = lambda self, cur_loc, dst, speed : self.cur_time + math.sqrt (pow(cur_loc[X] - dst[X], 2) + pow(cur_loc[Y] - dst[Y], 2)) / speed
+    # Calculate which AP covers a concrete point. The input, "loc", is a vector, containing the X,Y locations.
     loc2ap    = lambda self, loc : int (math.floor ((loc[Y] / self.cell_edge) ) * self.num_of_APs_in_row + math.floor ((loc[X] / self.cell_edge) )) 
       
     def start_mov_usr (self, usr):
@@ -95,13 +104,19 @@ class my_mobility_simulator (object):
             print (event)
 
     def print_locs (self):
+        """
+        Print the exact locations - namely, (x,y) coordinates, of each user.
+        Currently unused.
+        """
         printf (self.loc_output_file, 'time = {:.4f} : \n' .format (self.cur_time)) 
         for u in range(self.NUM_OF_USRS):
             printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (u, self.usr[u]['cur loc'][X], self.usr[u]['cur loc'][Y]))
         printf (self.loc_output_file, '\n')    
 
     def print_APs (self):
-        
+        """
+        Print the current time, and the list of the IDs of APS currently covering each AP. 
+        """        
         printf (self.ap_output_file, 'time = {:.4f} : ' .format (self.cur_time)) 
         for u in range(self.NUM_OF_USRS):
             printf (self.ap_output_file, '({},{})' .format (u, self.usr[u]['cur ap']))
@@ -186,16 +201,16 @@ class my_mobility_simulator (object):
     def __init__ (self):
         
         self.edge = 100 # edge of the rectangle in which usr move [m]
-        self.num_of_APs_in_row = 7
-        self.cell_edge = self.edge / self.num_of_APs_in_row
+        self.num_of_APs_in_row = 7 # The total number of APs covering the (square) area is self.num_of_APs_in_row * self.num_of_APs_in_row 
+        self.cell_edge = self.edge / self.num_of_APs_in_row # Edge of a single square cell, exclusively covered by a single AP.
         self.NUM_OF_USRS  = 5
 
         self.usr = [{} for u in range (self.NUM_OF_USRS)]
         for u in range (self.NUM_OF_USRS):
             self.usr[u] = {'max speed'      : (30 + 5*u)/ 3.6, 
-                            'cur loc'       : np.random.rand (2) * self.edge,
-                            'min stnd time' : 0.5,
-                            'max stnd time' : 1.5
+                           'cur loc'       : np.random.rand (2) * self.edge,
+                           'min stnd time' : 0.5,
+                           'max stnd time' : 1.5
                             }  # speed [m/sec]
             self.usr[u]['cur ap'] = self.loc2ap (self.usr[u]['cur loc'])
         
@@ -209,5 +224,4 @@ if __name__ == "__main__":
     sim = my_mobility_simulator ()
     # sim.print_locations = True # For printing also users' locations. Currently un-supported, because finding fresh accurate users' location requires complicated calculations. 
     sim.simulate (verbose = VERBOSE_EVENTS_AND_PERIODICAL)
-    exit
         

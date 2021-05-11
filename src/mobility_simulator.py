@@ -50,7 +50,7 @@ class my_mobility_simulator (object):
     loc2ap     = lambda self, loc : int (math.floor ((loc[Y] / self.cell_edge) ) * self.num_of_APs_in_row + math.floor ((loc[X] / self.cell_edge) )) 
     # Update the location of a usr. New location is calculated as: 
     # last_updated_location + time_since_last_location_update * directional_speed, for each dimension (that is, X and Y).
-    update_loc = lambda self, usr : usr['cur loc'] + (self.cur_time - self['last update time']) * usr['speed']
+    update_loc = lambda self, usr : usr['cur loc'] + (self.cur_time - usr['last update time']) * usr['speed']
       
     def start_mov_usr (self, usr):
         """
@@ -133,6 +133,12 @@ class my_mobility_simulator (object):
             printf (self.ap_output_file, '({},{})' .format (u, self.usr[u]['cur ap']))
         printf (self.ap_output_file, '\n')
             
+    def print_output (self):
+        if (self.print_APs_flag):
+            self.print_APs()
+        if (self.print_locs_flag):
+            self.print_locs()          
+            
     def simulate (self, verbose):
         """
         Run a simulation.
@@ -153,26 +159,27 @@ class my_mobility_simulator (object):
             self.ap_output_file  = open ("../res/my_mob_sim.ap",  "w")
             printf (self.ap_output_file,  '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of usr X at time t\n\n')
 
-            # if (self.print_locations):                 
-            #     self.loc_output_file = open ("../res/my_mob_sim.loc", "w")
-            #     printf (self.loc_output_file, '// mobility - output by mobility_simulator.py\n')
-            #     printf (self.loc_output_file, '// File format:\n//time = t:\n')
-            #     printf (self.loc_output_file, '// usr U (X, Y)\n//where (X,Y) is the location of usr U at time t\n')
-            #     printf (self.loc_output_file, '// the simulation is done in a rectangle of size MAX_X * MAX_Y, where\n')       
-            #     printf (self.loc_output_file, 'MAX_X {:.0f} MAX_Y {:.0f}\n\n' .format(self.edge, self.edge))
+            if (self.print_locs_flag):                 
+                self.loc_output_file = open ("../res/my_mob_sim.loc", "w")
+                printf (self.loc_output_file, '// mobility - output by mobility_simulator.py\n')
+                printf (self.loc_output_file, '// File format:\n//time = t:\n')
+                printf (self.loc_output_file, '// usr U (X, Y)\n//where (X,Y) is the location of usr U at time t\n')
+                printf (self.loc_output_file, '// the simulation is done in a rectangle of size MAX_X * MAX_Y, where\n')       
+                printf (self.loc_output_file, 'MAX_X {:.0f} MAX_Y {:.0f}\n\n' .format(self.edge, self.edge))
  
         if (self.verbose > 1): # If the verbose level requires that, begin a series of periodical events  
             self.eventQ.append ({'event type' : EVENT_T_PERIODICAL,
                                      'time'   : 0})                 
            
         if (self.verbose > 0): # If the verbose level requires that, write to file the initial APs of each user
-            self.print_APs()
-            if (sim.print_locations):
-                self.print_locs()   
+            self.print_output()
             
         # Start move the usrs   
-        for u in range(self.NUM_OF_USRS):
-            self.start_mov_usr (self.usr[u])
+        for usr in self.usr:
+            self.eventQ.append ({'event type' : EVENT_T_START_MOV,
+                                 'time'       : np.random.rand () * (usr['max stnd time'] - usr['min stnd time']),
+                                 'usr'        : usr
+                                 })
     
         while (1):
         
@@ -189,7 +196,7 @@ class my_mobility_simulator (object):
                     usr ['cur ap'          ] = self.loc2ap (usr['cur loc'])
                     usr ['last update time'] = self.cur_time
                     if (self.verbose == 1 or self.verbose == 3):
-                        self.print_APs ()
+                        self.print_output ()
                     self.mov_usr (usr) 
                 elif (event['event type'] == EVENT_T_ARRIVE):
                     usr = event['usr']  
@@ -203,7 +210,7 @@ class my_mobility_simulator (object):
                     usr['last update time'] = self.cur_time
                     self.start_mov_usr(event['usr'])
                 elif (event['event type'] == EVENT_T_PERIODICAL):
-                    self.print_APs()
+                    self.print_output()
                     self.eventQ.append ({'event type' : EVENT_T_PERIODICAL,
                                          'time'         : self.cur_time + self.T_BETWEEN_PERIODICAL_EVENTS
                                         })                    
@@ -223,13 +230,16 @@ class my_mobility_simulator (object):
 
         self.usr = [{} for u in range (self.NUM_OF_USRS)]
         for u in range (self.NUM_OF_USRS):
-            self.usr[u] = {'min speed'      : 30 / 3.6,
-                           'max speed'      : 80 / 3.6,                            
-                           'min stnd time'  : 0.5,
-                           'max stnd time'  : 1.5,
-                           'cur loc'       : np.random.rand (2) * self.edge
+            self.usr[u] = {'min speed'        : 30 / 3.6,
+                           'max speed'        : 80 / 3.6,                            
+                           'min stnd time'    : 0.5,
+                           'max stnd time'    : 1.5,
+                           'cur loc'          : np.random.rand (2) * self.edge,
+                           'last update time' : 0.0,  # last time were location was calculated 
+                           'speed'            : np.zeros(2) # positional speed to [X,Y] directional. Initialized to zero 
                             }  # speed [m/sec]
-            self.usr[u]['cur ap'] = self.loc2ap (self.usr[u]['cur loc'])
+            self.usr[u]['final loc'] = self.usr[u]['cur loc'] 
+            self.usr[u]['cur ap']    = self.loc2ap (self.usr[u]['cur loc'])
         
         self.eventQ   = []
         self.cur_time = 0
@@ -239,6 +249,7 @@ class my_mobility_simulator (object):
 
 if __name__ == "__main__":
     sim = my_mobility_simulator ()
-    sim.print_locations = True # For printing also users' locations. Currently un-supported, because finding fresh accurate users' location requires complicated calculations. 
+    sim.print_APs_flag  = True
+    sim.print_locs_flag = True # For printing also users' locations. Currently un-supported, because finding fresh accurate users' location requires complicated calculations. 
     sim.simulate (verbose = VERBOSE_EVENTS_AND_PERIODICAL)
         

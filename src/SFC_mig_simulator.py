@@ -28,7 +28,7 @@ class SFC_mig_simulator (object):
             u['B'] = {} # u['B'] will hold a list of the budgets required for placing u on each level 
             mu = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
             lvl = 0 
-            while lvl in range (self.tree_height+1):
+            for lvl in range (self.tree_height+1):
                 while (sum(mu) <= u['C_u']): # The SLA still allows increasing this user's CPU allocation
                     if (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) < slack[lvl]):  
                         u['B'].append(sum(mu))

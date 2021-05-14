@@ -25,7 +25,7 @@ class SFC_mig_simulator (object):
         for u in self.users:
             slack = [u['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
             #u['L'] = -1 # Highest server which is delay-feasible for u
-            u['B'] = {} # u['B'] will hold a list of the budgets required for placing u on each level 
+            u['B'] = [] # u['B'] will hold a list of the budgets required for placing u on each level 
             mu = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
             lvl = 0 
             for lvl in range (self.tree_height+1):

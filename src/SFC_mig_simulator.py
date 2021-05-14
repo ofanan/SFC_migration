@@ -16,67 +16,30 @@ from numpy import int
 
 class SFC_mig_simulator (object):
 
-    def check_greedy_alg (self):
-        
-        theta_v_lambda_v    = np.array ([0.1, 0.3, 0.5, 0.7, 0.9]) 
-        max_alloc           = 2 * np.ones (len (theta_v_lambda_v), dtype = 'int8')
-        
-        max_budget          = sum (max_alloc) 
-        
-        greedy_delay        = float ("inf") * np.ones (max_budget+1)
-        bf_delay            = float ("inf") * np.ones (max_budget+1)
-        
-        B0                  = np.array ([math.ceil(theta_v_lambda_v[i]) for i in range (len(theta_v_lambda_v))]) # minimal feasible budget
-        mu                  = B0.copy ()
-        budget              = sum (mu)
-        
-        # Calculate bf-delays
-        while (budget < max_budget):
-            budget   = int(sum (mu))
-            delay = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu))) 
-            bf_delay[budget] = min(bf_delay[budget], delay) 
-            mu = self.inc_array (mu, B0, max_alloc) 
-        
-        print (' bf_delay = ', bf_delay)
-        
-        # Calculate greedy delays
-        mu                  = B0.copy ()
-        budget              = sum (mu)
-        while (budget <= max_budget):
-    
-            greedy_delay[budget] = sum (1 / (mu[i] - theta_v_lambda_v[i]) for i in range(len(mu)))        
-            argmax = np.argmax (np.array ([1 / (mu[i] - theta_v_lambda_v[i]) - 1 / (mu[i] + 1 - theta_v_lambda_v[i]) for i in range(len(mu))]))
-            mu[argmax] = mu[argmax] + 1
-            budget     = budget     + 1 
-            
-        print (' greedy_delay = ', greedy_delay)
-        
-
-    def calc_CPU_alloc (self): 
+    def CPUAll (self): 
         """
+        CPUAll algorithm:
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
         The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
         """
         for u in self.users:
             slack = [u['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
-            mu    = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
-            u['req cpu'] = float ('inf') * np.ones (len(mu))
-            req_cpu = sum (mu)
+            #u['L'] = -1 # Highest server which is delay-feasible for u
+            u['B'] = {} # u['B'] will hold a list of the budgets required for placing u on each level 
+            mu = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
             lvl = 0 
             while lvl in range (self.tree_height+1):
-                while (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) > slack[lvl]): # while the delay is above the slack delay, and we don't exceed the CPU cap of this lvl 
+                while (sum(mu) <= u['C_u']): # The SLA still allows increasing this user's CPU allocation
+                    if (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) < slack[lvl]):  
+                        u['B'].append(sum(mu))
+                        # Can save now the exact vector mu; for now, no need for that, as we're interested only in the sum
+                        break
                     argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
-                    req_cpu += 1
-                    if (req_cpu > self.CPU_cap_at_lvl[lvl]): # the CPU cap at this lvl doesn't suffice for allocating this user's chain -> by the monotone-feasibility assumption, cannot allocate also in any higher lvl
-                        lvl = self.tree_height+1
-                        break
-                # can successfully allocate this user on this lvl
-                u['req cpu'][lvl] = req_cpu
-            print (u['req cpu'])
+            print (u['B'])
 
         exit ()
-    def gen_users_data (self):
+    def rd_user_data (self):
         """
         Read the input about the users (target delay, traffic), and write it to the appropriate fields in self.
         The input data is read from the file self.users_loc_file_name. 
@@ -111,14 +74,17 @@ class SFC_mig_simulator (object):
                     self.users[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
                 elif (splitted_line[1] == "mig_cost"):              
-                    self.users[u]['mig cost'] = float (line.split("=")[1].rstrip())
+                    self.users[u]['mig cost'] = int (line.split("=")[1].rstrip())
+                    
+                elif (splitted_line[1] == "C_u"):              
+                    self.users[u]['C_u'] = int (line.split("=")[1].rstrip())
                 # elif (splitted_line[1] == "mig_cost"):  
                 #     mig_cost = line.split("=")[1].rstrip().split(",")
                 #     self.mig_cost_of_usr[u] = [self.mig_cost_of_usr[u].fill (7)]  #(float (line.split("=")[1].rstrip()))
                 #     print (self.mig_cost_of_usr[u])
                 #     exit ()
 
-                                  
+        print (self.users)                              
         # The code below may be un-commented and ran only once we know the PoAs, as they're dummy VMs in the chain. 
         # Also, the code is relevant only for non-SS solutions.
         # Calculate v^+ of each VNF v.
@@ -270,9 +236,9 @@ class SFC_mig_simulator (object):
         self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users
         self.users_loc_file_name = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
         self.gen_parameterized_tree ()
-        self.gen_users_data ()
+        self.rd_user_data ()
         self.gen_APs ()
-        self.calc_CPU_alloc()
+        self.CPUAll()
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
         self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
         self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       

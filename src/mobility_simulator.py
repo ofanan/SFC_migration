@@ -270,6 +270,6 @@ if __name__ == "__main__":
     sim = my_mobility_simulator ()
     sim.print_APs_flag  = True
     sim.print_locs_flag = True # For printing also users' locations. Currently un-supported, because finding fresh accurate users' location requires complicated calculations.
-    sim.print_trajectory_of_usr = 0 # Plot the trajectory of the requested user. For plotting no trajectories, assign -1.   
+    sim.print_trajectory_of_usr = 0 # Print the trajectory of the requested user. For plotting no trajectories, assign -1.   
     sim.simulate (verbose = VERBOSE_ONLY_PERIODICAL)
         

@@ -131,7 +131,7 @@ class my_mobility_simulator (object):
         """
         Print the current time, and the list of the IDs of APS currently covering each AP. 
         """        
-        printf (self.ap_output_file, 'time = {:.4f} : ' .format (self.cur_time)) 
+        printf (self.ap_output_file, 'time = {:.4f} :\n' .format (self.cur_time)) 
         for u in range(self.NUM_OF_USRS):
             printf (self.ap_output_file, '({},{})' .format (u, self.usr[u]['cur ap']))
         printf (self.ap_output_file, '\n')

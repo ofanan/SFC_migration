@@ -24,7 +24,7 @@ class SFC_mig_simulator (object):
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
-        for u in self.users:
+        for u in self.usr:
             slack = [u['target delay'] -  u['delay to PoA'] - 2*self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
             slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
             #u['L'] = -1 # Highest server which is delay-feasible for u
@@ -32,25 +32,21 @@ class SFC_mig_simulator (object):
             mu = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
             lvl = 0 
             for lvl in range(len(slack)):
-                print ('lvl = ', lvl)
                 while (sum(mu) <= u['C_u']): # The SLA still allows increasing this user's CPU allocation
                     if (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) <= slack[lvl]):  
                         u['B'].append(sum(mu))
-                        print (mu)
                         # Can save now the exact vector mu; for now, no need for that, as we're interested only in the sum
                         break
                     argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
-            print ('u = ', u['B'])
 
-        exit ()
-    def rd_user_data (self):
+    def rd_usr_data (self):
         """
         Read the input about the users (target delay, traffic), and write it to the appropriate fields in self.
-        The input data is read from the file self.users_loc_file_name. 
+        The input data is read from the file self.usr_loc_file_name. 
         """
         usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
-        self.users = np.empty (self.MAX_NUM_OF_USRS, dtype=object)
+        self.usr = np.empty (self.MAX_NUM_OF_USRS, dtype=object)
         self.NUM_OF_VMs = 0
         
         for line in usrs_data_file: 
@@ -66,24 +62,24 @@ class SFC_mig_simulator (object):
                 
                 if (splitted_line[1] == "theta_times_lambda"):              
                     theta_times_lambda = line.split("=")[1].rstrip().split(",")
-                    self.users[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
+                    self.usr[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
                     self.NUM_OF_VMs += len (theta_times_lambda)
 
                 # The mig_cost here is for the whole chain. For specifying per-VM mig' cost,
                 # need to parse a vector, as done for 'theta times lambda' above. 
                 elif (splitted_line[1] == "mig_cost"):              
-                    self.users[u]['mig cost'] = int (line.split("=")[1].rstrip())
+                    self.usr[u]['mig cost'] = int (line.split("=")[1].rstrip())
                     
                 elif (splitted_line[1] == "target_delay"):              
-                    self.users[u]['target delay'] = float (line.split("=")[1].rstrip())
+                    self.usr[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
                 elif (splitted_line[1] == "delay_to_PoA"):              
-                    self.users[u]['delay to PoA'] = float (line.split("=")[1].rstrip())
+                    self.usr[u]['delay to PoA'] = float (line.split("=")[1].rstrip())
                     
                 elif (splitted_line[1] == "C_u"):              
-                    self.users[u]['C_u'] = int (line.split("=")[1].rstrip())
+                    self.usr[u]['C_u'] = int (line.split("=")[1].rstrip())
                     
-        self.users = np.delete (self.users, [i for i in range(self.MAX_NUM_OF_USRS) if i>u])
+        self.usr = np.delete (self.usr, [i for i in range(self.MAX_NUM_OF_USRS) if i>u])
                                                      
     def loc2ap (self):
         """
@@ -91,8 +87,8 @@ class SFC_mig_simulator (object):
         Read the input about the users locations, 
         and write the appropriate user-to-PoA connections to the file self.ap_file
         """
-        self.ap_file  = open ("../res/" + self.users_loc_file_name.split(".")[0] + ".ap", "w+")  
-        usrs_loc_file = open ("../res/" + self.users_loc_file_name,  "r") 
+        self.ap_file  = open ("../res/" + self.usr_loc_file_name.split(".")[0] + ".ap", "w+")  
+        usrs_loc_file = open ("../res/" + self.usr_loc_file_name,  "r") 
         printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
             
         for line in usrs_loc_file: 
@@ -117,7 +113,7 @@ class SFC_mig_simulator (object):
                 printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
                 continue
         
-            if (splitted_line[0] == "user"):
+            elif (splitted_line[0] == "user"):
                 X, Y = float(splitted_line[2]), float(splitted_line[3])
                 ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
                 printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
@@ -128,7 +124,7 @@ class SFC_mig_simulator (object):
             
     def gen_parameterized_tree (self):
         """
-        Generate a parameterized regular three-nodes tree (root and 2 leaves). 
+        Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
@@ -141,13 +137,14 @@ class SFC_mig_simulator (object):
 
 
         # levelize the tree (assuming a balanced tree) 
-        root = 0 # In networkx, the ID of the root is 0
-        self.num_of_leaves = 0
+        root                  = 0 # In networkx, the ID of the root is 0
+        self.num_of_leaves    = 0
         self.cpu_cost_at_root = 3^self.tree_height
         for s in self.G.nodes(): # for every server
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
+                self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
+                self.G.nodes[s]['AP id'] = self.num_of_leaves
                 self.num_of_leaves += 1
-                self.G.nodes[s]['lvl'] = 0 # Yep --> its lvl is 0
                 for lvl in range (self.tree_height):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']      = lvl # assume here a balanced tree
                     self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']  = self.CPU_cap_at_lvl[lvl]                
@@ -199,10 +196,10 @@ class SFC_mig_simulator (object):
         self.uniform_Tpd            = 2
         self.uniform_link_cost      = 1
         self.max_chain_len          = 2
-        self.MAX_NUM_OF_USRS        = 3
-        self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users
-        self.users_loc_file_name = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
-        self.users_ap_file_name  = 'mob_sim.ap' #input file containing the APs of all users along the simulation
+        self.MAX_NUM_OF_USRS        = 1000
+        self.usrs_data_file_name    = "res.usr" #input file containing the target delays and traffic of all users
+        self.usr_loc_file_name      = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
+        self.usr_ap_file_name       = 'mob_sim.ap' #input file containing the APs of all users along the simulation
         self.gen_parameterized_tree ()
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
         self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
@@ -211,20 +208,50 @@ class SFC_mig_simulator (object):
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
 
     def simulate (self):
-        self.rd_user_data ()
+        self.rd_usr_data ()
         self.CPUAll_once  ()       
         
-        self.ap_file  = open ("../res/" + self.users_ap_file_name, "r")  
+        self.ap_file  = open ("../res/" + self.usr_ap_file_name, "r")  
 
         for line in self.ap_file: 
 
             # Ignore comments lines
-            if (line.split ("//")[0] == ""):
+            if (line == "\n" or line.split ("//")[0] == ""):
                 continue
 
             splitted_line = line.split (" ")
 
+            if (splitted_line[0] == "time"):
+                continue
         
+            self.rd_AP_line(splitted_line)
+            self.alg_top ()
+    
+    def alg_top (self):
+        """
+        Top-level alg'
+        """
+        
+        self.bu ()
+        return
+    
+    def bu (self):
+        """
+        Bottom-up alg'
+        """
+    
+    def rd_AP_line (self, line):
+        splitted_line = line[0].split ("\n")[0].split (")")
+        for tuple in splitted_line:
+            tuple = tuple.split("(")
+            if (len(tuple) > 1):
+                tuple   = tuple[1].split (",")
+                usr_num = int(tuple[0])
+                AP      = int(tuple[1])
+                if (usr_num > len (self.usr)-1):
+                    print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (usr_num, len(self.usr)))
+                    exit  ()
+                self.usr[usr_num]['nxt AP'] = AP
         
 
     def calc_SS_sol_total_cost (self):

@@ -67,22 +67,22 @@ class SFC_mig_simulator (object):
                     self.usr[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
                     self.NUM_OF_VMs += len (theta_times_lambda)
 
-                # The mig_cost here is for the whole chain. For specifying per-VM mig' cost,
-                # need to parse a vector, as done for 'theta times lambda' above. 
-                elif (splitted_line[1] == "mig_cost"):              
-                    self.usr[u]['mig cost'] = int (line.split("=")[1].rstrip())
+                elif (splitted_line[1] == "delay_to_PoA"):              
+                    self.usr[u]['delay to PoA'] = float (line.split("=")[1].rstrip())
                     
                 elif (splitted_line[1] == "target_delay"):              
                     self.usr[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
-                elif (splitted_line[1] == "delay_to_PoA"):              
-                    self.usr[u]['delay to PoA'] = float (line.split("=")[1].rstrip())
+                elif (splitted_line[1] == "mig_cost"):              
+                    mig_cost = line.split("=")[1].rstrip().split(",")
+                    self.usr[u]['mig cost'] = [float (mig_cost[i]) for i in range (len (theta_times_lambda)) ]
                     
                 elif (splitted_line[1] == "C_u"):              
                     self.usr[u]['C_u'] = int (line.split("=")[1].rstrip())
                     
         self.usr = np.delete (self.usr, [i for i in range(self.MAX_NUM_OF_USRS) if i>u])
-                                                     
+        print (self.usr)
+                                                         
     def loc2ap (self):
         """
         Currently unused.
@@ -131,7 +131,7 @@ class SFC_mig_simulator (object):
         self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
         self.CPU_cap_at_lvl  = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
-        self.CPU_cost_at_lvl = [3 * (self.tree_height - lvl) for lvl in range (self.tree_height+1)]                
+        self.CPU_cost_at_lvl = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]                
         
         self.G = self.G.to_directed()
 
@@ -226,6 +226,10 @@ class SFC_mig_simulator (object):
 
         self.ap_file  = open ("../res/" + self.usr_ap_file_name, "r")  
 
+        # init self.X (current placement).
+        # self.X[u][s] = True will indicate that user u is placed on server s     
+        self.X = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+
         for line in self.ap_file: 
 
             # Ignore comments lines
@@ -263,14 +267,20 @@ class SFC_mig_simulator (object):
         """
         Calculate the cost of locating chain u on server s, per each pair u, s
         """
-        self.cost_per_chain = np.empty (len(self.usr), dtype = object)
+        self.cost_per_usr = np.empty (len(self.usr), dtype = object)
+        not_X = np.invert (self.X)
         for u in range(len(self.usr)):
-            self.cost_per_chain[u] = []
-            usr = self.usr[u]
+            self.cost_per_usr[u] = []
+            usr = self.usr[u]               
+            print (usr['mig cost'])
+            exit ()
             for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
-                self.cost_per_chain[u].append (usr['B'][lvl] * self.G.nodes[usr['S_u'][lvl]]['CPU cost'])
+                self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[usr['S_u'][lvl]]['CPU cost'])# + # comp' cost 
+                                             # usr['mig cost'][self.G.nodes[usr['S_u'][lvl]]] * not_X[u][self.G.nodes[usr['S_u'][lvl]]] #mig' cost
+                                            # )
+            print (usr['B'])
+        print (self.cost_per_usr)
         
-        print (self.cost_per_chain)
         return
     
     def bottom_up (self):
@@ -282,7 +292,7 @@ class SFC_mig_simulator (object):
         for s in self.G.nodes():
             self.G.nodes[s]['a'] = self.R * self.G.nodes[s]['CPU cap']
     
-        # init self.Y (the solution to be found).
+        # init self.Y (the placement to be found).
         # self.Y[u][s] = True will indicate that user u is placed on server s     
         self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
         

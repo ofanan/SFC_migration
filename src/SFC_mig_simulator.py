@@ -16,27 +16,32 @@ from numpy import int
 
 class SFC_mig_simulator (object):
 
-    def CPUAll (self): 
+    def CPUAll_once (self): 
         """
         CPUAll algorithm:
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
-        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
+        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
+        This version of the alg' assumes a balanced homogeneous tree, 
+        so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
         for u in self.users:
-            slack = [u['target delay'] -  self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
+            slack = [u['target delay'] -  u['delay to PoA'] - 2*self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
+            slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
             #u['L'] = -1 # Highest server which is delay-feasible for u
             u['B'] = [] # u['B'] will hold a list of the budgets required for placing u on each level 
             mu = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
             lvl = 0 
-            for lvl in range (self.tree_height+1):
+            for lvl in range(len(slack)):
+                print ('lvl = ', lvl)
                 while (sum(mu) <= u['C_u']): # The SLA still allows increasing this user's CPU allocation
-                    if (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) < slack[lvl]):  
+                    if (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) <= slack[lvl]):  
                         u['B'].append(sum(mu))
+                        print (mu)
                         # Can save now the exact vector mu; for now, no need for that, as we're interested only in the sum
                         break
                     argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
-            print (u['B'])
+            print ('u = ', u['B'])
 
         exit ()
     def rd_user_data (self):
@@ -45,7 +50,7 @@ class SFC_mig_simulator (object):
         The input data is read from the file self.users_loc_file_name. 
         """
         usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
-        self.users = np.array (1, dtype=object)
+        self.users = np.empty (self.MAX_NUM_OF_USRS, dtype=object)
         self.NUM_OF_VMs = 0
         
         for line in usrs_data_file: 
@@ -56,12 +61,6 @@ class SFC_mig_simulator (object):
 
             splitted_line = line.split (" ")
 
-            if (splitted_line[0] == "num_of_users"): 
-                self.users = np.resize (np.resize, int (line.split("=")[1].rstrip()))
-                self.NUM_OF_USERS  = int (line.split("=")[1].rstrip())
-                self.NUM_OF_CHAINS = self.NUM_OF_USERS
-                continue 
-
             if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
                 u = int(splitted_line[0].split("u")[1])
                 
@@ -69,61 +68,28 @@ class SFC_mig_simulator (object):
                     theta_times_lambda = line.split("=")[1].rstrip().split(",")
                     self.users[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
                     self.NUM_OF_VMs += len (theta_times_lambda)
-        
-                elif (splitted_line[1] == "target_delay"):              
-                    self.users[u]['target delay'] = float (line.split("=")[1].rstrip())
-                  
+
+                # The mig_cost here is for the whole chain. For specifying per-VM mig' cost,
+                # need to parse a vector, as done for 'theta times lambda' above. 
                 elif (splitted_line[1] == "mig_cost"):              
                     self.users[u]['mig cost'] = int (line.split("=")[1].rstrip())
                     
+                elif (splitted_line[1] == "target_delay"):              
+                    self.users[u]['target delay'] = float (line.split("=")[1].rstrip())
+                  
+                elif (splitted_line[1] == "delay_to_PoA"):              
+                    self.users[u]['delay to PoA'] = float (line.split("=")[1].rstrip())
+                    
                 elif (splitted_line[1] == "C_u"):              
                     self.users[u]['C_u'] = int (line.split("=")[1].rstrip())
-                # elif (splitted_line[1] == "mig_cost"):  
-                #     mig_cost = line.split("=")[1].rstrip().split(",")
-                #     self.mig_cost_of_usr[u] = [self.mig_cost_of_usr[u].fill (7)]  #(float (line.split("=")[1].rstrip()))
-                #     print (self.mig_cost_of_usr[u])
-                #     exit ()
-
-        print (self.users)                              
-        # The code below may be un-commented and ran only once we know the PoAs, as they're dummy VMs in the chain. 
-        # Also, the code is relevant only for non-SS solutions.
-        # Calculate v^+ of each VNF v.
-        # self.vpp[v] will hold the idx of the next VNF in the same chain.
-        # if v is the last VNF in its chain, then self.vpp[v] will hold the PoA of this chain's user  
-        # self.vpp                    = np.zeros (self.NUM_OF_VMs, dtype = 'uint')
-        #self.v0                     = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v0 will hold a list of all the VNFs which are first in their chain
-        #self.v_inf                  = np.zeros (self.NUM_OF_CHAINS, dtype = 'uint') # self.v_inf will hold a list of all the VNFs which are last in their chain
-        #self.v_not_inf              = [] # list of vnf's that are NOT last in the chain
-        #self.PoA_of_vnf = np.zeros (self.NUM_OF_VMs, dtype = 'uint') # self.PoA_of_vnf[v] will hold the PoA of the user using VNF v
-        # self.PoA_of_user            = random.choices (self.leaves, k=self.NUM_OF_USERS)
-        
-        # self.vnf_in_chain                 = np.empty (shape = self.NUM_OF_CHAINS, dtype = object) # self.vnf_in_chain[c] will hold a list of the VNFs in chain c  
-        # v = 0
-        # for chain_num in range (self.NUM_OF_CHAINS):
-        #     self.vnf_in_chain                 [chain_num] = []
-        #     # self.theta_times_lambda_v_chain [chain_num] = []
-        #     for idx_in_chain in range (self.NUM_OF_VMs_in_chain[chain_num]):
-        #         self.vnf_in_chain                [chain_num].append (v)
-        #         # self.theta_times_lambda_v_chain[chain_num].append (self.theta_times_lambda_v[v]) 
-        #         if (idx_in_chain == 0):
-        #             self.v0[chain_num] = v 
-        #         if (idx_in_chain == self.NUM_OF_VMs_in_chain[chain_num]-1): # Not "elif", because in the case of a single-VM chain, the first is also the last
-        #             self.v_inf[chain_num] = v
-        #             self.vpp [v] = self.PoA_of_user[chain_num]
-        #         else: # Not the last VM in the chain
-        #             self.v_not_inf.append(v)
-        #             self.vpp [v] = v+1 
-        #         self.PoA_of_vnf [v] = self.PoA_of_user[chain_num]    
-        #         v += 1
-        
-        # A Single-Server (per chain) solution for the problem 
-        # self.chain_nxt_loc          = 4 * np.ones (self.NUM_OF_CHAINS, dtype ='uint8') #self.PoA_of_user 
-        # self.chain_nxt_total_alloc = 7 * np.ones (self.NUM_OF_CHAINS) # total CPU allocation of the chain
-                
-    def gen_APs (self):
+                    
+        self.users = np.delete (self.users, [i for i in range(self.MAX_NUM_OF_USRS) if i>u])
+                                                     
+    def loc2ap (self):
         """
-        Read the input about the users delay, and write the appropriate user-to-PoA connections to the file self.ap_file
-        The input data is read from the file self.users_loc_file_name.          
+        Currently unused.
+        Read the input about the users locations, 
+        and write the appropriate user-to-PoA connections to the file self.ap_file
         """
         self.ap_file  = open ("../res/" + self.users_loc_file_name.split(".")[0] + ".ap", "w+")  
         usrs_loc_file = open ("../res/" + self.users_loc_file_name,  "r") 
@@ -229,21 +195,37 @@ class SFC_mig_simulator (object):
         self.tree_height            = 2
         self.children_per_node      = 4 # num of children of every non-leaf node
         self.uniform_link_capacity  = 100
-        self.Lmax                   = 1
-        self.uniform_Tpd            = 5
+        self.Lmax                   = 0
+        self.uniform_Tpd            = 2
         self.uniform_link_cost      = 1
         self.max_chain_len          = 2
+        self.MAX_NUM_OF_USRS        = 3
         self.usrs_data_file_name = "res.usr" #input file containing the target delays and traffic of all users
         self.users_loc_file_name = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
+        self.users_ap_file_name  = 'mob_sim.ap' #input file containing the APs of all users along the simulation
         self.gen_parameterized_tree ()
-        self.rd_user_data ()
-        self.gen_APs ()
-        self.CPUAll()
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
         self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
         self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
         self.write_to_cfg_file = True
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
+
+    def simulate (self):
+        self.rd_user_data ()
+        self.CPUAll_once  ()       
+        
+        self.ap_file  = open ("../res/" + self.users_ap_file_name, "r")  
+
+        for line in self.ap_file: 
+
+            # Ignore comments lines
+            if (line.split ("//")[0] == ""):
+                continue
+
+            splitted_line = line.split (" ")
+
+        
+        
 
     def calc_SS_sol_total_cost (self):
         """
@@ -289,6 +271,7 @@ if __name__ == "__main__":
     # Gen static LP problem
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = 0)
+    my_simulator.simulate()
     # my_simulator.calc_SS_sol_total_cost ()
     # my_simulator.check_greedy_alg ()
     # exit (0)

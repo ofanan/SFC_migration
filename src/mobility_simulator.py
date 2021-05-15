@@ -121,15 +121,10 @@ class my_mobility_simulator (object):
         """
         printf (self.loc_output_file, 'time = {:.4f} : \n' .format (self.cur_time)) 
 
-        usr = self.usr[0]
-        usr['cur loc']          = self.update_loc (usr) 
-        usr['last update time'] = self.cur_time
-        printf (self.loc_output_file, 'usr {} {:.2f} {:.2f}\n' .format (usr['id'], usr['cur loc'][X], usr['cur loc'][Y]))
-
-        # for usr in self.usr[0]: 
-        #     usr['cur loc']          = self.update_loc (usr) 
-        #     usr['last update time'] = self.cur_time
-        #     printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (usr['id'], usr['cur loc'][X], usr['cur loc'][Y]))
+        for usr in self.usr: 
+            usr['cur loc']          = self.update_loc (usr) 
+            usr['last update time'] = self.cur_time
+            printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (usr['id'], usr['cur loc'][X], usr['cur loc'][Y]))
         printf (self.loc_output_file, '\n')    
 
     def print_APs (self):

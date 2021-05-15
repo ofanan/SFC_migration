@@ -16,6 +16,8 @@ from numpy import int
 
 class SFC_mig_simulator (object):
 
+    parent_of = lambda self, s : self.G.nodes[s]['prnt']
+     
     def CPUAll_once (self): 
         """
         CPUAll algorithm:
@@ -135,15 +137,17 @@ class SFC_mig_simulator (object):
 
         shortest_path = nx.shortest_path(self.G)
 
-
-        # levelize the tree (assuming a balanced tree) 
+        # levelize the tree (assuming a balanced tree)
+        self.ap2s             = np.zeros (len (self.G.nodes), dtype='int16') 
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         self.cpu_cost_at_root = 3^self.tree_height
         for s in self.G.nodes(): # for every server
+            self.G.nodes[s]['id'] = s
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
-                self.G.nodes[s]['AP id'] = self.num_of_leaves
+                # self.G.nodes[s]['AP id'] = self.num_of_leaves
+                self.ap2s[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']      = lvl # assume here a balanced tree
@@ -154,7 +158,11 @@ class SFC_mig_simulator (object):
         #     if (n > i):
         #         print (n)
         # exit
-                    
+        
+        # Find parents of all nodes (except of the root)
+        for s in range (1, len(self.G.nodes())):
+            self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
+
         # Calculate edge propagation delays    
         for edge in self.G.edges: 
             self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
@@ -190,7 +198,7 @@ class SFC_mig_simulator (object):
         
         # Network parameters
         self.tree_height            = 2
-        self.children_per_node      = 4 # num of children of every non-leaf node
+        self.children_per_node      = 2 # num of children of every non-leaf node
         self.uniform_link_capacity  = 100
         self.Lmax                   = 0
         self.uniform_Tpd            = 2
@@ -225,6 +233,8 @@ class SFC_mig_simulator (object):
                 continue
         
             self.rd_AP_line(splitted_line)
+            print (self.usr)
+
             self.alg_top ()
     
     def alg_top (self):
@@ -233,6 +243,7 @@ class SFC_mig_simulator (object):
         """
         
         self.bu ()
+        
         return
     
     def bu (self):
@@ -246,12 +257,29 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             if (len(tuple) > 1):
                 tuple   = tuple[1].split (",")
-                usr_num = int(tuple[0])
-                AP      = int(tuple[1])
-                if (usr_num > len (self.usr)-1):
-                    print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (usr_num, len(self.usr)))
+                usr_id = int(tuple[0])
+                if (usr_id > len (self.usr)-1):
+                    print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (tuple[0], len(self.usr)))
                     exit  ()
-                self.usr[usr_num]['nxt AP'] = AP
+                usr     = self.usr[usr_id]
+                AP_id      = int(tuple[1])
+                if (AP_id > self.num_of_leaves):
+                    print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
+                    exit  ()
+                usr['nxt AP'] = AP_id
+                #self.G.nodes[s]['AP id'] = self.num_of_leaves
+                # print (self.G.nodes)
+                # list_to_filter = list (filter (lambda item : item[s]['lvl'] == 0 for s in range (10), self.G.nodes))
+                # print (list_to_filter)
+
+                usr['S_u'] = [] 
+                s = self.ap2s[AP_id]
+                usr['S_u'].append (s)
+                for lvl in (range (len(usr['B'])-1)):
+                    s = self.parent_of(s)
+                    usr['S_u'].append (s)
+                
+                # print (self.usr)
         
 
     def calc_SS_sol_total_cost (self):

@@ -177,13 +177,13 @@ class my_mobility_simulator (object):
             if (self.print_trajectory_of_usr >= 0):
                 self.trajectory_output_file = open ("../res/mob_sim.trj", "w")
  
-        if (self.verbose > 1): # If the verbose level requires that, begin a series of periodical events  
-            self.eventQ.append ({'event type' : EVENT_T_PERIODICAL,
-                                     'time'   : 0})                 
-           
         if (self.verbose > 0): # If the verbose level requires that, write to file the initial APs of each user
             self.print_output()
             
+            if (self.verbose > 1): # If the verbose level requires that, schedule the first periodical event (the next event will schedule each other)  
+                self.eventQ.append ({'event type' : EVENT_T_PERIODICAL,
+                                         'time'   : self.T_BETWEEN_PERIODICAL_EVENTS})                 
+               
         # Start move the usrs   
         for usr in self.usr:
             self.eventQ.append ({'event type' : EVENT_T_START_MOV,

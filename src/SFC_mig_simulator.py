@@ -262,10 +262,24 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['a'] = self.R * self.G.nodes[s]['CPU cap']
     
         # init self.Y (the solution to be found).
-        # self.Y[u][s] = 1 will indicate that user u is placed on server s     
-        self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'int8')
-    
+        # self.Y[u][s] = True will indicate that user u is placed on server s     
+        self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
         
+        # Mark all users as not placed yet
+        for usr in self.usr:
+            usr['placed'] = False
+    
+        for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels
+            lvl = self.G.nodes[s]['lvl']
+            for u in self.G.nodes[s]['Hs']: # for each chain in Hs
+                if (self.G.nodes[s]['a'] > self.usr[u]['B'][lvl]): 
+                    self.Y[u][s] = True
+                    self.usr[u]['placed'] = True
+                    self.G.nodes[s]['a'] -= self.usr[u]['B'][lvl]
+                elif (len (self.usr[u]['B']) == lvl):
+                    self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+                    return 
+                
     
     
     def rd_AP_line (self, line):

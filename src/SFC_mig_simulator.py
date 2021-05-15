@@ -157,7 +157,6 @@ class SFC_mig_simulator (object):
         # for n in self.G.neighbors(i):
         #     if (n > i):
         #         print (n)
-        # exit
         
         # Find parents of all nodes (except of the root)
         for s in range (1, len(self.G.nodes())):
@@ -247,12 +246,34 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
-        self.R = 1 # mult' rsrc augmentation factor
-        self.bu ()
+        self.R = 2 # mult' rsrc augmentation factor
+        self.bottom_up ()
+        self.reduce_cost ()
         
         return
     
-    def bu (self):
+    def reduce_cost (self):
+        """
+        Reduce cost alg': take a feasible solution, and greedily decrease the cost 
+        by changing the placement of a single chain, using a gradient method, as long as this is possible.
+        """
+        self.calc_cost()
+    
+    def calc_cost (self):
+        """
+        Calculate the cost of locating chain u on server s, per each pair u, s
+        """
+        self.cost_per_chain = np.empty (len(self.usr), dtype = object)
+        for u in range(len(self.usr)):
+            self.cost_per_chain[u] = []
+            usr = self.usr[u]
+            for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
+                self.cost_per_chain[u].append (usr['B'][lvl] * self.G.nodes[usr['S_u'][lvl]]['CPU cost'])
+        
+        print (self.cost_per_chain)
+        return
+    
+    def bottom_up (self):
         """
         Bottom-up alg'
         """
@@ -278,9 +299,11 @@ class SFC_mig_simulator (object):
                     self.G.nodes[s]['a'] -= self.usr[u]['B'][lvl]
                 elif (len (self.usr[u]['B']) == lvl):
                     self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
-                    return 
-                
-    
+                    return
+                 
+        # print (self.usr)
+        # for s in self.G.nodes():
+        #     print (self.G.nodes[s]['a'])
     
     def rd_AP_line (self, line):
         splitted_line = line[0].split ("\n")[0].split (")")
@@ -317,7 +340,6 @@ class SFC_mig_simulator (object):
                         self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
                         self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.NUM_OF_VMs_in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
-        exit
             
     def print_vars (self):
         """
@@ -354,8 +376,6 @@ if __name__ == "__main__":
     my_simulator.simulate()
     # my_simulator.calc_SS_sol_total_cost ()
     # my_simulator.check_greedy_alg ()
-    # exit (0)
-    #
     # my_simulator.init_problem  ()
     #
     # # Gen dynamic LP problem

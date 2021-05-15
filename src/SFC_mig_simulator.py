@@ -149,7 +149,7 @@ class SFC_mig_simulator (object):
                 # self.G.nodes[s]['AP id'] = self.num_of_leaves
                 self.ap2s[self.num_of_leaves] = s
                 self.num_of_leaves += 1
-                for lvl in range (self.tree_height):
+                for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']      = lvl # assume here a balanced tree
                     self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']  = self.CPU_cap_at_lvl[lvl]                
                     self.G.nodes[shortest_path[s][root][lvl]]['CPU cost'] = self.CPU_cost_at_lvl[lvl]                
@@ -218,7 +218,13 @@ class SFC_mig_simulator (object):
     def simulate (self):
         self.rd_usr_data ()
         self.CPUAll_once  ()       
-        
+
+        # reset S_u, Hs        
+        for usr in self.usr:
+            usr['S_u'] = [] 
+        for s in self.G.nodes():
+            self.G.nodes[s]['Hs'] = []
+
         self.ap_file  = open ("../res/" + self.usr_ap_file_name, "r")  
 
         for line in self.ap_file: 
@@ -232,9 +238,8 @@ class SFC_mig_simulator (object):
             if (splitted_line[0] == "time"):
                 continue
         
-            self.rd_AP_line(splitted_line)
-            print (self.usr)
 
+            self.rd_AP_line(splitted_line)                      
             self.alg_top ()
     
     def alg_top (self):
@@ -242,6 +247,7 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
+        self.R = 1 # mult' rsrc augmentation factor
         self.bu ()
         
         return
@@ -250,6 +256,17 @@ class SFC_mig_simulator (object):
         """
         Bottom-up alg'
         """
+        
+        # init a(s), the number of available CPU in each server 
+        for s in self.G.nodes():
+            self.G.nodes[s]['a'] = self.R * self.G.nodes[s]['CPU cap']
+    
+        # init self.Y (the solution to be found).
+        # self.Y[u][s] = 1 will indicate that user u is placed on server s     
+        self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'int8')
+    
+        
+    
     
     def rd_AP_line (self, line):
         splitted_line = line[0].split ("\n")[0].split (")")
@@ -266,21 +283,15 @@ class SFC_mig_simulator (object):
                 if (AP_id > self.num_of_leaves):
                     print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
                     exit  ()
-                usr['nxt AP'] = AP_id
-                #self.G.nodes[s]['AP id'] = self.num_of_leaves
-                # print (self.G.nodes)
-                # list_to_filter = list (filter (lambda item : item[s]['lvl'] == 0 for s in range (10), self.G.nodes))
-                # print (list_to_filter)
 
-                usr['S_u'] = [] 
                 s = self.ap2s[AP_id]
                 usr['S_u'].append (s)
+                self.G.nodes[s]['Hs'].append(usr_id)
                 for lvl in (range (len(usr['B'])-1)):
                     s = self.parent_of(s)
                     usr['S_u'].append (s)
-                
-                # print (self.usr)
-        
+                    self.G.nodes[s]['Hs'].append(usr_id)
+                        
 
     def calc_SS_sol_total_cost (self):
         """

@@ -16,8 +16,31 @@ from numpy import int
 
 class SFC_mig_simulator (object):
 
-    parent_of = lambda self, s : self.G.nodes[s]['prnt']
+    total_cost = lambda self, lvl, not_x, usr : \
+        self.link_cost_of_SSP_at_lvl[lvl] + not_x * self.uniform_mig_cost * len (usr['theta times lambda)']) + self.CPU_cost_at_lvl[lvl] * B    
      
+    def calc_cost (self):
+        """
+        Calculate the cost of locating chain u on server s, per each pair u, s
+        """
+        self.cost_per_usr = np.empty (len(self.usr), dtype = object)
+        not_X = np.invert (self.X)
+        for u in range(len(self.usr)):
+            self.cost_per_usr[u] = []
+            usr = self.usr[u]               
+            for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
+
+                self.cost_per_usr[u].append (self.total_cost (lvl, not_x[u][usr['S_u'][lvl]], usr)
+                # s = usr['S_u'][lvl]
+                # Below is a calculation of the cost for the fully-hetero' case. 
+                # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['CPU cost'] + # comp' cost 
+                #                              usr['mig cost'][lvl] * not_X[u][s] + #mig' cost
+                #                              self.G.nodes[s]['link cost'] # netw' cost
+                #                              ) 
+                                             # ) 
+                                            
+        # print (self.cost_per_usr)
+
     def CPUAll_once (self): 
         """
         CPUAll algorithm:
@@ -49,7 +72,6 @@ class SFC_mig_simulator (object):
         """
         usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
         self.usr = np.empty (self.MAX_NUM_OF_USRS, dtype=object)
-        self.NUM_OF_VMs = 0
         
         for line in usrs_data_file: 
     
@@ -65,7 +87,6 @@ class SFC_mig_simulator (object):
                 if (splitted_line[1] == "theta_times_lambda"):              
                     theta_times_lambda = line.split("=")[1].rstrip().split(",")
                     self.usr[u] = {'theta times lambda' : [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]}
-                    self.NUM_OF_VMs += len (theta_times_lambda)
 
                 elif (splitted_line[1] == "delay_to_PoA"):              
                     self.usr[u]['delay to PoA'] = float (line.split("=")[1].rstrip())
@@ -73,9 +94,9 @@ class SFC_mig_simulator (object):
                 elif (splitted_line[1] == "target_delay"):              
                     self.usr[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
-                elif (splitted_line[1] == "mig_cost"):              
-                    mig_cost = line.split("=")[1].rstrip().split(",")
-                    self.usr[u]['mig cost'] = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
+                # elif (splitted_line[1] == "mig_cost"):              
+                #     mig_cost = line.split("=")[1].rstrip().split(",")
+                #     self.usr[u]['mig cost'] = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
                     
                 elif (splitted_line[1] == "C_u"):              
                     self.usr[u]['C_u'] = int (line.split("=")[1].rstrip())
@@ -129,9 +150,15 @@ class SFC_mig_simulator (object):
         """
         self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
-        self.CPU_cap_at_lvl  = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
-        self.CPU_cost_at_lvl = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]                
+        self.CPU_cap_at_lvl   = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
+        self.CPU_cost_at_lvl  = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
+        self.link_cost_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         
+        # overall link cost of a Single-Server Placement of a chain at each lvl
+        self.link_cost_of_SSP_at_lvl = [2 * sum([self.link_cost_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
+        
+        print (self.link_cost_of_SSP_at_lvl)
+        exit ()
         self.G = self.G.to_directed()
 
         shortest_path = nx.shortest_path(self.G)
@@ -149,13 +176,14 @@ class SFC_mig_simulator (object):
                 self.ap2s[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
-                    self.G.nodes[shortest_path[s][root][lvl]]['lvl']      = lvl # assume here a balanced tree
-                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']  = self.CPU_cap_at_lvl[lvl]                
-                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cost'] = self.CPU_cost_at_lvl[lvl]                
-        # # Iterate over all children of node i
-        # for n in self.G.neighbors(i):
-        #     if (n > i):
-        #         print (n)
+                    self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = lvl # assume here a balanced tree
+                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']   = self.CPU_cap_at_lvl[lvl]                
+                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cost']  = self.CPU_cost_at_lvl[lvl]                
+                    self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_at_lvl[lvl]
+                    # # Iterate over all children of node i
+                    # for n in self.G.neighbors(i):
+                    #     if (n > i):
+                    #         print (n)
         
         # Find parents of all nodes (except of the root)
         for s in range (1, len(self.G.nodes())):
@@ -164,7 +192,6 @@ class SFC_mig_simulator (object):
         # Calculate edge propagation delays    
         for edge in self.G.edges: 
             self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
-            self.G[edge[0]][edge[1]]['cost']  = self.uniform_link_cost
             # paths_using_this_edge = []
             # for src in range (self.NUM_OF_SERVERS):
                 # for dst in range (self.NUM_OF_SERVERS): 
@@ -198,10 +225,10 @@ class SFC_mig_simulator (object):
         self.tree_height            = 2
         self.children_per_node      = 2 # num of children of every non-leaf node
         self.uniform_link_capacity  = 100
+        self.uniform_mig_cost       = 1
         self.Lmax                   = 0
         self.uniform_Tpd            = 2
         self.uniform_link_cost      = 1
-        self.max_chain_len          = 2
         self.MAX_NUM_OF_USRS        = 1000
         self.usrs_data_file_name    = "res.usr" #input file containing the target delays and traffic of all users
         self.usr_loc_file_name      = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
@@ -260,28 +287,7 @@ class SFC_mig_simulator (object):
         Reduce cost alg': take a feasible solution, and greedily decrease the cost 
         by changing the placement of a single chain, using a gradient method, as long as this is possible.
         """
-        self.calc_cost()
-    
-    def calc_cost (self):
-        """
-        Calculate the cost of locating chain u on server s, per each pair u, s
-        """
-        self.cost_per_usr = np.empty (len(self.usr), dtype = object)
-        not_X = np.invert (self.X)
-        for u in range(len(self.usr)):
-            self.cost_per_usr[u] = []
-            usr = self.usr[u]               
-            for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
-                s = usr['S_u'][lvl]
-                self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['CPU cost'] + # comp' cost 
-                                             usr['mig cost'][lvl] * not_X[u][s] + #mig' cost
-                                             0
-                                             ) 
-                                             # ) 
-                                            
-        # print (self.cost_per_usr)
-        
-        return
+        self.calc_cost()       
     
     def bottom_up (self):
         """
@@ -348,7 +354,8 @@ class SFC_mig_simulator (object):
         for chain in range(self.NUM_OF_CHAINS):
             total_cost += self.CPU_cost[self.chain_nxt_loc[chain]] * self.chain_nxt_total_alloc[chain] + \
                         self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
-                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.NUM_OF_VMs_in_chain[chain]] + \
+                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.
+_in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
             
     def print_vars (self):

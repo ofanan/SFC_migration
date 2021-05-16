@@ -22,30 +22,64 @@ class SFC_mig_simulator (object):
     # An inline func' for calculating the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    total_chain_cost_homo = lambda self, lvl, not_x, usr : \
-        self.link_cost_of_SSP_at_lvl[lvl] + not_x * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
+    total_chain_cost_homo = lambda self, lvl, not_X, usr: self.link_cost_of_SSP_at_lvl[lvl] + not_X * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
      
+    # Convert the decision var' self.Y to the vector cur_loc, where cur_loc[j] = s
+    # if chain j is scheduled to be located on server s 
+    Y2curloc = lambda self : np.nonzero(self.Y)  
+     
+    def reduce_cost (self):
+        """
+        Reduce cost alg': take a feasible solution, and greedily decrease the cost 
+        by changing the placement of a single chain, using a gradient method, as long as this is possible.
+        """
+        
+        # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
+        # before calling reduce_cost ()
+        self.calc_cost()
+        while (1):
+            u_star = -1; lvl_star = -1; max_reduction = 0 # init default values for the maximal reduction cost func', and for the argmax indices 
+            for u in range(len(self.usr)):
+                usr = self.usr[u]       
+                for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
+                    if (self.G.nodes[usr['S_u'][lvl]]['a'] >= usr['B'][lvl]): # if there's enough available space to move u to level lvl 
+                        reduction = self.total_chain_cost_homo (self.Y_lvl_of[u], self.not_X[u][usr['S_u'][lvl]], usr) - self.total_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr)
+                        if (reduction > max_reduction):  
+                            u_star = u
+                            lvl_star = lvl
+                            max_reduction = reduction 
+            if (max_reduction == 0): # cannot decrease cost anymore
+                break
+            
+            # move u_star from lvl to lvl_star, and update Y, a, accordingly
+            usr2mov            = self.usr[u_star]
+            old_lvl_of_usr2mov = self.Y_lvl_of[u_star]
+            self.G.nodes [usr2mov['S_u'][old_lvl_of_usr2mov]] ['a'] += usr2mov ['B'][old_lvl_of_usr2mov] # inc the available CPU at the prev loc of the moved usr  
+            self.G.nodes [usr2mov['S_u'][lvl_star]]           ['a'] -= usr2mov ['B'][lvl_star]           # dec the available CPU at the new  loc of the moved usr  
+            self.Y_lvl_of[u_star] = lvl_star # update self.Y_lvl_of accordingly. Note: we don't update self.Y for now.
+            print ('u_star = {}, lvl_star = {}, max_reduction = {}' .format(u_star, lvl_star, max_reduction))
+            exit ()
+            
+        
+        
+    
     def calc_cost (self):
         """
         Calculate the cost of locating chain u on server s, per each pair u, s
         """
         self.cost_per_usr = np.empty (len(self.usr), dtype = object)
-        not_X = np.invert (self.X)
         for u in range(len(self.usr)):
             self.cost_per_usr[u] = []
-            usr = self.usr[u]               
+            usr = self.usr[u]       
             for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
-                self.cost_per_usr[u].append (self.total_chain_cost_homo (lvl, not_X[u][usr['S_u'][lvl]], usr))
-                # s = usr['S_u'][lvl]
+                self.cost_per_usr[u].append (self.total_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr))
                 # Below is a calculation of the cost for the fully-hetero' case. 
+                # s = usr['S_u'][lvl]
                 # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['CPU cost'] + # comp' cost 
-                #                              usr['mig cost'][lvl] * not_X[u][s] + #mig' cost
-                #                              self.G.nodes[s]['link cost'] # netw' cost
-                #                              ) 
-                                             # ) 
-                                            
+                #                              usr['mig cost'][lvl] * self.not_X[u][s] + #mig' cost
+                #                              self.G.nodes[s]['link cost']) # netw' cost
         print (self.cost_per_usr)
-
+        
     def CPUAll_once (self): 
         """
         CPUAll algorithm:
@@ -194,9 +228,9 @@ class SFC_mig_simulator (object):
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
 
-        # Calculate edge propagation delays    
-        for edge in self.G.edges: 
-            self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
+        # # Calculate delays and costs for the fully-hetero' case, where each link may have a unique cost / delay.    
+        # for edge in self.G.edges: 
+        #     self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
             # paths_using_this_edge = []
             # for src in range (self.NUM_OF_SERVERS):
                 # for dst in range (self.NUM_OF_SERVERS): 
@@ -281,18 +315,12 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
+        self.not_X = np.invert (self.X)
         self.R = 2 # mult' rsrc augmentation factor
         self.bottom_up ()
         self.reduce_cost ()
         
         return
-    
-    def reduce_cost (self):
-        """
-        Reduce cost alg': take a feasible solution, and greedily decrease the cost 
-        by changing the placement of a single chain, using a gradient method, as long as this is possible.
-        """
-        self.calc_cost()       
     
     def bottom_up (self):
         """
@@ -305,7 +333,8 @@ class SFC_mig_simulator (object):
     
         # init self.Y (the placement to be found).
         # self.Y[u][s] = True will indicate that user u is placed on server s     
-        self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+        self.Y =               np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+        self.Y_lvl_of = (-1) * np.ones  (len (self.usr), dtype = 'int8') #self.Y_lvl_of[u] will hold the level on which chain u is placed by sol' Y. 
         
         # Mark all users as not placed yet
         for usr in self.usr:
@@ -314,18 +343,18 @@ class SFC_mig_simulator (object):
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels
             lvl = self.G.nodes[s]['lvl']
             for u in self.G.nodes[s]['Hs']: # for each chain in Hs
+                if (self.usr[u]['placed']): # chain was already placed
+                    continue
                 if (self.G.nodes[s]['a'] > self.usr[u]['B'][lvl]): 
                     self.Y[u][s] = True
+                    self.Y_lvl_of[u] = lvl 
                     self.usr[u]['placed'] = True
                     self.G.nodes[s]['a'] -= self.usr[u]['B'][lvl]
                 elif (len (self.usr[u]['B']) == lvl):
                     self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
                     return
                  
-        # print (self.usr)
-        # for s in self.G.nodes():
-        #     print (self.G.nodes[s]['a'])
-    
+   
     def rd_AP_line (self, line):
         splitted_line = line[0].split ("\n")[0].split (")")
         for tuple in splitted_line:

@@ -16,8 +16,14 @@ from numpy import int
 
 class SFC_mig_simulator (object):
 
-    total_cost = lambda self, lvl, not_x, usr : \
-        self.link_cost_of_SSP_at_lvl[lvl] + not_x * self.uniform_mig_cost * len (usr['theta times lambda)']) + self.CPU_cost_at_lvl[lvl] * B    
+    # An inline function that returns the parent of a given server
+    parent_of = lambda self, s : self.G.nodes[s]['prnt']
+
+    # An inline func' for calculating the total cost of placing a chain at some level. 
+    # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
+    # and uniform cost for all servers at the same layer.
+    total_chain_cost_homo = lambda self, lvl, not_x, usr : \
+        self.link_cost_of_SSP_at_lvl[lvl] + not_x * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
      
     def calc_cost (self):
         """
@@ -29,8 +35,7 @@ class SFC_mig_simulator (object):
             self.cost_per_usr[u] = []
             usr = self.usr[u]               
             for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
-
-                self.cost_per_usr[u].append (self.total_cost (lvl, not_x[u][usr['S_u'][lvl]], usr)
+                self.cost_per_usr[u].append (self.total_chain_cost_homo (lvl, not_X[u][usr['S_u'][lvl]], usr))
                 # s = usr['S_u'][lvl]
                 # Below is a calculation of the cost for the fully-hetero' case. 
                 # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['CPU cost'] + # comp' cost 
@@ -39,7 +44,7 @@ class SFC_mig_simulator (object):
                 #                              ) 
                                              # ) 
                                             
-        # print (self.cost_per_usr)
+        print (self.cost_per_usr)
 
     def CPUAll_once (self): 
         """
@@ -50,7 +55,7 @@ class SFC_mig_simulator (object):
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
         for u in self.usr:
-            slack = [u['target delay'] -  u['delay to PoA'] - 2*self.netw_delay_from_leaf_to_lvl[lvl] for lvl in range (self.tree_height+1)]
+            slack = [u['target delay'] -  u['delay to PoA'] - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
             slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
             #u['L'] = -1 # Highest server which is delay-feasible for u
             u['B'] = [] # u['B'] will hold a list of the budgets required for placing u on each level 
@@ -94,9 +99,9 @@ class SFC_mig_simulator (object):
                 elif (splitted_line[1] == "target_delay"):              
                     self.usr[u]['target delay'] = float (line.split("=")[1].rstrip())
                   
-                # elif (splitted_line[1] == "mig_cost"):              
-                #     mig_cost = line.split("=")[1].rstrip().split(",")
-                #     self.usr[u]['mig cost'] = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
+                elif (splitted_line[1] == "mig_cost"):              
+                    mig_cost = line.split("=")[1].rstrip().split(",")
+                    self.usr[u]['mig cost'] = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
                     
                 elif (splitted_line[1] == "C_u"):              
                     self.usr[u]['C_u'] = int (line.split("=")[1].rstrip())
@@ -150,15 +155,15 @@ class SFC_mig_simulator (object):
         """
         self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS     = self.G.number_of_nodes()
-        self.CPU_cap_at_lvl   = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
-        self.CPU_cost_at_lvl  = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
-        self.link_cost_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
+        self.CPU_cap_at_lvl    = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
+        self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
+        self.link_cost_at_lvl  = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
+        self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         
-        # overall link cost of a Single-Server Placement of a chain at each lvl
-        self.link_cost_of_SSP_at_lvl = [2 * sum([self.link_cost_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
+        # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
+        self.link_cost_of_SSP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
+        self.link_delay_of_SSP_at_lvl = [2 * sum([self.link_delay_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
         
-        print (self.link_cost_of_SSP_at_lvl)
-        exit ()
         self.G = self.G.to_directed()
 
         shortest_path = nx.shortest_path(self.G)
@@ -179,7 +184,7 @@ class SFC_mig_simulator (object):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = lvl # assume here a balanced tree
                     self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']   = self.CPU_cap_at_lvl[lvl]                
                     self.G.nodes[shortest_path[s][root][lvl]]['CPU cost']  = self.CPU_cost_at_lvl[lvl]                
-                    self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_at_lvl[lvl]
+                    self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_SSP_at_lvl[lvl]
                     # # Iterate over all children of node i
                     # for n in self.G.neighbors(i):
                     #     if (n > i):
@@ -200,19 +205,19 @@ class SFC_mig_simulator (object):
             # self.G[edge[0]][edge[1]]['paths using this edge'] = paths_using_this_edge
 
         # self.path_delay[s][d] will hold the prop' delay of the path from server s to server d
-        self.path_delay   = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
-        self.path_bw_cost = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS])
-        for s in range (self.NUM_OF_SERVERS):
-            for d in range (self.NUM_OF_SERVERS):
-                if (s == d):
-                    continue
-                self.path_delay   [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['delay'] for hop in range (len(shortest_path[s][d])-1))
-                self.path_bw_cost [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['cost']  for hop in range (len(shortest_path[s][d])-1))
+        # self.path_delay   = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
+        # self.path_bw_cost = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS])
+        # for s in range (self.NUM_OF_SERVERS):
+        #     for d in range (self.NUM_OF_SERVERS):
+        #         if (s == d):
+        #             continue
+        #         self.path_delay   [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['delay'] for hop in range (len(shortest_path[s][d])-1))
+        #         self.path_bw_cost [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['cost']  for hop in range (len(shortest_path[s][d])-1))
                 
         # calculate the network delay from a leaf to a node in each level,  
         # assuming that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
-        leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
-        self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
+        # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
+        # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
     def __init__ (self, verbose = -1):
         """
@@ -242,7 +247,7 @@ class SFC_mig_simulator (object):
 
     def simulate (self):
         self.rd_usr_data ()
-        self.CPUAll_once  ()       
+        self.CPUAll_once ()       
 
         # reset S_u, Hs        
         for usr in self.usr:

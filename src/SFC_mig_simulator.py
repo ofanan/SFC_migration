@@ -24,10 +24,7 @@ class SFC_mig_simulator (object):
     # and uniform cost for all servers at the same layer.
     total_chain_cost_homo = lambda self, lvl, not_X, usr: self.link_cost_of_SSP_at_lvl[lvl] + not_X * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
      
-    # Convert the decision var' self.Y to the vector cur_loc, where cur_loc[j] = s
-    # if chain j is scheduled to be located on server s 
-    Y2curloc = lambda self : np.nonzero(self.Y)  
-     
+         
     def reduce_cost (self):
         """
         Reduce cost alg': take a feasible solution, and greedily decrease the cost 
@@ -58,7 +55,6 @@ class SFC_mig_simulator (object):
             self.G.nodes [usr2mov['S_u'][lvl_star]]           ['a'] -= usr2mov ['B'][lvl_star]           # dec the available CPU at the new  loc of the moved usr  
             self.Y_lvl_of[u_star] = lvl_star # update self.Y_lvl_of accordingly. Note: we don't update self.Y for now.
             print ('u_star = {}, lvl_star = {}, max_reduction = {}' .format(u_star, lvl_star, max_reduction))
-            exit ()
             
         
         

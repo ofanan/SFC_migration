@@ -356,17 +356,23 @@ class SFC_mig_simulator (object):
         
         self.not_X = np.invert (self.X)
         
-        self.R = self.calc_upr_bnd_rsrc_aug () # upper-bnd on the rsrc aug' that may be required
+        self.R = self.calc_upr_bnd_rsrc_aug () 
         self.bottom_up (self.R)
         if ((sum (sum (self.Y))) < len (self.usr)):
             print ('did not find a feasible sol')
             exit ()
         
-        # check if the sol totally fails
-        self.print_sol()
+        ub = self.R # upper-bnd on the rsrc aug' that may be required
+        lb = 1
+        
+        while ub > lb + 0.5:
+            
+        
+        
+        # self.print_sol()
         print ('R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (), self.calc_sol_cost()) )
         self.reduce_cost ()
-        self.print_sol()
+        # self.print_sol()
         print ('R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (), self.calc_sol_cost()) )
         
         return

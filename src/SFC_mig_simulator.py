@@ -19,23 +19,49 @@ class SFC_mig_simulator (object):
     # An inline function that returns the parent of a given server
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
+    # # Find the server on which a given user is located, by the Y_lvl_of
+    loc_of_user = lambda self, u : self.usr[u]['S_u'][self.Y_lvl_of[u]]
+
     # An inline func' for calculating the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    total_chain_cost_homo = lambda self, lvl, not_X, usr: self.link_cost_of_SSP_at_lvl[lvl] + not_X * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
+    calc_chain_cost_homo = lambda self, lvl, not_X, usr: self.link_cost_of_SSP_at_lvl[lvl] + not_X * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
      
     # An inline func' for calculating the (maximal) rsrc aug' used by the current solution
-    mean_rsrc_aug = lambda self : np.max ([(self.R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
+    calc_sol_rsrc_aug = lambda self : np.max ([(self.R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
          
-    # def calc_rsrc_aug_n_cost_of_sol (self):
-    #     """
-    #     Calculate the amount of rsrc augmentation used by a solution, and its total cost
-    #     """       
-    #     rsrc_used = lambda self : np.max ([(self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
-    #
-    #     mean_rsrc_aug = np.mean ([self.G.nodes[s]['a'] / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) 
-    #
-    #     print ('mean_rsrc_aug = ', mean_rsrc_aug)
+    # An inline func' for calculating the CPU used in practice in each server in the current solution
+    used_cpu_in = lambda self : [(self.R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
+
+    # reset the solution, self.Y (init it to a matrix of "False")
+    reset_sol   =  lambda self : np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+
+    # calculate the cost of the current solution (self.Y)
+    calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (self.Y_lvl_of[u], not (self.X[u][self.loc_of_user(u)]), self.usr[u]) for u in range(len(self.usr))])
+   
+    # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
+    calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr['C_u'] for usr in self.usr]) / np.min ([np.min (usr['B']) for usr in self.usr])
+
+    def print_cost_per_usr (self):
+        """
+        For debugging / analysing only.
+        print the cost of each chain. 
+        """
+        
+        for u in range (len (self.usr)):
+            chain_cost = self.calc_chain_cost_homo (self.Y_lvl_of[u], not (self.X[u][self.loc_of_user(u)]), self.usr[u])  
+            print ('cost of usr {} = {}' .format (u, chain_cost))
+        
+
+    def print_sol (self):
+        """
+        print a formatted solution for the allocation and placement prob' 
+        """
+        used_cpu_in = self.used_cpu_in ()
+        print ('\\\ format: s : used / C_s   chains[u1, u2, ...]')
+        print ('\\\ where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.' )
+        for s in self.G.nodes():
+            print ('{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usr)) if self.Y[u][s] ] ))
         
          
     def reduce_cost (self):
@@ -46,14 +72,13 @@ class SFC_mig_simulator (object):
         
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling reduce_cost ()
-        self.calc_cost()
         while (1):
             u_star = -1; lvl_star = -1; max_reduction = 0 # init default values for the maximal reduction cost func', and for the argmax indices 
             for u in range(len(self.usr)):
                 usr = self.usr[u]       
                 for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
                     if (self.G.nodes[usr['S_u'][lvl]]['a'] >= usr['B'][lvl]): # if there's enough available space to move u to level lvl 
-                        reduction = self.total_chain_cost_homo (self.Y_lvl_of[u], self.not_X[u][usr['S_u'][lvl]], usr) - self.total_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr)
+                        reduction = self.calc_chain_cost_homo (self.Y_lvl_of[u], self.not_X[u][usr['S_u'][self.Y_lvl_of[u]]], usr) - self.calc_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr)
                         if (reduction > max_reduction):  
                             u_star = u
                             lvl_star = lvl
@@ -67,27 +92,29 @@ class SFC_mig_simulator (object):
             self.G.nodes [usr2mov['S_u'][old_lvl_of_usr2mov]] ['a'] += usr2mov ['B'][old_lvl_of_usr2mov] # inc the available CPU at the prev loc of the moved usr  
             self.G.nodes [usr2mov['S_u'][lvl_star]]           ['a'] -= usr2mov ['B'][lvl_star]           # dec the available CPU at the new  loc of the moved usr  
             self.Y_lvl_of[u_star] = lvl_star # update self.Y_lvl_of accordingly. Note: we don't update self.Y for now.
-            print ('u_star = {}, lvl_star = {}, max_reduction = {}' .format(u_star, lvl_star, max_reduction))
-            
+            # print ('u_star = {}, lvl_star = {}, max_reduction = {}' .format(u_star, lvl_star, max_reduction))
         
-        
-    
-    def calc_cost (self):
-        """
-        Calculate the cost of locating chain u on server s, per each pair u, s
-        """
-        self.cost_per_usr = np.empty (len(self.usr), dtype = object)
+        # Update self.Y
+        self.Y = self.reset_sol () 
         for u in range(len(self.usr)):
-            self.cost_per_usr[u] = []
             usr = self.usr[u]       
-            for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
-                self.cost_per_usr[u].append (self.total_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr))
-                # Below is a calculation of the cost for the fully-hetero' case. 
-                # s = usr['S_u'][lvl]
-                # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['cpu cost'] + # comp' cost 
-                #                              usr['mig cost'][lvl] * self.not_X[u][s] + #mig' cost
-                #                              self.G.nodes[s]['link cost']) # netw' cost
-        print (self.cost_per_usr)
+            self.Y[u] [usr['S_u'][self.Y_lvl_of[u]] ] = True   
+    
+    # def calc_chain_cost_hetro (self):
+    #     """
+    #     Calculate the cost of locating chain u on server s, per each pair u, s
+    #     """
+    #     self.cost_per_usr = np.empty (len(self.usr), dtype = object)
+    #     for u in range(len(self.usr)):
+    #         self.cost_per_usr[u] = []
+    #         usr = self.usr[u]       
+    #         for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
+    #             self.cost_per_usr[u].append (self.calc_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr))
+    #             # Below is a calculation of the cost for the fully-hetero' case. 
+    #             # s = usr['S_u'][lvl]
+    #             # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['cpu cost'] + # comp' cost 
+    #             #                              usr['mig cost'][lvl] * self.not_X[u][s] + #mig' cost
+    #             #                              self.G.nodes[s]['link cost']) # netw' cost
         
     def CPUAll_once (self): 
         """
@@ -112,6 +139,9 @@ class SFC_mig_simulator (object):
                         break
                     argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
+        
+        # for u in range(len (self.usr)):
+        #     print ('mu[{}] = {}' .format (u, self.usr[u]['B']))
 
     def rd_usr_data (self):
         """
@@ -316,7 +346,7 @@ class SFC_mig_simulator (object):
                 continue
         
 
-            self.rd_AP_line(splitted_line)                      
+            self.rd_AP_line(splitted_line)
             self.alg_top ()
     
     def alg_top (self):
@@ -325,16 +355,27 @@ class SFC_mig_simulator (object):
         """
         
         self.not_X = np.invert (self.X)
-        self.R = 2# mult' rsrc augmentation factor
-        self.bottom_up ()
+        
+        self.R = self.calc_upr_bnd_rsrc_aug () # upper-bnd on the rsrc aug' that may be required
+        self.bottom_up (self.R)
+        if ((sum (sum (self.Y))) < len (self.usr)):
+            print ('did not find a feasible sol')
+            exit ()
+        
+        # check if the sol totally fails
+        self.print_sol()
+        print ('R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (), self.calc_sol_cost()) )
         self.reduce_cost ()
-        print (self.mean_rsrc_aug())
+        self.print_sol()
+        print ('R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (), self.calc_sol_cost()) )
         
         return
     
-    def bottom_up (self):
+    def bottom_up (self, R):
         """
-        Bottom-up alg'
+        Bottom-up alg'. 
+        Looks for a feasible sol'.
+        Input: R, a mult' factor on the amount of CPU units in each server.
         """
         
         # init a(s), the number of available CPU in each server 
@@ -343,7 +384,7 @@ class SFC_mig_simulator (object):
     
         # init self.Y (the placement to be found).
         # self.Y[u][s] = True will indicate that user u is placed on server s     
-        self.Y =               np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+        self.Y = self.reset_sol ()
         self.Y_lvl_of = (-1) * np.ones  (len (self.usr), dtype = 'int8') #self.Y_lvl_of[u] will hold the level on which chain u is placed by sol' Y. 
         
         # Mark all users as not placed yet

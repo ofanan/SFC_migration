@@ -24,6 +24,19 @@ class SFC_mig_simulator (object):
     # and uniform cost for all servers at the same layer.
     total_chain_cost_homo = lambda self, lvl, not_X, usr: self.link_cost_of_SSP_at_lvl[lvl] + not_X * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
      
+    # An inline func' for calculating the (maximal) rsrc aug' used by the current solution
+    mean_rsrc_aug = lambda self : np.max ([(self.R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
+         
+    # def calc_rsrc_aug_n_cost_of_sol (self):
+    #     """
+    #     Calculate the amount of rsrc augmentation used by a solution, and its total cost
+    #     """       
+    #     rsrc_used = lambda self : np.max ([(self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
+    #
+    #     mean_rsrc_aug = np.mean ([self.G.nodes[s]['a'] / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) 
+    #
+    #     print ('mean_rsrc_aug = ', mean_rsrc_aug)
+        
          
     def reduce_cost (self):
         """
@@ -71,7 +84,7 @@ class SFC_mig_simulator (object):
                 self.cost_per_usr[u].append (self.total_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr))
                 # Below is a calculation of the cost for the fully-hetero' case. 
                 # s = usr['S_u'][lvl]
-                # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['CPU cost'] + # comp' cost 
+                # self.cost_per_usr[u].append (usr['B'][lvl] * self.G.nodes[s]['cpu cost'] + # comp' cost 
                 #                              usr['mig cost'][lvl] * self.not_X[u][s] + #mig' cost
                 #                              self.G.nodes[s]['link cost']) # netw' cost
         print (self.cost_per_usr)
@@ -212,8 +225,8 @@ class SFC_mig_simulator (object):
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = lvl # assume here a balanced tree
-                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cap']   = self.CPU_cap_at_lvl[lvl]                
-                    self.G.nodes[shortest_path[s][root][lvl]]['CPU cost']  = self.CPU_cost_at_lvl[lvl]                
+                    self.G.nodes[shortest_path[s][root][lvl]]['cpu cap']   = self.CPU_cap_at_lvl[lvl]                
+                    self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
                     self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_SSP_at_lvl[lvl]
                     # # Iterate over all children of node i
                     # for n in self.G.neighbors(i):
@@ -312,9 +325,10 @@ class SFC_mig_simulator (object):
         """
         
         self.not_X = np.invert (self.X)
-        self.R = 2 # mult' rsrc augmentation factor
+        self.R = 2# mult' rsrc augmentation factor
         self.bottom_up ()
         self.reduce_cost ()
+        print (self.mean_rsrc_aug())
         
         return
     
@@ -325,7 +339,7 @@ class SFC_mig_simulator (object):
         
         # init a(s), the number of available CPU in each server 
         for s in self.G.nodes():
-            self.G.nodes[s]['a'] = self.R * self.G.nodes[s]['CPU cap']
+            self.G.nodes[s]['a'] = self.R * self.G.nodes[s]['cpu cap']
     
         # init self.Y (the placement to be found).
         # self.Y[u][s] = True will indicate that user u is placed on server s     

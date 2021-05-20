@@ -28,10 +28,10 @@ class SFC_mig_simulator (object):
     calc_chain_cost_homo = lambda self, lvl, not_X, usr: self.link_cost_of_SSP_at_lvl[lvl] + not_X * self.uniform_mig_cost * len (usr['theta times lambda']) + self.CPU_cost_at_lvl[lvl] * usr['B'][lvl]    
      
     # An inline func' for calculating the (maximal) rsrc aug' used by the current solution
-    calc_sol_rsrc_aug = lambda self : np.max ([(self.R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
+    calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
          
     # An inline func' for calculating the CPU used in practice in each server in the current solution
-    used_cpu_in = lambda self : [(self.R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
+    used_cpu_in = lambda self, R : [(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
 
     # reset the solution, self.Y (init it to a matrix of "False")
     reset_sol   =  lambda self : np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
@@ -41,6 +41,11 @@ class SFC_mig_simulator (object):
    
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr['C_u'] for usr in self.usr]) / np.min ([np.min (usr['B']) for usr in self.usr])
+
+    # Returns True iff the solution self.Y schedules all the chain.
+    # Note: the function does NOT check whether self.Y adheres to all the constraints (e.g., CPU cap', link cap', delay).
+    # This is assumed to be True by construction.
+    found_sol = lambda self: sum (sum (self.Y)) >= len (self.usr)
 
     def print_cost_per_usr (self):
         """
@@ -356,24 +361,29 @@ class SFC_mig_simulator (object):
         
         self.not_X = np.invert (self.X)
         
-        self.R = self.calc_upr_bnd_rsrc_aug () 
-        self.bottom_up (self.R)
-        if ((sum (sum (self.Y))) < len (self.usr)):
-            print ('did not find a feasible sol')
+        R = self.calc_upr_bnd_rsrc_aug () 
+        self.bottom_up (R)
+        if (not(self.found_sol())):
+            print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
         
-        ub = self.R # upper-bnd on the rsrc aug' that may be required
+        ub = R # upper-bnd on the rsrc aug' that may be required
         lb = 1
         
         while ub > lb + 0.5:
             
-        
-        
-        # self.print_sol()
-        print ('R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (), self.calc_sol_cost()) )
-        self.reduce_cost ()
-        # self.print_sol()
-        print ('R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (), self.calc_sol_cost()) )
+            R = (ub+lb)/2
+            self.bottom_up(R) 
+            
+            if (not(self.found_sol())):
+                lb = R
+                
+            else:
+                # self.print_sol()
+                print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                self.reduce_cost ()
+                print ('after reduceCost: R = {}, phi = {}' .for mat (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                ub = R
         
         return
     
@@ -386,7 +396,7 @@ class SFC_mig_simulator (object):
         
         # init a(s), the number of available CPU in each server 
         for s in self.G.nodes():
-            self.G.nodes[s]['a'] = self.R * self.G.nodes[s]['cpu cap']
+            self.G.nodes[s]['a'] = R * self.G.nodes[s]['cpu cap']
     
         # init self.Y (the placement to be found).
         # self.Y[u][s] = True will indicate that user u is placed on server s     

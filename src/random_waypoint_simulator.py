@@ -25,7 +25,7 @@ VERBOSE_EVENTS_AND_PERIODICAL = 3 # Write to a file users' APs upon either a use
 
 EPSILON = 0.0001
 
-class my_mobility_simulator (object):
+class random_waypoint_simulator (object):
     """
     Event-driven mobility simulator.
     Users randomly move within a square, using a random waypoint model.
@@ -262,7 +262,7 @@ class my_mobility_simulator (object):
         self.T_BETWEEN_PERIODICAL_EVENTS = 0.1 # time between sequencing prints of all usrs' locations        
 
 if __name__ == "__main__":
-    sim = my_mobility_simulator ()
+    sim = random_waypoint_simulator ()
     sim.print_APs_flag  = True
     sim.print_locs_flag = True # For printing also users' locations. Currently un-supported, because finding fresh accurate users' location requires complicated calculations.
     sim.print_trajectory_of_usr = 0 # Print the trajectory of the requested user. For plotting no trajectories, assign -1.   

@@ -6,8 +6,8 @@ import time
 import random
 
 from printf import printf
-import Check_sol
-import obj_func
+# import Check_sol
+# import obj_func
 from _overlapped import NULL
 # from solve_problem_by_Cplex import solve_problem_by_Cplex
 from networkx.algorithms.threshold import shortest_path
@@ -129,22 +129,23 @@ class SFC_mig_simulator (object):
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
-        for u in self.usr:
-            slack = [u['target delay'] -  u['delay to PoA'] - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
+        for usr in self.usr:
+            slack = [usr['target delay'] -  usr['delay to PoA'] - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
             slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
             #u['L'] = -1 # Highest server which is delay-feasible for u
-            u['B'] = [] # u['B'] will hold a list of the budgets required for placing u on each level 
-            mu = np.array ([math.floor(u['theta times lambda'][i]) + 1 for i in range (len(u['theta times lambda']))]) # minimal feasible budget
+            usr['B'] = [] # usr['B'] will hold a list of the budgets required for placing u on each level 
+            mu = np.array ([math.floor(usr['theta times lambda'][i]) + 1 for i in range (len(usr['theta times lambda']))]) # minimal feasible budget
             lvl = 0 
             for lvl in range(len(slack)):
-                while (sum(mu) <= u['C_u']): # The SLA still allows increasing this user's CPU allocation
-                    if (sum (1 / (mu[i] - u['theta times lambda'][i]) for i in range(len(mu))) <= slack[lvl]):  
-                        u['B'].append(sum(mu))
+                while (sum(mu) <= usr['C_u']): # The SLA still allows increasing this user's CPU allocation
+                    if (sum (1 / (mu[i] - usr['theta times lambda'][i]) for i in range(len(mu))) <= slack[lvl]):  
+                        usr['B'].append(sum(mu))
                         # Can save now the exact vector mu; for now, no need for that, as we're interested only in the sum
                         break
-                    argmax = np.argmax (np.array ([1 / (mu[i] - u['theta times lambda'][i]) - 1 / (mu[i] + 1 - u['theta times lambda'][i]) for i in range(len(mu))]))
+                    argmax = np.argmax (np.array ([1 / (mu[i] - usr['theta times lambda'][i]) - 1 / (mu[i] + 1 - usr['theta times lambda'][i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
-        
+            usr['L'] = lvl # usr['L'] holds the highest lvl on which it's possible to locate this usr
+            
         # for u in range(len (self.usr)):
         #     print ('mu[{}] = {}' .format (u, self.usr[u]['B']))
 
@@ -183,6 +184,8 @@ class SFC_mig_simulator (object):
                     
                 elif (splitted_line[1] == "C_u"):              
                     self.usr[u]['C_u'] = int (line.split("=")[1].rstrip())
+                    
+                self.usr[u]['id'] = u
                     
         self.usr = np.delete (self.usr, [i for i in range(self.MAX_NUM_OF_USRS) if i>u])
                                                          
@@ -382,7 +385,7 @@ class SFC_mig_simulator (object):
                 # self.print_sol()
                 print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 self.reduce_cost ()
-                print ('after reduceCost: R = {}, phi = {}' .for mat (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 ub = R
         
         return
@@ -409,31 +412,40 @@ class SFC_mig_simulator (object):
     
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels
             lvl = self.G.nodes[s]['lvl']
-            for u in self.G.nodes[s]['Hs']: # for each chain in Hs
-                if (self.usr[u]['placed']): # chain was already placed
+#             Hs = [self.usr[u] for u in self.G.nodes[s]['Hs']]
+            Hs = sorted ([self.usr[u] for u in self.G.nodes[s]['Hs']], key = lambda usr : usr['L'])
+            for usr in Hs: # for each chain in Hs
+                if (usr['placed']): # chain was already placed
                     continue
-                if (self.G.nodes[s]['a'] > self.usr[u]['B'][lvl]): 
-                    self.Y[u][s] = True
-                    self.Y_lvl_of[u] = lvl 
-                    self.usr[u]['placed'] = True
-                    self.G.nodes[s]['a'] -= self.usr[u]['B'][lvl]
-                elif (len (self.usr[u]['B']) == lvl):
+                if (self.G.nodes[s]['a'] > usr['B'][lvl]): 
+                    self.Y[usr['id']][s] = True
+                    self.Y_lvl_of[usr['id']] = lvl 
+                    usr['placed'] = True
+                    self.G.nodes[s]['a'] -= usr['B'][lvl]
+                elif (len (usr['B']) == lvl):
                     self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
                     return
                  
    
     def rd_AP_line (self, line):
+        """
+        Read a line in an ".ap" file.
+        An AP file details for each time t, the current AP of each user.
+        The user number and its current AP are written as a tuple. e.g.: 
+        (3, 2) means that user 3 is currently covered by user 2.
+        After reading the tuples, the function assigns each chain to its relevant list of chains, H-s.  
+        """
         splitted_line = line[0].split ("\n")[0].split (")")
         for tuple in splitted_line:
             tuple = tuple.split("(")
             if (len(tuple) > 1):
                 tuple   = tuple[1].split (",")
-                usr_id = int(tuple[0])
+                usr_id  = int(tuple[0])
                 if (usr_id > len (self.usr)-1):
                     print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (tuple[0], len(self.usr)))
                     exit  ()
-                usr     = self.usr[usr_id]
-                AP_id      = int(tuple[1])
+                usr   = self.usr[usr_id]
+                AP_id = int(tuple[1])
                 if (AP_id > self.num_of_leaves):
                     print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
                     exit  ()

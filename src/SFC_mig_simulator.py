@@ -4,6 +4,7 @@ import math
 import itertools 
 import time
 import random
+import heapq
 
 from printf import printf
 # import Check_sol
@@ -13,6 +14,15 @@ from _overlapped import NULL
 from networkx.algorithms.threshold import shortest_path
 from cmath import sqrt
 from numpy import int
+
+class usr_c (object):
+    """
+    class for of "user" 
+    """ 
+    def __init__ (self, cur_id):
+        self.cur_id = cur_id
+    def __lt__ (self, other):
+        return (self.cur_cpu < other.cur_cpu)
 
 class SFC_mig_simulator (object):
 
@@ -69,6 +79,46 @@ class SFC_mig_simulator (object):
         for s in self.G.nodes():
             print ('{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usr)) if self.Y[u][s] ] ))
         
+    def push_up (self):
+        """
+        Push chains up: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
+        Do that when chains are sorted in a decreasing order of the # of CPU units they currently use.
+        """
+        
+        # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
+        # before calling push-up ()
+        usrs_heap = []
+        for usr in self.usr: #range (len(self.usr)):
+            usr2push = usr_c(usr['id'])
+            usr2push.cur_cpu = usr['B'][self.Y_lvl_of[usr['id']]]  
+            
+            heapq.heappush(usrs_heap, usr2push) 
+        # while (1):
+        #     for u in range(len(self.usr)):
+        #         usr = self.usr[u]       
+        #         for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
+        #             if (self.G.nodes[usr['S_u'][lvl]]['a'] >= usr['B'][lvl]): # if there's enough available space to move u to level lvl 
+        #                 reduction = self.calc_chain_cost_homo (self.Y_lvl_of[u], self.not_X[u][usr['S_u'][self.Y_lvl_of[u]]], usr) - self.calc_chain_cost_homo (lvl, self.not_X[u][usr['S_u'][lvl]], usr)
+        #                 if (reduction > max_reduction):  
+        #                     u_star = u
+        #                     lvl_star = lvl
+        #                     max_reduction = reduction 
+        #     if (max_reduction == 0): # cannot decrease cost anymore
+        #         break
+        #
+        #     # move u_star from lvl to lvl_star, and update Y, a, accordingly
+        #     usr2mov            = self.usr[u_star]
+        #     old_lvl_of_usr2mov = self.Y_lvl_of[u_star]
+        #     self.G.nodes [usr2mov['S_u'][old_lvl_of_usr2mov]] ['a'] += usr2mov ['B'][old_lvl_of_usr2mov] # inc the available CPU at the prev loc of the moved usr  
+        #     self.G.nodes [usr2mov['S_u'][lvl_star]]           ['a'] -= usr2mov ['B'][lvl_star]           # dec the available CPU at the new  loc of the moved usr  
+        #     self.Y_lvl_of[u_star] = lvl_star # update self.Y_lvl_of accordingly. Note: we don't update self.Y for now.
+        #     # print ('u_star = {}, lvl_star = {}, max_reduction = {}' .format(u_star, lvl_star, max_reduction))
+        #
+        # # Update self.Y
+        # self.Y = self.reset_sol () 
+        # for u in range(len(self.usr)):
+        #     usr = self.usr[u]       
+        #     self.Y[u] [usr['S_u'][self.Y_lvl_of[u]] ] = True   
          
     def reduce_cost (self):
         """
@@ -385,7 +435,7 @@ class SFC_mig_simulator (object):
             else:
                 # self.print_sol(R)
                 print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
-                self.reduce_cost ()
+                self.push_up ()
                 print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 ub = R
         

@@ -58,13 +58,14 @@ class SFC_mig_simulator (object):
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
 
-    def print_sol (self):
+    def print_sol (self, R):
         """
         print a formatted solution for the allocation and placement prob' 
         """
-        used_cpu_in = self.used_cpu_in ()
+        used_cpu_in = self.used_cpu_in (R)
         print ('\\\ format: s : used / C_s   chains[u1, u2, ...]')
         print ('\\\ where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.' )
+        print ('Rsrc aug = {:.2f}', R)
         for s in self.G.nodes():
             print ('{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usr)) if self.Y[u][s] ] ))
         
@@ -382,7 +383,7 @@ class SFC_mig_simulator (object):
                 lb = R
                 
             else:
-                # self.print_sol()
+                # self.print_sol(R)
                 print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 self.reduce_cost ()
                 print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
@@ -412,11 +413,8 @@ class SFC_mig_simulator (object):
     
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels
             lvl = self.G.nodes[s]['lvl']
-#             Hs = [self.usr[u] for u in self.G.nodes[s]['Hs']]
-            Hs = sorted ([self.usr[u] for u in self.G.nodes[s]['Hs']], key = lambda usr : usr['L'])
-            for usr in Hs: # for each chain in Hs
-                if (usr['placed']): # chain was already placed
-                    continue
+            Hs = [self.usr[u] for u in self.G.nodes[s]['Hs'] if (not(self.usr[u]['placed']))]
+            for usr in sorted (Hs, key = lambda usr : usr['L']): # for each chain in Hs, in an increasing order of level ('L')                   
                 if (self.G.nodes[s]['a'] > usr['B'][lvl]): 
                     self.Y[usr['id']][s] = True
                     self.Y_lvl_of[usr['id']] = lvl 

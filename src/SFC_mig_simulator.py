@@ -24,6 +24,8 @@ class usr_c (object):
     def __lt__ (self, other):
         return (self.cur_cpu < other.cur_cpu)
 
+
+
 class SFC_mig_simulator (object):
 
     # An inline function that returns the parent of a given server

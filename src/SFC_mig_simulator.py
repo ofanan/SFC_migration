@@ -19,8 +19,9 @@ class usr_c (object):
     """
     class for of "user" 
     """ 
-    def __init__ (self, cur_id):
-        self.cur_id = cur_id
+    def __init__ (self, id, cur_cpu = -1):
+        self.id      = id
+        self.cur_cpu = cur_cpu
     def __lt__ (self, other):
         return (self.cur_cpu < other.cur_cpu)
 
@@ -91,11 +92,14 @@ class SFC_mig_simulator (object):
         # before calling push-up ()
         usrs_heap = []
         for usr in self.usr: #range (len(self.usr)):
-            usr2push = usr_c(usr['id'])
-            usr2push.cur_cpu = usr['B'][self.Y_lvl_of[usr['id']]]  
-            
-            heapq.heappush(usrs_heap, usr2push) 
-        # while (1):
+            heapq.heappush(usrs_heap, usr_c(id = usr['id'], cur_cpu = usr['B'][self.Y_lvl_of[usr['id']]])) 
+
+        while (1):
+            usr = heapq.nlargest (1, usrs_heap)
+            usr = usr[0]
+            # for lvl in range ()
+            # print (usr.id)
+            exit ()
         #     for u in range(len(self.usr)):
         #         usr = self.usr[u]       
         #         for lvl in range(len (usr['B'])): # for each level in which there's a delay-feasible server for this usr
@@ -436,9 +440,9 @@ class SFC_mig_simulator (object):
                 
             else:
                 # self.print_sol(R)
-                print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                # print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 self.push_up ()
-                print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                # print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 ub = R
         
         return
@@ -470,6 +474,7 @@ class SFC_mig_simulator (object):
                 if (self.G.nodes[s]['a'] > usr['B'][lvl]): 
                     self.Y[usr['id']][s] = True
                     self.Y_lvl_of[usr['id']] = lvl 
+                    usr['lvl'] = lvl
                     usr['placed'] = True
                     self.G.nodes[s]['a'] -= usr['B'][lvl]
                 elif (len (usr['B']) == lvl):

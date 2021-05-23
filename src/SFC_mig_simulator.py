@@ -18,6 +18,10 @@ from numpy import int
 
 class SFC_mig_simulator (object):
 
+
+    #############################################################################
+    # Inline functions
+    #############################################################################
     # An inline function that returns the parent of a given server
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
@@ -29,10 +33,10 @@ class SFC_mig_simulator (object):
     # and uniform cost for all servers at the same layer.
     calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + (not (self.X[usr.id][usr.S_u[usr.lvl]])) * self.uniform_mig_cost * len (usr.theta_times_lambda) + self.CPU_cost_at_lvl[lvl] * usr.B[lvl]    
           
-    # An inline func' for calculating the (maximal) rsrc aug' used by the current solution
+    # Calculate the (maximal) rsrc aug' used by the current solution
     calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
          
-    # An inline func' for calculating the CPU used in practice in each server in the current solution
+    # Valculate the CPU used in practice in each server in the current solution
     used_cpu_in = lambda self, R : [(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
 
     # calculate the cost of the current solution (self.Y)
@@ -88,16 +92,19 @@ class SFC_mig_simulator (object):
         # before calling push-up ()
         usrs_heap = []
         for usr in self.usrs: #range (len(self.usrs)):
-            usr2push = usr_c(id = usr.id) 
-            heapq.heappush(usrs_heap, usr_c(id = usr.id, cur_cpu = usr.B[usr.lvl])) 
+            heapq.heappush(usrs_heap, usr)
+            print (usr.B) 
 
-         
+        while True:
+            usr = heapq.nlargest(1, usrs_heap)[0]
+            for lvl in range (usr.lvl+1, len(usr.B)): 
+                print ('usr {}, prev lvl = {}, suggested lvl = {}' .format(usr.id, usr.lvl, lvl))
+     
     def reduce_cost (self):
         """
         Reduce cost alg': take a feasible solution, and greedily decrease the cost 
         by changing the placement of a single chain, using a gradient method, as long as this is possible.
-        """
-        
+        """        
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling reduce_cost ()
         while (1):
@@ -234,8 +241,8 @@ class SFC_mig_simulator (object):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
-        self.G                  = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
-        self.NUM_OF_SERVERS     = self.G.number_of_nodes()
+        self.G                 = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
+        self.NUM_OF_SERVERS    = self.G.number_of_nodes()
         self.CPU_cap_at_lvl    = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
@@ -310,7 +317,6 @@ class SFC_mig_simulator (object):
         # Network parameters
         self.tree_height            = 2
         self.children_per_node      = 2 # num of children of every non-leaf node
-        self.uniform_link_capacity  = 100
         self.uniform_mig_cost       = 1
         self.Lmax                   = 0
         self.uniform_Tpd            = 2
@@ -384,9 +390,12 @@ class SFC_mig_simulator (object):
             
             if (self.found_sol()):
                 # self.print_sol(R)
-                print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
-                self.reduce_cost ()
-                print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                # print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                # self.reduce_cost ()
+                # print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                # print ('B4 push-up: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                self.push_up ()
+                # print ('after push-up: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 ub = R
         
             else:
@@ -461,8 +470,7 @@ class SFC_mig_simulator (object):
         for chain in range(self.NUM_OF_CHAINS):
             total_cost += self.CPU_cost[self.chain_nxt_loc[chain]] * self.chain_nxt_total_alloc[chain] + \
                         self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
-                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self.
-_in_chain[chain]] + \
+                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self._in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
             
     def print_vars (self):

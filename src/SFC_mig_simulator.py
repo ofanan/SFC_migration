@@ -22,7 +22,7 @@ class SFC_mig_simulator (object):
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
     # # Find the server on which a given user is located, by its lvl
-    loc_of_user = lambda self, u : self.usr[u].S_u[self.usr[u].lvl]
+    loc_of_user = lambda self, u : self.usrs[u].S_u[self.usrs[u].lvl]
 
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
@@ -36,23 +36,23 @@ class SFC_mig_simulator (object):
     used_cpu_in = lambda self, R : [(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
 
     # calculate the cost of the current solution (self.Y)
-    calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usr])
+    calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
    
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
-    calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usr]) / np.min ([np.min (usr.B) for usr in self.usr])
+    calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
     # Returns True iff the solution self.Y schedules all the chain.
     # Note: the function does NOT check whether self.Y adheres to all the constraints (e.g., CPU cap', link cap', delay).
     # This is assumed to be True by construction.
-    found_sol = lambda self: sum (sum (self.Y)) >= len (self.usr)
+    found_sol = lambda self: sum (sum (self.Y)) >= len (self.usrs)
 
     def reset_sol (self):
         """"reset the solution, including:
         - self.Y (init it to a matrix of "False")
         - usr.lvl
         """
-        self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
-        for usr in self.usr:
+        self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
+        for usr in self.usrs:
             usr.lvl = -1
 
 
@@ -62,7 +62,7 @@ class SFC_mig_simulator (object):
         print the cost of each chain. 
         """
         
-        for usr in self.usr:
+        for usr in self.usrs:
             chain_cost = self.calc_chain_cost_homo (usr, usr.lvl)  
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
@@ -76,7 +76,7 @@ class SFC_mig_simulator (object):
         print ('\\\ where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.' )
         print ('Rsrc aug = {:.2f}' .format(R))
         for s in self.G.nodes():
-            print ('{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usr)) if self.Y[u][s] ] ))
+            print ('{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
         
     def push_up (self):
         """
@@ -87,7 +87,7 @@ class SFC_mig_simulator (object):
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling push-up ()
         usrs_heap = []
-        for usr in self.usr: #range (len(self.usr)):
+        for usr in self.usrs: #range (len(self.usrs)):
             usr2push = usr_c(id = usr.id) 
             heapq.heappush(usrs_heap, usr_c(id = usr.id, cur_cpu = usr.B[usr.lvl])) 
 
@@ -102,8 +102,8 @@ class SFC_mig_simulator (object):
         # before calling reduce_cost ()
         while (1):
             lvl_star = -1; max_reduction = 0 # init default values for the maximal reduction cost func', and for the argmax indices 
-            for u in range(len(self.usr)):
-                usr = self.usr[u]       
+            for u in range(len(self.usrs)):
+                usr = self.usrs[u]       
                 for lvl in range(len (usr.B)): # for each level in which there's a delay-feasible server for this usr
                     if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl 
                         reduction = self.calc_chain_cost_homo (usr, usr.lvl) - self.calc_chain_cost_homo (usr, lvl)
@@ -122,9 +122,9 @@ class SFC_mig_simulator (object):
             usr2mov.lvl                                       = lvl_star # update usr.lvl accordingly. Note: we don't update self.Y for now.
         
         # Update self.Y
-        self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+        self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
  
-        for usr in self.usr:
+        for usr in self.usrs:
             self.Y[usr.id][usr.S_u[usr.lvl]] = True   
     
         
@@ -136,7 +136,7 @@ class SFC_mig_simulator (object):
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
-        for usr in self.usr:
+        for usr in self.usrs:
             slack = [usr.target_delay - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
             slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
             #u.L = -1 # Highest server which is delay-feasible for u
@@ -153,16 +153,16 @@ class SFC_mig_simulator (object):
                     mu[argmax] = mu[argmax] + 1
             usr.L = lvl # usr.L holds the highest lvl on which it's possible to locate this usr
             
-        # for u in range(len (self.usr)):
-        #     print ('mu[{}] = {}' .format (u, self.usr[u]B))
+        # for u in range(len (self.usrs)):
+        #     print ('mu[{}] = {}' .format (u, self.usrs[u]B))
 
     def rd_usr_data (self):
         """
         Read the input about the users (target_delay, traffic), and write it to the appropriate fields in self.
-        The input data is read from the file self.usr_loc_file_name. 
+        The input data is read from the file self.usrs_loc_file_name. 
         """
-        usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
-        self.usr = []
+        usrs_data_file = open ("../res/" + self.usrss_data_file_name,  "r")
+        self.usrs = []
         
         for line in usrs_data_file: 
     
@@ -174,21 +174,21 @@ class SFC_mig_simulator (object):
 
             if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
                 id = int(splitted_line[0].split("u")[1])
-                self.usr.append (usr_c(id = id))
+                self.usrs.append (usr_c(id = id))
 
             elif (splitted_line[0] == "theta_times_lambda"):
                 theta_times_lambda = line.split("=")[1].rstrip().split(",")
-                self.usr[id].theta_times_lambda = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
+                self.usrs[id].theta_times_lambda = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
 
             elif (splitted_line[0] == "target_delay"):              
-                self.usr[id].target_delay = float (line.split("=")[1].rstrip())
+                self.usrs[id].target_delay = float (line.split("=")[1].rstrip())
               
             elif (splitted_line[0] == "mig_cost"):              
                 mig_cost = line.split("=")[1].rstrip().split(",")
-                self.usr[id].mig_cost = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
+                self.usrs[id].mig_cost = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
                 
             elif (splitted_line[0] == "C_u"):              
-                self.usr[id].C_u = int (line.split("=")[1].rstrip())
+                self.usrs[id].C_u = int (line.split("=")[1].rstrip())
                             
     def loc2ap (self):
         """
@@ -196,8 +196,8 @@ class SFC_mig_simulator (object):
         Read the input about the users locations, 
         and write the appropriate user-to-PoA connections to the file self.ap_file
         """
-        self.ap_file  = open ("../res/" + self.usr_loc_file_name.split(".")[0] + ".ap", "w+")  
-        usrs_loc_file = open ("../res/" + self.usr_loc_file_name,  "r") 
+        self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
+        usrs_loc_file = open ("../res/" + self.usrs_loc_file_name,  "r") 
         printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
             
         for line in usrs_loc_file: 
@@ -316,9 +316,9 @@ class SFC_mig_simulator (object):
         self.Lmax                   = 0
         self.uniform_Tpd            = 2
         self.uniform_link_cost      = 1
-        self.usrs_data_file_name    = "res.usr" #input file containing the target_delays and traffic of all users
-        self.usr_loc_file_name      = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
-        self.usr_ap_file_name       = 'mob_sim.ap' #input file containing the APs of all users along the simulation
+        self.usrss_data_file_name    = "res.usr" #input file containing the target_delays and traffic of all users
+        self.usrs_loc_file_name      = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
+        self.usrs_ap_file_name       = 'mob_sim.ap' #input file containing the APs of all users along the simulation
         self.gen_parameterized_tree ()
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
         self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
@@ -331,16 +331,16 @@ class SFC_mig_simulator (object):
         self.CPUAll_once ()       
 
         # reset S_u, Hs        
-        for usr in self.usr:
+        for usr in self.usrs:
             usr.S_u = [] 
         for s in self.G.nodes():
             self.G.nodes[s]['Hs'] = []
 
-        self.ap_file  = open ("../res/" + self.usr_ap_file_name, "r")  
+        self.ap_file  = open ("../res/" + self.usrs_ap_file_name, "r")  
 
         # init self.X (current placement).
         # self.X[u][s] = True will indicate that user u is placed on server s     
-        self.X = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+        self.X = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
 
         for line in self.ap_file: 
 
@@ -365,7 +365,7 @@ class SFC_mig_simulator (object):
         self.not_X = np.invert (self.X)
         
  
-        calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usr]) / np.min ([np.min (usr.B) for usr in self.usr])
+        calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
         R = self.calc_upr_bnd_rsrc_aug () 
         self.bottom_up (R)
@@ -411,14 +411,14 @@ class SFC_mig_simulator (object):
                 
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
-            Hs = [self.usr[u] for u in self.G.nodes[s]['Hs'] if (self.usr[u].lvl == -1)]
+            Hs = [self.usrs[u] for u in self.G.nodes[s]['Hs'] if (self.usrs[u].lvl == -1)]
             for usr in sorted (Hs, key = lambda usr : usr.L): # for each chain in Hs, in an increasing order of level ('L')                   
                 if (self.G.nodes[s]['a'] > usr.B[lvl]): 
                     self.Y[usr.id][s] = True
                     usr.lvl = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
                 elif (len (usr.B) == lvl):
-                    self.Y = np.zeros ([len (self.usr), len (self.G.nodes())], dtype = 'bool')
+                    self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
                     return
                  
    
@@ -436,10 +436,10 @@ class SFC_mig_simulator (object):
             if (len(tuple) > 1):
                 tuple   = tuple[1].split (",")
                 usr_id  = int(tuple[0])
-                if (usr_id > len (self.usr)-1):
-                    print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (tuple[0], len(self.usr)))
+                if (usr_id > len (self.usrs)-1):
+                    print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (tuple[0], len(self.usrs)))
                     exit  ()
-                usr   = self.usr[usr_id]
+                usr   = self.usrs[usr_id]
                 AP_id = int(tuple[1])
                 if (AP_id > self.num_of_leaves):
                     print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))

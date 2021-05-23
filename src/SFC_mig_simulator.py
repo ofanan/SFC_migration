@@ -102,8 +102,7 @@ class SFC_mig_simulator (object):
         # before calling reduce_cost ()
         while (1):
             lvl_star = -1; max_reduction = 0 # init default values for the maximal reduction cost func', and for the argmax indices 
-            for u in range(len(self.usrs)):
-                usr = self.usrs[u]       
+            for usr in self.usrs:
                 for lvl in range(len (usr.B)): # for each level in which there's a delay-feasible server for this usr
                     if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl 
                         reduction = self.calc_chain_cost_homo (usr, usr.lvl) - self.calc_chain_cost_homo (usr, lvl)

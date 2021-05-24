@@ -71,21 +71,29 @@ class SFC_mig_simulator (object):
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
 
+    def init_log_file (self):
+        """
+        Open the log file for writing and write initial comments line on it
+        """
+        with open('../res/' + self.log_file_name, 'w') as self.log_output_file:
+            self.log_output_file.write('')                
+        self.log_output_file  = open ('../res/' + self.log_file_name,  "w")
+        printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]')
+        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.' )
+
     def print_sol (self, R):
         """
-        print a formatted solution for the allocation and placement prob' 
+        print a solution for DPM to the output log file 
         """
+        printf (self.log_output_file, 'R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
         used_cpu_in = self.used_cpu_in (R)
-        print ('// format: s : used / C_s   chains[u1, u2, ...]')
-        print ('// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.' )
-        print ('Rsrc aug = {:.2f}' .format(R))
         for s in self.G.nodes():
-            print ('{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
+            printf (self.log_output_file, '{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
         
     def push_up (self):
         """
         Push chains up: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
-        Do that when chains are sorted in a decreasing order of the # of CPU units they currently use.
+        Do that when chains are sorted in a decreasing order of the # of CPU units they're currently using.
         """
         
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
@@ -100,12 +108,12 @@ class SFC_mig_simulator (object):
         while True:
             usr = heapq.nlargest(1, usrs_heap)[0]
             for lvl in range (len(usr.B)-1, usr.lvl+1, -1): 
-                # print ('usr {}, prev lvl = {}, suggested lvl = {}' .format(usr.id, usr.lvl, lvl))
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     usr.lvl = lvl # update usr.lvl accordingly. Note: we don't update self.Y for now.
-                    heapq.heappush(usrs_heap, usr) # push usr back to the heap; after more users move, maybe it will be possible to push this user further up
+                    if (lvl < len(usr.B)-1): # If this is still not the highest delay-feasible server for this server...
+                        heapq.heappush(usrs_heap, usr) # push usr back to the heap; after more users move maybe it will be possible to push this user further up
                     stop_cntr = 0 # succeeded to push-up a user, so reset the cntr
             stop_cntr += 1
             if (stop_cntr == len (self.usrs)): # didn't suucceed to push-up any user
@@ -326,20 +334,30 @@ class SFC_mig_simulator (object):
         self.verbose                = verbose
         
         # Network parameters
-        self.tree_height            = 2
-        self.children_per_node      = 2 # num of children of every non-leaf node
-        self.uniform_mig_cost       = 1
-        self.Lmax                   = 0
-        self.uniform_Tpd            = 2
-        self.uniform_link_cost      = 1
-        self.usrss_data_file_name    = "res.usr" #input file containing the target_delays and traffic of all users
-        self.usrs_loc_file_name      = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name       = 'mob_sim.ap' #input file containing the APs of all users along the simulation
+        self.tree_height           = 2
+        self.children_per_node     = 2 # num of children of every non-leaf node
+        self.uniform_mig_cost      = 1
+        self.Lmax                  = 0
+        self.uniform_Tpd           = 2
+        self.uniform_link_cost     = 1
+        
+        # Names of input files for the users' data, locations and / or current access points
+        self.usrss_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
+        self.usrs_loc_file_name    = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
+        self.usrs_ap_file_name     = 'mob_sim.ap' #input file containing the APs of all users along the simulation
+        
+        # Names of output files
+        self.log_file_name         = "run.log" 
+        self.res_file_name         = "run.res" 
         self.gen_parameterized_tree ()
+
+        # Flags indicators for writing output to results and log files
+        self.write_to_cfg_file = False
+        self.write_to_log_file = True
+        
+        # Flags indicators for writing output to various LP solvers
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
-        self.write_to_py_file  = True # When true, will write to Py file, checking the feasibility and cost of a suggested sol'.  
         self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
-        self.write_to_cfg_file = True
         self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
 
     def simulate (self):
@@ -352,10 +370,12 @@ class SFC_mig_simulator (object):
         for s in self.G.nodes():
             self.G.nodes[s]['Hs'] = []
 
+        # Open input and output files
         self.ap_file  = open ("../res/" + self.usrs_ap_file_name, "r")  
+        if (self.write_to_log_file):
+            self.init_log_file()
 
-        # init self.X (current placement).
-        # self.X[u][s] = True will indicate that user u is placed on server s     
+        # init self.X (current placement): self.X[u][s] = True will indicate that user u is placed on server s     
         self.X = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
 
         for line in self.ap_file: 
@@ -389,11 +409,9 @@ class SFC_mig_simulator (object):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
                    
-        self.print_sol(R)
         ub = R # upper-bnd on the rsrc aug' that may be required
         lb = 1
         
-        print ('R = {}' .format (R))
         while ub > lb + 0.5:
             
             R = (ub+lb)/2
@@ -404,10 +422,10 @@ class SFC_mig_simulator (object):
                 # print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 # self.reduce_cost ()
                 # print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
-                print ('B4 push-up: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                printf (self.log_output_file, 'B4 push-up')
                 self.print_sol(R)
                 self.push_up ()
-                print ('after push-up: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
+                printf (self.log_output_file, 'After push-up')
                 self.print_sol(R)
                 ub = R
         

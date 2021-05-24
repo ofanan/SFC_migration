@@ -85,10 +85,10 @@ class SFC_mig_simulator (object):
         """
         print a solution for DPM to the output log file 
         """
-        printf (self.log_output_file, 'R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
+        printf (self.log_output_file, 'used R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
         used_cpu_in = self.used_cpu_in (R)
         for s in self.G.nodes():
-            printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
+            printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [usr.id for usr in self.usrs if self.Y[usr.id][s] ] ))
 
     def print_heap (self):
         for usr in self.usrs:
@@ -108,16 +108,13 @@ class SFC_mig_simulator (object):
         n = 0  
         while n < len (self.usrs):
             usr = self.usrs[n]
-            for lvl in range (len(usr.B)-1, usr.lvl+1, -1): #  
+            for lvl in range (len(usr.B)-1, usr.lvl, -1): #  
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
-                    print ('R = {}, moving usr id {}' .format (R, usr.id))
-                    if (self.G.nodes [usr.S_u[usr.lvl]]     ['a'] > R * self.G.nodes [usr.S_u[usr.lvl]]['cpu cap'] ):
-                        print ('Bingo2')
-                        exit ()
+                    # print ('R = {:.2f}, moving usr id {}' .format (R, usr.id))
                     # print ('b4')
-                    self.print_heap()
+                    # self.print_heap()
                     usr.lvl = lvl # update usr.lvl accordingly. Note: we don't update self.Y for now.
                     
                     # update the moved usr's location in the heap
@@ -134,16 +131,7 @@ class SFC_mig_simulator (object):
                     n = -1 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             n += 1
-        printf (self.log_output_file, 'finished push_up\n')
-        for s in range (len (self.G.nodes)):
-            printf (self.log_output_file, 's{}, R*Cs = {}, a = {:.2f}\n' .format (s, R * self.G.nodes[s]['cpu cap'], self.G.nodes[s]['a']))
-        printf (self.log_output_file, '\n')
-        
-        # for s in self.G.nodes():
-        #     print ('s{} : Hs = {}' .format (s, self.G.nodes[s]['Hs']))
-        # for usr in self.usrs:
-        #     print ('u{} : S_u = {}' .format (usr.id, usr.S_u))
-                    
+                            
     def reduce_cost (self):
         """
         Reduce cost alg': take a feasible solution, and greedily decrease the cost 
@@ -211,10 +199,9 @@ class SFC_mig_simulator (object):
                         break
                     argmax = np.argmax (np.array ([1 / (mu[i] - usr.theta_times_lambda[i]) - 1 / (mu[i] + 1 - usr.theta_times_lambda[i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
-            usr.L = lvl # usr.L holds the highest lvl on which it's possible to locate this usr
             
-        # for u in range(len (self.usrs)):
-        #     print ('mu[{}] = {}' .format (u, self.usrs[u]B))
+        # for usr in self.usrs:
+        #     print ('u{}.B = {}' .format (usr.id, usr.B))
 
     def rd_usr_data (self):
         """
@@ -450,6 +437,7 @@ class SFC_mig_simulator (object):
         while ub > lb + 0.5:
             
             R = (ub+lb)/2
+            printf (self.log_output_file, 'designed R = {}' .format(R))
             self.bottom_up(R) 
             
             if (self.found_sol()):
@@ -492,9 +480,8 @@ class SFC_mig_simulator (object):
                 
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
-            #Hs = [self.usrs[u] for u in self.G.nodes[s]['Hs'] if (self.usrs[u].lvl == -1)]
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
-            for usr in sorted (Hs, key = lambda usr : usr.L): # for each chain in Hs, in an increasing order of level ('L')                   
+            for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')                   
                 if (self.G.nodes[s]['a'] > usr.B[lvl]): 
                     self.Y[usr.id][s] = True
                     usr.lvl = lvl
@@ -583,6 +570,9 @@ if __name__ == "__main__":
     # Gen static LP problem
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = 0)
+    # for lvl in range (2, 1, -1): 
+    #     print ('lvl = ', lvl)  
+
     my_simulator.simulate()
     # my_simulator.calc_SS_sol_total_cost ()
     # my_simulator.check_greedy_alg ()

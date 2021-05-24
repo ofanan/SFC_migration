@@ -78,17 +78,17 @@ class SFC_mig_simulator (object):
         with open('../res/' + self.log_file_name, 'w') as self.log_output_file:
             self.log_output_file.write('')                
         self.log_output_file  = open ('../res/' + self.log_file_name,  "w")
-        printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]')
-        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.' )
+        printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
+        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
     def print_sol (self, R):
         """
         print a solution for DPM to the output log file 
         """
-        printf (self.log_output_file, 'R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
+        printf (self.log_output_file, 'R = {}, phi = {}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
         used_cpu_in = self.used_cpu_in (R)
         for s in self.G.nodes():
-            printf (self.log_output_file, '{}: {} / {}\t chains {}' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
+            printf (self.log_output_file, '{}: {} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
         
     def push_up (self):
         """
@@ -112,7 +112,7 @@ class SFC_mig_simulator (object):
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     usr.lvl = lvl # update usr.lvl accordingly. Note: we don't update self.Y for now.
-                    if (lvl < len(usr.B)-1): # If this is still not the highest delay-feasible server for this server...
+                    if (lvl == len(usr.B)-1): # If we pushed the usr to the highest  is still not the highest delay-feasible server for this server...
                         heapq.heappush(usrs_heap, usr) # push usr back to the heap; after more users move maybe it will be possible to push this user further up
                     stop_cntr = 0 # succeeded to push-up a user, so reset the cntr
             stop_cntr += 1
@@ -422,10 +422,10 @@ class SFC_mig_simulator (object):
                 # print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 # self.reduce_cost ()
                 # print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
-                printf (self.log_output_file, 'B4 push-up')
+                printf (self.log_output_file, 'B4 push-up\n')
                 self.print_sol(R)
                 self.push_up ()
-                printf (self.log_output_file, 'After push-up')
+                printf (self.log_output_file, 'After push-up\n')
                 self.print_sol(R)
                 ub = R
         

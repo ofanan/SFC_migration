@@ -12,4 +12,4 @@ class usr_c (object):
         self.lvl = -1
          
     def __lt__ (self, other):
-        return (self.cur_cpu < other.cur_cpu)
+        return (self.B[self.lvl] < other.B[other.lvl])

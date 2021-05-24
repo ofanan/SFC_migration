@@ -85,10 +85,15 @@ class SFC_mig_simulator (object):
         """
         print a solution for DPM to the output log file 
         """
-        printf (self.log_output_file, 'R = {}, phi = {}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
+        printf (self.log_output_file, 'R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
         used_cpu_in = self.used_cpu_in (R)
         for s in self.G.nodes():
-            printf (self.log_output_file, '{}: {} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
+            printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [u for u in range (len(self.usrs)) if self.Y[u][s] ] ))
+
+    def print_heap (self):
+        for usr in self.usrs:
+            print ('id = {}, lvl = {}, CPU = {}' .format (usr.id, usr.lvl, usr.B[usr.lvl]))
+        print ('')
         
     def push_up (self):
         """
@@ -98,26 +103,46 @@ class SFC_mig_simulator (object):
         
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling push-up ()
-        usrs_heap = []
-        for usr in self.usrs: #range (len(self.usrs)):
-            heapq.heappush(usrs_heap, usr)
-
+        # usrs_heap = []
+        # for usr in self.usrs: #range (len(self.usrs)):
+            # heapq.heap
+            # heapq.heappush(usrs_heap, usr)
+        # for usr in self.usrs:
+        #     print (usr.id)
+        heapq._heapify_max(self.usrs)
+ 
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling reduce_cost ()
-        stop_cntr = 0 # will cnt continuum number of usrs that we didn't succeed to push-up  
-        while True:
-            usr = heapq.nlargest(1, usrs_heap)[0]
-            for lvl in range (len(usr.B)-1, usr.lvl+1, -1): 
+        stop_cntr = 0 # will cnt continuum number of usrs that we didn't succeed to push-up
+        n = 0  
+        while n < len (self.usrs):
+            usr = self.usrs[n]#.copy()
+            for lvl in range (len(usr.B)-1, usr.lvl+1, -1): #  
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
+                    print ('b4')
+                    print ('moving usr id ', usr.id)
+                    self.print_heap()
                     usr.lvl = lvl # update usr.lvl accordingly. Note: we don't update self.Y for now.
-                    if (lvl == len(usr.B)-1): # If we pushed the usr to the highest  is still not the highest delay-feasible server for this server...
-                        heapq.heappush(usrs_heap, usr) # push usr back to the heap; after more users move maybe it will be possible to push this user further up
-                    stop_cntr = 0 # succeeded to push-up a user, so reset the cntr
-            stop_cntr += 1
-            if (stop_cntr == len (self.usrs)): # didn't suucceed to push-up any user
-                break
+                    # stop_cntr = 0 # succeeded to push-up a user, so reset the cntr
+                    
+                    # update the moved usr's location in the heap
+                    self.usrs[n] = self.usrs[-1] # replace the usr to push-up with the last usr in the heap
+                    self.usrs.pop()
+                    #self.print_heap()
+                    heapq.heappush(self.usrs, usr)
+                    print ('after')
+                    self.print_heap()
+                    # print ('n = ', n)
+                    # heapq._siftup_max(self.usrs, n)
+                    # heapq._siftdown_max(self.usrs, 0, n)
+                    
+                    n = -1 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
+                    break
+            n += 1
+            print ('n = ', n)
+        print ('finished push_up\n')
                     
     def reduce_cost (self):
         """
@@ -147,6 +172,16 @@ class SFC_mig_simulator (object):
             usr2mov.lvl                                       = lvl_star # update usr.lvl accordingly. Note: we don't update self.Y for now.
         
         # Update self.Y
+        self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
+ 
+        for usr in self.usrs:
+            self.Y[usr.id][usr.S_u[usr.lvl]] = True   
+
+    
+    def update_Y (self):
+        """
+        Update the solution Y according to the values of the field ".lvl" in each usr
+        """
         self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
  
         for usr in self.usrs:

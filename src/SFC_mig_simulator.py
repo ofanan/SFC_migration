@@ -95,7 +95,7 @@ class SFC_mig_simulator (object):
             print ('id = {}, lvl = {}, CPU = {}' .format (usr.id, usr.lvl, usr.B[usr.lvl]))
         print ('')
         
-    def push_up (self):
+    def push_up (self, R):
         """
         Push chains up: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
         Do that when chains are sorted in a decreasing order of the # of CPU units they're currently using.
@@ -103,37 +103,30 @@ class SFC_mig_simulator (object):
         
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling push-up ()
-        # usrs_heap = []
-        # for usr in self.usrs: #range (len(self.usrs)):
-            # heapq.heap
-            # heapq.heappush(usrs_heap, usr)
-        # for usr in self.usrs:
-        #     print (usr.id)
         heapq._heapify_max(self.usrs)
  
-        # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
-        # before calling reduce_cost ()
-        stop_cntr = 0 # will cnt continuum number of usrs that we didn't succeed to push-up
         n = 0  
         while n < len (self.usrs):
-            usr = self.usrs[n]#.copy()
+            usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl+1, -1): #  
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
-                    print ('b4')
-                    print ('moving usr id ', usr.id)
+                    print ('R = {}, moving usr id {}' .format (R, usr.id))
+                    if (self.G.nodes [usr.S_u[usr.lvl]]     ['a'] > R * self.G.nodes [usr.S_u[usr.lvl]]['cpu cap'] ):
+                        print ('Bingo2')
+                        exit ()
+                    # print ('b4')
                     self.print_heap()
                     usr.lvl = lvl # update usr.lvl accordingly. Note: we don't update self.Y for now.
-                    # stop_cntr = 0 # succeeded to push-up a user, so reset the cntr
                     
                     # update the moved usr's location in the heap
                     self.usrs[n] = self.usrs[-1] # replace the usr to push-up with the last usr in the heap
                     self.usrs.pop()
                     #self.print_heap()
                     heapq.heappush(self.usrs, usr)
-                    print ('after')
-                    self.print_heap()
+                    # print ('after')
+                    # self.print_heap()
                     # print ('n = ', n)
                     # heapq._siftup_max(self.usrs, n)
                     # heapq._siftdown_max(self.usrs, 0, n)
@@ -141,8 +134,15 @@ class SFC_mig_simulator (object):
                     n = -1 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             n += 1
-            print ('n = ', n)
-        print ('finished push_up\n')
+        printf (self.log_output_file, 'finished push_up\n')
+        for s in range (len (self.G.nodes)):
+            printf (self.log_output_file, 's{}, R*Cs = {}, a = {:.2f}\n' .format (s, R * self.G.nodes[s]['cpu cap'], self.G.nodes[s]['a']))
+        printf (self.log_output_file, '\n')
+        
+        # for s in self.G.nodes():
+        #     print ('s{} : Hs = {}' .format (s, self.G.nodes[s]['Hs']))
+        # for usr in self.usrs:
+        #     print ('u{} : S_u = {}' .format (usr.id, usr.S_u))
                     
     def reduce_cost (self):
         """
@@ -459,7 +459,7 @@ class SFC_mig_simulator (object):
                 # print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
                 printf (self.log_output_file, 'B4 push-up\n')
                 self.print_sol(R)
-                self.push_up ()
+                self.push_up (R)
                 printf (self.log_output_file, 'After push-up\n')
                 self.print_sol(R)
                 ub = R
@@ -469,6 +469,13 @@ class SFC_mig_simulator (object):
                 lb = R
                 
         return
+
+    # def update_used_cpu (self):
+    #     # init a(s), the number of available CPU in each server 
+    #     for s in self.G.nodes():
+    #         self.G.nodes[s]['used'] = R * self.G.nodes[s]['cpu cap']
+                
+
     
     def bottom_up (self, R):
         """
@@ -485,7 +492,8 @@ class SFC_mig_simulator (object):
                 
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
-            Hs = [self.usrs[u] for u in self.G.nodes[s]['Hs'] if (self.usrs[u].lvl == -1)]
+            #Hs = [self.usrs[u] for u in self.G.nodes[s]['Hs'] if (self.usrs[u].lvl == -1)]
+            Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
             for usr in sorted (Hs, key = lambda usr : usr.L): # for each chain in Hs, in an increasing order of level ('L')                   
                 if (self.G.nodes[s]['a'] > usr.B[lvl]): 
                     self.Y[usr.id][s] = True
@@ -521,11 +529,15 @@ class SFC_mig_simulator (object):
 
                 s = self.ap2s[AP_id]
                 usr.S_u.append (s)
-                self.G.nodes[s]['Hs'].append(usr_id)
+                self.G.nodes[s]['Hs'].append(usr)
                 for lvl in (range (len(usr.B)-1)):
                     s = self.parent_of(s)
                     usr.S_u.append (s)
-                    self.G.nodes[s]['Hs'].append(usr_id)
+                    self.G.nodes[s]['Hs'].append(usr)
+        # for s in self.G.nodes():
+        #     print ('s{} : Hs = {}' .format (s, self.G.nodes[s]['Hs']))
+        # for usr in self.usrs:
+        #     print ('u{} : S_u = {}' .format (usr.id, usr.S_u))
                         
 
     def calc_SS_sol_total_cost (self):

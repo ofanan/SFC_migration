@@ -111,16 +111,11 @@ class SFC_mig_simulator (object):
         used_cpu_in = np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])
         
         for s in self.G.nodes():
-            # printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (
-            #         s, #self.G.nodes[s]['cur RCs'], # 
-            #          - sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ] ), 
-            #         [usr.id for usr in self.usrs if self.Y[usr.id][s] ] ))
-            printf (self.log_output_file, '{} : ' .format (s))
-            # printf (self.log_output_file, '{:.0f} / '.format (self.G.nodes[s]['cur RCs'] - 
-            #                                                sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ]) ))
-            printf (self.log_output_file, '{:.0f} / '.format (sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ] )))
-            printf (self.log_output_file, '{}' .format (self.G.nodes[s]['cpu cap'])) 
-            printf (self.log_output_file, '\t chains {}\n' .format ([usr.id for usr in self.usrs if self.Y[usr.id][s] ]))
+            printf (self.log_output_file, '{} : {:.0f} / {}\t chains {}\n' .format (
+                    s,
+                    sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ] ),
+                    self.G.nodes[s]['cpu cap'],
+                    [usr.id for usr in self.usrs if self.Y[usr.id][s] ]))
 
     def print_heap (self):
         for usr in self.usrs:

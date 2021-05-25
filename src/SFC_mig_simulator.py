@@ -310,7 +310,6 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['id'] = s
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
-                # self.G.nodes[s]['AP id'] = self.num_of_leaves
                 self.ap2s[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
@@ -430,20 +429,29 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
-        R = self.calc_upr_bnd_rsrc_aug () 
-        self.bottom_up (R)
+        max_R = self.calc_upr_bnd_rsrc_aug () 
+        
+        # init cur RCs and a(s) to the number of available CPU in each server, assuming maximal rsrc aug' 
+        for s in self.G.nodes():
+            self.G.nodes[s]['cur RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
+            self.G.nodes[s]['a']       = self.G.nodes[s]['cur RCs'] #currently-available rsrcs at server s  
+
+        self.bottom_up ()
         if (not(self.found_sol())):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
                    
-        ub = R # upper-bnd on the rsrc aug' that may be required
-        lb = 1
-        
-        while ub > lb + 0.5:
+        ub = np.array([self.G.nodes[s]['cur Rcs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
+        lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
+        while True:
             
-            R = (ub+lb)/2
-            printf (self.log_output_file, 'designed R = {}\n' .format(R))
-            self.bottom_up(R) 
+            for s in self.G.nodes():
+                self.G.nodes[s]['a'] = [math.ceil ( 0.5*(ub[s] + lb[s])) for s in self.G.nodes()] 
+            if (np.array([self.G.nodes[s]['a'] for s in self.G.nodes()]) == np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])).all():
+                break
+            self.bottom_up() 
+            printf (self.log_output_file, 'designed R = {}\n' .format())
+            dummy = 0
             
             if (self.found_sol()):
                 if (self.verbose == VERBOSE_RES_AND_LOG):
@@ -462,7 +470,7 @@ class SFC_mig_simulator (object):
                 
         return
 
-    def bottom_up (self, R):
+    def bottom_up (self):
         """
         Bottom-up alg'. 
         Looks for a feasible sol'.
@@ -471,10 +479,6 @@ class SFC_mig_simulator (object):
         
         self.reset_sol()
 
-        # init a(s), the number of available CPU in each server 
-        for s in self.G.nodes():
-            self.G.nodes[s]['a'] = R * self.G.nodes[s]['cpu cap']
-                
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]

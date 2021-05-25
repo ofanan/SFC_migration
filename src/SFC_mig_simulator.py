@@ -131,22 +131,12 @@ class SFC_mig_simulator (object):
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
-                    # print ('R = {:.2f}, moving usr id {}' .format (R, usr.id))
-                    # print ('b4')
-                    # self.print_heap()
                     usr.lvl = lvl # update usr.lvl accordingly. Note: we don't update self.Y for now.
                     
                     # update the moved usr's location in the heap
                     self.usrs[n] = self.usrs[-1] # replace the usr to push-up with the last usr in the heap
                     self.usrs.pop()
-                    #self.print_heap()
                     heapq.heappush(self.usrs, usr)
-                    # print ('after')
-                    # self.print_heap()
-                    # print ('n = ', n)
-                    # heapq._siftup_max(self.usrs, n)
-                    # heapq._siftdown_max(self.usrs, 0, n)
-                    
                     n = -1 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             n += 1
@@ -183,7 +173,6 @@ class SFC_mig_simulator (object):
  
         for usr in self.usrs:
             self.Y[usr.id][usr.S_u[usr.lvl]] = True   
-
     
     def update_Y (self):
         """
@@ -192,8 +181,7 @@ class SFC_mig_simulator (object):
         self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
  
         for usr in self.usrs:
-            self.Y[usr.id][usr.S_u[usr.lvl]] = True   
-    
+            self.Y[usr.id][usr.S_u[usr.lvl]] = True    
         
     def CPUAll_once (self): 
         """
@@ -219,9 +207,6 @@ class SFC_mig_simulator (object):
                     argmax = np.argmax (np.array ([1 / (mu[i] - usr.theta_times_lambda[i]) - 1 / (mu[i] + 1 - usr.theta_times_lambda[i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
             
-        # for usr in self.usrs:
-        #     print ('u{}.B = {}' .format (usr.id, usr.B))
-
     def rd_usr_data (self):
         """
         Read the input about the users (target_delay, traffic), and write it to the appropriate fields in self.
@@ -432,6 +417,8 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
 
             if (splitted_line[0] == "time"):
+                if (self.verbose == VERBOSE_RES_AND_LOG):
+                    printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))
                 continue
         
 
@@ -443,11 +430,6 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
-        self.not_X = np.invert (self.X)
-        
- 
-        calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
-
         R = self.calc_upr_bnd_rsrc_aug () 
         self.bottom_up (R)
         if (not(self.found_sol())):
@@ -460,17 +442,18 @@ class SFC_mig_simulator (object):
         while ub > lb + 0.5:
             
             R = (ub+lb)/2
-            printf (self.log_output_file, 'designed R = {}' .format(R))
+            printf (self.log_output_file, 'designed R = {}\n' .format(R))
             self.bottom_up(R) 
             
             if (self.found_sol()):
                 if (self.verbose == VERBOSE_RES_AND_LOG):
-                    printf (self.log_output_file, 'B4 push-up\n')
+                    printf (self.log_output_file, 'B4 push-up: ')
                     self.print_sol(R)
                 self.push_up (R)
                 if (self.verbose == VERBOSE_RES_AND_LOG):
-                    printf (self.log_output_file, 'After push-up\n')
+                    printf (self.log_output_file, 'After push-up: ')
                     self.print_sol(R)
+                print ('R = {:.2f}, ub = {:.2f}, lb = {:.2f}' .format (R, ub, lb))
                 ub = R
         
             else:

@@ -41,9 +41,6 @@ class SFC_mig_simulator (object):
     # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
     calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
          
-    # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
-    calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
-         
     # Valculate the CPU used in practice in each server in the current solution
     used_cpu_in = lambda self, R : [(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
 
@@ -92,8 +89,6 @@ class SFC_mig_simulator (object):
         Open the res file for writing and write initial comments line on it
         """
         self.res_output_file = self.init_output_file(self.res_file_name)
-        printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
-        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
     def init_log_file (self):
         """
@@ -101,13 +96,13 @@ class SFC_mig_simulator (object):
         """
         self.log_output_file = self.init_output_file(self.log_file_name)
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
-        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
+        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s.\n//C_s = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
     def print_sol (self):
         """
         print a solution for DPM to the output log file 
         """
-        # printf (self.log_output_file, 'used R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
+        printf (self.log_output_file, 'phi = {:.0f}\n' .format (self.calc_sol_cost()))
         used_cpu_in = np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])
         
         for s in self.G.nodes():

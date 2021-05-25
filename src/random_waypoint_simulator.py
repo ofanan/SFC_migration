@@ -25,6 +25,13 @@ VERBOSE_EVENTS_AND_PERIODICAL = 3 # Write to a file users' APs upon either a use
 
 EPSILON = 0.0001
 
+class mobile_usr (object):
+    """
+    class of "mobile user" 
+    """ 
+    def __init__ (self, id):
+        self.id      = id
+         
 class random_waypoint_simulator (object):
     """
     Event-driven mobility simulator.
@@ -52,48 +59,48 @@ class random_waypoint_simulator (object):
     
     # Update the location of a usr. New location is calculated as: 
     # last_updated_location + time_since_last_location_update * directional_speed, for each dimension (that is, X and Y).
-    update_loc = lambda self, usr : usr['cur loc'] + (self.cur_time - usr['last update time']) * usr['speed']
+    update_loc = lambda self, usr : usr.cur_loc + (self.cur_time - usr.last_update_time) * usr.speed
       
     def start_mov_usr (self, usr):
         """
         Start a move of a usr: 
-        - Pick the destination (usr['final loc']) u.a.r from the area
+        - Pick the destination (usr.final_loc) u.a.r from the area
         - Generate an event for the arrival to the destination, and insert it into the eventQ.
         - If the destination is within the coverage area of another AP, generate an additional event, for the migration to that AP.
         """
 
-        usr['final loc'] = self.edge * np.random.rand (2)  # destination of movement
-        usr['final ap'        ] = self.loc2ap (usr['final loc'])
+        usr.final_loc = self.edge * np.random.rand (2)  # destination of movement
+        usr.final_ap  = self.loc2ap (usr.final_loc)
         self.calc_usr_speed(usr)
         self.eventQ.append ({'event type'   : EVENT_T_ARRIVE,
-                             'time'         : self.arr_t (usr['cur loc'], usr['final loc'], usr['max speed']),
+                             'time'         : self.arr_t (usr.cur_loc, usr.final_loc, usr.max_speed),
                              'usr'          : usr
                              })
-        if (usr['final ap' ] == usr['cur ap']): # the move is within the coverage of the current AP - no need to schedule additional events 
+        if (usr.final_ap == usr.cur_ap): # the move is within the coverage of the current AP - no need to schedule additional events 
             return
         self.mov_usr (usr)
 
     def calc_usr_speed (self, usr): 
         """
         Calculate the projectory of the speed of a given usr in each direction, as follows:
-        - pick a speed u.a.r. from [usr['min speed'], usr['max speed']].
+        - pick a speed u.a.r. from [usr['min speed'], usr.max_speed].
         - calculate the projection of the speed on the X, Y axes; take into the account (speed[x] is negative when the direction is to smaller x; same with speed[y]). 
-        - Write the speed to usr['speed']  
+        - Write the speed to usr.speed  
         """
-        speed = random.uniform (usr['min speed'], usr['max speed']) 
-        theta = np.arctan (abs( (usr['final loc'][Y] - usr['cur loc'][Y]) / (usr['final loc'][X] - usr['cur loc'][X]) )) # angle of progression
-        usr['speed'] = np.array ([math.cos(theta)*usr['max speed'], math.sin(theta)*usr['max speed']])  #Projection of the speed on the X, Y, direction
-        usr['speed'] = np.array([usr['speed'][dim] if (usr['final loc'][dim] > usr['cur loc'][dim]) else -usr['speed'][dim] for dim in [X,Y]])        
+        speed = random.uniform (usr.min_speed, usr.max_speed) 
+        theta = np.arctan (abs( (usr.final_loc[Y] - usr.cur_loc[Y]) / (usr.final_loc[X] - usr.cur_loc[X]) )) # angle of progression
+        usr.speed = np.array ([math.cos(theta) * usr.max_speed, math.sin(theta) * usr.max_speed])  #Projection of the speed on the X, Y, direction
+        usr.speed = np.array([usr.speed[dim] if (usr.final_loc[dim] > usr.cur_loc[dim]) else -usr.speed[dim] for dim in [X,Y]])        
 
     def mov_usr (self, usr):        
         time_to_mig = np.ones(2) * np.inf
         for dim in (X,Y): # for each dimension
-            lower_borderline = self.cell_edge * math.floor(usr['cur loc'][dim] / self.cell_edge)
-            offset = usr['cur loc'][dim] % self.cell_edge # offset of the usr's current location within its current cell
-            if (usr['final loc'][dim] < lower_borderline):
-                time_to_mig[dim] = offset / abs(usr['speed'][dim])
-            elif (usr['final loc'][dim] > lower_borderline + self.cell_edge):
-                time_to_mig[dim] = (self.cell_edge - offset) / abs(usr['speed'][dim])
+            lower_borderline = self.cell_edge * math.floor(usr.cur_loc[dim] / self.cell_edge)
+            offset = usr.cur_loc[dim] % self.cell_edge # offset of the usr's current location within its current cell
+            if (usr.final_loc[dim] < lower_borderline):
+                time_to_mig[dim] = offset / abs(usr.speed[dim])
+            elif (usr.final_loc[dim] > lower_borderline + self.cell_edge):
+                time_to_mig[dim] = (self.cell_edge - offset) / abs(usr.speed[dim])
 
         time_to_mig = min (time_to_mig)
         if (time_to_mig == np.inf): # the final destination is within the current cell - no need to schedule a future mig' event
@@ -119,31 +126,34 @@ class random_waypoint_simulator (object):
         Print the exact locations - namely, (x,y) coordinates, of each user.
         Currently unused.
         """
-        printf (self.loc_output_file, 'time = {:.4f} : \n' .format (self.cur_time)) 
+        printf (self.loc_output_file, 'time = {:.2f} : \n' .format (self.cur_time)) 
 
-        for usr in self.usr: 
-            usr['cur loc']          = self.update_loc (usr) 
-            usr['last update time'] = self.cur_time
-            printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (usr['id'], usr['cur loc'][X], usr['cur loc'][Y]))
+        for usr in self.usrs: 
+            usr.cur_loc          = self.update_loc (usr) 
+            usr.last_update_time = self.cur_time
+            printf (self.loc_output_file, 'usr {} {:.1f} {:.1f}\n' .format (usr.id, usr.cur_loc[X], usr.cur_loc[Y]))
         printf (self.loc_output_file, '\n')    
 
     def print_APs (self):
         """
         Print the current time, and the list of the IDs of APS currently covering each AP. 
         """        
-        printf (self.ap_output_file, 'time = {:.4f} :\n' .format (self.cur_time)) 
-        for u in range(self.NUM_OF_USRS):
-            printf (self.ap_output_file, '({},{})' .format (u, self.usr[u]['cur ap']))
+        if (self.last_printed_APs == np.array([usr.cur_ap for usr in self.usrs])).all():
+            return 
+        printf (self.ap_output_file, 'time = {:.2f} :\n' .format (self.cur_time)) 
+        for usr in self.usrs:
+            printf (self.ap_output_file, '({},{})' .format (usr.id, usr.cur_ap))
         printf (self.ap_output_file, '\n')
+        self.last_printed_APs = [usr.cur_ap for usr in self.usrs]
             
     def print_output (self):
         if (self.print_APs_flag):
             self.print_APs()
         if (self.print_locs_flag):
             self.print_locs()  
-        if (self.print_trajectory_of_usr >= 0): # and any ([self.usr[self.print_trajectory_of_usr]['speed'][dim] > 0 for dim in [X,Y]])):
-            printf (self.trajectory_output_file, '({:.2f}, {:.2f})' .format (self.usr[self.print_trajectory_of_usr]['cur loc'][X],
-                                                                             self.usr[self.print_trajectory_of_usr]['cur loc'][Y]
+        if (self.print_trajectory_of_usr >= 0): # and any ([self.usrs[self.print_trajectory_of_usr][speed][dim] > 0 for dim in [X,Y]])):
+            printf (self.trajectory_output_file, '({:.2f}, {:.2f})' .format (self.usrs[self.print_trajectory_of_usr].cur_loc[X],
+                                                                             self.usrs[self.print_trajectory_of_usr].cur_loc[Y]
                                                                              ))        
             
     def simulate (self, verbose):
@@ -185,9 +195,9 @@ class random_waypoint_simulator (object):
                                          'time'   : self.T_BETWEEN_PERIODICAL_EVENTS})                 
                
         # Start move the usrs   
-        for usr in self.usr:
+        for usr in self.usrs:
             self.eventQ.append ({'event type' : EVENT_T_START_MOV,
-                                 'time'       : random.uniform(usr['min stnd time'], usr['max stnd time']), 
+                                 'time'       : random.uniform(usr.min_stnd_time, usr.max_stnd_time), 
                                  'usr'        : usr
                                  })
     
@@ -202,25 +212,25 @@ class random_waypoint_simulator (object):
         
                 if (event['event type'] == EVENT_T_MIG):
                     usr = event['usr']  
-                    usr ['cur loc'         ] = self.update_loc (usr)
-                    usr ['cur ap'          ] = self.loc2ap (usr['cur loc'])
-                    usr ['last update time'] = self.cur_time
+                    usr.cur_loc = self.update_loc (usr)
+                    usr.cur_ap  = self.loc2ap (usr.cur_loc)
+                    usr.last_update_time = self.cur_time
                     if (self.verbose == 1 or self.verbose == 3):
                         self.print_output ()
                     self.mov_usr (usr) 
                 elif (event['event type'] == EVENT_T_ARRIVE):
                     usr = event['usr']  
-                    usr ['cur loc'         ] = usr['final loc']
-                    usr ['last update time'] = self.cur_time
-                    usr ['speed'           ] = np.zeros (2)
+                    usr.cur_loc = usr.final_loc
+                    usr.last_update_time = self.cur_time
+                    usr.speed            = np.zeros (2)
                     self.eventQ.append ({'event type' : EVENT_T_START_MOV,
-                                         'time'       : self.cur_time + random.uniform(usr['min stnd time'], usr['max stnd time']),
+                                         'time'       : self.cur_time + random.uniform(usr.min_stnd_time, usr.max_stnd_time),
                                          'usr'        : usr
                                          })
-                    if (usr['id'] == self.print_trajectory_of_usr):
+                    if (usr.id == self.print_trajectory_of_usr):
                         printf (self.trajectory_output_file, '\n\n')
                 elif (event['event type'] == EVENT_T_START_MOV):
-                    usr['last update time'] = self.cur_time
+                    usr.last_update_time = self.cur_time
                     self.start_mov_usr(event['usr'])
                 elif (event['event type'] == EVENT_T_PERIODICAL):
                     self.print_output()
@@ -241,20 +251,19 @@ class random_waypoint_simulator (object):
         self.cell_edge = self.edge / self.num_of_APs_in_row # Edge of a single square cell, exclusively covered by a single AP.
         self.NUM_OF_USRS  = 8
 
-        self.usr = [{} for u in range (self.NUM_OF_USRS)]
-        for u in range (self.NUM_OF_USRS):
-            self.usr[u] = {'id'               : u,
-                           'min speed'        : 30 / 3.6,
-                           'max speed'        : 80 / 3.6,                            
-                           'min stnd time'    : 0.5,
-                           'max stnd time'    : 1.5,
-                           'cur loc'          : np.random.rand (2) * self.edge,
-                           'last update time' : 0.0,  # last time were location was calculated 
-                           'speed'            : np.zeros(2) # positional speed to [X,Y] directional. Initialized to zero 
-                            }  # speed [m/sec]
-            self.usr[u]['final loc'] = self.usr[u]['cur loc'] 
-            self.usr[u]['cur ap']    = self.loc2ap (self.usr[u]['cur loc'])
-        
+        self.usrs = [mobile_usr(id = id) for id in range (self.NUM_OF_USRS)]
+        for usr in self.usrs:
+            usr.min_speed        = 30 / 3.6
+            usr.max_speed        = 80 / 3.6
+            usr.min_stnd_time    = 0.5                             
+            usr.max_stnd_time    = 1.5
+            usr.cur_loc          = np.random.rand (2) * self.edge
+            usr.last_update_time = 0.0 # last time were location was calculated
+            usr.speed            = np.zeros(2) # positional speed to [X,Y] directional. Initialized to zero speed [m/sec]
+            usr.final_lco        = usr.cur_loc 
+            usr.cur_ap           = self.loc2ap (usr.cur_loc)
+
+        self.last_printed_APs    = np.zeros (self.NUM_OF_USRS, dtype = 'int8')        
         self.eventQ   = []
         self.cur_time = 0
         self.MAX_TIME = 20

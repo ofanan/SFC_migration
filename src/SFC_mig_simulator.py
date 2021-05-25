@@ -148,6 +148,7 @@ class SFC_mig_simulator (object):
                     n = -1 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             n += 1
+        self.update_Y()
                             
     def reduce_cost (self):
         """
@@ -448,6 +449,9 @@ class SFC_mig_simulator (object):
         if (not(self.found_sol())):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
+        # printf (self.log_output_file, 'After BU:\n') 
+        # self.print_sol()
+        # print (self.Y)
                    
         ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
@@ -461,7 +465,9 @@ class SFC_mig_simulator (object):
             for s in self.G.nodes():
                 self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
 
-            self.bottom_up() 
+            self.bottom_up()
+            # printf (self.log_output_file, 'After BU:\n') 
+            # self.print_sol()
 
             if (self.found_sol()):
                 ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
@@ -472,6 +478,10 @@ class SFC_mig_simulator (object):
         if (self.verbose == VERBOSE_RES_AND_LOG):
             printf (self.log_output_file, 'B4 push-up:\n')
             self.print_sol()
+            
+        # update the available capacity a at each server
+        for s in self.G.nodes():
+            self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ])
         self.push_up ()
         if (self.verbose == VERBOSE_RES_AND_LOG):
             printf (self.log_output_file, 'After push-up:\n')

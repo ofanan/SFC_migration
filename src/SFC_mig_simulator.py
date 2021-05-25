@@ -38,7 +38,10 @@ class SFC_mig_simulator (object):
     # and uniform cost for all servers at the same layer.
     calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + (not (self.X[usr.id][usr.S_u[usr.lvl]])) * self.uniform_mig_cost * len (usr.theta_times_lambda) + self.CPU_cost_at_lvl[lvl] * usr.B[lvl]    
           
-    # Calculate the (maximal) rsrc aug' used by the current solution
+    # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
+    calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
+         
+    # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
     calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
          
     # Valculate the CPU used in practice in each server in the current solution
@@ -100,12 +103,12 @@ class SFC_mig_simulator (object):
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
         printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
-    def print_sol (self, R):
+    def print_sol (self):
         """
         print a solution for DPM to the output log file 
         """
-        printf (self.log_output_file, 'used R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
-        used_cpu_in = self.used_cpu_in (R)
+        # printf (self.log_output_file, 'used R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
+        used_cpu_in = np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])
         for s in self.G.nodes():
             printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [usr.id for usr in self.usrs if self.Y[usr.id][s] ] ))
 
@@ -114,7 +117,7 @@ class SFC_mig_simulator (object):
             print ('id = {}, lvl = {}, CPU = {}' .format (usr.id, usr.lvl, usr.B[usr.lvl]))
         print ('')
         
-    def push_up (self, R):
+    def push_up (self):
         """
         Push chains up: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
         Do that when chains are sorted in a decreasing order of the # of CPU units they're currently using.
@@ -441,34 +444,34 @@ class SFC_mig_simulator (object):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
                    
-        ub = np.array([self.G.nodes[s]['cur Rcs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
+        ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
-        while True:
+        while True: 
             
             for s in self.G.nodes():
-                self.G.nodes[s]['a'] = [math.ceil ( 0.5*(ub[s] + lb[s])) for s in self.G.nodes()] 
+                self.G.nodes[s]['a'] = math.ceil (0.5*(ub[s] + lb[s])) 
             if (np.array([self.G.nodes[s]['a'] for s in self.G.nodes()]) == np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])).all():
                 break
+            
+            for s in self.G.nodes():
+                self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
             self.bottom_up() 
-            printf (self.log_output_file, 'designed R = {}\n' .format())
-            dummy = 0
+
+            # printf (self.log_output_file, 'designed R = {}\n' .format())
             
             if (self.found_sol()):
-                if (self.verbose == VERBOSE_RES_AND_LOG):
-                    printf (self.log_output_file, 'B4 push-up: ')
-                    self.print_sol(R)
-                self.push_up (R)
-                if (self.verbose == VERBOSE_RES_AND_LOG):
-                    printf (self.log_output_file, 'After push-up: ')
-                    self.print_sol(R)
-                print ('R = {:.2f}, ub = {:.2f}, lb = {:.2f}' .format (R, ub, lb))
-                ub = R
+                ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
         
             else:
-                print ('R = {}' .format (R))
-                lb = R
+                lb = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
                 
-        return
+        if (self.verbose == VERBOSE_RES_AND_LOG):
+            printf (self.log_output_file, 'B4 push-up: ')
+            self.print_sol()
+        self.push_up ()
+        if (self.verbose == VERBOSE_RES_AND_LOG):
+            printf (self.log_output_file, 'After push-up: ')
+            self.print_sol()
 
     def bottom_up (self):
         """
@@ -482,7 +485,8 @@ class SFC_mig_simulator (object):
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
-            for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')                   
+            for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
+                #print ('s = ', s, 'a = ', self.G.nodes[s]['a'], 'B = ', usr.B[lvl])                   
                 if (self.G.nodes[s]['a'] > usr.B[lvl]): 
                     self.Y[usr.id][s] = True
                     usr.lvl = lvl

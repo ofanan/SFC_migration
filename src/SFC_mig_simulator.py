@@ -109,8 +109,18 @@ class SFC_mig_simulator (object):
         """
         # printf (self.log_output_file, 'used R = {:.2f}, phi = {:.0f}\n' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()))
         used_cpu_in = np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])
+        
         for s in self.G.nodes():
-            printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (s, used_cpu_in[s], self.G.nodes[s]['cpu cap'], [usr.id for usr in self.usrs if self.Y[usr.id][s] ] ))
+            # printf (self.log_output_file, '{}: {:.0f} / {}\t chains {}\n' .format (
+            #         s, #self.G.nodes[s]['cur RCs'], # 
+            #          - sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ] ), 
+            #         [usr.id for usr in self.usrs if self.Y[usr.id][s] ] ))
+            printf (self.log_output_file, '{} : ' .format (s))
+            # printf (self.log_output_file, '{:.0f} / '.format (self.G.nodes[s]['cur RCs'] - 
+            #                                                sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ]) ))
+            printf (self.log_output_file, '{:.0f} / '.format (sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ] )))
+            printf (self.log_output_file, '{}' .format (self.G.nodes[s]['cpu cap'])) 
+            printf (self.log_output_file, '\t chains {}\n' .format ([usr.id for usr in self.usrs if self.Y[usr.id][s] ]))
 
     def print_heap (self):
         for usr in self.usrs:
@@ -455,10 +465,9 @@ class SFC_mig_simulator (object):
             
             for s in self.G.nodes():
                 self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
+
             self.bottom_up() 
 
-            # printf (self.log_output_file, 'designed R = {}\n' .format())
-            
             if (self.found_sol()):
                 ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
         
@@ -466,11 +475,11 @@ class SFC_mig_simulator (object):
                 lb = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
                 
         if (self.verbose == VERBOSE_RES_AND_LOG):
-            printf (self.log_output_file, 'B4 push-up: ')
+            printf (self.log_output_file, 'B4 push-up:\n')
             self.print_sol()
         self.push_up ()
         if (self.verbose == VERBOSE_RES_AND_LOG):
-            printf (self.log_output_file, 'After push-up: ')
+            printf (self.log_output_file, 'After push-up:\n')
             self.print_sol()
 
     def bottom_up (self):

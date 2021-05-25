@@ -237,9 +237,9 @@ class random_waypoint_simulator (object):
     def __init__ (self):
         
         self.edge = 100 # edge of the rectangle in which usr move [m]
-        self.num_of_APs_in_row = 7 # The total number of APs covering the (square) area is self.num_of_APs_in_row * self.num_of_APs_in_row 
+        self.num_of_APs_in_row = 2 # The total number of APs covering the (square) area is self.num_of_APs_in_row * self.num_of_APs_in_row 
         self.cell_edge = self.edge / self.num_of_APs_in_row # Edge of a single square cell, exclusively covered by a single AP.
-        self.NUM_OF_USRS  = 5
+        self.NUM_OF_USRS  = 8
 
         self.usr = [{} for u in range (self.NUM_OF_USRS)]
         for u in range (self.NUM_OF_USRS):

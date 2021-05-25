@@ -16,6 +16,11 @@ from networkx.algorithms.threshold import shortest_path
 from cmath import sqrt
 from numpy import int
 
+# Levels of verbose (which output is generated)
+VERBOSE_NO_OUTPUT             = 0
+VERBOSE_ONLY_RES              = 1 # Write to a file the total cost and rsrc aug. upon every event
+VERBOSE_RES_AND_LOG           = 2 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
+
 class SFC_mig_simulator (object):
 
 
@@ -70,14 +75,28 @@ class SFC_mig_simulator (object):
             chain_cost = self.calc_chain_cost_homo (usr, usr.lvl)  
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
+    def init_output_file (self, file_name):
+        """
+        Open an output file for writing, overwriting previous content in that file 
+        """
+        with open('../res/' + file_name, 'w') as FD:
+            FD.write('')                
+        FD  = open ('../res/' + file_name,  "w")
+        return FD
+
+    def init_res_file (self):
+        """
+        Open the res file for writing and write initial comments line on it
+        """
+        self.res_output_file = self.init_output_file(self.res_file_name)
+        printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
+        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
     def init_log_file (self):
         """
         Open the log file for writing and write initial comments line on it
         """
-        with open('../res/' + self.log_file_name, 'w') as self.log_output_file:
-            self.log_output_file.write('')                
-        self.log_output_file  = open ('../res/' + self.log_file_name,  "w")
+        self.log_output_file = self.init_output_file(self.log_file_name)
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
         printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s. C_S = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
@@ -208,7 +227,7 @@ class SFC_mig_simulator (object):
         Read the input about the users (target_delay, traffic), and write it to the appropriate fields in self.
         The input data is read from the file self.usrs_loc_file_name. 
         """
-        usrs_data_file = open ("../res/" + self.usrss_data_file_name,  "r")
+        usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
         self.usrs = []
         
         for line in usrs_data_file: 
@@ -363,19 +382,23 @@ class SFC_mig_simulator (object):
         self.uniform_Tpd           = 2
         self.uniform_link_cost     = 1
         
+        # INPUT / OUTPUT FILES
+        self.verbose = VERBOSE_RES_AND_LOG
+        
         # Names of input files for the users' data, locations and / or current access points
-        self.usrss_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
-        self.usrs_loc_file_name    = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name     = 'mob_sim.ap' #input file containing the APs of all users along the simulation
+        self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
+        self.usrs_loc_file_name   = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
+        self.usrs_ap_file_name    = 'mob_sim.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
-        self.log_file_name         = "run.log" 
-        self.res_file_name         = "run.res" 
+        if (self.verbose == VERBOSE_ONLY_RES or self.verbose == VERBOSE_RES_AND_LOG):
+            self.res_file_name     = "run.res" 
+        if (self.verbose == VERBOSE_RES_AND_LOG):
+            self.log_file_name = "run.log" 
         self.gen_parameterized_tree ()
 
         # Flags indicators for writing output to results and log files
         self.write_to_cfg_file = False
-        self.write_to_log_file = True
         
         # Flags indicators for writing output to various LP solvers
         self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
@@ -394,7 +417,7 @@ class SFC_mig_simulator (object):
 
         # Open input and output files
         self.ap_file  = open ("../res/" + self.usrs_ap_file_name, "r")  
-        if (self.write_to_log_file):
+        if (self.verbose == VERBOSE_RES_AND_LOG):
             self.init_log_file()
 
         # init self.X (current placement): self.X[u][s] = True will indicate that user u is placed on server s     
@@ -441,15 +464,13 @@ class SFC_mig_simulator (object):
             self.bottom_up(R) 
             
             if (self.found_sol()):
-                # self.print_sol(R)
-                # print ('B4 reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
-                # self.reduce_cost ()
-                # print ('after reduceCost: R = {}, phi = {}' .format (self.calc_sol_rsrc_aug (R), self.calc_sol_cost()) )
-                printf (self.log_output_file, 'B4 push-up\n')
-                self.print_sol(R)
+                if (self.verbose == VERBOSE_RES_AND_LOG):
+                    printf (self.log_output_file, 'B4 push-up\n')
+                    self.print_sol(R)
                 self.push_up (R)
-                printf (self.log_output_file, 'After push-up\n')
-                self.print_sol(R)
+                if (self.verbose == VERBOSE_RES_AND_LOG):
+                    printf (self.log_output_file, 'After push-up\n')
+                    self.print_sol(R)
                 ub = R
         
             else:
@@ -458,13 +479,6 @@ class SFC_mig_simulator (object):
                 
         return
 
-    # def update_used_cpu (self):
-    #     # init a(s), the number of available CPU in each server 
-    #     for s in self.G.nodes():
-    #         self.G.nodes[s]['used'] = R * self.G.nodes[s]['cpu cap']
-                
-
-    
     def bottom_up (self, R):
         """
         Bottom-up alg'. 
@@ -520,12 +534,8 @@ class SFC_mig_simulator (object):
                 for lvl in (range (len(usr.B)-1)):
                     s = self.parent_of(s)
                     usr.S_u.append (s)
-                    self.G.nodes[s]['Hs'].append(usr)
-        # for s in self.G.nodes():
-        #     print ('s{} : Hs = {}' .format (s, self.G.nodes[s]['Hs']))
-        # for usr in self.usrs:
-        #     print ('u{} : S_u = {}' .format (usr.id, usr.S_u))
-                        
+                    self.G.nodes[s]['Hs'].append(usr)                       
+
 
     def calc_SS_sol_total_cost (self):
         """

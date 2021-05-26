@@ -106,7 +106,7 @@ class SFC_mig_simulator (object):
         used_cpu_in = np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])
         
         for s in self.G.nodes():
-            printf (self.log_output_file, '{} : {:.0f} / {}\t chains {}\n' .format (
+            printf (self.log_output_file, 's{} : used cpu={:.0f}, Cs={}\t chains {}\n' .format (
                     s,
                     sum ([usr.B[usr.lvl] for usr in self.usrs if self.Y[usr.id][s] ] ),
                     self.G.nodes[s]['cpu cap'],
@@ -444,9 +444,9 @@ class SFC_mig_simulator (object):
         if (not(self.found_sol())):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
-        # printf (self.log_output_file, 'After BU:\n') 
-        # self.print_sol()
-        # print (self.Y)
+        if (self.verbose == VERBOSE_RES_AND_LOG):
+            printf (self.log_output_file, 'Initial solution:\n')
+            self.print_sol()
                    
         ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required

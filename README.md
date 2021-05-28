@@ -2,6 +2,12 @@
 
 This project provides simulator tools to test scenarios and algorithms for the migration of Service Function Chains (SFC). 
 
+# SFC migration simulator
+The file SFC_mig_simulator.py implements a simulator that does the following:
+- generates a tree network.
+- reads users' and mobility input data files.
+- runs our top-level algorithm for finding and efficient feasible solution.
+
 # Mobility simulator
 
 The file mobility_simulator.py implements a simple [random waypoint simulator](https://en.wikipedia.org/wiki/Random_waypoint_model). 

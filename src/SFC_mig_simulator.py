@@ -27,12 +27,15 @@ class SFC_mig_simulator (object):
     #############################################################################
     # Inline functions
     #############################################################################
-    # An inline function that returns the parent of a given server
+    # Returns the parent of a given server
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
     # # Find the server on which a given user is located, by its lvl
     loc_of_user = lambda self, u : self.usrs[u].S_u[self.usrs[u].lvl]
 
+    # calculate the cost of the current solution (self.Y)
+    calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
+   
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
@@ -41,12 +44,9 @@ class SFC_mig_simulator (object):
     # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
     calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
          
-    # Valculate the CPU used in practice in each server in the current solution
+    # Calculate the CPU used in practice in each server in the current solution
     used_cpu_in = lambda self, R : [(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
 
-    # calculate the cost of the current solution (self.Y)
-    calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
-   
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
@@ -56,7 +56,8 @@ class SFC_mig_simulator (object):
     found_sol = lambda self: sum (sum (self.Y)) >= len (self.usrs)
 
     def reset_sol (self):
-        """"reset the solution, including:
+        """"
+        reset the solution, including:
         - self.Y (init it to a matrix of "False")
         - usr.lvl
         """
@@ -67,7 +68,7 @@ class SFC_mig_simulator (object):
 
     def print_cost_per_usr (self):
         """
-        For debugging / analysing only.
+        For debugging / analysis:
         print the cost of each chain. 
         """
         
@@ -92,7 +93,7 @@ class SFC_mig_simulator (object):
 
     def init_log_file (self):
         """
-        Open the log file for writing and write initial comments line on it
+        Open the log file for writing and write initial comments lines on it
         """
         self.log_output_file = self.init_output_file(self.log_file_name)
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
@@ -113,6 +114,10 @@ class SFC_mig_simulator (object):
                     [usr.id for usr in self.usrs if self.Y[usr.id][s] ]))
 
     def print_heap (self):
+        """
+        print the id, level and CPU of each user in a heap.
+        Used for debugginign only.
+        """
         for usr in self.usrs:
             print ('id = {}, lvl = {}, CPU = {}' .format (usr.id, usr.lvl, usr.B[usr.lvl]))
         print ('')
@@ -285,7 +290,6 @@ class SFC_mig_simulator (object):
             
         printf(self.ap_file, "\n")
 
-            
     def gen_parameterized_tree (self):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
@@ -537,7 +541,7 @@ class SFC_mig_simulator (object):
                     self.G.nodes[s]['Hs'].append(usr)                       
 
 
-    def calc_SS_sol_total_cost (self):
+    def calc_sol_cost_SS (self):
         """
         Calculate the total cost of an SS (single-server pver-chain) full solution.
         """
@@ -584,7 +588,7 @@ if __name__ == "__main__":
     #     print ('lvl = ', lvl)  
 
     my_simulator.simulate()
-    # my_simulator.calc_SS_sol_total_cost ()
+    # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()
     # my_simulator.init_problem  ()
     #

@@ -1,0 +1,6 @@
+C:\Users\ofanan\eclipse\Sumo\bin\sumo -c dua.actuated.sumocfg --vtk-output vtk
+
+C:\Users\ofanan\eclipse\Sumo\bin\netconvert --sumo-net-file lust.net.xml --plai
+n-output-prefix plain --proj-plain-geo
+
+

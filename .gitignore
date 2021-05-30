@@ -20,3 +20,4 @@ src/obj_func.py
 .classpath
 build.xml
 
+/bin/

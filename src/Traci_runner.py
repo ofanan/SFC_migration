@@ -74,21 +74,21 @@ if __name__ == "__main__":
 
     # this script has been called from the command line. It will start sumo as a
     # server, then connect and run
-    if options.nogui:
-        sumoBinary = checkBinary('sumo')
-    else:
-        sumoBinary = checkBinary('sumo')
+    sumoBinary = checkBinary('sumo')
+    path_to_scenario = '../../LuSTScenario/scenario/'
 
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs
-    traci.start([sumoBinary, "-c", "scenario/due.actuated.sumocfg"]) #"--tripinfo-output", "tripinfo.xml"])
-    with open('gamad.pos', 'w') as FD:
+    traci.start([sumoBinary, "-c", path_to_scenario + "due.actuated.sumocfg"]) #"--tripinfo-output", "tripinfo.xml"])
+    with open('vehicles.pos', 'w') as FD:
         FD.write('')                
-    FD  = open ('gamad.pos',  "w")
+    FD  = open ('vehicles.pos',  "w")
     
+    num_of_simulated_secs = 3000
     num_of_vehicles = 0
+    step = 0
     veh_key2id = []
-    while traci.simulation.getMinExpectedNumber() > 0:
+    while (step < 3000 and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         printf (FD, 't = {:.2f}\n' .format (traci.simulation.getTime()))
         for veh_key in traci.vehicle.getIDList(): 
             filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id))
@@ -105,4 +105,5 @@ if __name__ == "__main__":
             printf (FD, "user {} \tID={}\t ({:.1f},{:.1f})\n" .format (veh_key, veh_id, position[0], position[1]))
             # exit ()
         traci.simulationStep()
+        step += 1
     run()

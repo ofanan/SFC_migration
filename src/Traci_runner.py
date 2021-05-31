@@ -21,10 +21,14 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import matplotlib.pyplot as plt
 import os
 import sys
 import optparse
 import random
+from sumolib import checkBinary  # noqa
+import traci  # noqa
+
 
 from printf import printf 
 
@@ -35,9 +39,8 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-from sumolib import checkBinary  # noqa
-import traci  # noqa
 
+filter_out = lambda id, list_of_ids: not (id in list_of_ids)
 
 
 def run():
@@ -70,6 +73,7 @@ def get_options():
 
 # this is the main entry point of this script
 if __name__ == "__main__":
+
     options = get_options()
 
     # this script has been called from the command line. It will start sumo as a
@@ -80,30 +84,49 @@ if __name__ == "__main__":
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs
     traci.start([sumoBinary, "-c", path_to_scenario + "due.actuated.sumocfg"]) #"--tripinfo-output", "tripinfo.xml"])
-    with open('vehicles.pos', 'w') as FD:
-        FD.write('')                
-    FD  = open ('vehicles.pos',  "w")
+    with open('vehicles.pos', 'w') as pos_output_file:
+        pos_output_file.write('')                
+    pos_output_file  = open ('vehicles.pos',  "w")
     
-    num_of_simulated_secs = 3000
-    num_of_vehicles = 0
-    step = 0
-    veh_key2id = []
-    while (step < 3000 and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
-        printf (FD, 't = {:.2f}\n' .format (traci.simulation.getTime()))
-        for veh_key in traci.vehicle.getIDList(): 
+    with open('traj.pos', 'w') as traj_output_file:
+        traj_output_file.write('')                
+    traj_output_file  = open ('traj.pos',  "w")
+    
+    
+    num_of_simulated_secs = 3600
+    num_of_vehicles       = 0
+    step                  = 0
+    veh_key2id            = [] # will hold pairs of (veh key, veh id)
+    ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
+    max_X_pos, max_Y_pos = 0, 0
+    X, Y = [], []
+
+    while (step < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
+        printf (pos_output_file, 't = {:.2f}\n' .format (traci.simulation.getTime()))
+        cur_list_of_vehicles = traci.vehicle.getIDList()
+        # list (filter (lambda veh : filter_out (veh['id'], cur_list_of_vehicles), veh_key2id)) #remove from the list all the
+        # ids2recycle = list (set (ids2recycle) | set())
+        # free_ids = [veh_id for veh_id in veh_key2id]
+        # veh_key2id = list (filter (lambda veh : filter_out (veh['id'], cur_list_of_vehicles), veh_key2id)) #remove from the list all the 
+        for veh_key in cur_list_of_vehicles: 
             filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id))
             if (len(filtered_list) == 0): # first time this veh_key appears in the simulation
                 veh_id = num_of_vehicles
-                veh_key2id.append({'key' : veh_key, 'id' : veh_id})
+                veh_key2id.append({'key' : veh_key, 'id' : veh_id}) 
                 num_of_vehicles += 1
             elif (len(filtered_list) == 1): # already seen this veh_key in the sim' --> extract its id from the hash 
                 veh_id = filtered_list[0]['id']
             elif (len(filtered_list) == 2):
-                printf (FD, 'In-naal raback\n')
+                printf (pos_output_file, 'In-naal raback\n')
                 exit ()
             position = traci.vehicle.getPosition(veh_key)
-            printf (FD, "user {} \tID={}\t ({:.1f},{:.1f})\n" .format (veh_key, veh_id, position[0], position[1]))
-            # exit ()
+            max_X_pos, max_Y_pos = max (max_X_pos, position[0]), max (max_Y_pos, position[0])
+            printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
+            X.append (position[0]), Y.append (position[1]) 
+            # printf (traj_output_file, '({:.0f}, {:.0f})' .format (position[0], position[1]))
         traci.simulationStep()
         step += 1
-    run()
+    plt.scatter(X, Y)
+    plt.show()
+    traci.close()
+    sys.stdout.flush()

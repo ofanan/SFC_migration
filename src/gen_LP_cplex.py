@@ -28,14 +28,24 @@ import sys
 import cplex
 from cplex.exceptions import CplexError
 
-# data common to all populateby functions
-my_obj = [1.0, 2.0, 3.0]
-my_ub = [40.0, cplex.infinity, cplex.infinity]
-my_colnames = ["x1", "x2", "x3"]
-my_rhs = [20.0, 30.0]
-my_rownames = ["c1", "c2"]
-my_sense = "LL"
+# The file exemplifies how to CPLEX-solve the following LP:
+# Maximize
+# x1  + 2x2 + 3x3
+# subject to
+# –x1 +  x2 + x3 <= 20
+#  x1 – 3x2 + x3 <= 30
+# with these bounds
+# 0 <= x1 <= 40
+# 0 <= x2 <= infinity
+# 0 <= x3 <= infinity
 
+# data common to all populateby functions
+my_obj      = [1.0, 2.0, 3.0]
+my_ub       = [40.0, cplex.infinity, cplex.infinity]
+my_colnames = ["x1", "x2", "x3"]
+my_rhs      = [20.0, 30.0]
+my_rownames = ["c1", "c2"]
+my_sense    = "LL"
 
 def populatebyrow(prob):
     prob.objective.set_sense(prob.objective.sense.maximize)
@@ -48,7 +58,7 @@ def populatebyrow(prob):
     # lbs is a list of all the lower bounds
     lbs = prob.variables.get_lower_bounds()
 
-    # ub1 is just the first lower bound
+    # ub1 is just the first upper bound
     ub1 = prob.variables.get_upper_bounds(0)
 
     # names is ["x1", "x3"]
@@ -56,7 +66,6 @@ def populatebyrow(prob):
 
     rows = [[[0, "x2", "x3"], [-1.0, 1.0, 1.0]],
             [["x1", 1, 2], [1.0, -3.0, 1.0]]]
-
     prob.linear_constraints.add(lin_expr=rows, senses=my_sense,
                                 rhs=my_rhs, names=my_rownames)
 

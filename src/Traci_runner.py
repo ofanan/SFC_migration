@@ -51,12 +51,12 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs #--no-step-log #--verbose #"'--duration-log.statistics', 'false' 
-    traci.start([sumoBinary, '-c', path_to_scenario + 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'false']) #"--tripinfo-output", "tripinfo.xml"])
+    traci.start([sumoBinary, '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'false']) #"--tripinfo-output", "tripinfo.xml"])
     with open('vehicles.pos', 'w') as pos_output_file:
         pos_output_file.write('')                
     pos_output_file  = open ('../res/vehicles.pos',  "w")
     
-    num_of_simulated_secs = 3600*24
+    num_of_simulated_secs = 36# 00*24
     num_of_vehicles       = 0
     step                  = 0
     veh_key2id            = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
@@ -86,10 +86,11 @@ if __name__ == "__main__":
                 printf (pos_output_file, 'In-naal raback\n')
                 Traci_exit ()
             position = traci.vehicle.getPosition(veh_key)
-            # printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
+            printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
         traci.simulationStep()
         step += 1
     # plt.scatter(X, Y)
+    printf (pos_output_file, '\nX = {}\nY = {}\n' .format(X, Y))
     plt.plot (X,Y)
     plt.show()
     traci.close()

@@ -98,13 +98,12 @@ if __name__ == "__main__":
     #     traj_output_file.write('')                
     # traj_output_file  = open ('traj.pos',  "w")   
 
-    num_of_simulated_secs = 585
+    num_of_simulated_secs = 3600*24
     num_of_vehicles       = 0
     step                  = 0
     veh_key2id            = [] # will hold pairs of (veh key, veh id)
     ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
-    max_X_pos, max_Y_pos = 0, 0
-    X, Y = [], []
+    X, Y                  = [], [] # Will be used for ptyhon-plots            
 
     while (step < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         cur_list_of_vehicles = traci.vehicle.getIDList()
@@ -113,15 +112,13 @@ if __name__ == "__main__":
         if (len (vehs_that_left) > 0):
             ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in vehs_that_left]))) # add to ids2recycle the IDs of all cars that left
             printf (pos_output_file, 'left vehs are: {}. IDs to recycle are {}\n' .format (vehs_that_left, ids2recycle))
-        # free_ids = [veh_id for veh_id in veh_key2id]
-        # veh_key2id = list (filter (lambda veh : filter_out (veh['id'], cur_list_of_vehicles), veh_key2id)) #remove from the list all the
-        # printf (num_veh_output_file, '({}{:.0f}\' .format(len(cur_list_of_vehicles))) 
         X.append (step), Y.append (len(cur_list_of_vehicles))
         for veh_key in cur_list_of_vehicles: 
             filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs 
             if (len(filtered_list) == 0): # first time this veh_key appears in the simulation
                 if (len (ids2recycle) > 0): # can recycle an ID of a veh that left
                     veh_id = ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
+                    veh_key2id = list (filter (lambda veh : veh['id'] != veh_id, veh_key2id)) # remove the old {veh_key, veh_id} tuple from the veh_key2id map 
                 else:
                     veh_id = num_of_vehicles # pick a new ID
                     num_of_vehicles += 1
@@ -132,14 +129,11 @@ if __name__ == "__main__":
                 printf (pos_output_file, 'In-naal raback\n')
                 Traci_exit ()
             position = traci.vehicle.getPosition(veh_key)
-            max_X_pos, max_Y_pos = max (max_X_pos, position[0]), max (max_Y_pos, position[0])
-            printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
-            # X.append (position[0]), Y.append (position[1]) 
-            # printf (traj_output_file, '({:.0f}, {:.0f})' .format (position[0], position[1]))
+            # printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
         traci.simulationStep()
         step += 1
     # plt.scatter(X, Y)
-    # plt.plot (X,Y)
-    # plt.show()
+    plt.plot (X,Y)
+    plt.show()
     traci.close()
     sys.stdout.flush()

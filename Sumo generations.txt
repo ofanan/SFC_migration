@@ -4,3 +4,20 @@ C:\Users\ofanan\eclipse\Sumo\bin\netconvert --sumo-net-file lust.net.xml --plai
 n-output-prefix plain --proj-plain-geo
 
 
+In BGU's servers:
+conda config --add channels conda-forge
+conda config --set channel_priority strict
+conda install -c conda-forge sumo (see https://anaconda.org/conda-forge/sumo)
+conda activate sumo
+
+  environment location: /home/itamarq/.conda/envs/py37
+
+export PYTHONPATH="$SUMO_HOME/tools:$PYTHONPATH"
+
+
+By https://github.com/xingminw/plymouth-traffic-env
+conda create -n sumo python=3.7
+conda activate sumo
+
+Sumo is found in:
+/home/itamarq/.conda/pkgs/sumo-2.2.4-py37h89c1867_0

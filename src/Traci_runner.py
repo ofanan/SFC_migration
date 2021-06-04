@@ -47,7 +47,6 @@ if __name__ == "__main__":
     # this script has been called from the command line. It will start sumo as a
     # server, then connect and run
     sumoBinary = checkBinary('sumo')
-    path_to_scenario = '../../LuSTScenario/scenario/'
 
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs #--no-step-log #--verbose #"'--duration-log.statistics', 'false' 
@@ -81,7 +80,7 @@ if __name__ == "__main__":
                     num_of_vehicles += 1
                 veh_key2id.append({'key' : veh_key, 'id' : veh_id}) 
             elif (len(filtered_list) == 1): # already seen this veh_key in the sim' --> extract its id from the hash 
-                veh_id = filtered_list[0]['id']
+                veh_id = filtered_list[0]['id'] 
             elif (len(filtered_list) == 2):
                 printf (pos_output_file, 'In-naal raback\n')
                 Traci_exit ()

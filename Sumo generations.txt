@@ -21,3 +21,7 @@ conda activate sumo
 
 Sumo is found in:
 /home/itamarq/.conda/pkgs/sumo-2.2.4-py37h89c1867_0
+
+sudo yum install curl wget lynx w3m
+
+wget -O - https://unix.stackexchange.com/questions/401068/web-browser-from-console-centos

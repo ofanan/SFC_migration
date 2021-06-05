@@ -10,7 +10,7 @@ import os
 import sys
 import optparse
 import random
-from sumolib import checkBinary  # noqa
+from sumolib import checkBinary  
 import traci  # noqa
 
 from printf import printf 
@@ -50,12 +50,13 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs #--no-step-log #--verbose #"'--duration-log.statistics', 'false' 
-    traci.start([sumoBinary, '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'false']) #"--tripinfo-output", "tripinfo.xml"])
+    step_size             = '30'
+    traci.start([sumoBinary, '-c', 'my.sumocfg', '--step-length',step_size, '-W', '-V', 'false', '--no-step-log', 'false']) #"--tripinfo-output", "tripinfo.xml"])
     with open('vehicles.pos', 'w') as pos_output_file:
         pos_output_file.write('')                
     pos_output_file  = open ('../res/vehicles.pos',  "w")
     
-    num_of_simulated_secs = 36# 00*24
+    num_of_simulated_secs = 3600*24
     num_of_vehicles       = 0
     step                  = 0
     veh_key2id            = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
@@ -64,7 +65,7 @@ if __name__ == "__main__":
 
     while (step < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         cur_list_of_vehicles = traci.vehicle.getIDList()
-        printf (pos_output_file, 't = {:.0f}, {} active vehicles\n' .format (traci.simulation.getTime(), len(cur_list_of_vehicles)))
+        printf (pos_output_file, '{}, ' .format (len(cur_list_of_vehicles)))
         vehs_that_left = list (filter (lambda veh : veh['key'] not in (cur_list_of_vehicles), veh_key2id)) #list of cars that left the simulation
         if (len (vehs_that_left) > 0):
             ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in vehs_that_left]))) # add to ids2recycle the IDs of all cars that left
@@ -85,12 +86,11 @@ if __name__ == "__main__":
                 printf (pos_output_file, 'In-naal raback\n')
                 Traci_exit ()
             position = traci.vehicle.getPosition(veh_key)
-            printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
+            # printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
         traci.simulationStep()
         step += 1
     # plt.scatter(X, Y)
-    printf (pos_output_file, '\nX = {}\nY = {}\n' .format(X, Y))
-    plt.plot (X,Y)
-    plt.show()
+    # plt.plot (X,Y)
+    # plt.show()
     traci.close()
     sys.stdout.flush()

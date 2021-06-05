@@ -5,7 +5,7 @@
     <input>
         <net-file value="../../LuSTScenario/scenario/lust.net.xml"/>
         <route-files value="../../LuSTScenario/scenario/buslines.rou.xml,../../LuSTScenario/scenario/DUERoutes/local.actuated.0.rou.xml,../../LuSTScenario/scenario/DUERoutes/local.actuated.1.rou.xml,../../LuSTScenario/scenario/DUERoutes/local.actuated.2.rou.xml,../../LuSTScenario/scenario/transit.rou.xml"/>
-        <additional-files value="../../LuSTScenario/scenario/vtypes.add.xml,../../LuSTScenario/scenario/busstops.add.xml,../../LuSTScenario/scenario/e1detectors.add.xml,../../LuSTScenario/scenario/lust.poly.xml"/>
+        <additional-files value="../../LuSTScenario/scenario/vtypes.add.xml,../../LuSTScenario/scenario/busstops.add.xml,../../LuSTScenario/scenario/lust.poly.xml"/>
     </input>
 
     <time>

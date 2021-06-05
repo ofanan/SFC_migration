@@ -76,17 +76,22 @@ class SFC_mig_simulator (object):
         A = []
         b = []
         for s in self.G.nodes():
-            A_s = []
+            A_s_non_zeros = [] # will hold the non-zero coefficients in this server's CPU cap constraint
+            X_s_non_zeros = [] # will hold the decision vars with non-zero coefficients in this server's CPU cap constraint
             # relevant_decision_vars = filter (lambda item : item.server == s, self.decision_vars)
             for decision_var in filter (lambda item : item.server == s, self.decision_vars):
                 usr = self.usrs[decision_var.usr]
-                A_s.append(usr.B[self.G.nodes[s]['lvl']])
-            if (sum ([item for item in A_s]) > self.G.nodes[s]['cpu cap']): # The total CPU cap required by all users which can be placed in s > the CPU cap of s
-                A.append(A_s)
+                A_s_non_zeros.append(usr.B[self.G.nodes[s]['lvl']])
+                X_s_non_zeros.append(decision_var.id)
+            if (sum ([cpu_req for cpu_req in A_s_non_zeros]) > self.G.nodes[s]['cpu cap']): # The total CPU cap required by all users which can be placed in s > the CPU cap of s
+                #A_s = np.zeros (len(self.usrs), dtype = 'uint8')
+                A.append([A_s_non_zeros[i] if i in X_s_non_zeros else 0 for i in range(len(self.usrs))])
                 b.append (self.G.nodes[s]['cpu cap'])
             #                                  #item.lvl == self.G.nodes[s]['lvl']
             # for usr in changed_usrs: #[usr for usr in changed_usrs if (usr.S_u[self.G.nodes[s]['lvl']] == s)]: # for each user who  
             #     print (s)
+        print ('A = ', A)
+        print ('b = ', b)
         exit ()
         
         # c = [-1, 4]

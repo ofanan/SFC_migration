@@ -6,7 +6,8 @@ import time
 import random
 import heapq
 
-from usr_c import usr_c
+from usr_c import usr_c # class of the users
+from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
 # import Check_sol
 # import obj_func
@@ -55,15 +56,44 @@ class SFC_mig_simulator (object):
     # This is assumed to be True by construction.
     found_sol = lambda self: sum (sum (self.Y)) >= len (self.usrs)
 
-    def solveByLp (self):
+    def solveByLp (self, changed_usrs):
         """
         Example of solving a problem using Python's LP capabilities.
         """
-        c = [-1, 4]
-        A = [[-3, 1], [1, 2]]
-        b = [6, 4]
-        x0_bounds = (None, None)
-        x1_bounds = (-3, None)
+        self.decision_vars  = []
+        id                  = 0
+        for usr in changed_usrs:
+            for lvl in range(len(usr.B)):
+                self.decision_vars.append (decision_var_c (id     = id, 
+                                                           usr    = usr.id, 
+                                                           lvl    = lvl, 
+                                                           server = usr.S_u[lvl], 
+                                                           cost   = self.calc_chain_cost_homo(usr, lvl)))
+                
+        # Adding the CPU cap' constraints
+        # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
+        #A = np.empty(len(self.G.nodes), dtype=object)
+        A = []
+        b = []
+        for s in self.G.nodes():
+            A_s = []
+            # relevant_decision_vars = filter (lambda item : item.server == s, self.decision_vars)
+            for decision_var in filter (lambda item : item.server == s, self.decision_vars):
+                usr = self.usrs[decision_var.usr]
+                A_s.append(usr.B[self.G.nodes[s]['lvl']])
+            if (sum ([item for item in A_s]) > self.G.nodes[s]['cpu cap']): # The total CPU cap required by all users which can be placed in s > the CPU cap of s
+                A.append(A_s)
+                b.append (self.G.nodes[s]['cpu cap'])
+            #                                  #item.lvl == self.G.nodes[s]['lvl']
+            # for usr in changed_usrs: #[usr for usr in changed_usrs if (usr.S_u[self.G.nodes[s]['lvl']] == s)]: # for each user who  
+            #     print (s)
+        exit ()
+        
+        # c = [-1, 4]
+        # A = [[-3, 1], [1, 2]]
+        # b = [6, 4]
+        # x0_bounds = (None, None)
+        # x1_bounds = (-3, None)
         res = linprog(c, A_ub=A, b_ub=b, bounds=[x0_bounds, x1_bounds])
 
 
@@ -76,7 +106,6 @@ class SFC_mig_simulator (object):
         self.Y = np.zeros ([len (self.usrs), len (self.G.nodes())], dtype = 'bool')
         for usr in self.usrs:
             usr.lvl = -1
-
 
     def print_cost_per_usr (self):
         """
@@ -375,8 +404,6 @@ class SFC_mig_simulator (object):
         """
         Init a toy example - topology (e.g., chains, VMs, target_delays etc.).
         """
-        self.solveByLp()
-        exit ()
         
         self.verbose                = verbose
         
@@ -444,6 +471,8 @@ class SFC_mig_simulator (object):
         
 
             self.rd_AP_line(splitted_line)
+            self.solveByLp(self.usrs)
+            exit ()
             self.alg_top ()
     
     def alg_top (self):
@@ -553,7 +582,7 @@ class SFC_mig_simulator (object):
                     s = self.parent_of(s)
                     usr.S_u.append (s)
                     self.G.nodes[s]['Hs'].append(usr)                       
-
+                    
 
     def calc_sol_cost_SS (self):
         """
@@ -598,9 +627,6 @@ if __name__ == "__main__":
     # Gen static LP problem
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = 0)
-    # for lvl in range (2, 1, -1): 
-    #     print ('lvl = ', lvl)  
-
     my_simulator.simulate()
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()

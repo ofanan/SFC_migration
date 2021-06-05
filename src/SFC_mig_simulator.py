@@ -87,19 +87,22 @@ class SFC_mig_simulator (object):
                 #A_s = np.zeros (len(self.usrs), dtype = 'uint8')
                 A.append([A_s_non_zeros[i] if i in X_s_non_zeros else 0 for i in range(len(self.usrs))])
                 b.append (self.G.nodes[s]['cpu cap'])
-            #                                  #item.lvl == self.G.nodes[s]['lvl']
-            # for usr in changed_usrs: #[usr for usr in changed_usrs if (usr.S_u[self.G.nodes[s]['lvl']] == s)]: # for each user who  
-            #     print (s)
-        print ('A = ', A)
+        print ('A = ', np.array(A))
+        print ('A shape = ', np.array(A).shape)
         print ('b = ', b)
-        exit ()
-        
+
         # c = [-1, 4]
         # A = [[-3, 1], [1, 2]]
         # b = [6, 4]
         # x0_bounds = (None, None)
         # x1_bounds = (-3, None)
-        res = linprog(c, A_ub=A, b_ub=b, bounds=[x0_bounds, x1_bounds])
+        #res = linprog(c, A_ub=A, b_ub=b, bounds=[x0_bounds, x1_bounds])
+        A = np.array(A)
+        res = linprog ([decision_var.cost for decision_var in self.decision_vars], 
+                       A_ub   = A, 
+                       b_ub   = np.array(b), 
+                       bounds = [np.zeros (len(self.decision_vars)), np.ones (len(self.decision_vars))])
+        exit ()
 
 
     def reset_sol (self):

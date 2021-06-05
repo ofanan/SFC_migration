@@ -12,9 +12,9 @@ from printf import printf
 # import obj_func
 # from _overlapped import NULL
 # from solve_problem_by_Cplex import solve_problem_by_Cplex
-from networkx.algorithms.threshold import shortest_path
+from scipy.optimize import linprog
+# from networkx.algorithms.threshold import shortest_path
 from cmath import sqrt
-from numpy import int
 
 # Levels of verbose (which output is generated)
 VERBOSE_NO_OUTPUT             = 0
@@ -54,6 +54,18 @@ class SFC_mig_simulator (object):
     # Note: the function does NOT check whether self.Y adheres to all the constraints (e.g., CPU cap', link cap', delay).
     # This is assumed to be True by construction.
     found_sol = lambda self: sum (sum (self.Y)) >= len (self.usrs)
+
+    def solveByLp (self):
+        """
+        Example of solving a problem using Python's LP capabilities.
+        """
+        c = [-1, 4]
+        A = [[-3, 1], [1, 2]]
+        b = [6, 4]
+        x0_bounds = (None, None)
+        x1_bounds = (-3, None)
+        res = linprog(c, A_ub=A, b_ub=b, bounds=[x0_bounds, x1_bounds])
+
 
     def reset_sol (self):
         """"
@@ -363,6 +375,8 @@ class SFC_mig_simulator (object):
         """
         Init a toy example - topology (e.g., chains, VMs, target_delays etc.).
         """
+        self.solveByLp()
+        exit ()
         
         self.verbose                = verbose
         
@@ -579,7 +593,7 @@ class SFC_mig_simulator (object):
      
           
 if __name__ == "__main__":
-    lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
+    #lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
     
     # Gen static LP problem
     t = time.time()

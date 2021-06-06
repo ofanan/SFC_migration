@@ -72,22 +72,20 @@ class SFC_mig_simulator (object):
 
         # Adding the CPU cap' constraints
         # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
-        A = np.zeros ([len (self.G.nodes), len(self.decision_vars)], dtype = 'uint16')
+        A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
         for s in self.G.nodes():
             for decision_var in filter (lambda item : item.server == s, self.decision_vars):
                 A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
 
-        # c = [-1, 4]
-        # #A = [[-3, 1], [1, 2]]
-        # A = np.ones ([2, 2])
-        # # print (A)
-        # b = [6, 4]
-        # x0_bounds = (None, None)
-        # x1_bounds = (-3, None)
-        # res = linprog(c, A_ub=A, b_ub=b, bounds=[x0_bounds, x1_bounds])
+        for decision_var in self.decision_vars:
+            A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
+        b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
+        b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
+        print (A)
+        print (b_ub)
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
-                       b_ub   = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))], 
+                       b_ub   = b_ub, 
                        bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
         print (res)
         # Should add necessary deployment restrictionns

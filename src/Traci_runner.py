@@ -63,6 +63,8 @@ if __name__ == "__main__":
     ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
     X, Y                  = [], [] # Will be used for ptyhon-plots            
 
+    traci.simulationStep (1120 * 30) # already simulated...
+
     while (step < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         cur_list_of_vehicles = traci.vehicle.getIDList()
         printf (pos_output_file, '{}, ' .format (len(cur_list_of_vehicles)))

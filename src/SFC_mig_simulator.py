@@ -65,7 +65,7 @@ class SFC_mig_simulator (object):
         for usr in changed_usrs:
             for lvl in range(len(usr.B)):
                 self.decision_vars.append (decision_var_c (id     = id, 
-                                                           usr    = usr.id, 
+                                                           usr    = usr, 
                                                            lvl    = lvl, 
                                                            server = usr.S_u[lvl]))
                 id += 1
@@ -75,16 +75,7 @@ class SFC_mig_simulator (object):
         A = np.zeros ([len (self.G.nodes), len(self.decision_vars)], dtype = 'uint16')
         for s in self.G.nodes():
             for decision_var in filter (lambda item : item.server == s, self.decision_vars):
-                A[s][decision_var.id] = self.usrs[decision_var.usr][decision_var.lvl]
-            # if (A_s_non_zeros = []) # no constraint on this server (the total demand by users that may use this server < its CPU capacity)
-            #     self.decision_vars = filter (lambda item: item.server != s, self.decision_vars) # remove all decision vars related to this server, as they're 
-        print ('A = ', A)
-        # print ('A = ', np.array(A))
-        # print ('A shape = ', np.array(A).shape)
-        # print ('b = ', b)
-        # b = np.empty (len(self.G.nodes), dytpe='uint16')
-        #     b[s] (self.G.nodes[s]['cpu cap'])
-        # print ('c = ', [decision_var.cost for decision_var in self.decision_vars])
+                A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
 
         # c = [-1, 4]
         # #A = [[-3, 1], [1, 2]]
@@ -94,11 +85,15 @@ class SFC_mig_simulator (object):
         # x0_bounds = (None, None)
         # x1_bounds = (-3, None)
         # res = linprog(c, A_ub=A, b_ub=b, bounds=[x0_bounds, x1_bounds])
-        exit ()
-        res = linprog ([decision_var.cost for decision_var in self.decision_vars], 
+        res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
-                       b_ub   = [s['cpu cap'] for s in self.G.nodes[s]], 
-                       bounds = [np.zeros (len(self.decision_vars)), np.ones (len(self.decision_vars))])
+                       b_ub   = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))], 
+                       bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
+        print (res)
+        # Should add necessary deployment restrictionns
+        exit ()
+                                           # self.G.nodes[s]['cpu cap'],
+
 
 
     def reset_sol (self):

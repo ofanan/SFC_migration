@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs #--no-step-log #--verbose #"'--duration-log.statistics', 'false' 
-    step_size             = '30'
+    step_size             = str (60)
     traci.start([sumoBinary, '-c', 'my.sumocfg', '--step-length',step_size, '-W', '-V', 'false', '--no-step-log', 'false']) #"--tripinfo-output", "tripinfo.xml"])
     with open('vehicles.pos', 'w') as pos_output_file:
         pos_output_file.write('')                
@@ -58,39 +58,37 @@ if __name__ == "__main__":
     
     num_of_simulated_secs = 3600*24
     num_of_vehicles       = 0
-    step                  = 0
     veh_key2id            = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
     ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
     X, Y                  = [], [] # Will be used for ptyhon-plots            
 
-    traci.simulationStep (1120 * 30) # already simulated...
-
-    while (step < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
+    warmup_period         = 0 #1120 * 30
+    traci.simulationStep (warmup_period) 
+    while (traci.simulation.getTime() < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         cur_list_of_vehicles = traci.vehicle.getIDList()
-        printf (pos_output_file, '{}, ' .format (len(cur_list_of_vehicles)))
-        vehs_that_left = list (filter (lambda veh : veh['key'] not in (cur_list_of_vehicles), veh_key2id)) #list of cars that left the simulation
-        if (len (vehs_that_left) > 0):
-            ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in vehs_that_left]))) # add to ids2recycle the IDs of all cars that left
-        X.append (step), Y.append (len(cur_list_of_vehicles))
-        for veh_key in cur_list_of_vehicles: 
-            filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs 
-            if (len(filtered_list) == 0): # first time this veh_key appears in the simulation
-                if (len (ids2recycle) > 0): # can recycle an ID of a veh that left
-                    veh_id = ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
-                    veh_key2id = list (filter (lambda veh : veh['id'] != veh_id, veh_key2id)) # remove the old {veh_key, veh_id} tuple from the veh_key2id map 
-                else:
-                    veh_id = num_of_vehicles # pick a new ID
-                    num_of_vehicles += 1
-                veh_key2id.append({'key' : veh_key, 'id' : veh_id}) 
-            elif (len(filtered_list) == 1): # already seen this veh_key in the sim' --> extract its id from the hash 
-                veh_id = filtered_list[0]['id'] 
-            elif (len(filtered_list) == 2):
-                printf (pos_output_file, 'In-naal raback\n')
-                Traci_exit ()
-            position = traci.vehicle.getPosition(veh_key)
-            # printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
+        printf (pos_output_file, '({},{})\n' .format (traci.simulation.getTime(), len(cur_list_of_vehicles)))
+        # vehs_that_left = list (filter (lambda veh : veh['key'] not in (cur_list_of_vehicles), veh_key2id)) #list of cars that left the simulation
+        # if (len (vehs_that_left) > 0):
+        #     ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in vehs_that_left]))) # add to ids2recycle the IDs of all cars that left
+        # X.append (time), Y.append (len(cur_list_of_vehicles))
+        # for veh_key in cur_list_of_vehicles: 
+        #     filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs 
+        #     if (len(filtered_list) == 0): # first time this veh_key appears in the simulation
+        #         if (len (ids2recycle) > 0): # can recycle an ID of a veh that left
+        #             veh_id = ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
+        #             veh_key2id = list (filter (lambda veh : veh['id'] != veh_id, veh_key2id)) # remove the old {veh_key, veh_id} tuple from the veh_key2id map 
+        #         else:
+        #             veh_id = num_of_vehicles # pick a new ID
+        #             num_of_vehicles += 1
+        #         veh_key2id.append({'key' : veh_key, 'id' : veh_id}) 
+        #     elif (len(filtered_list) == 1): # already seen this veh_key in the sim' --> extract its id from the hash 
+        #         veh_id = filtered_list[0]['id'] 
+        #     elif (len(filtered_list) == 2):
+        #         printf (pos_output_file, 'In-naal raback\n')
+        #         Traci_exit ()
+        #     position = traci.vehicle.getPosition(veh_key)
+        #     printf (pos_output_file, "user {} \tID={}\t ({:.0f},{:.0f})\n" .format (veh_key, veh_id, position[0], position[1]))
         traci.simulationStep()
-        step += 1
     # plt.scatter(X, Y)
     # plt.plot (X,Y)
     # plt.show()

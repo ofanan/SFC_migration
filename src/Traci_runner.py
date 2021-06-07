@@ -50,8 +50,9 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a
     # subprocess and then the python script connects and runs #--no-step-log #--verbose #"'--duration-log.statistics', 'false' 
-    step_size             = str (60)
-    traci.start([sumoBinary, '-c', 'my.sumocfg', '--step-length',step_size, '-W', '-V', 'false', '--no-step-log', 'false']) #"--tripinfo-output", "tripinfo.xml"])
+    step_size             = str (60) 
+    traci.start([sumoBinary, '-c', 'my.sumocfg', '--step-length',step_size, '-W']) #"--tripinfo-output", "tripinfo.xml"]) #--duration-log.disable
+    # traci.start([sumoBinary, '-c', 'my.sumocfg', '--step-length',step_size, '-W', '-V', 'false', '--no-step-log', 'false']) # or true? #"--tripinfo-output", "tripinfo.xml"]) #--duration-log.disable
     with open('vehicles.pos', 'w') as pos_output_file:
         pos_output_file.write('')                
     pos_output_file  = open ('../res/vehicles.pos',  "w")
@@ -62,11 +63,18 @@ if __name__ == "__main__":
     ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
     X, Y                  = [], [] # Will be used for ptyhon-plots            
 
-    warmup_period         = 0 #1120 * 30
+    warmup_period         = 0 
+    # Defining the Time Period to Simulate is documented in:
+    # https://sumo.dlr.de/docs/Simulation/Basic_Definition.html
     traci.simulationStep (warmup_period) 
+    print ("start reporting at {}. Simulation step is {}" .format (traci.simulation.getTime(), step_size))
     while (traci.simulation.getTime() < num_of_simulated_secs and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         cur_list_of_vehicles = traci.vehicle.getIDList()
-        printf (pos_output_file, '({},{})\n' .format (traci.simulation.getTime(), len(cur_list_of_vehicles)))
+        printf (pos_output_file, 't={:.0f}: tot {} act {}\n' .format (traci.simulation.getTime(), len(cur_list_of_vehicles), 
+                                                          len(cur_list_of_vehicles) - len ([veh for veh in cur_list_of_vehicles if traci.vehicle.getSpeed(veh)==0])))
+        if (len(cur_list_of_vehicles) != traci.vehicle.getIDCount()):
+            print ('len(cur_list_of_vehicles) = {}, getIdCnt ={}' .format(len(cur_list_of_vehicles), traci.vehicle.getIDCount()))
+         
         # vehs_that_left = list (filter (lambda veh : veh['key'] not in (cur_list_of_vehicles), veh_key2id)) #list of cars that left the simulation
         # if (len (vehs_that_left) > 0):
         #     ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in vehs_that_left]))) # add to ids2recycle the IDs of all cars that left

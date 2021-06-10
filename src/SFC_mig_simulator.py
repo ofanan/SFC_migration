@@ -403,12 +403,15 @@ class SFC_mig_simulator (object):
         self.verbose                = verbose
         
         # Network parameters
-        self.tree_height           = 2
-        self.children_per_node     = 2 # num of children of every non-leaf node
-        self.uniform_mig_cost      = 1
-        self.Lmax                  = 0
-        self.uniform_Tpd           = 2
-        self.uniform_link_cost     = 1
+        self.tree_height                = 2
+        self.children_per_node          = 2 # num of children of every non-leaf node
+        self.uniform_mig_cost           = 1
+        self.Lmax                       = 0
+        self.uniform_Tpd                = 2
+        self.uniform_link_cost          = 1
+        self.uniform_theta_times_lambda = [1,1]
+        self.uniform_Cu                 = 15
+        self.uniform_target_delay       = 10
         
         # INPUT / OUTPUT FILES
         self.verbose = VERBOSE_RES_AND_LOG
@@ -459,14 +462,19 @@ class SFC_mig_simulator (object):
 
             splitted_line = line.split (" ")
 
-            if (splitted_line[0] == "time"):
+            print (splitted_line[0])
+            if (splitted_line[0] == "t"):
                 if (self.verbose == VERBOSE_RES_AND_LOG):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))
                 continue
         
-
+            if (splitted_line[0] == "vehicles_that_left:"):
+                for u in splitted_line[1:]:
+                    print (u)
+                continue
+        
             self.rd_AP_line(splitted_line)
-            self.solveByLp(self.usrs)
+            self.alg_top()
             exit ()
             self.alg_top ()
     
@@ -559,10 +567,12 @@ class SFC_mig_simulator (object):
             if (len(tuple) > 1):
                 tuple   = tuple[1].split (",")
                 usr_id  = int(tuple[0])
-                if (usr_id > len (self.usrs)-1):
-                    print ('error: encountered usr num {}, where by res.usr file, there are only {} users' .format (tuple[0], len(self.usrs)))
-                    exit  ()
-                usr   = self.usrs[usr_id]
+                list_of_usr = list(filter (lambda usr : usr.id == usr_id, self.usrs))
+                if (len (list_of_usr) == 0): # New user
+                    usr = usr_c (id = usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, mig_cost=self.uniform_mig_cost, C_u=self.uniform_Cu, lvl = -1)
+                    self.usrs.append (usr)
+                else:
+                    usr = list_of_usr[0]
                 AP_id = int(tuple[1])
                 if (AP_id > self.num_of_leaves):
                     print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
@@ -579,7 +589,7 @@ class SFC_mig_simulator (object):
 
     def calc_sol_cost_SS (self):
         """
-        Calculate the total cost of an SS (single-server pver-chain) full solution.
+        Calculate the total cost of an SS (single-server per-chain) full solution.
         """
         total_cost = 0
         for chain in range(self.NUM_OF_CHAINS):

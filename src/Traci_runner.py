@@ -8,24 +8,29 @@ from printf import printf
 
 if __name__ == "__main__":
 
-    with open('../vehicles.pos', 'w') as pos_output_file:
-        pos_output_file.write('')                
-    pos_output_file  = open ('../res/vehicles.pos',  "w")
+    with open('../vehicles.loc', 'w') as loc_output_file:
+        loc_output_file.write('')                
+    loc_output_file  = open ('../res/vehicles.loc',  "w")
 
     traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true']) 
-    traci.simulationStep (3600*7.5) #until getting to the required time (time starts at 00:00). 
+    # traci.simulationStep (3600*7.5) #until getting to the required time (time starts at 00:00). 
     veh_key2id            = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
     ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
     num_of_vehicles       = 0
+    printf (loc_output_file, '// locations of vehicles\n// format:\n// u x y\t\t where: u=id of the usr (vehicle), x and y the current (x,y) coodinates of the vehicle.\n' )
     while (traci.simulation.getTime() < 3600*9 and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
         
         # # print statistics of the number of cars along the simulation
         # if (traci.simulation.getTime() % 60 ==0):
-        #     printf (pos_output_file, 't={}: act={} moving={}\n' 
+        #     printf (loc_output_file, 't={}: act={} moving={}\n' 
         #              .format (traci.simulation.getTime(), traci.vehicle.getIDCount(), traci.vehicle.getIDCount() - len ([v for v in traci.vehicle.getIDList() if traci.vehicle.getSpeed(v)==0])))
-        printf (pos_output_file, 't = {:.0f}\n' .format (traci.simulation.getTime()))
+        printf (loc_output_file, 't = {:.0f}\n' .format (traci.simulation.getTime()))
         cur_list_of_vehicles = [veh for veh in traci.vehicle.getIDList() if traci.vehicle.getSpeed(veh)>0]
         vehs_that_left = list (filter (lambda veh : veh['key'] not in (cur_list_of_vehicles), veh_key2id)) #list of cars that left the simulation
+        printf (loc_output_file, 'vehicles_that_left: ')
+        for veh in vehs_that_left:
+            printf (loc_output_file, '{:.0f} ' .format(veh['id']))
+        printf (loc_output_file, '\n')
         if (len (vehs_that_left) > 0):
             ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in vehs_that_left]))) # add to ids2recycle the IDs of all cars that left
         for veh_key in cur_list_of_vehicles: 
@@ -41,7 +46,7 @@ if __name__ == "__main__":
             else: # already seen this veh_key in the sim' --> extract its id from the hash 
                 veh_id = filtered_list[0]['id'] 
             position = traci.vehicle.getPosition(veh_key)
-            printf (pos_output_file, "u {}\t {:.0f} {:.0f} \n" .format (veh_id, position[0], position[1]))
+            printf (loc_output_file, "u {}\t {:.0f} {:.0f} \n" .format (veh_id, position[0], position[1]))
 
         sys.stdout.flush()
         traci.simulationStep()

@@ -9,12 +9,7 @@ import heapq
 from usr_c import usr_c # class of the users
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
-# import Check_sol
-# import obj_func
-# from _overlapped import NULL
-# from solve_problem_by_Cplex import solve_problem_by_Cplex
 from scipy.optimize import linprog
-# from networkx.algorithms.threshold import shortest_path
 from cmath import sqrt
 
 # Levels of verbose (which output is generated)
@@ -64,17 +59,17 @@ class SFC_mig_simulator (object):
         id                  = 0
         for usr in changed_usrs:
             for lvl in range(len(usr.B)):
-                self.decision_vars.append (decision_var_c (id     = id, 
-                                                           usr    = usr, 
-                                                           lvl    = lvl, 
-                                                           server = usr.S_u[lvl]))
+                self.decision_vars.append (decision_var_c (id  = id, 
+                                                           usr = usr, 
+                                                           lvl = lvl, 
+                                                           s   = usr.S_u[lvl]))
                 id += 1
 
         # Adding the CPU cap' constraints
         # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
         A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
         for s in self.G.nodes():
-            for decision_var in filter (lambda item : item.server == s, self.decision_vars):
+            for decision_var in filter (lambda item : item.s == s, self.decision_vars):
                 A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
 
         for decision_var in self.decision_vars:
@@ -87,7 +82,15 @@ class SFC_mig_simulator (object):
                        A_ub   = A, 
                        b_ub   = b_ub, 
                        bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
-        print (res)
+        
+        if (res.status==0): # successfully solved
+            for i in [i for i in range(len(res.x)) if res.x[i]>0]:
+                print ('u {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
+                    self.decision_vars[i].usr.id, 
+                    self.decision_vars[i].lvl, 
+                    self.decision_vars[i].s,
+                    res.x[i]
+                    ))
         # Should add necessary deployment restrictionns
         exit ()
                                            # self.G.nodes[s]['cpu cap'],

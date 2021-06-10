@@ -51,6 +51,10 @@ class SFC_mig_simulator (object):
     # This is assumed to be True by construction.
     found_sol = lambda self: sum (sum (self.Y)) >= len (self.usrs)
 
+    # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
+    loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
+
+
     def solveByLp (self, changed_usrs):
         """
         Example of solving a problem using Python's LP capabilities.
@@ -85,17 +89,9 @@ class SFC_mig_simulator (object):
         
         if (res.status==0): # successfully solved
             for i in [i for i in range(len(res.x)) if res.x[i]>0]:
-                print ('u {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
-                    self.decision_vars[i].usr.id, 
-                    self.decision_vars[i].lvl, 
-                    self.decision_vars[i].s,
-                    res.x[i]
-                    ))
-        # Should add necessary deployment restrictionns
+                print ('u {} lvl {:.0f} loc {:.0f} val {:.2f}' 
+                       .format(self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
         exit ()
-                                           # self.G.nodes[s]['cpu cap'],
-
-
 
     def reset_sol (self):
         """"
@@ -233,7 +229,7 @@ class SFC_mig_simulator (object):
         for usr in self.usrs:
             self.Y[usr.id][usr.S_u[usr.lvl]] = True    
         
-    def CPUAll_once (self): 
+    def CPUAll (self, usrs): 
         """
         CPUAll algorithm:
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
@@ -241,10 +237,9 @@ class SFC_mig_simulator (object):
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
-        for usr in self.usrs:
+        for usr in usrs:
             slack = [usr.target_delay - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
             slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
-            #u.L = -1 # Highest server which is delay-feasible for u
             usr.B = [] # usr.B will hold a list of the budgets required for placing u on each level 
             mu = np.array ([math.floor(usr.theta_times_lambda[i]) + 1 for i in range (len(usr.theta_times_lambda))]) # minimal feasible budget
             lvl = 0 
@@ -256,6 +251,12 @@ class SFC_mig_simulator (object):
                         break
                     argmax = np.argmax (np.array ([1 / (mu[i] - usr.theta_times_lambda[i]) - 1 / (mu[i] + 1 - usr.theta_times_lambda[i]) for i in range(len(mu))]))
                     mu[argmax] = mu[argmax] + 1
+                    
+    def fix_usr_params (self, usrs):
+        """
+        For each of the given users, fix the following parameters:
+        target_delay, mig_cost, C_u
+        """
             
     def rd_usr_data (self):
         """
@@ -293,13 +294,18 @@ class SFC_mig_simulator (object):
                             
     def loc2ap (self):
         """
-        Currently unused.
         Read the input about the users locations, 
         and write the appropriate user-to-PoA connections to the file self.ap_file
+        Assume that each AP covers a square area
         """
         self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
         usrs_loc_file = open ("../res/" + self.usrs_loc_file_name,  "r") 
         printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
+            
+        self.max_X, self.max_Y = 1000, 1000 # size of the square cell of each AP, in meters. 
+        self.num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
+        self.cell_X_edge = max_X / self.num_of_APs_in_row
+        self.cell_Y_edge = self.cell_X_edge
             
         for line in usrs_loc_file: 
         
@@ -309,27 +315,16 @@ class SFC_mig_simulator (object):
 
             splitted_line = line.split (" ")
 
-            if (splitted_line[0] == 'MAX_X'):
-                max_X, max_Y = float(splitted_line[1]), float(splitted_line[3])
-                if (max_X != max_Y):
-                    print("Sorry, currently only square city sizes are supported. Please fix the .loc file\n")
-                    exit ()
-            
-            num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
-            cell_X_edge = max_X / num_of_APs_in_row
-            cell_Y_edge = cell_X_edge
-            
             if (splitted_line[0] == "time"):
                 printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
                 continue
         
-            elif (splitted_line[0] == "user"):
-                X, Y = float(splitted_line[2]), float(splitted_line[3])
-                ap = int (math.floor ((Y / cell_Y_edge) ) * num_of_APs_in_row + math.floor ((X / cell_X_edge) )) 
+            elif (splitted_line[0] == "u"):
+                ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3])) 
                 printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
                 continue
             
-        printf(self.ap_file, "\n")
+        printf(self.ap_file, "\n")   
 
     def gen_parameterized_tree (self):
         """
@@ -440,8 +435,8 @@ class SFC_mig_simulator (object):
 
     def simulate (self):
         self.rd_usr_data ()
-        self.CPUAll_once ()       
-
+        self.CPUAll (self.usrs)       
+        
         # reset S_u, Hs        
         for usr in self.usrs:
             usr.S_u = [] 
@@ -508,8 +503,6 @@ class SFC_mig_simulator (object):
                 self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
 
             self.bottom_up()
-            # printf (self.log_output_file, 'After BU:\n') 
-            # self.print_sol()
 
             if (self.found_sol()):
                 ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])

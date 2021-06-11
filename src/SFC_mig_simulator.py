@@ -473,7 +473,9 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "new_or_moved:"):
                 self.rd_AP_line(splitted_line[1:])
                 self.alg_top()
-                exit ()
+                for usr in self.usrs: # prepare for the next iteration
+                     usr.cur_s = usr.nxt_s
+                self.solveByLp (self.usrs)
                 continue
         
     def binary_search (self):

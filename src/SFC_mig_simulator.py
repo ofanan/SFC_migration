@@ -27,7 +27,7 @@ class SFC_mig_simulator (object):
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
     # # Find the server on which a given user is located, by its lvl
-    loc_of_user = lambda self, u : self.usrs[u].S_u[self.usrs[u].lvl]
+    loc_of_user = lambda self, usr : usr.S_u[usr.lvl]
 
     # calculate the cost of the current solution (self.Y)
     calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
@@ -54,6 +54,8 @@ class SFC_mig_simulator (object):
     # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
     loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
 
+    # Returns the server to which a given user is currently assigned
+    cur_server_of = lambda usr: usr.S_u[usr.lvl] 
 
     def solveByLp (self, changed_usrs):
         """
@@ -80,8 +82,8 @@ class SFC_mig_simulator (object):
             A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
         b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
         b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        print (A)
-        print (b_ub)
+        # print (A)
+        # print (b_ub)
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
                        b_ub   = b_ub, 
@@ -229,6 +231,28 @@ class SFC_mig_simulator (object):
         for usr in self.usrs:
             self.Y[usr.id][usr.S_u[usr.lvl]] = True    
         
+    def CPUAll_single_usr (self, usr): 
+        """
+        CPUAll algorithm:
+        calculate the minimal CPU allocation required by a given usr, when the highest server on which u is located is s.
+        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
+        This version of the alg' assumes a balanced homogeneous tree, 
+        so that the netw' delay between every two servers is unequivocally defined by their levels.
+        """
+        slack = [usr.target_delay - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
+        slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
+        usr.B = [] # usr.B will hold a list of the budgets required for placing u on each level 
+        mu = np.array ([math.floor(usr.theta_times_lambda[i]) + 1 for i in range (len(usr.theta_times_lambda))]) # minimal feasible budget
+        lvl = 0 
+        for lvl in range(len(slack)):
+            while (sum(mu) <= usr.C_u): # The SLA still allows increasing this user's CPU allocation
+                if (sum (1 / (mu[i] - usr.theta_times_lambda[i]) for i in range(len(mu))) <= slack[lvl]):  
+                    usr.B.append(sum(mu))
+                    # Can save now the exact vector mu; for now, no need for that, as we're interested only in the sum
+                    break
+                argmax = np.argmax (np.array ([1 / (mu[i] - usr.theta_times_lambda[i]) - 1 / (mu[i] + 1 - usr.theta_times_lambda[i]) for i in range(len(mu))]))
+                mu[argmax] = mu[argmax] + 1
+                    
     def CPUAll (self, usrs): 
         """
         CPUAll algorithm:
@@ -238,20 +262,8 @@ class SFC_mig_simulator (object):
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
         for usr in usrs:
-            slack = [usr.target_delay - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
-            slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
-            usr.B = [] # usr.B will hold a list of the budgets required for placing u on each level 
-            mu = np.array ([math.floor(usr.theta_times_lambda[i]) + 1 for i in range (len(usr.theta_times_lambda))]) # minimal feasible budget
-            lvl = 0 
-            for lvl in range(len(slack)):
-                while (sum(mu) <= usr.C_u): # The SLA still allows increasing this user's CPU allocation
-                    if (sum (1 / (mu[i] - usr.theta_times_lambda[i]) for i in range(len(mu))) <= slack[lvl]):  
-                        usr.B.append(sum(mu))
-                        # Can save now the exact vector mu; for now, no need for that, as we're interested only in the sum
-                        break
-                    argmax = np.argmax (np.array ([1 / (mu[i] - usr.theta_times_lambda[i]) - 1 / (mu[i] + 1 - usr.theta_times_lambda[i]) for i in range(len(mu))]))
-                    mu[argmax] = mu[argmax] + 1
-                    
+            self.CPUAll_single_usr(usr)
+            
     def fix_usr_params (self, usrs):
         """
         For each of the given users, fix the following parameters:
@@ -460,23 +472,34 @@ class SFC_mig_simulator (object):
             if (line == "\n" or line.split ("//")[0] == ""):
                 continue
 
+            line = line.split ('\n')[0]
             splitted_line = line.split (" ")
 
-            print (splitted_line[0])
             if (splitted_line[0] == "t"):
                 if (self.verbose == VERBOSE_RES_AND_LOG):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))
                 continue
         
-            if (splitted_line[0] == "vehicles_that_left:"):
-                for u in splitted_line[1:]:
-                    print (u)
+            elif (splitted_line[0] == "usrs_that_left:"):
+                # usrs_that_left = list (filter (lambda: usr, usr.id in splitted_line[1:], self.usrs))
+                for usr in list (filter (lambda usr : usr.id in splitted_line[1:], self.usrs)): 
+                    # free the resources held by that usr
+                    self.G.nodes[usr.C_u[usr.lvl]]['a'] += usr.B[usr.lvl]
+                    
+                    print (self.usrs)
+                    del usr
+                    print (self.usrs)
+                    exit ()
                 continue
         
-            self.rd_AP_line(splitted_line)
-            self.alg_top()
-            exit ()
-            self.alg_top ()
+            elif (splitted_line[0] == "new_or_moved:"):
+                # splitted_line = splitted_line[1:].split ('\n')[0]
+                print (splitted_line)
+                self.rd_AP_line(splitted_line[1:])
+                # self.alg_top()
+                # exit ()
+                continue
+        
     
     def alg_top (self):
         """
@@ -563,28 +586,38 @@ class SFC_mig_simulator (object):
         """
         splitted_line = line[0].split ("\n")[0].split (")")
         for tuple in splitted_line:
+            if (len(tuple) <= 1):
+                break
             tuple = tuple.split("(")
-            if (len(tuple) > 1):
-                tuple   = tuple[1].split (",")
-                usr_id  = int(tuple[0])
-                list_of_usr = list(filter (lambda usr : usr.id == usr_id, self.usrs))
-                if (len (list_of_usr) == 0): # New user
-                    usr = usr_c (id = usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, mig_cost=self.uniform_mig_cost, C_u=self.uniform_Cu, lvl = -1)
-                    self.usrs.append (usr)
-                else:
-                    usr = list_of_usr[0]
-                AP_id = int(tuple[1])
-                if (AP_id > self.num_of_leaves):
-                    print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
-                    exit  ()
+            # print ('b4 split', tuple)
+            tuple   = tuple[1].split (',')
 
-                s = self.ap2s[AP_id]
+            if (tuple[0] == 'n'): # new user
+                usr = usr_c (id = int(tuple[1]))
+                self.CPUAll_single_usr (usr)
+            else: # old, existing user, who moved
+                list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
+                usr = list_of_usr[0]
+                usr_cur_cpu = usr.B[usr.lvl]
+                self.CPUAll_single_usr (usr)
+                if (usr.lvl >= len (usr.B) and usr.B[usr.lvl] <= usr_cur_cpu): # can satisfy delay constraint while leaving the chain in its cur location and CPU budget 
+                        continue
+                
+                # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
+                self.G.nodes[cur_server_of(usr)]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+
+            AP_id = int(tuple[2])
+            if (AP_id > self.num_of_leaves):
+                print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
+                exit  ()
+
+            s = self.ap2s[AP_id]
+            usr.S_u.append (s)
+            self.G.nodes[s]['Hs'].append(usr)
+            for lvl in (range (len(usr.B)-1)):
+                s = self.parent_of(s)
                 usr.S_u.append (s)
-                self.G.nodes[s]['Hs'].append(usr)
-                for lvl in (range (len(usr.B)-1)):
-                    s = self.parent_of(s)
-                    usr.S_u.append (s)
-                    self.G.nodes[s]['Hs'].append(usr)                       
+                self.G.nodes[s]['Hs'].append(usr)                       
                     
 
     def calc_sol_cost_SS (self):

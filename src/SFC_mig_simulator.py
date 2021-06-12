@@ -77,8 +77,10 @@ class SFC_mig_simulator (object):
             A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
         b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
         b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        # print (A)
-        # print (b_ub)
+        print (A)
+        print (b_ub)
+        print (self.usrs)
+        exit ()
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
                        b_ub   = b_ub, 
@@ -437,12 +439,15 @@ class SFC_mig_simulator (object):
 
         # reset Hs        
         for s in self.G.nodes():
-            self.G.nodes[s]['Hs'] = []
+            self.G.nodes[s]['Hs'] = [] 
+            self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
 
         # Open input and output files
         self.ap_file  = open ("../res/" + self.usrs_ap_file_name, "r")  
         if (self.verbose == VERBOSE_RES_AND_LOG):
             self.init_log_file()
+            
+        self.usrs = []
 
         for line in self.ap_file: 
 
@@ -593,6 +598,7 @@ class SFC_mig_simulator (object):
             if (tuple[0] == 'n'): # new user
                 usr = usr_c (id = int(tuple[1]))
                 self.CPUAll_single_usr (usr)
+                self.usrs.append (usr)
             else: # old, existing user, who moved
                 list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
                 usr = list_of_usr[0]

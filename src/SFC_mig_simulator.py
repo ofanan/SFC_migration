@@ -304,22 +304,42 @@ class SFC_mig_simulator (object):
         self.num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
         self.cell_X_edge = self.max_X / self.num_of_APs_in_row
         self.cell_Y_edge = self.cell_X_edge
-    
+        
+        cur_ap_of_usr = [] # will hold pairs of (usr_id, cur_ap). 
         for line in usrs_loc_file: 
     
-            # Ignore comments lines
+            # remove the new-line character at the end (if any), and ignore comments lines 
+            line = line.split ('\n')[0] 
             if (line.split ("//")[0] == ""):
                 continue
     
             splitted_line = line.split (" ")
     
-            if (splitted_line[0] == "time"):
-                printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
+            # print (splitted_line[0])
+            if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'):
+                printf(self.ap_file, '{}\n' .format (line))
                 continue
     
-            elif (splitted_line[0] == "u"):
-                ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3])) 
-                printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
+            elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
+                printf(self.ap_file, 'new_or_moved: ')
+            
+            else: # now we know that this line details a user that either joined, or moved.
+                print (splitted_line)
+                type   = splitted_line[0] # type will be either 'n', or 'o' (new, old user, resp.).
+                usr_id = splitted_line[1]
+                nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
+                if (type == 'n'): # new vehicle
+                    printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
+                    cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
+                else: # old vehicle
+                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, cur_ap_of_usr))
+                    if (len (list_of_usr)== 0):
+                        print ('Inaal raback')
+                        exit ()
+                    if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
+                        continue
+                    printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
+                    list_of_usr[0]['ap'] = nxt_ap       
                 continue
     
         printf(self.ap_file, "\n")   
@@ -417,7 +437,7 @@ class SFC_mig_simulator (object):
         
         # Names of input files for the users' data, locations and / or current access points
         self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
-        self.usrs_loc_file_name   = "my_mob_sim.loc"  #input file containing the locations of all users along the simulation
+        self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
         self.usrs_ap_file_name    = 'mob_sim.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
@@ -463,7 +483,7 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))
                 continue
         
-            elif (splitted_line[0] == "usrs_that_left:"):
+            elif (splitted_line[0] == "users_that_left:"):
                 # usrs_that_left = list (filter (lambda: usr, usr.id in splitted_line[1:], self.usrs))
                 for usr in list (filter (lambda usr : usr.id in splitted_line[1:], self.usrs)): 
                     # free the resources held by that usr
@@ -668,7 +688,7 @@ if __name__ == "__main__":
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = 0)
     my_simulator.loc2ap ()
-
+    exit ()
     my_simulator.simulate()
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()

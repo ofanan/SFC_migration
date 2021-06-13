@@ -46,7 +46,7 @@ class SFC_mig_simulator (object):
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
-    # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
+    # # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
     loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
 
     # Returns the server to which a given user is currently assigned
@@ -299,29 +299,29 @@ class SFC_mig_simulator (object):
         self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
         usrs_loc_file = open ("../res/" + self.usrs_loc_file_name,  "r") 
         printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
-            
+    
         self.max_X, self.max_Y = 1000, 1000 # size of the square cell of each AP, in meters. 
         self.num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
-        self.cell_X_edge = max_X / self.num_of_APs_in_row
+        self.cell_X_edge = self.max_X / self.num_of_APs_in_row
         self.cell_Y_edge = self.cell_X_edge
-            
+    
         for line in usrs_loc_file: 
-        
+    
             # Ignore comments lines
             if (line.split ("//")[0] == ""):
                 continue
-
+    
             splitted_line = line.split (" ")
-
+    
             if (splitted_line[0] == "time"):
                 printf(self.ap_file, "\ntime = {}: " .format (splitted_line[2].rstrip()))
                 continue
-        
+    
             elif (splitted_line[0] == "u"):
                 ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3])) 
                 printf(self.ap_file, "({}, {})," .format (line.split (" ")[1], ap))
                 continue
-            
+    
         printf(self.ap_file, "\n")   
 
     def gen_parameterized_tree (self):
@@ -667,6 +667,8 @@ if __name__ == "__main__":
     # Gen static LP problem
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = 0)
+    my_simulator.loc2ap ()
+
     my_simulator.simulate()
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()

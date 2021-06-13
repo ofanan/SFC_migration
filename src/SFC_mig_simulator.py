@@ -317,11 +317,11 @@ class SFC_mig_simulator (object):
     
             # print (splitted_line[0])
             if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'):
-                printf(self.ap_file, '{}\n' .format (line))
+                printf(self.ap_file, '\n{}' .format (line))
                 continue
     
             elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
-                printf(self.ap_file, 'new_or_moved: ')
+                printf(self.ap_file, '\nnew_or_moved: ')
             
             else: # now we know that this line details a user that either joined, or moved.
                 print (splitted_line)
@@ -338,7 +338,7 @@ class SFC_mig_simulator (object):
                         exit ()
                     if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
                         continue
-                    printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
+                    printf(self.ap_file, "({},{},{})" .format (type,usr_id, nxt_ap))                
                     list_of_usr[0]['ap'] = nxt_ap       
                 continue
     

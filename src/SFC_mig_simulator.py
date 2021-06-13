@@ -77,10 +77,10 @@ class SFC_mig_simulator (object):
             A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
         b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
         b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        print (A)
-        print (b_ub)
-        print (self.usrs)
-        exit ()
+        # print (A)
+        # print (b_ub)
+        # print (self.usrs)
+        # exit ()
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
                        b_ub   = b_ub, 

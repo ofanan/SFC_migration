@@ -12,6 +12,6 @@
 
 # This is a comment. Below the execution commands
 whoami
-python ./hello_world.py
+python3.4 ./hello_world.py
 
 

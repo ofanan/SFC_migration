@@ -30,11 +30,11 @@ class loc2ap_c (object):
     
     
     def __init__(self, num_of_APs):
-        self.num_of_APs = num_of_APs
-        self.max_X, self.max_Y = 1000, 1000 # size of the square cell of each AP, in meters. 
-        self.num_of_APs_in_row = int (math.sqrt (self.num_of_APs)) #$$$ cast to int, floor  
-        self.cell_X_edge = self.max_X / self.num_of_APs_in_row
-        self.cell_Y_edge = self.cell_X_edge        
+        self.num_of_APs         = num_of_APs
+        self.max_X, self.max_Y  = 12000, 12000 # size of the square cell of each AP, in meters. 
+        self.num_of_APs_in_row  = int (math.sqrt (self.num_of_APs)) #$$$ cast to int, floor  
+        self.cell_X_edge        = self.max_X / self.num_of_APs_in_row
+        self.cell_Y_edge        = self.cell_X_edge    
     
     def loc2ap (self, usrs_loc_file_name):
         """
@@ -79,7 +79,7 @@ class loc2ap_c (object):
                         exit ()
                     if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
                         continue
-                    printf(self.ap_file, "({},{},{})" .format (type,usr_id, nxt_ap))                
+                    printf(self.ap_file, "({},{},{})" .format (type, usr_id, nxt_ap))                
                     list_of_usr[0]['ap'] = nxt_ap       
                 continue
     
@@ -87,5 +87,5 @@ class loc2ap_c (object):
     
 if __name__ == '__main__':
     my_loc2ap = loc2ap_c (num_of_APs = 4)
-    my_loc2ap.loc2ap (usrs_loc_file_name = 'short.loc')
+    my_loc2ap.loc2ap (usrs_loc_file_name = 'vehicles_1min.loc')
     

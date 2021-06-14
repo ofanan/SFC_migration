@@ -16,6 +16,7 @@ from cmath import sqrt
 VERBOSE_NO_OUTPUT             = 0
 VERBOSE_ONLY_RES              = 1 # Write to a file the total cost and rsrc aug. upon every event
 VERBOSE_RES_AND_LOG           = 2 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
+VERBOSE_RES_AND_DETAILED_LOG  = 3 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
 
 class SFC_mig_simulator (object):
 
@@ -60,10 +61,7 @@ class SFC_mig_simulator (object):
         id                  = 0
         for usr in changed_usrs:
             for lvl in range(len(usr.B)):
-                self.decision_vars.append (decision_var_c (id  = id, 
-                                                           usr = usr, 
-                                                           lvl = lvl, 
-                                                           s   = usr.S_u[lvl]))
+                self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
                 id += 1
 
         # Adding the CPU cap' constraints
@@ -86,10 +84,16 @@ class SFC_mig_simulator (object):
                        b_ub   = b_ub, 
                        bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
         
-        if (res.status==0): # successfully solved
-            for i in [i for i in range(len(res.x)) if res.x[i]>0]:
-                print ('u {} lvl {:.0f} loc {:.0f} val {:.2f}' 
-                       .format(self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
+        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            printf (self.res_output_file, 't{}.LP.stts{} {:.2f}' .format(self.t, res.status, res.fun))
+            printf (self.log_output_file, 't{}.LP.stts{} {:.2f}' .format(self.t, res.status, res.fun))
+            if (res.success): # successfully solved
+                printf (self.log_output_file, 'cost by LP = {:.2f}\n' .format(res.fun))
+                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                    for i in [i for i in range(len(res.x)) if res.x[i]>0]:
+                        printf (self.log_output_file, 'u {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
+                               self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
+                        printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))                    
         exit ()
 
     def reset_sol (self):
@@ -124,12 +128,14 @@ class SFC_mig_simulator (object):
         """
         Open the res file for writing and write initial comments line on it
         """
+        self.res_file_name = "../res/" + self.usrs_ap_file_name.split(".")[0] + ".res"  
         self.res_output_file = self.init_output_file(self.res_file_name)
 
     def init_log_file (self):
         """
         Open the log file for writing and write initial comments lines on it
         """
+        self.log_file_name = "../res/" + self.usrs_ap_file_name.split(".")[0] + ".log"  
         self.log_output_file = self.init_output_file(self.log_file_name)
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
         printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s.\n//C_s = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
@@ -290,59 +296,59 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "C_u"):              
                 self.usrs[id].C_u = int (line.split("=")[1].rstrip())
                             
-    def loc2ap (self):
-        """
-        Read the input about the users locations, 
-        and write the appropriate user-to-PoA connections to the file self.ap_file
-        Assume that each AP covers a square area
-        """
-        self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
-        usrs_loc_file = open ("../res/" + self.usrs_loc_file_name,  "r") 
-        printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
-    
-        self.max_X, self.max_Y = 1000, 1000 # size of the square cell of each AP, in meters. 
-        self.num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
-        self.cell_X_edge = self.max_X / self.num_of_APs_in_row
-        self.cell_Y_edge = self.cell_X_edge
-        
-        cur_ap_of_usr = [] # will hold pairs of (usr_id, cur_ap). 
-        for line in usrs_loc_file: 
-    
-            # remove the new-line character at the end (if any), and ignore comments lines 
-            line = line.split ('\n')[0] 
-            if (line.split ("//")[0] == ""):
-                continue
-    
-            splitted_line = line.split (" ")
-    
-            # print (splitted_line[0])
-            if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'):
-                printf(self.ap_file, '\n{}' .format (line))
-                continue
-    
-            elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
-                printf(self.ap_file, '\nnew_or_moved: ')
-            
-            else: # now we know that this line details a user that either joined, or moved.
-                print (splitted_line)
-                type   = splitted_line[0] # type will be either 'n', or 'o' (new, old user, resp.).
-                usr_id = splitted_line[1]
-                nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
-                if (type == 'n'): # new vehicle
-                    printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
-                    cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
-                else: # old vehicle
-                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, cur_ap_of_usr))
-                    if (len (list_of_usr)== 0):
-                        print ('Inaal raback')
-                        exit ()
-                    if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
-                        continue
-                    printf(self.ap_file, "({},{},{})" .format (type,usr_id, nxt_ap))                
-                    list_of_usr[0]['ap'] = nxt_ap       
-                continue
-    
-        printf(self.ap_file, "\n")   
+    # def loc2ap (self):
+    #     """
+    #     Read the input about the users locations, 
+    #     and write the appropriate user-to-PoA connections to the file self.ap_file
+    #     Assume that each AP covers a square area
+    #     """
+    #     self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
+    #     usrs_loc_file = open ("../res/" + self.usrs_loc_file_name,  "r") 
+    #     printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
+    #
+    #     self.max_X, self.max_Y = 1000, 1000 # size of the square cell of each AP, in meters. 
+    #     self.num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
+    #     self.cell_X_edge = self.max_X / self.num_of_APs_in_row
+    #     self.cell_Y_edge = self.cell_X_edge
+    #
+    #     cur_ap_of_usr = [] # will hold pairs of (usr_id, cur_ap). 
+    #     for line in usrs_loc_file: 
+    #
+    #         # remove the new-line character at the end (if any), and ignore comments lines 
+    #         line = line.split ('\n')[0] 
+    #         if (line.split ("//")[0] == ""):
+    #             continue
+    #
+    #         splitted_line = line.split (" ")
+    #
+    #         # print (splitted_line[0])
+    #         if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'):
+    #             printf(self.ap_file, '\n{}' .format (line))
+    #             continue
+    #
+    #         elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
+    #             printf(self.ap_file, '\nnew_or_moved: ')
+    #
+    #         else: # now we know that this line details a user that either joined, or moved.
+    #             print (splitted_line)
+    #             type   = splitted_line[0] # type will be either 'n', or 'o' (new, old user, resp.).
+    #             usr_id = splitted_line[1]
+    #             nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
+    #             if (type == 'n'): # new vehicle
+    #                 printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
+    #                 cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
+    #             else: # old vehicle
+    #                 list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, cur_ap_of_usr))
+    #                 if (len (list_of_usr)== 0):
+    #                     print ('Inaal raback')
+    #                     exit ()
+    #                 if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
+    #                     continue
+    #                 printf(self.ap_file, "({},{},{})" .format (type,usr_id, nxt_ap))                
+    #                 list_of_usr[0]['ap'] = nxt_ap       
+    #             continue
+    #
+    #     printf(self.ap_file, "\n")   
 
     def gen_parameterized_tree (self):
         """
@@ -438,13 +444,14 @@ class SFC_mig_simulator (object):
         # Names of input files for the users' data, locations and / or current access points
         self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
         self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name    = 'mob_sim.ap' #input file containing the APs of all users along the simulation
+        self.usrs_ap_file_name    = 'short.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
-        if (self.verbose == VERBOSE_ONLY_RES or self.verbose == VERBOSE_RES_AND_LOG):
-            self.res_file_name     = "run.res" 
-        if (self.verbose == VERBOSE_RES_AND_LOG):
-            self.log_file_name = "run.log" 
+        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            self.init_res_file() 
+        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            self.init_log_file() 
+             
         self.gen_parameterized_tree ()
 
         # Flags indicators for writing output to results and log files
@@ -479,20 +486,14 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
 
             if (splitted_line[0] == "t"):
-                if (self.verbose == VERBOSE_RES_AND_LOG):
-                    printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))
+                self.t = splitted_line[2]
+                if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+                    printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
                 continue
         
             elif (splitted_line[0] == "users_that_left:"):
-                # usrs_that_left = list (filter (lambda: usr, usr.id in splitted_line[1:], self.usrs))
-                for usr in list (filter (lambda usr : usr.id in splitted_line[1:], self.usrs)): 
-                    # free the resources held by that usr
-                    self.G.nodes[usr.C_u[usr.lvl]]['a'] += usr.B[usr.lvl]
-                    
-                    print (self.usrs)
-                    del usr
-                    print (self.usrs)
-                    exit ()
+                for usr in list (filter (lambda usr : usr.id in splitted_line[1:], self.usrs)):                     
+                    self.G.nodes[usr.C_u[usr.lvl]]['a'] += usr.B[usr.lvl] # free the resources held by that usr
                 continue
         
             elif (splitted_line[0] == "new_or_moved:"):
@@ -686,9 +687,7 @@ if __name__ == "__main__":
     
     # Gen static LP problem
     t = time.time()
-    my_simulator = SFC_mig_simulator (verbose = 0)
-    my_simulator.loc2ap ()
-    exit ()
+    my_simulator = SFC_mig_simulator (verbose = 1)
     my_simulator.simulate()
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()

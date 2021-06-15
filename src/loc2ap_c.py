@@ -25,8 +25,9 @@ VERBOSE_RES_AND_LOG           = 2 # Write to a file the total cost and rsrc aug.
 
 class loc2ap_c (object):
 
-    # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
-    loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
+    # # Currently unused.
+    # # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares, and a line-by-line cells numbering
+    # loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
     
     def loc2ap_sq_power_of_4 (self, x, y):
         """
@@ -36,21 +37,24 @@ class loc2ap_c (object):
         """
         ap = 0
         x_offset, y_offset = x, y
-        cur_edge = max_x / 2
-        for p in range (self.power_of_4):
-            ap += (2 * y_offset / cur_edge) + x_offset / cur_edge
-            cur_edge /= 2
+        cur_edge = self.max_x / 2
+        for p in range (self.max_power_of_4):
+            ap += 4**(1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
             x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge   
+            cur_edge /= 2  
+        print ('ap = ', ap)
+    
+    def __init__(self, num_of_APs=16, max_power_of_4=2):
+
+        self.max_x, self.max_y = 12000, 12000 # size of the square cell of each AP, in meters. 
+        self.max_power_of_4    = max_power_of_4    
+        self.num_of_APs        = 4**self.max_power_of_4
         
-    
-    
-    def __init__(self, num_of_APs):
-        self.num_of_APs         = num_of_APs
-        self.max_X, self.max_Y  = 12000, 12000 # size of the square cell of each AP, in meters. 
-        self.num_of_APs_in_row  = int (math.sqrt (self.num_of_APs)) #$$$ cast to int, floor  
-        self.cell_X_edge        = self.max_X / self.num_of_APs_in_row
-        self.cell_Y_edge        = self.cell_X_edge
-        self.power_of_4         = 1    
+        # # parameters to be used only for "line by line" cells' locations
+        # self.num_of_APs         = num_of_APs
+        # self.num_of_APs_in_row  = int (math.sqrt (self.num_of_APs)) #$$$ cast to int, floor  
+        # self.cell_X_edge        = self.max_x / self.num_of_APs_in_row
+        # self.cell_Y_edge        = self.cell_X_edge
     
     def loc2ap (self, usrs_loc_file_name):
         """
@@ -102,20 +106,19 @@ class loc2ap_c (object):
         printf(self.ap_file, "\n")   
     
 if __name__ == '__main__':
-    my_loc2ap = loc2ap_c (num_of_APs = 4)
+    my_loc2ap = loc2ap_c (max_power_of_4 = 2)
+    my_loc2ap.loc2ap_sq_power_of_4 (2999, 6999)
     
-    max_x = 12000
-    x, y = 11000, 11000
-    ap = int(0)
-    x_offset, y_offset = x, y
-    cur_edge = max_x / 2
-    for p in range (2):
-        ap += 4**(1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
-        x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge
-        print (x_offset, y_offset)   
-        cur_edge /= 2
+    # max_x = 12000
+    # x, y = 11000, 11000
+    # ap = int(0)
+    # x_offset, y_offset = x, y
+    # cur_edge = max_x / 2
+    # for p in range (2):
+    #     ap += 4**(1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
+    #     x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge
+    #     print (x_offset, y_offset)   
+    #     cur_edge /= 2
     
-    print ('ap = ', ap)
-    # my_loc2ap.loc2ap (3000, 3000)
     # my_loc2ap.loc2ap (usrs_loc_file_name = 'vehicles_1min.loc')
     

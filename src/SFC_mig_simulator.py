@@ -36,14 +36,11 @@ class SFC_mig_simulator (object):
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + (usr.S_u[usr.lvl] != usr.cur_s) * self.uniform_mig_cost * len (usr.theta_times_lambda) + self.CPU_cost_at_lvl[lvl] * usr.B[lvl]    
+    calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + (usr.S_u[usr.lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda) + self.CPU_cost_at_lvl[lvl] * usr.B[lvl]    
           
-    # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
-    calc_sol_rsrc_aug = lambda self, R : np.max ([(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) / self.G.nodes[s]['cpu cap'] for s in self.G.nodes()])
-         
-    # Calculate the CPU used in practice in each server in the current solution
-    used_cpu_in = lambda self, R : [(R * self.G.nodes[s]['cpu cap'] - self.G.nodes[s]['a']) for s in self.G.nodes()]
-
+    # Calculate the number of CPU units actually used in each server
+    used_cpu_in = lambda self: np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
+          
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
@@ -53,6 +50,15 @@ class SFC_mig_simulator (object):
     # Returns the server to which a given user is currently assigned
     cur_server_of = lambda usr: usr.S_u[usr.lvl] 
 
+    # def calc_rsrc_aug
+    # """
+    # # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
+    # """
+    #     used_cpu_in = self.used_cpu_in ()
+    #     calc_sol_rsrc_aug = lambda self: np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()])
+         
+
+    
     def solveByLp (self, changed_usrs):
         """
         Example of solving a problem using Python's LP capabilities.
@@ -85,16 +91,13 @@ class SFC_mig_simulator (object):
                        bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
         
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-            printf (self.res_output_file, 't{}.LP.stts{} {:.2f}' .format(self.t, res.status, res.fun))
-            printf (self.log_output_file, 't{}.LP.stts{} {:.2f}' .format(self.t, res.status, res.fun))
-            if (res.success): # successfully solved
-                printf (self.log_output_file, 'cost by LP = {:.2f}\n' .format(res.fun))
+            printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
+            printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
+            if (res.success == True): # successfully solved
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     for i in [i for i in range(len(res.x)) if res.x[i]>0]:
-                        printf (self.log_output_file, 'u {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
+                        printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
                                self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
-                        printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (splitted_line[2]))                    
-        exit ()
 
     def reset_sol (self):
         """"
@@ -140,12 +143,25 @@ class SFC_mig_simulator (object):
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
         printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s.\n//C_s = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
-    def print_sol (self):
+    def print_sol_to_res (self):
         """
         print a solution for DPM to the output log file 
         """
-        printf (self.log_output_file, 'phi = {:.0f}\n' .format (self.calc_sol_cost()))
-        used_cpu_in = np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])
+        used_cpu_in = self.used_cpu_in ()
+        printf (self.res_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
+            self.t, 
+            self.calc_sol_cost(),
+            np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]))) 
+
+    def print_sol_to_log (self):
+        """
+        print a solution for DPM to the output log file 
+        """
+        used_cpu_in = self.used_cpu_in ()
+        printf (self.log_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
+            self.t, 
+            self.calc_sol_cost(),
+            np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]))) 
         
         for s in self.G.nodes():
             printf (self.log_output_file, 's{} : used cpu={:.0f}, Cs={}\t chains {}\n' .format (
@@ -362,7 +378,7 @@ class SFC_mig_simulator (object):
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
-        self.link_cost_of_SSP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
+        self.link_cost_of_SSP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
         self.link_delay_of_SSP_at_lvl = [2 * sum([self.link_delay_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
         
         self.G = self.G.to_directed()
@@ -425,7 +441,7 @@ class SFC_mig_simulator (object):
         Init a toy example - topology (e.g., chains, VMs, target_delays etc.).
         """
         
-        self.verbose                = verbose
+        self.verbose                    = verbose
         
         # Network parameters
         self.tree_height                = 2
@@ -437,9 +453,6 @@ class SFC_mig_simulator (object):
         self.uniform_theta_times_lambda = [1,1]
         self.uniform_Cu                 = 15
         self.uniform_target_delay       = 10
-        
-        # INPUT / OUTPUT FILES
-        self.verbose = VERBOSE_RES_AND_LOG
         
         # Names of input files for the users' data, locations and / or current access points
         self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
@@ -498,10 +511,12 @@ class SFC_mig_simulator (object):
         
             elif (splitted_line[0] == "new_or_moved:"):
                 self.rd_AP_line(splitted_line[1:])
-                self.alg_top()
-                for usr in self.usrs: # prepare for the next iteration
-                     usr.cur_s = usr.nxt_s
                 self.solveByLp (self.usrs)
+                self.alg_top()
+                if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+                    self.print_sol_to_res()
+                for usr in self.usrs: # The solution found by alg_top for this iteration is the "cur_state" for next iteration
+                     usr.cur_s = usr.nxt_s
                 continue
         
     def binary_search (self):
@@ -523,9 +538,9 @@ class SFC_mig_simulator (object):
             exit ()
         
         # Now we know that we found an initial feasible sol 
-        if (self.verbose == VERBOSE_RES_AND_LOG):
-            printf (self.log_output_file, 'Initial solution:\n')
-            self.print_sol()
+        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+            printf (self.log_output_file, 'Binary search initial solution:\n')
+            self.print_sol_to_log()
                    
         ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
@@ -558,18 +573,20 @@ class SFC_mig_simulator (object):
         
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         if (not(self.bottom_up())):
+            if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+                printf (self.log_output_file, 'By binary search:\n')
             self.binary_search()
 
         # By hook or by crook, now we have a feasible solution        
-        if (self.verbose == VERBOSE_RES_AND_LOG):
+        if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'B4 push-up:\n')
-            self.print_sol()
+            self.print_sol_to_log()
             
         self.update_available_cpu_by_sol () # update the available capacity a at each server $$$ - isn't this already done by bottom-up?
         self.push_up ()
-        if (self.verbose == VERBOSE_RES_AND_LOG):
+        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'After push-up:\n')
-            self.print_sol()
+            self.print_sol_to_log()
 
     def update_available_cpu_by_sol (self):
         """
@@ -588,25 +605,31 @@ class SFC_mig_simulator (object):
         """
         
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
+            # print ('s = {}' .format (s))
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
+           
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
-                #print ('s = ', s, 'a = ', self.G.nodes[s]['a'], 'B = ', usr.B[lvl])                   
+                # print ('lvl = {}. trying usr {}, |Su| = {}' .format (lvl, usr.id, len (usr.B)))
                 if (self.G.nodes[s]['a'] > usr.B[lvl]): 
+                    # print ('assigned user {}' .format (usr.id))                   
                     usr.nxt_s = s
                     usr.lvl = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
-                elif (len (usr.B) == lvl):
+                elif (len (usr.B)-1 == lvl):
+                    # print ('bu rtrn false')
+                    # exit ()
                     return False
         return True
    
     def rd_AP_line (self, line):
         """
         Read a line in an ".ap" file.
-        An AP file details for each time t, the current AP of each user.
-        The user number and its current AP are written as a tuple. e.g.: 
-        (3, 2) means that user 3 is currently covered by user 2.
-        After reading the tuples, the function assigns each chain to its relevant list of chains, H-s.  
+        An AP file details for each time t, the user status (new/old), and the current AP of each user.
+        This is written as a tuple. e.g.: 
+        (n, 3, 2) means that user 3 is a new user, currently covered by user 2.
+        (o, 2, 4) means that user 2 is an old user, that moved towards AP 4.
+        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
         """
         splitted_line = line[0].split ("\n")[0].split (")")
         for tuple in splitted_line:
@@ -687,7 +710,7 @@ if __name__ == "__main__":
     
     # Gen static LP problem
     t = time.time()
-    my_simulator = SFC_mig_simulator (verbose = 1)
+    my_simulator = SFC_mig_simulator (verbose = VERBOSE_RES_AND_DETAILED_LOG)
     my_simulator.simulate()
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()

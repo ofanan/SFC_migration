@@ -42,7 +42,7 @@ class loc2ap_c (object):
             ap += 4**(1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
             x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge   
             cur_edge /= 2  
-        print ('ap = ', ap)
+        return ap
     
     def __init__(self, num_of_APs=16, max_power_of_4=2):
 
@@ -88,7 +88,13 @@ class loc2ap_c (object):
             else: # now we know that this line details a user that either joined, or moved.
                 type   = splitted_line[0] # type will be either 'n', or 'o' (new, old user, resp.).
                 usr_id = splitted_line[1]
-                nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
+                # nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
+                nxt_ap = self.loc2ap_sq_power_of_4 (float(splitted_line[2]), float(splitted_line[3]))
+                # print (float(splitted_line[2]), float(splitted_line[3]))
+                # print ('nxt ap = ', nxt_ap)
+                # nxt_ap = self.loc2ap_sq_power_of_4 (11000, 9300)
+                # print ('nxt ap = ', nxt_ap)
+                # exit ()
                 if (type == 'n'): # new vehicle
                     printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
                     cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
@@ -107,18 +113,6 @@ class loc2ap_c (object):
     
 if __name__ == '__main__':
     my_loc2ap = loc2ap_c (max_power_of_4 = 2)
-    my_loc2ap.loc2ap_sq_power_of_4 (2999, 6999)
+    my_loc2ap.loc2ap ('vehicles_1min.loc')
     
-    # max_x = 12000
-    # x, y = 11000, 11000
-    # ap = int(0)
-    # x_offset, y_offset = x, y
-    # cur_edge = max_x / 2
-    # for p in range (2):
-    #     ap += 4**(1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
-    #     x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge
-    #     print (x_offset, y_offset)   
-    #     cur_edge /= 2
-    
-    # my_loc2ap.loc2ap (usrs_loc_file_name = 'vehicles_1min.loc')
     

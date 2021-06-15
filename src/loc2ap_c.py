@@ -28,13 +28,29 @@ class loc2ap_c (object):
     # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
     loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
     
+    def loc2ap_sq_power_of_4 (self, x, y):
+        """
+        Finding the AP covering the user's area, assuming that the number of APs is a power of 4.
+        Input:  (x,y) location data
+        Output: ap that covers this area
+        """
+        ap = 0
+        x_offset, y_offset = x, y
+        cur_edge = max_x / 2
+        for p in range (self.power_of_4):
+            ap += (2 * y_offset / cur_edge) + x_offset / cur_edge
+            cur_edge /= 2
+            x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge   
+        
+    
     
     def __init__(self, num_of_APs):
         self.num_of_APs         = num_of_APs
         self.max_X, self.max_Y  = 12000, 12000 # size of the square cell of each AP, in meters. 
         self.num_of_APs_in_row  = int (math.sqrt (self.num_of_APs)) #$$$ cast to int, floor  
         self.cell_X_edge        = self.max_X / self.num_of_APs_in_row
-        self.cell_Y_edge        = self.cell_X_edge    
+        self.cell_Y_edge        = self.cell_X_edge
+        self.power_of_4         = 1    
     
     def loc2ap (self, usrs_loc_file_name):
         """
@@ -87,5 +103,19 @@ class loc2ap_c (object):
     
 if __name__ == '__main__':
     my_loc2ap = loc2ap_c (num_of_APs = 4)
-    my_loc2ap.loc2ap (usrs_loc_file_name = 'vehicles_1min.loc')
+    
+    max_x = 12000
+    x, y = 11000, 11000
+    ap = int(0)
+    x_offset, y_offset = x, y
+    cur_edge = max_x / 2
+    for p in range (2):
+        ap += 4**(1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
+        x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge
+        print (x_offset, y_offset)   
+        cur_edge /= 2
+    
+    print ('ap = ', ap)
+    # my_loc2ap.loc2ap (3000, 3000)
+    # my_loc2ap.loc2ap (usrs_loc_file_name = 'vehicles_1min.loc')
     

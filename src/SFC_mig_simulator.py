@@ -98,6 +98,8 @@ class SFC_mig_simulator (object):
                     for i in [i for i in range(len(res.x)) if res.x[i]>0]:
                         printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
                                self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
+            else: 
+                printf (self.log_output_file, '// status codes: 1: Iteration limit reached. 2. Infeasible. 3. Unbounded. 4. Numerical difficulties.\n')
 
     def reset_sol (self):
         """"

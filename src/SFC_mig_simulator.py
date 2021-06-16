@@ -279,102 +279,48 @@ class SFC_mig_simulator (object):
         target_delay, mig_cost, C_u
         """
             
-    def rd_usr_data (self):
-        """
-        Currently unused.
-        Read the input about the users (target_delay, traffic), and write it to the appropriate fields in self.
-        The input data is read from the file self.usrs_loc_file_name.
-        """
-        usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
-        self.usrs = []
-        
-        for line in usrs_data_file: 
-    
-            # Ignore comments lines
-            if (line.split ("//")[0] == ""):
-                continue
-
-            splitted_line = line.split (" ")
-
-            if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
-                id = int(splitted_line[0].split("u")[1])
-                self.usrs.append (usr_c(id = id))
-
-            elif (splitted_line[0] == "theta_times_lambda"):
-                theta_times_lambda = line.split("=")[1].rstrip().split(",")
-                self.usrs[id].theta_times_lambda = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
-
-            elif (splitted_line[0] == "target_delay"):              
-                self.usrs[id].target_delay = float (line.split("=")[1].rstrip())
-              
-            elif (splitted_line[0] == "mig_cost"):              
-                mig_cost = line.split("=")[1].rstrip().split(",")
-                self.usrs[id].mig_cost = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
-                
-            elif (splitted_line[0] == "C_u"):              
-                self.usrs[id].C_u = int (line.split("=")[1].rstrip())
-                            
-    # def loc2ap (self):
+    # def rd_usr_data (self):
     #     """
-    #     Read the input about the users locations, 
-    #     and write the appropriate user-to-PoA connections to the file self.ap_file
-    #     Assume that each AP covers a square area
+    #     Currently unused.
+    #     Read the input about the users (target_delay, traffic), and write it to the appropriate fields in self.
+    #     The input data is read from the file self.usrs_loc_file_name.
     #     """
-    #     self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
-    #     usrs_loc_file = open ("../res/" + self.usrs_loc_file_name,  "r") 
-    #     printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
+    #     usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
+    #     self.usrs = []
     #
-    #     self.max_X, self.max_Y = 1000, 1000 # size of the square cell of each AP, in meters. 
-    #     self.num_of_APs_in_row = int (math.sqrt (self.num_of_leaves)) #$$$ cast to int, floor  
-    #     self.cell_X_edge = self.max_X / self.num_of_APs_in_row
-    #     self.cell_Y_edge = self.cell_X_edge
+    #     for line in usrs_data_file: 
     #
-    #     cur_ap_of_usr = [] # will hold pairs of (usr_id, cur_ap). 
-    #     for line in usrs_loc_file: 
-    #
-    #         # remove the new-line character at the end (if any), and ignore comments lines 
-    #         line = line.split ('\n')[0] 
+    #         # Ignore comments lines
     #         if (line.split ("//")[0] == ""):
     #             continue
     #
     #         splitted_line = line.split (" ")
     #
-    #         # print (splitted_line[0])
-    #         if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'):
-    #             printf(self.ap_file, '\n{}' .format (line))
-    #             continue
+    #         if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
+    #             id = int(splitted_line[0].split("u")[1])
+    #             self.usrs.append (usr_c(id = id))
     #
-    #         elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
-    #             printf(self.ap_file, '\nnew_or_moved: ')
+    #         elif (splitted_line[0] == "theta_times_lambda"):
+    #             theta_times_lambda = line.split("=")[1].rstrip().split(",")
+    #             self.usrs[id].theta_times_lambda = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
     #
-    #         else: # now we know that this line details a user that either joined, or moved.
-    #             print (splitted_line)
-    #             type   = splitted_line[0] # type will be either 'n', or 'o' (new, old user, resp.).
-    #             usr_id = splitted_line[1]
-    #             nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
-    #             if (type == 'n'): # new vehicle
-    #                 printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
-    #                 cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
-    #             else: # old vehicle
-    #                 list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, cur_ap_of_usr))
-    #                 if (len (list_of_usr)== 0):
-    #                     print ('Inaal raback')
-    #                     exit ()
-    #                 if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
-    #                     continue
-    #                 printf(self.ap_file, "({},{},{})" .format (type,usr_id, nxt_ap))                
-    #                 list_of_usr[0]['ap'] = nxt_ap       
-    #             continue
+    #         elif (splitted_line[0] == "target_delay"):              
+    #             self.usrs[id].target_delay = float (line.split("=")[1].rstrip())
     #
-    #     printf(self.ap_file, "\n")   
-
+    #         elif (splitted_line[0] == "mig_cost"):              
+    #             mig_cost = line.split("=")[1].rstrip().split(",")
+    #             self.usrs[id].mig_cost = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
+    #
+    #         elif (splitted_line[0] == "C_u"):              
+    #             self.usrs[id].C_u = int (line.split("=")[1].rstrip())
+                            
     def gen_parameterized_tree (self):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS    = self.G.number_of_nodes()
-        self.CPU_cap_at_lvl    = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
+        self.cpu_cap_at_lvl    = np.array ([3 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint8')                
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
@@ -398,11 +344,12 @@ class SFC_mig_simulator (object):
                 self.ap2s[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
-                    self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = lvl # assume here a balanced tree
-                    self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
-                    self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_SSP_at_lvl[lvl]
-                    self.G.nodes[shortest_path[s][root][lvl]]['cpu cap']   = self.CPU_cap_at_lvl[lvl]                
-                    self.G.nodes[shortest_path[s][root][lvl]]['a']         = self.CPU_cap_at_lvl[lvl] # initially, there is no rsrc augmentation, and the available capacity of each server is exactly its CPU capacity.
+                    self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
+                    self.G.nodes[shortest_path[s][root][lvl]]['cpu cap']   = self.cpu_cap_at_lvl[lvl]                
+                    self.G.nodes[shortest_path[s][root][lvl]]['a']         = self.cpu_cap_at_lvl[lvl] # initially, there is no rsrc augmentation, and the available capacity of each server is exactly its CPU capacity.
+                    # # The lines below are for case one likes to vary the link and cpu costs of distinct servers on the same level. 
+                    # self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
+                    # self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_SSP_at_lvl[lvl]
                     # # Iterate over all children of node i
                     # for n in self.G.neighbors(i):
                     #     if (n > i):
@@ -456,9 +403,9 @@ class SFC_mig_simulator (object):
         self.uniform_target_delay       = 10
         
         # Names of input files for the users' data, locations and / or current access points
-        self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
-        self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name    = 'vehicles_1min.ap' #input file containing the APs of all users along the simulation
+        # self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
+        # self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
+        self.usrs_ap_file_name    = 'short.ap' #vehicles_1min.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
@@ -606,20 +553,16 @@ class SFC_mig_simulator (object):
         """
         
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
-            # print ('s = {}' .format (s))
+
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
            
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
-                # print ('lvl = {}. trying usr {}, |Su| = {}' .format (lvl, usr.id, len (usr.B)))
                 if (self.G.nodes[s]['a'] > usr.B[lvl]): 
-                    # print ('assigned user {}' .format (usr.id))                   
                     usr.nxt_s = s
                     usr.lvl = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
                 elif (len (usr.B)-1 == lvl):
-                    # print ('bu rtrn false')
-                    # exit ()
                     return False
         return True
    

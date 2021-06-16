@@ -372,7 +372,7 @@ class SFC_mig_simulator (object):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
-        self.G                 = nx.generators.classic.balanced_tree (r=self.tree_height, h=self.children_per_node) # Generate a tree of height h where each node has r children.
+        self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS    = self.G.number_of_nodes()
         self.CPU_cap_at_lvl    = [3 * (lvl+1) for lvl in range (self.tree_height+1)]                
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
@@ -391,7 +391,6 @@ class SFC_mig_simulator (object):
         self.ap2s             = np.zeros (len (self.G.nodes), dtype='int16') 
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
-        self.cpu_cost_at_root = 3^self.tree_height
         for s in self.G.nodes(): # for every server
             self.G.nodes[s]['id'] = s
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
@@ -403,12 +402,12 @@ class SFC_mig_simulator (object):
                     self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
                     self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_SSP_at_lvl[lvl]
                     self.G.nodes[shortest_path[s][root][lvl]]['cpu cap']   = self.CPU_cap_at_lvl[lvl]                
-                    self.G.nodes[shortest_path[s][root][lvl]]['a']         = self.CPU_cap_at_lvl[lvl] # initially, there is no rsrc augmentation, and the available capacity of each server is exactly its CPU capacity.                
+                    self.G.nodes[shortest_path[s][root][lvl]]['a']         = self.CPU_cap_at_lvl[lvl] # initially, there is no rsrc augmentation, and the available capacity of each server is exactly its CPU capacity.
                     # # Iterate over all children of node i
                     # for n in self.G.neighbors(i):
                     #     if (n > i):
                     #         print (n)
-        
+
         # Find parents of all nodes (except of the root)
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
@@ -446,8 +445,8 @@ class SFC_mig_simulator (object):
         self.verbose                    = verbose
         
         # Network parameters
-        self.tree_height                = 2
-        self.children_per_node          = 2 # num of children of every non-leaf node
+        self.tree_height                = 3
+        self.children_per_node          = 4 # num of children of every non-leaf node
         self.uniform_mig_cost           = 1
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -459,7 +458,7 @@ class SFC_mig_simulator (object):
         # Names of input files for the users' data, locations and / or current access points
         self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
         self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name    = 'short.ap' #input file containing the APs of all users along the simulation
+        self.usrs_ap_file_name    = 'vehicles_1min.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):

@@ -459,10 +459,18 @@ class SFC_mig_simulator (object):
         
             elif (splitted_line[0] == "new_or_moved:"):
                 self.rd_AP_line(splitted_line[1:])
+                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                    self.last_rt = time.time()
+                    printf (self.log_output_file, 'Starting LP\n')
                 self.solveByLp (self.usrs)
+                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                    printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+                    self.last_rt = time.time()
                 self.alg_top()
                 if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                     self.print_sol_to_res()
+                    if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                        printf (self.log_output_file, '\nSolved using our alg within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
                 for usr in self.usrs: # The solution found by alg_top for this iteration is the "cur_state" for next iteration
                      usr.cur_s = usr.nxt_s
                 continue

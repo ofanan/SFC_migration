@@ -163,15 +163,26 @@ class SFC_mig_simulator (object):
 
 
         model = plp.LpProblem(name="small-problem", sense=plp.LpMinimize)
-        self.decision_vars  = []
+        self.d_vars  = []
         id                  = 0
         for usr in self.usrs:
             for lvl in range(len(usr.B)):
-                lp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
-                self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], lp_var=lp_var))
-                model += (lp_var <= 5)
+                plp_lp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
+                self.d_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_lp_var=plp_lp_var))
                 id += 1
 
+        # Adding the CPU cap' constraints
+        expression = 2 * self.d_vars[0].plp_lp_var
+        print (expression)
+        expression += 2 * self.d_vars[1].plp_lp_var
+        print (expression)
+        # for s in self.G.nodes():
+        #     d_vars_using_s = list (filter (lambda item : item.s == s, self.d_vars))
+        #     #for decision_var in filter (lambda item : item.s == s, self.d_vars):
+        #     expression = [d_var.usr.B[d_var.lvl] * d_var.plp_lp_var] 
+        #
+        #
+        #         model += (lp_var <= 5)
         
         
         exit ()

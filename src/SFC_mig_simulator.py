@@ -57,8 +57,6 @@ class SFC_mig_simulator (object):
     #     used_cpu_in = self.used_cpu_in ()
     #     calc_sol_rsrc_aug = lambda self: np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()])
          
-
-    
     def solveByLp (self, changed_usrs):
         """
         Example of solving a problem using Python's LP capabilities.
@@ -85,6 +83,7 @@ class SFC_mig_simulator (object):
         # print (b_ub)
         # print (self.usrs)
         # exit ()
+        printf (self.log_output_file, 'next command - calling linprog\n')
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
                        b_ub   = b_ub, 

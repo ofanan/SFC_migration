@@ -1,0 +1,8 @@
+#!/bin/bash
+#SBATCH --partition main
+#SBATCH --job-name 1min
+#SBATCH --mail-user=itamarq@post.bgu.ac.il
+#SBATCH --mail-type=END
+echo "starting"
+python SFC_mig_simulator.py
+

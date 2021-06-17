@@ -5,6 +5,7 @@ import itertools
 import time
 import random
 import heapq
+import pulp as plp
 
 from usr_c import usr_c # class of the users
 from decision_var_c import decision_var_c # class of the decision variables
@@ -57,10 +58,111 @@ class SFC_mig_simulator (object):
     #     used_cpu_in = self.used_cpu_in ()
     #     calc_sol_rsrc_aug = lambda self: np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()])
          
-    def solveByLp (self, changed_usrs):
+    def solve_by_scipy_linprog (self, changed_usrs):
         """
-        Example of solving a problem using Python's LP capabilities.
+        Find a fractional optimal solution using Python's scipy.optimize.linprog library
         """
+        self.decision_vars  = []
+        id                  = 0
+        for usr in changed_usrs:
+            for lvl in range(len(usr.B)):
+                self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
+                id += 1
+
+        # Adding the CPU cap' constraints
+        # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
+        A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
+        for s in self.G.nodes():
+            for decision_var in filter (lambda item : item.s == s, self.decision_vars):
+                A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
+
+        for decision_var in self.decision_vars:
+            A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
+        b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
+        b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
+        # print (A)
+        # print (b_ub)
+        # print (self.usrs)
+        # exit ()
+        printf (self.log_output_file, 'next command - calling linprog\n')
+        res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
+                       A_ub   = A, 
+                       b_ub   = b_ub, 
+                       bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
+        
+        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
+            printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
+            if (res.success == True): # successfully solved
+                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                    for i in [i for i in range(len(res.x)) if res.x[i]>0]:
+                        printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
+                               self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
+            else: 
+                printf (self.log_output_file, '// status codes: 1: Iteration limit reached. 2. Infeasible. 3. Unbounded. 4. Numerical difficulties.\n')
+
+    def solve_by_plp (self):
+        """
+        Find a fractional optimal solution using Python's pulp library.
+        pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
+        """
+        # opt_model = plp.LpProblem(name="MIP Model")
+        #
+        # n = 10
+        # m = 5
+        # set_I = range(1, n+1)
+        # set_J = range(1, m+1)
+        # c = {(i,j): random.normalvariate(0,1) for i in set_I for j in set_J}
+        # a = {(i,j): random.normalvariate(0,5) for i in set_I for j in set_J}
+        # l = {(i,j): random.randint(0,10) for i in set_I for j in set_J}
+        # u = {(i,j): random.randint(10,20) for i in set_I for j in set_J}
+        # b = {j: random.randint(0,30) for j in set_J}
+        # x_vars  = {(i,j):
+        # plp.LpVariable(cat=plp.LpContinuous, 
+        #                lowBound=l[i,j], upBound=u[i,j], 
+        #                name="x_{0}_{1}".format(i,j)) 
+        # for i in set_I for j in set_J}
+        #
+        # # <= constraints
+        # constraints = {j : opt_model.addConstraint(
+        # plp.LpConstraint(
+        #              e=m(a[i,j] * x_vars[i,j] for i in set_I),
+        #              sense=plp.plp.LpConstraintLE,
+        #              rhs=b[j],
+        #              name="constraint_{0}".format(j))) for j in set_J}
+        # # >= constraints
+        # constraints = {j : opt_model.addConstraint(
+        # plp.LpConstraint(
+        #              e=plp.lpSum(a[i,j] * x_vars[i,j] for i in set_I),
+        #              sense=plp.LpConstraintGE,
+        #              rhs=b[j],
+        #              name="constraint_{0}".format(j)))
+        #        for j in set_J}
+        # # == constraints
+        # constraints = {j : opt_model.addConstraint(
+        # plp.LpConstraint(
+        #              e=plp.lpSum(a[i,j] * x_vars[i,j] for i in set_I),
+        #              sense=plp.LpConstraintEQ,
+        #              rhs=b[j],
+        #              name="constraint_{0}".format(j)))
+        #        for j in set_J}        
+        #
+        # objective = plp.lpSum(x_vars[i,j] * c[i,j] 
+        #             for i in set_I 
+        #             for j in set_J)
+        #
+        # # for minimization
+        # opt_model.sense = plp.LpMinimize
+        # solver_list = pl.listSolvers(onlyAvailable=True)
+        x = plp.LpVariable("x", 0, 3)
+        y = plp.LpVariable("y", 0, 1)
+        prob = plp.LpProblem("myProblem", plp.LpMinimize)
+        prob += x + y <= 2
+        prob += -4*x + y
+        status = prob.solve()
+
+        exit ()
+
         self.decision_vars  = []
         id                  = 0
         for usr in changed_usrs:
@@ -461,7 +563,7 @@ class SFC_mig_simulator (object):
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     self.last_rt = time.time()
                     printf (self.log_output_file, 'Starting LP\n')
-                self.solveByLp (self.usrs)
+                self.solve_by_plp ()
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
                     self.last_rt = time.time()

@@ -154,21 +154,27 @@ class SFC_mig_simulator (object):
         # # for minimization
         # opt_model.sense = plp.LpMinimize
         # solver_list = pl.listSolvers(onlyAvailable=True)
-        x = plp.LpVariable("x", 0, 3)
-        y = plp.LpVariable("y", 0, 1)
-        prob = plp.LpProblem("myProblem", plp.LpMinimize)
-        prob += x + y <= 2
-        prob += -4*x + y
-        status = prob.solve()
+        # x = plp.LpVariable("x", 0, 3)
+        # y = plp.LpVariable("y", 0, 1)
+        # prob = plp.LpProblem("myProblem", plp.LpMinimize)
+        # prob += x + y <= 2
+        # prob += -4*x + y
+        # status = prob.solve()
 
-        exit ()
 
+        model = plp.LpProblem(name="small-problem", sense=plp.LpMinimize)
         self.decision_vars  = []
         id                  = 0
-        for usr in changed_usrs:
+        for usr in self.usrs:
             for lvl in range(len(usr.B)):
-                self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
+                lp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
+                self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], lp_var=lp_var))
+                model += (lp_var <= 5)
                 id += 1
+
+        
+        
+        exit ()
 
         # Adding the CPU cap' constraints
         # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 

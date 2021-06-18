@@ -80,10 +80,6 @@ class SFC_mig_simulator (object):
             A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
         b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
         b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        # print (A)
-        # print (b_ub)
-        # print (self.usrs)
-        # exit ()
         printf (self.log_output_file, 'next command - calling linprog\n')
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
@@ -106,107 +102,43 @@ class SFC_mig_simulator (object):
         Find a fractional optimal solution using Python's pulp library.
         pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
         """
-        # opt_model = plp.LpProblem(name="MIP Model")
-        #
-        # n = 10
-        # m = 5
-        # set_I = range(1, n+1)
-        # set_J = range(1, m+1)
-        # c = {(i,j): random.normalvariate(0,1) for i in set_I for j in set_J}
-        # a = {(i,j): random.normalvariate(0,5) for i in set_I for j in set_J}
-        # l = {(i,j): random.randint(0,10) for i in set_I for j in set_J}
-        # u = {(i,j): random.randint(10,20) for i in set_I for j in set_J}
-        # b = {j: random.randint(0,30) for j in set_J}
-        # x_vars  = {(i,j):
-        # plp.LpVariable(cat=plp.LpContinuous, 
-        #                lowBound=l[i,j], upBound=u[i,j], 
-        #                name="x_{0}_{1}".format(i,j)) 
-        # for i in set_I for j in set_J}
-        #
-        # # <= constraints
-        # constraints = {j : opt_model.addConstraint(
-        # plp.LpConstraint(
-        #              e=m(a[i,j] * x_vars[i,j] for i in set_I),
-        #              sense=plp.plp.LpConstraintLE,
-        #              rhs=b[j],
-        #              name="constraint_{0}".format(j))) for j in set_J}
-        # # >= constraints
-        # constraints = {j : opt_model.addConstraint(
-        # plp.LpConstraint(
-        #              e=plp.lpSum(a[i,j] * x_vars[i,j] for i in set_I),
-        #              sense=plp.LpConstraintGE,
-        #              rhs=b[j],
-        #              name="constraint_{0}".format(j)))
-        #        for j in set_J}
-        # # == constraints
-        # constraints = {j : opt_model.addConstraint(
-        # plp.LpConstraint(
-        #              e=plp.lpSum(a[i,j] * x_vars[i,j] for i in set_I),
-        #              sense=plp.LpConstraintEQ,
-        #              rhs=b[j],
-        #              name="constraint_{0}".format(j)))
-        #        for j in set_J}        
-        #
-        # objective = plp.lpSum(x_vars[i,j] * c[i,j] 
-        #             for i in set_I 
-        #             for j in set_J)
-        #
-        # # for minimization
-        # opt_model.sense = plp.LpMinimize
-        # solver_list = pl.listSolvers(onlyAvailable=True)
-        # x = plp.LpVariable("x", 0, 3)
-        # y = plp.LpVariable("y", 0, 1)
-        # prob = plp.LpProblem("myProblem", plp.LpMinimize)
-        # prob += x + y <= 2
-        # prob += -4*x + y
-        # status = prob.solve()
 
-
-        model = plp.LpProblem(name="small-problem", sense=plp.LpMinimize)
-        self.d_vars  = []
-        id                  = 0
+        model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize)
+        self.d_vars  = [] # decision variables  
+        obj_func     = [] # objective function
+        id           = 0  # cntr for the id of the decision variables 
         for usr in self.usrs:
-            for lvl in range(len(usr.B)):
+            single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
+            for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
                 plp_lp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
                 self.d_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_lp_var=plp_lp_var))
+                single_place_const += plp_lp_var
+                obj_func           += self.calc_chain_cost_homo (usr, lvl) * plp_lp_var 
                 id += 1
+            model += (single_place_const == 1) # demand that each chain is placed in a single server
+        model += obj_func
 
-        # Adding the CPU cap' constraints
-        expression = 2 * self.d_vars[0].plp_lp_var
-        print (expression)
-        expression += 2 * self.d_vars[1].plp_lp_var
-        print (expression)
-        # for s in self.G.nodes():
-        #     d_vars_using_s = list (filter (lambda item : item.s == s, self.d_vars))
-        #     #for decision_var in filter (lambda item : item.s == s, self.d_vars):
-        #     expression = [d_var.usr.B[d_var.lvl] * d_var.plp_lp_var] 
-        #
-        #
-        #         model += (lp_var <= 5)
-        
-        
-        exit ()
-
-        # Adding the CPU cap' constraints
-        # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
-        A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
         for s in self.G.nodes():
-            for decision_var in filter (lambda item : item.s == s, self.decision_vars):
-                A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
+            cpu_cap_const = []
+            for d_var in list (filter (lambda item : item.s == s, self.d_vars)): # for every decision variable meaning placing a chain on this server 
+                cpu_cap_const += (d_var.usr.B[d_var.lvl] * d_var.plp_lp_var) # Add the overall cpu of this chain, if located on s
+            if (cpu_cap_const != []):
+                model += (cpu_cap_const <= self.G.nodes[s]['cpu cap']) 
 
-        for decision_var in self.decision_vars:
-            A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
-        b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
-        b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        # print (A)
-        # print (b_ub)
-        # print (self.usrs)
-        # exit ()
-        printf (self.log_output_file, 'next command - calling linprog\n')
-        res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
-                       A_ub   = A, 
-                       b_ub   = b_ub, 
-                       bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
+        printf (self.log_output_file, 'next command - calling pulp\n')
+        
+        # solve using another solver: solve(GLPK(msg = 0))
+        model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
+        
+        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            printf (self.res_output_file, 't{}.plp.stts{} {:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+                                                                            #plp.LpStatus[model.status]))
+        if (model.status == 1 and self.verbose == VERBOSE_RES_AND_DETAILED_LOG): # successfully solved
+            for d_var in self.d_vars: 
+                if d_var.plp_lp_var.value() > 0:
+                    printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
+                           d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
+        exit ()
         
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))

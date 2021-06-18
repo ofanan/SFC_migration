@@ -373,7 +373,7 @@ class SFC_mig_simulator (object):
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         self.NUM_OF_SERVERS    = self.G.number_of_nodes()
-        self.cpu_cap_at_lvl    = np.array ([3 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint8')                
+        self.cpu_cap_at_lvl    = np.array ([100 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint8')                
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.

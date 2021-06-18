@@ -133,23 +133,26 @@ class SFC_mig_simulator (object):
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.res_output_file, 't{}.plp.stts{} {:.2f}\n' .format(self.t, model.status, model.objective.value())) 
                                                                             #plp.LpStatus[model.status]))
-        if (model.status == 1 and self.verbose == VERBOSE_RES_AND_DETAILED_LOG): # successfully solved
-            for d_var in self.d_vars: 
-                if d_var.plp_lp_var.value() > 0:
-                    printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
-                           d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
+        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG): # successfully solved
+            if (model.status == 1): 
+                for d_var in self.d_vars: 
+                    if d_var.plp_lp_var.value() > 0:
+                        printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
+                               d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
+            else:
+                printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
         exit ()
         
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
             printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-            if (res.success == True): # successfully solved
-                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+            if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                if (res.success == True): # successfully solved
                     for i in [i for i in range(len(res.x)) if res.x[i]>0]:
                         printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
                                self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
             else: 
-                printf (self.log_output_file, '// status codes: 1: Iteration limit reached. 2. Infeasible. 3. Unbounded. 4. Numerical difficulties.\n')
+                printf (self.log_output_file, '//Failed. status = {}\n' .format )
 
     def reset_sol (self):
         """"
@@ -475,6 +478,7 @@ class SFC_mig_simulator (object):
 
     def simulate (self):
 
+        print ('Simulating. num of leaves = {}. ap file = {}' .format (self.num_of_leaves, self.usrs_ap_file_name))
         # reset Hs        
         for s in self.G.nodes():
             self.G.nodes[s]['Hs'] = [] 

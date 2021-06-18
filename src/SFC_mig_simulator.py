@@ -58,13 +58,13 @@ class SFC_mig_simulator (object):
     #     used_cpu_in = self.used_cpu_in ()
     #     calc_sol_rsrc_aug = lambda self: np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()])
          
-    def solve_by_scipy_linprog (self, changed_usrs):
+    def solve_by_scipy_linprog (self):
         """
         Find a fractional optimal solution using Python's scipy.optimize.linprog library
         """
         self.decision_vars  = []
         id                  = 0
-        for usr in changed_usrs:
+        for usr in self.usrs:
             for lvl in range(len(usr.B)):
                 self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
                 id += 1
@@ -80,7 +80,7 @@ class SFC_mig_simulator (object):
             A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
         b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
         b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        printf (self.log_output_file, 'next command - calling linprog\n')
+        printf (self.log_output_file, 'next command - calling scipy_linprog\n')
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
                        b_ub   = b_ub, 
@@ -132,6 +132,8 @@ class SFC_mig_simulator (object):
         
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.res_output_file, 't{}.plp.stts{} {:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+            if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+                printf (self.log_output_file, 't{}.plp.stts{} {:.2f}\n' .format(self.t, model.status, model.objective.value())) 
                                                                             #plp.LpStatus[model.status]))
         if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG): # successfully solved
             if (model.status == 1): 
@@ -141,19 +143,7 @@ class SFC_mig_simulator (object):
                                d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
             else:
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
-        exit ()
         
-        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-            printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-            printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-            if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                if (res.success == True): # successfully solved
-                    for i in [i for i in range(len(res.x)) if res.x[i]>0]:
-                        printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
-                               self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
-            else: 
-                printf (self.log_output_file, '//Failed. status = {}\n' .format )
-
     def reset_sol (self):
         """"
         reset the solution - namely, the placement of each user to a concrete level in the tree, and to a concrete server
@@ -372,8 +362,7 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.NUM_OF_SERVERS    = self.G.number_of_nodes()
-        self.cpu_cap_at_lvl    = np.array ([100 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint8')                
+        self.cpu_cap_at_lvl    = np.array ([1000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
@@ -451,9 +440,9 @@ class SFC_mig_simulator (object):
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 1
-        self.uniform_theta_times_lambda = [1,1]
-        self.uniform_Cu                 = 15
-        self.uniform_target_delay       = 10
+        self.uniform_theta_times_lambda = [1, 1]
+        self.uniform_Cu                 = 10
+        self.uniform_target_delay       = 30
         
         # Names of input files for the users' data, locations and / or current access points
         # self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
@@ -517,9 +506,11 @@ class SFC_mig_simulator (object):
                     self.last_rt = time.time()
                     printf (self.log_output_file, 'Starting LP\n')
                 self.solve_by_plp ()
+                # self.solve_by_scipy_linprog ()
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
                     self.last_rt = time.time()
+                exit ()
                 self.alg_top()
                 if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                     self.print_sol_to_res()
@@ -646,7 +637,11 @@ class SFC_mig_simulator (object):
             tuple   = tuple[1].split (',')
 
             if (tuple[0] == 'n'): # new user
-                usr = usr_c (id = int(tuple[1]))
+        
+                usr = usr_c (id = int(tuple[1]), 
+                             theta_times_lambda=self.uniform_theta_times_lambda,
+                             target_delay = 15,
+                             C_u = 10)
                 self.CPUAll_single_usr (usr)
                 self.usrs.append (usr)
             else: # old, existing user, who moved

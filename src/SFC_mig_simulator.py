@@ -49,7 +49,7 @@ class SFC_mig_simulator (object):
     loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
 
     # Returns the server to which a given user is currently assigned
-    cur_server_of = lambda usr: usr.S_u[usr.lvl] 
+    cur_server_of = lambda self, usr: usr.S_u[usr.lvl] 
 
     # def calc_rsrc_aug
     # """
@@ -80,7 +80,6 @@ class SFC_mig_simulator (object):
             A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
         b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
         b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        printf (self.log_output_file, 'next command - calling scipy_linprog\n')
         res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
                        A_ub   = A, 
                        b_ub   = b_ub, 
@@ -131,9 +130,9 @@ class SFC_mig_simulator (object):
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
         
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-            printf (self.res_output_file, 't{}.plp.stts{} {:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+            printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-                printf (self.log_output_file, 't{}.plp.stts{} {:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+                printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
                                                                             #plp.LpStatus[model.status]))
         if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG): # successfully solved
             if (model.status == 1): 
@@ -440,14 +439,14 @@ class SFC_mig_simulator (object):
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 1
-        self.uniform_theta_times_lambda = [1, 1]
-        self.uniform_Cu                 = 10
-        self.uniform_target_delay       = 30
+        self.uniform_theta_times_lambda = [1, 1, 1]
+        self.uniform_Cu                 = 15
+        self.uniform_target_delay       = 20
         
         # Names of input files for the users' data, locations and / or current access points
         # self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
         # self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name    = 'short.ap' #vehicles_1min.ap' #input file containing the APs of all users along the simulation
+        self.usrs_ap_file_name    = 'vehicles_1min.ap' #vehicles_1min.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
@@ -510,7 +509,6 @@ class SFC_mig_simulator (object):
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
                     self.last_rt = time.time()
-                exit ()
                 self.alg_top()
                 if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                     self.print_sol_to_res()
@@ -564,8 +562,6 @@ class SFC_mig_simulator (object):
                 ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])        
             else:
                 lb = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
-                
-    
     
     def alg_top (self):
         """
@@ -653,7 +649,7 @@ class SFC_mig_simulator (object):
                         continue
                 
                 # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
-                self.G.nodes[cur_server_of(usr)]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+                self.G.nodes[self.cur_server_of(usr)]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
 
             AP_id = int(tuple[2])
             if (AP_id > self.num_of_leaves):

@@ -20,5 +20,3 @@ alias h=history
 alias gitter="git stash; git pull origin master"
 # export SUMO_HOME="/home/itamarq/.conda/envs/py37/lib/python3.7/site-packages/sumo/"
 # export PYTHON_PATH="/home/itamarq/.conda/envs/py37/lib/python3.7/site-packages/sumolib"
-
-

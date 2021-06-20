@@ -234,10 +234,13 @@ class SFC_mig_simulator (object):
         heapq._heapify_max(self.usrs)
  
         n = 0  
+
         while n < len (self.usrs):
             usr = self.usrs[n]
-            for lvl in range (len(usr.B)-1, usr.lvl, -1): #  
-                if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl                     
+            for lvl in range (len(usr.B)-1, usr.lvl, -1): #                  
+                if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
+                    if (self.t == 27027 and lvl ==3):
+                        print ('s[0][a] = {}' .format(self.G.nodes[0]['a']))                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
@@ -272,7 +275,6 @@ class SFC_mig_simulator (object):
                             max_reduction = reduction 
             if (max_reduction == 0): # cannot decrease cost anymore
                 break
-            print ('max_reduction = ', max_reduction)
             
             # move usr2mov from its current lvl to lvl_star, and update Y, a, accordingly
             self.G.nodes [usr2mov.S_u[usr2mov.lvl]] ['a'] += usr2mov.B[usr2mov.lvl] # inc the available CPU at the prev loc of the moved usr
@@ -440,13 +442,13 @@ class SFC_mig_simulator (object):
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 1
         self.uniform_theta_times_lambda = [1, 1, 1]
-        self.uniform_Cu                 = 15
+        self.uniform_Cu                 = 15 
         self.uniform_target_delay       = 20
         
         # Names of input files for the users' data, locations and / or current access points
         # self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
         # self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name    = 'vehicles_1min.ap' #vehicles_1min.ap' #input file containing the APs of all users along the simulation
+        self.usrs_ap_file_name = 'vehicles_1min.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
@@ -489,7 +491,9 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
 
             if (splitted_line[0] == "t"):
-                self.t = splitted_line[2]
+                self.t = int(splitted_line[2])
+                if (self.t > 27027):
+                    exit ()
                 if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
                 continue
@@ -504,7 +508,7 @@ class SFC_mig_simulator (object):
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     self.last_rt = time.time()
                     printf (self.log_output_file, 'Starting LP\n')
-                self.solve_by_plp ()
+                # self.solve_by_plp ()
                 # self.solve_by_scipy_linprog ()
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
@@ -532,6 +536,7 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['cur RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
             self.G.nodes[s]['a']       = self.G.nodes[s]['cur RCs'] #currently-available rsrcs at server s  
 
+        print ('In binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
         if (not (self.bottom_up ())):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
@@ -573,13 +578,14 @@ class SFC_mig_simulator (object):
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                 printf (self.log_output_file, 'By binary search:\n')
             self.binary_search()
+            print ('After binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
+
 
         # By hook or by crook, now we have a feasible solution        
         if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'B4 push-up:\n')
             self.print_sol_to_log()
             
-        self.update_available_cpu_by_sol () # update the available capacity a at each server $$$ - isn't this already done by bottom-up?
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'After push-up:\n')
@@ -588,7 +594,8 @@ class SFC_mig_simulator (object):
     def update_available_cpu_by_sol (self):
         """
         Update the available capacity at each server to: 
-        the (possibly augmented) CPU capacity at this server - the total CPU assigned to users by the solution 
+        the (possibly augmented) CPU capacity at this server - the total CPU assigned to users by the solution.
+        NOTE: this function assumes that every user is already exclusively located in its "nxt_s" location! 
         """
         for s in self.G.nodes():
             self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s == s])                
@@ -607,7 +614,7 @@ class SFC_mig_simulator (object):
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
            
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
-                if (self.G.nodes[s]['a'] > usr.B[lvl]): 
+                if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
@@ -629,7 +636,6 @@ class SFC_mig_simulator (object):
             if (len(tuple) <= 1):
                 break
             tuple = tuple.split("(")
-            # print ('b4 split', tuple)
             tuple   = tuple[1].split (',')
 
             if (tuple[0] == 'n'): # new user

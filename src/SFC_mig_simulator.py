@@ -197,6 +197,7 @@ class SFC_mig_simulator (object):
         """
         print a solution for DPM to the output log file 
         """
+        return
         used_cpu_in = self.used_cpu_in ()
         printf (self.res_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
             self.t, 
@@ -213,12 +214,15 @@ class SFC_mig_simulator (object):
             self.calc_sol_cost(),
             np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]))) 
         
-        for s in self.G.nodes():
-            printf (self.log_output_file, 's{} : used cpu={:.0f}, Cs={}\t chains {}\n' .format (
-                    s,
-                    sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),
-                    self.G.nodes[s]['cpu cap'],
-                    [usr.id for usr in self.usrs if usr.nxt_s==s]))
+        s = 0
+        printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu direct={:.0f}, Cs={}\t chains {}\n' .format (
+                s,
+                self.G.nodes[s]['cur RCs'],
+                self.G.nodes[s]['a'],
+                sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),
+                #used_cpu_in[s],
+                self.G.nodes[s]['cpu cap'],
+                [usr.id for usr in self.usrs if usr.nxt_s==s]))
 
     def print_heap (self):
         """
@@ -241,11 +245,15 @@ class SFC_mig_simulator (object):
  
         n = 0  # num of failing push-up tries in sequence; when this number reaches the number of users, return
 
+        if (self.t == 27027):
+            printf (self.log_output_file, 'In push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
+                (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))     
+
         while n < len (self.usrs):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
-                # if (self.t == 27027 and usr.S_u[lvl] == 0):
-                #     printf (self.log_output_file, '\ns[0][cur RCs] = {}, s[0][a] = {}' .format (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))
+                if (self.t == 27027 and usr.S_u[lvl] == 0):
+                    printf (self.log_output_file, '\nn = {}, s[0][cur RCs] = {}, s[0][a] = {}' .format (n, self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))
                 # print ('s = {}' .format (usr.S_u[lvl]))
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
                     # if (lvl ==3 and self.t == 27027): 
@@ -259,8 +267,8 @@ class SFC_mig_simulator (object):
                     
                     # update the moved usr's location in the heap
                     self.usrs[n] = self.usrs[-1] # replace the usr to push-up with the last usr in the heap
-                    self.usrs.pop()
-                    heapq.heappush(self.usrs, usr)
+                    self.usrs.pop() # pop the last user from the heap
+                    heapq.heappush(self.usrs, usr) # push back to the heap the user we have just pushed-up
                     n = 0 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             n += 1
@@ -507,9 +515,19 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
                 continue
         
-            elif (splitted_line[0] == "users_that_left:"):
-                for usr in list (filter (lambda usr : usr.id in splitted_line[1:], self.usrs)):                     
-                    self.G.nodes[usr.C_u[usr.lvl]]['a'] += usr.B[usr.lvl] # free the resources held by that usr
+            elif (splitted_line[0] == "usrs_that_left:"):
+                # print ('splitted_line[1:] is {}' .format ( splitted_line[1:]))
+                usr_ids = [ int(i) for i in splitted_line[1:] if i != '']
+                for usr in list (filter (lambda usr : usr.id in usr_ids, self.usrs)): 
+                # for usr in list (filter (lambda usr : usr.id==523, self.usrs)): 
+                    print ('usr id is {}' .format (usr.id))             
+                    print ('Bingo!')
+                    exit ()
+                    self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the resources held by that usr       
+                    # self.G.nodes[usr.C_u[usr.lvl]]['a'] += usr.B[usr.lvl] # free the resources held by that usr
+                    self.usrs.remove (usr)
+                    #$$$$$$$$$ remove that User
+                    #update Hs
                 continue
         
             elif (splitted_line[0] == "new_or_moved:"):
@@ -566,7 +584,7 @@ class SFC_mig_simulator (object):
                 # print ('s[1][cur RCs] = {}' .format (s, self.G.nodes[1]['cur RCs']))
                 # print ('s[1][a] = {}' .format (s, self.G.nodes[1]['a']))
                 used_cpu = self.used_cpu_in ()
-                print ('used cpu in s[1] = {}' .format (used_cpu[1]))
+                print ('used cpu in s[0] = {}' .format (used_cpu[0 ]))
                 return 
 
             # Update the available capacity at each server according to the value of resource augmentation for this iteration            
@@ -612,15 +630,16 @@ class SFC_mig_simulator (object):
 
         # By hook or by crook, now we have a feasible solution        
         if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
-            printf (self.log_output_file, 'B4 push-up:\n')
+            printf (self.log_output_file, 'B4 push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
+                   (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))     
             self.print_sol_to_log()
         
-        if (self.t == 27027):      
-            print ('b4 calling push-up: s[0][curRCs] = {}, s[0][a] = {}' .format (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))    
+        # if (self.t == 27027):      
             # print ('b4 calling push-up: s[1][a] = {}' .format (self.G.nodes[1]['a']))    
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-            printf (self.log_output_file, 'After push-up:\n')
+            printf (self.log_output_file, 'after push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
+                   (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))     
             self.print_sol_to_log()
 
     def update_available_cpu_by_sol (self):
@@ -645,6 +664,8 @@ class SFC_mig_simulator (object):
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
            
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
+                if (s == 0):
+                    printf (self.log_output_file, 'in bottom_up. a = {}\n' .format (self.G.nodes[0]['a']))
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl = lvl

@@ -33,9 +33,6 @@ class SFC_mig_simulator (object):
     # Returns the parent of a given server
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
-    # # Find the server on which a given user is located, by its lvl
-    loc_of_user = lambda self, usr : usr.S_u[usr.lvl]
-
     # calculate the total cost of a solution
     calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
    
@@ -242,11 +239,14 @@ class SFC_mig_simulator (object):
         # before calling push-up ()
         heapq._heapify_max(self.usrs)
  
-        n = 0  
+        n = 0  # num of failing push-up tries in sequence; when this number reaches the number of users, return
 
         while n < len (self.usrs):
             usr = self.usrs[n]
-            for lvl in range (len(usr.B)-1, usr.lvl, -1): #                  
+            for lvl in range (len(usr.B)-1, usr.lvl, -1): #
+                # if (self.t == 27027 and usr.S_u[lvl] == 0):
+                #     printf (self.log_output_file, '\ns[0][cur RCs] = {}, s[0][a] = {}' .format (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))
+                # print ('s = {}' .format (usr.S_u[lvl]))
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
                     # if (lvl ==3 and self.t == 27027): 
                     #     print ('s[0][a] = {}' .format(self.G.nodes[0]['a']))                     
@@ -261,7 +261,7 @@ class SFC_mig_simulator (object):
                     self.usrs[n] = self.usrs[-1] # replace the usr to push-up with the last usr in the heap
                     self.usrs.pop()
                     heapq.heappush(self.usrs, usr)
-                    n = -1 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
+                    n = 0 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             n += 1
                             
@@ -545,15 +545,14 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['cur RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
             self.G.nodes[s]['a']       = self.G.nodes[s]['cur RCs'] #currently-available rsrcs at server s  
 
-        print ('t = {}. In binary search: s[1][a] = {}' .format(self.t, self.G.nodes[1]['a']))
         if (not (self.bottom_up ())):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
         
         # Now we know that we found an initial feasible sol 
-        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-            printf (self.log_output_file, 'Binary search initial solution:\n')
-            self.print_sol_to_log()
+        # if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+        #     printf (self.log_output_file, 'Binary search initial solution:\n')
+        #     self.print_sol_to_log()
                    
         ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
@@ -602,9 +601,9 @@ class SFC_mig_simulator (object):
         if (not(self.bottom_up())):
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                 printf (self.log_output_file, 'By binary search:\n')
-            print ('bottom_up failed. Calling binary search.')
+            # print ('bottom_up failed. Calling binary search.')
             self.binary_search()
-            print ('After binary search: s[1][cur RCs] = {}' .format(self.G.nodes[1]['cur RCs']))
+            # print ('After binary search: s[1][cur RCs] = {}' .format(self.G.nodes[1]['cur RCs']))
         # printf (self.log_output_file, 'By binary search:\n')
         # self.binary_search()
         # print ('After binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
@@ -617,7 +616,8 @@ class SFC_mig_simulator (object):
             self.print_sol_to_log()
         
         if (self.t == 27027):      
-            print ('b4 calling push-up: s[1][a] = {}' .format (self.G.nodes[1]['a']))    
+            print ('b4 calling push-up: s[0][curRCs] = {}, s[0][a] = {}' .format (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))    
+            # print ('b4 calling push-up: s[1][a] = {}' .format (self.G.nodes[1]['a']))    
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'After push-up:\n')

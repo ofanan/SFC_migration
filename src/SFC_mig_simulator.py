@@ -1,3 +1,8 @@
+# Bugs: 
+# 1. Bottom-up seems to run each time on all users, rather than only on new users. (Hs?)
+# 2. binary_search doesn't init / resets the available cap' at each server correctly 
+# 3. Should comment-in the call to plp, and to bottom_up only for critical chains in alg_top
+
 import networkx as nx
 import numpy as np
 import math
@@ -50,7 +55,7 @@ class SFC_mig_simulator (object):
 
     # Returns the server to which a given user is currently assigned
     cur_server_of = lambda self, usr: usr.S_u[usr.lvl] 
-
+   
     # def calc_rsrc_aug
     # """
     # # Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
@@ -58,6 +63,18 @@ class SFC_mig_simulator (object):
     #     used_cpu_in = self.used_cpu_in ()
     #     calc_sol_rsrc_aug = lambda self: np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()])
          
+    def reset_sol (self):
+        """
+        Reset the solution, namely, Dis-place all users. This is done by: 
+        1. Resetting the placement of each user to a concrete level in the tree, and to a concrete server.
+        2. Init the available cpu at each server to its (possibly augmented) cpu capacity. 
+        """
+        for usr in self.usrs:
+            usr.lvl = -1
+            usr.nxt_s = -1
+        for s in self.G.nodes():
+            self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs']  
+
     def solve_by_scipy_linprog (self):
         """
         Find a fractional optimal solution using Python's scipy.optimize.linprog library
@@ -143,14 +160,6 @@ class SFC_mig_simulator (object):
             else:
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
         
-    def reset_sol (self):
-        """"
-        reset the solution - namely, the placement of each user to a concrete level in the tree, and to a concrete server
-        - usr.lvl
-        """
-        for usr in self.usrs:
-            usr.lvl   = -1
-            usr.nxt_s = -1
 
     def print_cost_per_usr (self):
         """
@@ -239,12 +248,12 @@ class SFC_mig_simulator (object):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #                  
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
-                    if (self.t == 27027 and lvl ==3):
-                        print ('s[0][a] = {}' .format(self.G.nodes[0]['a']))                     
+                    # if (lvl ==3 and self.t == 27027): 
+                    #     print ('s[0][a] = {}' .format(self.G.nodes[0]['a']))                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
-                    # update usr.lvl accordingly and usr.nxt_s
+                    # update usr.lvl and usr.nxt_s accordingly 
                     usr.lvl      = lvl               
                     usr.nxt_s    = usr.S_u[usr.lvl]    
                     
@@ -508,7 +517,7 @@ class SFC_mig_simulator (object):
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     self.last_rt = time.time()
                     printf (self.log_output_file, 'Starting LP\n')
-                # self.solve_by_plp ()
+                # self.solve_by_plp () #$$$$$$$$
                 # self.solve_by_scipy_linprog ()
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
@@ -536,7 +545,7 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['cur RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
             self.G.nodes[s]['a']       = self.G.nodes[s]['cur RCs'] #currently-available rsrcs at server s  
 
-        print ('In binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
+        print ('t = {}. In binary search: s[1][a] = {}' .format(self.t, self.G.nodes[1]['a']))
         if (not (self.bottom_up ())):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
@@ -550,19 +559,35 @@ class SFC_mig_simulator (object):
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
         while True: 
             
-            # Update the available capacity at each server according to the value of resource augmentation for this iteration            
-            for s in self.G.nodes():
-                self.G.nodes[s]['a'] = math.ceil (0.5*(ub[s] + lb[s])) 
-            if (np.array([self.G.nodes[s]['a'] for s in self.G.nodes()]) == np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])).all():
-                # The binary search converged - update 'a' to the real available value at each server, considering the allocation to users, and return
-                self.update_available_cpu_by_sol()
+            check_ar = np.array ([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool') 
+            if (check_ar.all()):
+                # self.update_available_cpu_by_sol()
+                # for s in self.G.nodes():
+                #     print ('s[{}][cur RCs] = {}' .format (s, self.G.nodes[s]['cur RCs']))
+                # print ('s[1][cur RCs] = {}' .format (s, self.G.nodes[1]['cur RCs']))
+                # print ('s[1][a] = {}' .format (s, self.G.nodes[1]['a']))
+                used_cpu = self.used_cpu_in ()
+                print ('used cpu in s[1] = {}' .format (used_cpu[1]))
                 return 
-            
-            # Update the total capacity at each server according to the value of resource augmentation for this iteration            
+
+            # Update the available capacity at each server according to the value of resource augmentation for this iteration            
+            # print ('ub =', ub)
+            # print ('lb = ', lb)
             for s in self.G.nodes():
-                self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
+                self.G.nodes[s]['cur RCs'] = math.floor (0.5*(ub[s] + lb[s]))  
+            # print ('ub[1] = {}, lb[1] = {}, s[1][cur RCs] = {}' .format (ub[1], lb[1], self.G.nodes[1]['cur RCs']))
+            # print ('In loop: s[0][a] = {}' .format(self.G.nodes[0]['a']))
+
+            # if (np.array([self.G.nodes[s]['a'] for s in self.G.nodes()]) == np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])).all():
+            #     # The binary search converged - update 'a' to the real available value at each server, considering the allocation to users, and return
+#            if ( np.array ([ub[s] == self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]).all():
+            
+            # # Update the total capacity at each server according to the value of resource augmentation for this iteration            
+            # for s in self.G.nodes():
+            #     self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
 
             # Solve using bottom-up
+            self.reset_sol()
             if (self.bottom_up()):
                 ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])        
             else:
@@ -577,15 +602,22 @@ class SFC_mig_simulator (object):
         if (not(self.bottom_up())):
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                 printf (self.log_output_file, 'By binary search:\n')
+            print ('bottom_up failed. Calling binary search.')
             self.binary_search()
-            print ('After binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
+            print ('After binary search: s[1][cur RCs] = {}' .format(self.G.nodes[1]['cur RCs']))
+        # printf (self.log_output_file, 'By binary search:\n')
+        # self.binary_search()
+        # print ('After binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
+        # exit ()
 
 
         # By hook or by crook, now we have a feasible solution        
         if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'B4 push-up:\n')
             self.print_sol_to_log()
-            
+        
+        if (self.t == 27027):      
+            print ('b4 calling push-up: s[1][a] = {}' .format (self.G.nodes[1]['a']))    
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'After push-up:\n')
@@ -609,7 +641,6 @@ class SFC_mig_simulator (object):
         """
         
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
-
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs']  if (usr.lvl == -1)]
            

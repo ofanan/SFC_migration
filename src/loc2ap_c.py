@@ -17,18 +17,15 @@ VERBOSE_NO_OUTPUT             = 0
 VERBOSE_ONLY_RES              = 1 # Write to a file the total cost and rsrc aug. upon every event
 VERBOSE_RES_AND_LOG           = 2 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
 
-
-
-#############################################################################
-# Inline functions
-#############################################################################
-
 class loc2ap_c (object):
-
-    # # Currently unused.
-    # # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares, and a line-by-line cells numbering
-    # loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
     
+    # inline function for the files location-to-AP mapping
+    # currently this function always maps assuming square cells.
+    loc2ap = lambda self, x, y : loc2ap_sq_power_of_4 (self, x, y)
+    
+    # inline function for formatted-printing the AP of a single user
+    print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})," .format (usr['id'], usr['nxt ap']))   
+
     def loc2ap_sq_power_of_4 (self, x, y):
         """
         Finding the AP covering the user's area, assuming that the number of APs is a power of 4.
@@ -56,7 +53,22 @@ class loc2ap_c (object):
         # self.cell_X_edge        = self.max_x / self.num_of_APs_in_row
         # self.cell_Y_edge        = self.cell_X_edge
     
-    def loc2ap (self, usrs_loc_file_name):
+    def print_usrs_ap (self):
+        
+        new_usrs = list (filter (usr['new']), self.usrs)
+        if (len (new_usrs) > 0):
+            printf (self.ap_file, 'new_usrs: ')
+            for usr in new_usrs: # for every new usr
+                self.print_usr_ap (usr)
+
+        old_usrs = list (filter (usr['new'] == False and usr['nxt ap'] != usr['cur ap']), self.usrs)
+        if (len (old_usrs) > 0):
+            printf (self.ap_file, 'new_usrs: ')
+            for usr in old_usrs: # for every existing usr
+                self.print_usr_ap (usr)
+                usr['cur ap'] = usr['cur ap']
+    
+    def parse_file (self, usrs_loc_file_name):
         """
         Read the input about the users locations, 
         and write the appropriate user-to-PoA connections to the file self.ap_file
@@ -68,7 +80,8 @@ class loc2ap_c (object):
         printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
         printf (self.ap_file, 'num_of_APs = {}' .format (self.num_of_APs))
         
-        cur_ap_of_usr = [] # will hold pairs of (usr_id, cur_ap). 
+        # cur_ap_of_usr = [] # will hold pairs of (usr_id, cur_ap). 
+        self.usrs = []
         for line in usrs_loc_file: 
     
             # remove the new-line character at the end (if any), and ignore comments lines 
@@ -79,40 +92,35 @@ class loc2ap_c (object):
             splitted_line = line.split (" ")
     
             if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'):
+                self.print_usrs_ap()
                 printf(self.ap_file, '\n{}' .format (line))
+                # self.new_usrs, self.moved_usrs = [], []
                 continue
     
             elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
-                printf(self.ap_file, '\nnew_or_moved: ')
+                # printf(self.ap_file, '\nnew_or_moved: ')
+                self.new_or_moved = True
             
             else: # now we know that this line details a user that either joined, or moved.
-                type   = splitted_line[0] # type will be either 'n', or 'o' (new, old user, resp.).
-                usr_id = splitted_line[1]
-                # nxt_ap = self.loc2ap_sq (float(splitted_line[2]), float(splitted_line[3]))
-                nxt_ap = self.loc2ap_sq_power_of_4 (float(splitted_line[2]), float(splitted_line[3]))
-                # print (float(splitted_line[2]), float(splitted_line[3]))
-                # print ('nxt ap = ', nxt_ap)
-                # nxt_ap = self.loc2ap_sq_power_of_4 (11000, 9300)
-                # print ('nxt ap = ', nxt_ap)
-                # exit ()
-                if (type == 'n'): # new vehicle
-                    printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
-                    cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
-                else: # old vehicle
-                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, cur_ap_of_usr))
+                type   = splitted_line[0]
+                nxt_ap = self.loc2ap (float(splitted_line[2]), float(splitted_line[3]))
+                if (type == 'n'):
+                    self.new_usrs.append (
+                        {'id' : splitted_line[1], 'nxt ap' : nxt_ap, 'new' : True})
+                    
+                    # printf(self.ap_file, "({},{},{})," .format (type,usr_id, nxt_ap))                
+                    # cur_ap_of_usr.append({'id' : usr_id, 'ap' : nxt_ap})
+                else: # existing user, who moved
+                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.old_usrs)) #cur_ap_of_usr))
                     if (len (list_of_usr)== 0):
                         print ('Inaal raback')
                         exit ()
-                    if (list_of_usr[0]['ap'] == nxt_ap): # The user is moving within area covered by the cur AP
-                        continue
-                    printf(self.ap_file, "({},{},{})" .format (type, usr_id, nxt_ap))                
-                    list_of_usr[0]['ap'] = nxt_ap       
-                continue
+                    list_of_usr[0]['nxt ap'] == nxt_ap
     
         printf(self.ap_file, "\n")   
     
 if __name__ == '__main__':
     my_loc2ap = loc2ap_c (max_power_of_4 = 2)
-    my_loc2ap.loc2ap ('vehicles_1min.loc')
+    my_loc2ap.parse_file ('vehicles_1min.loc')
     
     

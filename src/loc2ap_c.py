@@ -89,19 +89,14 @@ class loc2ap_c (object):
         """
         Plot for each ap the number of vehicles associated with it along the trace.
         """
-        for ap in range (self.self.num_of_APs):
-            plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap])
-            plt.ylabel ('Number of vehicles in cell {}' .format(ap))
-            print (ap)
-            plt.show ()
-                
-            # print (len (my_loc2ap.num_of_vehs_in_ap))
-        # X = [1,2,3,4]
-        # Y = [2,4,6,8]
-        # plt.plot (X, Y)
-        # plt.show()
-                    
-    
+        for plot_num in range (4**(self.max_power_of_4-1)):
+            for ap in range (4*plot_num, 4*(plot_num+1)): 
+                plt.title ('Number of vehicles in each cell')
+                plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
+                plt.ylabel ('Number of vehicles')
+            plt.legend()
+            plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
+            plt.clf()
         
     def parse_file (self, usrs_loc_file_name):
         """
@@ -147,16 +142,26 @@ class loc2ap_c (object):
                     list_of_usr = list (filter (lambda usr: usr['id'] == splitted_line[1], self.usrs)) 
                     list_of_usr[0]['nxt ap'] == nxt_ap
     
+    def post_processing (self):
+        """
+        Post processing after finished parse all the input file(s).
+        The post processing may include:
+        - Adding some lines to the output .ap file.
+        - Plot the num_of_vehs 
+        """
         if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
             printf(self.ap_file, "\n")   
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.plot_num_of_vehs_per_ap ()
     
+    
 if __name__ == '__main__':
     max_power_of_4                  = 2        
     my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
     
-    # self.cnt_vehs_file              = open ("../res/" + usrs_loc_file_name.split(".")[0] + ".cnt", "w+")
-    my_loc2ap.parse_file ('short.loc')
+    for i in range (9): 
+        my_loc2ap.parse_file ('vehicles_{}.loc' .format (i))
+        i += 1
+    my_loc2ap.post_processing ()
 
     

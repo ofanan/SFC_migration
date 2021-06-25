@@ -13,15 +13,24 @@ from scipy.optimize import linprog
 from cmath import sqrt
 
 class loc2ap_c (object):
+    """
+    Accept as input a .loc file (a file detailing the locations of all the new users / users who moved at each slot).
+    Output a .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
+    """
+
     
     # inline function for the files location-to-AP mapping
     # currently this function always maps assuming square cells.
-    loc2ap = lambda self, x, y : self.loc2ap_sq_power_of_4 (x, y)
+    loc2ap = lambda self, x, y : self.loc2ap_using_sq_cells (x, y)
     
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})," .format (usr['id'], usr['nxt ap']))   
 
-    def loc2ap_sq_power_of_4 (self, x, y):
+    def __init__(self, max_power_of_4=3):
+
+        self.max_x, self.max_y = 12000, 12000 # size of the square cell of each AP, in meters. 
+        
+    def loc2ap_using_sq_cells (self, x, y):
         """
         Finding the AP covering the user's area, assuming that the number of APs is a power of 4.
         Input:  (x,y) location data
@@ -36,19 +45,10 @@ class loc2ap_c (object):
             cur_edge /= 2
         return ap
     
-    def __init__(self, max_power_of_4=3):
-
-        self.max_x, self.max_y = 12000, 12000 # size of the square cell of each AP, in meters. 
-        self.max_power_of_4    = max_power_of_4    
-        self.num_of_APs        = 4**self.max_power_of_4
-        
-        # # parameters to be used only for "line by line" cells' locations
-        # self.num_of_APs         = num_of_APs
-        # self.num_of_APs_in_row  = int (math.sqrt (self.num_of_APs)) #$$$ cast to int, floor  
-        # self.cell_X_edge        = self.max_x / self.num_of_APs_in_row
-        # self.cell_Y_edge        = self.cell_X_edge
-    
     def print_usrs_ap (self):
+        """
+        Format-prints the users' AP, as caclulated earlier, to the .ap output file
+        """
         
         new_usrs = list (filter (lambda usr: usr['new'], self.usrs))
         if (len (new_usrs) > 0):
@@ -62,12 +62,21 @@ class loc2ap_c (object):
             for usr in old_usrs: # for every existing usr
                 self.print_usr_ap (usr)
                 usr['cur ap'] = usr['nxt ap']
-    
-    def parse_file (self, usrs_loc_file_name):
+                
+    def cnt_num_of_vehs_per_ap (self):
         """
-        Read the input about the users locations, 
-        and write the appropriate user-to-PoA connections to the file self.ap_file
-        Assume that each AP covers a square area
+        Count the number of vehicles associated with each AP during the simulation.
+        """
+        for ap in self.num_of_APs: 
+            self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
+        
+        for usr in usrs:
+            self.num_of_vehs_in_ap[usr['nxt ap']] += 1
+    
+    def parse_file (self, use_sq_cells = True, usrs_loc_file_name):
+        """
+        - Read the input about the users locations.
+        - Write the appropriate user-to-PoA connections to the file self.ap_file
         """
         self.usrs_loc_file_name = usrs_loc_file_name
         self.ap_file  = open ("../res/" + self.usrs_loc_file_name.split(".")[0] + ".ap", "w+")  
@@ -87,6 +96,7 @@ class loc2ap_c (object):
     
             if (splitted_line[0] == "t"):
                 self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
+                self.cnt_num_of_vehs_per_ap ()
                 printf(self.ap_file, '\n{}' .format (line)) # print the header of the current time: "t = ..."
                 continue
     
@@ -94,10 +104,7 @@ class loc2ap_c (object):
                 printf(self.ap_file, '\n{}\n' .format (line))
                 continue
     
-            elif (splitted_line[0] == 'new_or_moved:'): # new vehicle
-                self.new_or_moved = True
-            
-            else: # now we know that this line details a user that either joined, or moved.
+            elif (splitted_line[0] != 'new_or_moved:'): # new vehicle
                 type   = splitted_line[0]
                 nxt_ap = self.loc2ap (float(splitted_line[2]), float(splitted_line[3]))
                 if (type == 'n'):
@@ -105,15 +112,17 @@ class loc2ap_c (object):
                         {'id' : splitted_line[1], 'nxt ap' : nxt_ap, 'new' : True})
                 else: # existing user, who moved
                     list_of_usr = list (filter (lambda usr: usr['id'] == splitted_line[1], self.usrs)) 
-                    if (len (list_of_usr)== 0):
-                        print ('Inaal raback')
-                        exit ()
                     list_of_usr[0]['nxt ap'] == nxt_ap
     
         printf(self.ap_file, "\n")   
     
 if __name__ == '__main__':
-    my_loc2ap = loc2ap_c (max_power_of_4 = 2)
-    my_loc2ap.parse_file ('vehicles_1min.loc')
+    use_sq_cells                = True
+    if (use_sq_cells):
+        max_power_of_4              = 2        
+        self.num_of_APs        = 4**self.max_power_of_4
+        my_loc2ap                   = loc2ap_c (max_power_of_4 = max_power_of_4)
+        my_loc2ap.num_of_vehs_in_ap = np.empty (4**max_power_of_4, dtype = 'object')
+        my_loc2ap.parse_file ('vehicles_1min.loc', use_sq_cells = use_sq_cells)
     
     

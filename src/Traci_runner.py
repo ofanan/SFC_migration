@@ -56,19 +56,8 @@ if __name__ == "__main__":
                 else: # already seen this veh_key in the sim' --> extract its id from the hash 
                     type = 'o' # will indicate that this is a old vehicle 
                     veh_id = filtered_list[0]['id'] 
-                    # filtered_list [0]['new'] = False # mark this vehicle as 'old'
                 position = traci.vehicle.getPosition(veh_key)
                 printf (loc_output_file, "{} {} {:.0f} {:.0f} \n" .format (type, veh_id, position[0], position[1]))
-    
-            # printf (loc_output_file, "new_vehs: ")
-            # for veh in list (filter (lambda veh : veh['new'] == True, veh_key2id)):
-            #     position = traci.vehicle.getPosition(veh['key'])
-            #     printf (loc_output_file, "({},{:.0f},{:.0f})," .format (veh['id'], position[0], position[1]))
-            #
-            # printf (loc_output_file, "\nold_vehs: ")
-            # for veh in list (filter (lambda veh : veh['new'] == False, veh_key2id)):
-            #     position = traci.vehicle.getPosition(veh['key'])
-            #     printf (loc_output_file, "({},{:.0f},{:.0f})," .format (veh['id'], position[0], position[1]))
     
             sys.stdout.flush()
             traci.simulationStep()

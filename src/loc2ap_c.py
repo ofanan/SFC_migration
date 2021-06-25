@@ -5,6 +5,7 @@ import itertools
 import time
 import random
 import heapq
+import matplotlib.pyplot as plt
 
 from usr_c import usr_c # class of the users
 from decision_var_c import decision_var_c # class of the decision variables
@@ -73,7 +74,7 @@ class loc2ap_c (object):
         for usr in usrs:
             self.num_of_vehs_in_ap[usr['nxt ap']] += 1
     
-    def parse_file (self, use_sq_cells = True, usrs_loc_file_name):
+    def parse_file (self, usrs_loc_file_name, use_sq_cells = True):
         """
         - Read the input about the users locations.
         - Write the appropriate user-to-PoA connections to the file self.ap_file
@@ -117,12 +118,20 @@ class loc2ap_c (object):
         printf(self.ap_file, "\n")   
     
 if __name__ == '__main__':
-    use_sq_cells                = True
-    if (use_sq_cells):
-        max_power_of_4              = 2        
-        self.num_of_APs        = 4**self.max_power_of_4
-        my_loc2ap                   = loc2ap_c (max_power_of_4 = max_power_of_4)
-        my_loc2ap.num_of_vehs_in_ap = np.empty (4**max_power_of_4, dtype = 'object')
-        my_loc2ap.parse_file ('vehicles_1min.loc', use_sq_cells = use_sq_cells)
+    # use_sq_cells                = True
+    # if (use_sq_cells):
+    #     max_power_of_4              = 2        
+    #     self.num_of_APs        = 4**self.max_power_of_4
+    #     my_loc2ap                   = loc2ap_c (max_power_of_4 = max_power_of_4)
+    #     my_loc2ap.num_of_vehs_in_ap = np.empty (4**max_power_of_4, dtype = 'object')
+    #     my_loc2ap.parse_file ('vehicles_1min.loc', use_sq_cells = use_sq_cells)
+
+    X = [1,2,3,4]
+    Y = [2,4,6,8]
+    plt.plot (X, Y)
+    plt.ylabel ('some numbers')
+    plt.show()
+        
+        
     
     

@@ -36,6 +36,7 @@ class loc2ap_c (object):
 
         self.max_x, self.max_y = 12000, 12000 # size of the square cell of each AP, in meters.
         self.verbose           = verbose 
+        self.usrs              = []
         self.use_sq_cells      = use_sq_cells
         if (self.use_sq_cells):
             self.max_power_of_4    = max_power_of_4
@@ -89,8 +90,10 @@ class loc2ap_c (object):
         """
         Plot for each ap the number of vehicles associated with it along the trace.
         """
+        num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w+')
         for plot_num in range (4**(self.max_power_of_4-1)):
-            for ap in range (4*plot_num, 4*(plot_num+1)): 
+            for ap in range (4*plot_num, 4*(plot_num+1)):
+                printf (num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
                 plt.title ('Number of vehicles in each cell')
                 plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
                 plt.ylabel ('Number of vehicles')
@@ -103,13 +106,13 @@ class loc2ap_c (object):
         - Read the input about the users locations.
         - Write the appropriate user-to-PoA connections to the file self.ap_file
         """
-        usrs_loc_file           = open ("../res/" + usrs_loc_file_name,  "r") 
+        self.usrs_loc_file_name = usrs_loc_file_name
+        usrs_loc_file           = open ('../res/' + self.usrs_loc_file_name,  "r") 
         if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
             self.ap_file        = open ("../res/" + usrs_loc_file_name.split(".")[0] + ".ap",  "w+")  
             printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
             printf (self.ap_file, 'num_of_APs = {}' .format (self.num_of_APs))
         
-        self.usrs = []
         for line in usrs_loc_file: 
     
             # remove the new-line character at the end (if any), and ignore comments lines 
@@ -120,6 +123,7 @@ class loc2ap_c (object):
             splitted_line = line.split (" ")
     
             if (splitted_line[0] == "t"):
+                self.t = int(splitted_line[2])
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
                     printf(self.ap_file, '\n{}' .format (line)) # print the header of the current time: "t = ..."
@@ -140,6 +144,9 @@ class loc2ap_c (object):
                         {'id' : splitted_line[1], 'nxt ap' : nxt_ap, 'new' : True})
                 else: # existing user, who moved
                     list_of_usr = list (filter (lambda usr: usr['id'] == splitted_line[1], self.usrs)) 
+                    if (len(list_of_usr) == 0):
+                        print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
+                        exit ()
                     list_of_usr[0]['nxt ap'] == nxt_ap
     
     def post_processing (self):
@@ -153,14 +160,14 @@ class loc2ap_c (object):
             printf(self.ap_file, "\n")   
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.plot_num_of_vehs_per_ap ()
-    
+     
     
 if __name__ == '__main__':
-    max_power_of_4                  = 2        
+    max_power_of_4                  = 3        
     my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
     
-    for i in range (9): 
-        my_loc2ap.parse_file ('vehicles_{}.loc' .format (i))
+    for i in range (4): 
+        my_loc2ap.parse_file ('short_{}.loc' .format (i))
         i += 1
     my_loc2ap.post_processing ()
 

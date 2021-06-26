@@ -164,7 +164,7 @@ class loc2ap_c (object):
     
 if __name__ == '__main__':
     max_power_of_4                  = 3        
-    my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
+    my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
     
     for i in range (9): 
         my_loc2ap.parse_file ('vehicles_{}.loc' .format (i))

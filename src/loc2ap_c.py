@@ -136,14 +136,14 @@ class loc2ap_c (object):
                     printf(self.ap_file, '\n{}\n' .format (line))
                 continue
     
-            elif (splitted_line[0] != 'new_or_moved:'): # new vehicle
-                type   = splitted_line[0]
+            elif (splitted_line[0] != 'new_or_moved:'): 
                 nxt_ap = self.loc2ap (float(splitted_line[2]), float(splitted_line[3]))
-                if (type == 'n'):
+                usr_id = np.uint16(splitted_line[1])
+                if (splitted_line[0] == 'n'): # new vehicle
                     self.usrs.append (
-                        {'id' : splitted_line[1], 'nxt ap' : nxt_ap, 'new' : True})
+                        {'id' : usr_id, 'nxt ap' : nxt_ap, 'new' : True})
                 else: # existing user, who moved
-                    list_of_usr = list (filter (lambda usr: usr['id'] == splitted_line[1], self.usrs)) 
+                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs)) 
                     if (len(list_of_usr) == 0):
                         print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
                         exit ()
@@ -166,9 +166,7 @@ if __name__ == '__main__':
     max_power_of_4                  = 3        
     my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
     
-    for i in range (4): 
-        my_loc2ap.parse_file ('short_{}.loc' .format (i))
+    for i in range (9): 
+        my_loc2ap.parse_file ('vehicles_{}.loc' .format (i))
         i += 1
     my_loc2ap.post_processing ()
-
-    

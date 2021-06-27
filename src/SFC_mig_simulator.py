@@ -341,41 +341,6 @@ class SFC_mig_simulator (object):
         target_delay, mig_cost, C_u
         """
             
-    # def rd_usr_data (self):
-    #     """
-    #     Currently unused.
-    #     Read the input about the users (target_delay, traffic), and write it to the appropriate fields in self.
-    #     The input data is read from the file self.usrs_loc_file_name.
-    #     """
-    #     usrs_data_file = open ("../res/" + self.usrs_data_file_name,  "r")
-    #     self.usrs = []
-    #
-    #     for line in usrs_data_file: 
-    #
-    #         # Ignore comments lines
-    #         if (line.split ("//")[0] == ""):
-    #             continue
-    #
-    #         splitted_line = line.split (" ")
-    #
-    #         if (splitted_line[0].split("u")[0] == ""): # line begins by "u"
-    #             id = int(splitted_line[0].split("u")[1])
-    #             self.usrs.append (usr_c(id = id))
-    #
-    #         elif (splitted_line[0] == "theta_times_lambda"):
-    #             theta_times_lambda = line.split("=")[1].rstrip().split(",")
-    #             self.usrs[id].theta_times_lambda = [float (theta_times_lambda[i]) for i in range (len (theta_times_lambda)) ]
-    #
-    #         elif (splitted_line[0] == "target_delay"):              
-    #             self.usrs[id].target_delay = float (line.split("=")[1].rstrip())
-    #
-    #         elif (splitted_line[0] == "mig_cost"):              
-    #             mig_cost = line.split("=")[1].rstrip().split(",")
-    #             self.usrs[id].mig_cost = [float (mig_cost[i]) for i in range (len (mig_cost)) ]
-    #
-    #         elif (splitted_line[0] == "C_u"):              
-    #             self.usrs[id].C_u = int (line.split("=")[1].rstrip())
-                            
     def gen_parameterized_tree (self):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 

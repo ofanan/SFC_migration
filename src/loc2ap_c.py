@@ -67,9 +67,9 @@ class loc2ap_c (object):
             for usr in new_usrs: # for every new usr
                 self.print_usr_ap (usr)
 
-        old_usrs = list (filter (lambda usr: usr['new'] == False and usr['nxt ap'] != usr['cur ap'], self.usrs))
+        old_usrs = list (filter (lambda usr: (usr['new']==False) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
         if (len (old_usrs) > 0):
-            printf (self.ap_file, 'old_usrs: ')
+            printf (self.ap_file, '\nold_usrs: ')
             for usr in old_usrs: # for every existing usr
                 self.print_usr_ap (usr)
                 usr['cur ap'] = usr['nxt ap']
@@ -123,6 +123,9 @@ class loc2ap_c (object):
                     printf(self.ap_file, '\n{}' .format (line)) # print the header of the current time: "t = ..."
                 if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
                     self.cnt_num_of_vehs_per_ap ()
+                for usr in self.usrs: # mark all existing usrs as old
+                    usr['new'] = False
+                    usr['cur ap'] = usr ['nxt ap']
                 continue
     
             elif (splitted_line[0] == 'usrs_that_left:'):
@@ -135,13 +138,13 @@ class loc2ap_c (object):
                 usr_id = np.uint16(splitted_line[1])
                 if (splitted_line[0] == 'n'): # new vehicle
                     self.usrs.append (
-                        {'id' : usr_id, 'nxt ap' : nxt_ap, 'new' : True})
+                        {'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
                 else: # existing user, who moved
-                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs)) 
+                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                     if (len(list_of_usr) == 0):
                         print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
                         exit ()
-                    list_of_usr[0]['nxt ap'] == nxt_ap
+                    list_of_usr[0]['nxt ap'] = nxt_ap
     
     def post_processing (self):
         """
@@ -163,11 +166,11 @@ class loc2ap_c (object):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
     
 if __name__ == '__main__':
-    max_power_of_4                  = 3        
-    my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
+    max_power_of_4 = 3        
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
     
-    for i in range (9): 
-        usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
+    for i in range (1): 
+        usrs_loc_file_name = 'short_{}.loc' .format (i)
         my_loc2ap.parse_file             (usrs_loc_file_name)
         my_loc2ap.print_intermediate_res ()
         i += 1

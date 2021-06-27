@@ -30,7 +30,7 @@ class loc2ap_c (object):
     loc2ap = lambda self, x, y : self.loc2ap_using_sq_cells (x, y)
     
     # inline function for formatted-printing the AP of a single user
-    print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})," .format (usr['id'], usr['nxt ap']))   
+    print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
 

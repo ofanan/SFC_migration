@@ -169,8 +169,8 @@ if __name__ == '__main__':
     max_power_of_4 = 3        
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
     
-    for i in range (1): 
-        usrs_loc_file_name = 'short_{}.loc' .format (i)
+    for i in range (9): 
+        usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
         my_loc2ap.parse_file             (usrs_loc_file_name)
         my_loc2ap.print_intermediate_res ()
         i += 1

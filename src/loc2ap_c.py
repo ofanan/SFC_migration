@@ -1,18 +1,11 @@
-import networkx as nx
 import numpy as np
 import math
 import itertools 
 import time
-import random
-import heapq
 import matplotlib.pyplot as plt
 
 from usr_c import usr_c # class of the users
-from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
-from scipy.optimize import linprog
-from cmath import sqrt
-from future.backports.test.support import verbose
 
 VERBOSE_AP         = 1
 VERBOSE_CNT        = 2
@@ -45,6 +38,8 @@ class loc2ap_c (object):
             self.num_of_vehs_in_ap = np.empty (4**self.max_power_of_4, dtype = 'object')
             for ap in range(self.num_of_APs): 
                 self.num_of_vehs_in_ap[ap] = []
+        if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+            self.num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w+')
         
     def loc2ap_using_sq_cells (self, x, y):
         """
@@ -90,10 +85,9 @@ class loc2ap_c (object):
         """
         Plot for each ap the number of vehicles associated with it along the trace.
         """
-        num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w+')
         for plot_num in range (4**(self.max_power_of_4-1)):
             for ap in range (4*plot_num, 4*(plot_num+1)):
-                printf (num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
+                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
                 plt.title ('Number of vehicles in each cell')
                 plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
                 plt.ylabel ('Number of vehicles')
@@ -111,7 +105,7 @@ class loc2ap_c (object):
         if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
             self.ap_file        = open ("../res/" + usrs_loc_file_name.split(".")[0] + ".ap",  "w+")  
             printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
-            printf (self.ap_file, 'num_of_APs = {}' .format (self.num_of_APs))
+            printf (self.ap_file, 'num_of_APs = {}\n' .format (self.num_of_APs))
         
         for line in usrs_loc_file: 
     
@@ -161,12 +155,20 @@ class loc2ap_c (object):
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.plot_num_of_vehs_per_ap ()
      
+    def print_intermediate_res (self): 
+        if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+            self.num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
+            printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
+            for ap in range (self.num_of_APs):
+                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
     
 if __name__ == '__main__':
     max_power_of_4                  = 3        
-    my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
+    my_loc2ap                       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
     
-    for i in range (9): 
-        my_loc2ap.parse_file ('vehicles_{}.loc' .format (i))
+    for i in range (4): 
+        usrs_loc_file_name = 'short_{}.loc' .format (i)
+        my_loc2ap.parse_file             (usrs_loc_file_name)
+        my_loc2ap.print_intermediate_res ()
         i += 1
     my_loc2ap.post_processing ()

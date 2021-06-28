@@ -708,6 +708,7 @@ class SFC_mig_simulator (object):
                         self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self._in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
             
+            
     def print_vars (self):
         """
         Print the decision variables. Each variable is printed with the constraints that it's >=0  

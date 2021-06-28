@@ -427,11 +427,11 @@ class SFC_mig_simulator (object):
         self.uniform_theta_times_lambda = [1, 1, 1]
         self.uniform_Cu                 = 15 
         self.uniform_target_delay       = 20
-        
+        self.warned_about_too_large_ap  = False
         # Names of input files for the users' data, locations and / or current access points
         # self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
         # self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name = 'vehicles_1min.ap' #input file containing the APs of all users along the simulation
+        self.usrs_ap_file_name = 'short_0.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
@@ -494,8 +494,11 @@ class SFC_mig_simulator (object):
                         self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'],sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),self.G.nodes[0]['cpu cap'],[usr.id for usr in self.usrs if usr.cur_s==s]))
                 continue
         
-            elif (splitted_line[0] == "new_or_moved:"):
-                self.rd_AP_line(splitted_line[1:])
+            elif (splitted_line[0] == "new_usrs:"):              
+                self.rd_new_usrs_line (splitted_line[1:])
+                exit ()
+            elif (splitted_line[0] == "old_usrs:"):              
+                self.rd_old_usrs(splitted_line[1:])
                 if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
                     self.last_rt = time.time()
                     printf (self.log_output_file, 'Starting LP\n')
@@ -644,49 +647,47 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'end bu. a={}, used = {}\n' .format (
                 self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==0] )))
         return True
-   
-    def rd_AP_line (self, line):
+
+    def rd_new_usrs_line (self, line, new_usrs = True):
         """
-        Read a line in an ".ap" file.
-        An AP file details for each time t, the user status (new/old), and the current AP of each user.
-        This is written as a tuple. e.g.: 
-        (n, 3, 2) means that user 3 is a new user, currently covered by user 2.
-        (o, 2, 4) means that user 2 is an old user, that moved towards AP 4.
+        Read a line detailing the new usrs just joined the system, in an ".ap" file.
+        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
         After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
         """
         splitted_line = line[0].split ("\n")[0].split (")")
+            # if (new_usrs): # this is a line of new users
         for tuple in splitted_line:
             if (len(tuple) <= 1):
                 break
             tuple = tuple.split("(")
             tuple   = tuple[1].split (',')
+            
+            usr = usr_c (id = int(tuple[0]), # (np.fromstring (tuple[0], dtype=np.uint16), 
+                         theta_times_lambda=self.uniform_theta_times_lambda,
+                         target_delay = 15,
+                         C_u = 10)
+            self.CPUAll_single_usr (usr)
+            self.usrs.append (usr)
 
-            if (tuple[0] == 'n'): # new user
-        
-                usr = usr_c (id = int(tuple[1]), 
-                             theta_times_lambda=self.uniform_theta_times_lambda,
-                             target_delay = 15,
-                             C_u = 10)
-                self.CPUAll_single_usr (usr)
-                self.usrs.append (usr)
-            else: # old, existing user, who moved
-                list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
-                usr = list_of_usr[0]
-                usr_cur_cpu = usr.B[usr.lvl]
-                self.CPUAll_single_usr (usr)
-                if (usr.lvl <= len (usr.B) and usr.B[usr.lvl] <= usr_cur_cpu): # can satisfy delay constraint while leaving the chain in its cur location and CPU budget 
-                        continue
-                # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
-                self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-                # dis-place this user (mark it as having nor assigned level, neither assigned server) 
-                usr.lvl   = -1
-                usr.nxt_s = -1
+            # # else: # the line details old, existing user, who moved
+            #     list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
+            #     usr = list_of_usr[0]
+            #     usr_cur_cpu = usr.B[usr.lvl]
+            #     self.CPUAll_single_usr (usr)
+            #     if (usr.lvl <= len (usr.B) and usr.B[usr.lvl] <= usr_cur_cpu): # can satisfy delay constraint while leaving the chain in its cur location and CPU budget 
+            #             continue
+            #     # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
+            #     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+            #     # dis-place this user (mark it as having nor assigned level, neither assigned server) 
+            #     usr.lvl   = -1
+            #     usr.nxt_s = -1
 
-            AP_id = int(tuple[2])
+            AP_id = int(tuple[1])
             if (AP_id > self.num_of_leaves):
-                print ('error: encountered AP num {} in the input file, but in the tree there are only {} leaves' .format (AP_id, self.num_of_leaves))
-                exit  ()
-
+                AP_id = self.num_of_leaves-1
+                if (self.warned_about_too_large_ap == False):
+                    print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+                    self.warned_about_too_large_ap = True
             s = self.ap2s[AP_id]
             usr.S_u.append (s)
             self.G.nodes[s]['Hs'].append(usr)
@@ -695,7 +696,7 @@ class SFC_mig_simulator (object):
                 usr.S_u.append (s)
                 self.G.nodes[s]['Hs'].append(usr)                       
                     
-
+    
     def calc_sol_cost_SS (self):
         """
         Calculate the total cost of an SS (single-server per-chain) full solution.

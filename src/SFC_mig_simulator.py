@@ -468,13 +468,19 @@ class SFC_mig_simulator (object):
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
-                printf (self.log_output_file, 'Beginning left usrs: Rcs={}, a={}, used cpu ={:.0f}, Cs={}\t chains {}\n' .format (
-                        self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ), self.G.nodes[0]['cpu cap'], [usr.id for usr in self.usrs if usr.cur_s==s]))
+                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                    printf (self.log_output_file, 'Beginning left usrs: Rcs={}, a={}, used cpu ={:.0f}, Cs={}\t chains {}\n' .format (
+                            self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ), self.G.nodes[0]['cpu cap'], [usr.id for usr in self.usrs if usr.cur_s==s]))
 
-                for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)): 
-                    self.G.nodes[usr.cur_s]['Hs'].remove (usr)
+                # usrs_that_left = list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs))
+                for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
+
+                    print (usr.id, usr.B, usr.lvl)
                     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the resources held by that usr       
-                    self.usrs.remove (usr)
+                    
+                    # Remove the usr from the list of "descended users" on any server s 
+                    for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+                        self.G.nodes[s]['Hs'].remove (usr)
                     del (usr)
                 printf (self.log_output_file, 'Ending  left usrs: Rcs={}, a={}, used cpu direct={:.0f}, Cs={}\t chains {}\n' .format (
                         self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'],sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),self.G.nodes[0]['cpu cap'],[usr.id for usr in self.usrs if usr.cur_s==s]))
@@ -483,12 +489,15 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
-                self.rd_old_usrs(splitted_line[1:])
+                self.rd_old_usrs_line (splitted_line[1:])
                 
                 self.solve_mig_prob ()
                 continue
 
     def solve_mig_prob (self):
+        """
+        Solve the mig' problem for this time slot, using the self.alg algorithm (e.g., lp, or our algorithm).
+        """
         
         if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
             self.last_rt = time.time()
@@ -500,18 +509,12 @@ class SFC_mig_simulator (object):
                 print ('sorry, but the requested algorithm {} is not supported' .format (self.alg))
                 exit ()
 
-        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-            printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
-            self.last_rt = time.time()
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             self.print_sol_to_res()
             if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                printf (self.log_output_file, '\nSolved using our alg within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+                printf (self.log_output_file, '\nSolved using in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
-             usr.cur_s = usr.nxt_s
-
-
-        
+             usr.cur_s = usr.nxt_s        
         
     def binary_search (self):
         """
@@ -576,6 +579,7 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
+        printf (self.log_output_file, 'beginning alg top\n')
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         if (not(self.bottom_up())):
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
@@ -599,6 +603,7 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'after push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
                    (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))     
             self.print_sol_to_log()
+        printf (self.log_output_file, 'finished alg top\n')
 
     def update_available_cpu_by_sol (self):
         """
@@ -630,14 +635,14 @@ class SFC_mig_simulator (object):
                     return False
         return True
 
-    def rd_new_usrs_line (self, line, new_usrs = True):
+    def rd_new_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
         The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
         After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
         """
         splitted_line = line[0].split ("\n")[0].split (")")
-            # if (new_usrs): # this is a line of new users
+
         for tuple in splitted_line:
             if (len(tuple) <= 1):
                 break
@@ -664,12 +669,14 @@ class SFC_mig_simulator (object):
                 usr.S_u.append (s)
                 self.G.nodes[s]['Hs'].append(usr)                       
                     
-    def rd_old_usrs_line (self, line, new_usrs = True):
+    def rd_old_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
         The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
         After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
         """
+        if (line == []): # if the list of old users that moved is empty
+            return
         splitted_line = line[0].split ("\n")[0].split (")")
             # if (new_usrs): # this is a line of new users
         for tuple in splitted_line:
@@ -732,9 +739,17 @@ if __name__ == "__main__":
     #lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
     
     # Gen static LP problem
+    # usr0 = usr_c (id = 0, theta_times_lambda=1, target_delay = 15, C_u = 10)
+    # usr1 = usr_c (id = 1, theta_times_lambda=1, target_delay = 15, C_u = 10)
+    # usr2 = usr_c (id = 2, theta_times_lambda=1, target_delay = 15, C_u = 10)
+    #
+    # list_of_usrs = []
+    # list_of_usrs.append (usr0)
+    # list_of_usrs.append (usr1)
+    # list_of_usrs.append (usr2)
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = VERBOSE_RES_AND_DETAILED_LOG)
-    my_simulator.simulate ('alg_lp')
+    my_simulator.simulate ('alg_top')
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()
     # my_simulator.init_problem  ()

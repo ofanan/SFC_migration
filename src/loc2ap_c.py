@@ -68,11 +68,10 @@ class loc2ap_c (object):
                 self.print_usr_ap (usr)
 
         old_usrs = list (filter (lambda usr: (usr['new']==False) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
-        if (len (old_usrs) > 0):
-            printf (self.ap_file, '\nold_usrs: ')
-            for usr in old_usrs: # for every existing usr
-                self.print_usr_ap (usr)
-                usr['cur ap'] = usr['nxt ap']
+        printf (self.ap_file, '\nold_usrs: ')
+        for usr in old_usrs: # for every existing usr
+            self.print_usr_ap (usr)
+            usr['cur ap'] = usr['nxt ap']
                 
     def cnt_num_of_vehs_per_ap (self):
         """

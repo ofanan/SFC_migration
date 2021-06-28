@@ -475,7 +475,6 @@ class SFC_mig_simulator (object):
                 # usrs_that_left = list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs))
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
-                    print (usr.id, usr.B, usr.lvl)
                     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the resources held by that usr       
                     
                     # Remove the usr from the list of "descended users" on any server s 
@@ -501,18 +500,18 @@ class SFC_mig_simulator (object):
         
         if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
             self.last_rt = time.time()
-            if (self.alg == 'alg_lp'): 
-                self.solve_by_plp () 
-            elif (self.alg ==  'alg_top'):
-                self.alg_top()
-            else: 
-                print ('sorry, but the requested algorithm {} is not supported' .format (self.alg))
-                exit ()
+        if (self.alg == 'alg_lp'): 
+            self.solve_by_plp () 
+        elif (self.alg ==  'alg_top'):
+            self.alg_top ()
+        else: 
+            print ('sorry, but the requested algorithm {} is not supported' .format (self.alg))
+            exit ()
 
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             self.print_sol_to_res()
             if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                printf (self.log_output_file, '\nSolved using in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+                printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
              usr.cur_s = usr.nxt_s        
         
@@ -554,24 +553,11 @@ class SFC_mig_simulator (object):
             for s in self.G.nodes():
                 self.G.nodes[s]['cur RCs'] = math.floor (0.5*(ub[s] + lb[s]))  
             self.reset_sol()
-            # print ('In loop: ub[0]=={}, lb[0]={}, s[0][a] = {}' .format(ub[0], lb[0], self.G.nodes[0]['a']))
-
-            # if (np.array([self.G.nodes[s]['a'] for s in self.G.nodes()]) == np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])).all():
-#            if ( np.array ([ub[s] == self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]).all():
-            
-            # # Update the total capacity at each server according to the value of resource augmentation for this iteration            
-            # for s in self.G.nodes():
-            #     self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['a'] 
 
             # Solve using bottom-up
             if (self.bottom_up()):
-                # for usr in self.usrs:
-                #     print ('usr.B = {}, usr lvl = {}' .format (usr.B, usr.lvl))
-                print ('In If: ub=={}, lb={}, a = {}, used cpu={}' .format(
-                    ub[0], lb[0], self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==0] )))
                 ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])        
             else:
-                print ('In else: ub[0]=={}, lb[0]={}, s[0][a] = {}' .format(ub[0], lb[0], self.G.nodes[0]['a']))
                 lb = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
     
     def alg_top (self):
@@ -584,13 +570,7 @@ class SFC_mig_simulator (object):
         if (not(self.bottom_up())):
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                 printf (self.log_output_file, 'By binary search:\n')
-            # print ('bottom_up failed. Calling binary search.')
             self.binary_search()
-            # print ('After binary search: s[1][cur RCs] = {}' .format(self.G.nodes[1]['cur RCs']))
-        # printf (self.log_output_file, 'By binary search:\n')
-        # self.binary_search()
-        # print ('After binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
-        # exit ()
 
         # By hook or by crook, now we have a feasible solution        
         if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
@@ -736,17 +716,7 @@ class SFC_mig_simulator (object):
      
           
 if __name__ == "__main__":
-    #lp_time_summary_file = open ("../res/lp_time_summary.res", "a") # Will write to this file an IBM CPlex' .mod file, describing the problem
-    
-    # Gen static LP problem
-    # usr0 = usr_c (id = 0, theta_times_lambda=1, target_delay = 15, C_u = 10)
-    # usr1 = usr_c (id = 1, theta_times_lambda=1, target_delay = 15, C_u = 10)
-    # usr2 = usr_c (id = 2, theta_times_lambda=1, target_delay = 15, C_u = 10)
-    #
-    # list_of_usrs = []
-    # list_of_usrs.append (usr0)
-    # list_of_usrs.append (usr1)
-    # list_of_usrs.append (usr2)
+
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = VERBOSE_RES_AND_DETAILED_LOG)
     my_simulator.simulate ('alg_top')

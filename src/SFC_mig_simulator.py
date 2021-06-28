@@ -423,7 +423,7 @@ class SFC_mig_simulator (object):
         # Names of input files for the users' data, locations and / or current access points
         # self.usrs_data_file_name  = "res.usr" #input file containing the target_delays and traffic of all users
         # self.usrs_loc_file_name   = "short.loc"  #input file containing the locations of all users along the simulation
-        self.usrs_ap_file_name = 'short_0.ap' #input file containing the APs of all users along the simulation
+        self.usrs_ap_file_name = 'vehicles_0.ap' #input file containing the APs of all users along the simulation
         
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):

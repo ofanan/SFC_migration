@@ -117,6 +117,7 @@ class SFC_mig_simulator (object):
         pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
         """
 
+        printf (self.log_output_file, 'Starting LP\n')
         model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize)
         self.d_vars  = [] # decision variables  
         obj_func     = [] # objective function
@@ -189,7 +190,7 @@ class SFC_mig_simulator (object):
         """
         Open the log file for writing and write initial comments lines on it
         """
-        self.log_file_name = "../res/" + self.usrs_ap_file_name.split(".")[0] + ".log"  
+        self.log_file_name = "../res/" + self.usrs_ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.log'  
         self.log_output_file = self.init_output_file(self.log_file_name)
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
         printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s.\n//C_s = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
@@ -246,19 +247,10 @@ class SFC_mig_simulator (object):
  
         n = 0  # num of failing push-up tries in sequence; when this number reaches the number of users, return
 
-        if (self.t == 27027):
-            printf (self.log_output_file, 'In push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
-                (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))     
-
         while n < len (self.usrs):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
-                # if (self.t == 27027 and usr.S_u[lvl] == 0):
-                #     printf (self.log_output_file, '\nn = {}, s[0][cur RCs] = {}, s[0][a] = {}' .format (n, self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))
-                # print ('s = {}' .format (usr.S_u[lvl]))
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
-                    # if (lvl ==3 and self.t == 27027): 
-                    #     print ('s[0][a] = {}' .format(self.G.nodes[0]['a']))                     
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
@@ -360,14 +352,14 @@ class SFC_mig_simulator (object):
         shortest_path = nx.shortest_path(self.G)
 
         # levelize the tree (assuming a balanced tree)
-        self.ap2s             = np.zeros (len (self.G.nodes), dtype='int16') 
+        self.ap2s             = []  
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         for s in self.G.nodes(): # for every server
             self.G.nodes[s]['id'] = s
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
-                self.ap2s[self.num_of_leaves] = s
+                self.ap2s.append (s) #[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
@@ -436,21 +428,17 @@ class SFC_mig_simulator (object):
         # Names of output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             self.init_res_file() 
-        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-            self.init_log_file() 
-             
         self.gen_parameterized_tree ()
 
-        # Flags indicators for writing output to results and log files
-        self.write_to_cfg_file = False
-        
-        # Flags indicators for writing output to various LP solvers
-        self.write_to_prb_file = False # When true, will write outputs to a .prb file. - ".prb" - A .prb file may solve an LP problem using the online Eq. solver: https://online-optimizer.appspot.com/?model=builtin:default.mod
-        self.write_to_mod_file = False # When true, will write to a .mod file, fitting to IBM CPlex solver       
-        self.write_to_lp_file  = True  # When true, will write to a .lp file, which allows running Cplex using a Python's api.       
+    def simulate (self, alg):
+        """
+        Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
+        """
 
-    def simulate (self):
-
+        self.alg = alg
+        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            self.init_log_file()
+             
         print ('Simulating. num of leaves = {}. ap file = {}' .format (self.num_of_leaves, self.usrs_ap_file_name))
         # reset Hs        
         for s in self.G.nodes():
@@ -475,8 +463,6 @@ class SFC_mig_simulator (object):
 
             if (splitted_line[0] == "t"):
                 self.t = int(splitted_line[2])
-                if (self.t > 27027):
-                    exit ()
                 if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
                 continue
@@ -496,26 +482,36 @@ class SFC_mig_simulator (object):
         
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line (splitted_line[1:])
-                exit ()
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs(splitted_line[1:])
-                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                    self.last_rt = time.time()
-                    printf (self.log_output_file, 'Starting LP\n')
-                # self.solve_by_plp () #$$$$$$$$
-                # self.solve_by_scipy_linprog ()
-                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                    printf (self.log_output_file, '\nGenerated and solved LP within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
-                    self.last_rt = time.time()
-                self.alg_top()
-                if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-                    self.print_sol_to_res()
-                    if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                        printf (self.log_output_file, '\nSolved using our alg within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
-                for usr in self.usrs: # The solution found by alg_top for this iteration is the "cur_state" for next iteration
-                     usr.cur_s = usr.nxt_s
-                     #$$$should update it only for the moved users?
+                
+                self.solve_mig_prob ()
                 continue
+
+    def solve_mig_prob (self):
+        
+        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+            self.last_rt = time.time()
+            if (self.alg == 'alg_lp'): 
+                self.solve_by_plp () 
+            elif (self.alg ==  'alg_top'):
+                self.alg_top()
+            else: 
+                print ('sorry, but the requested algorithm {} is not supported' .format (self.alg))
+                exit ()
+
+        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+            printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+            self.last_rt = time.time()
+        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            self.print_sol_to_res()
+            if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+                printf (self.log_output_file, '\nSolved using our alg within {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+        for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
+             usr.cur_s = usr.nxt_s
+
+
+        
         
     def binary_search (self):
         """
@@ -592,15 +588,12 @@ class SFC_mig_simulator (object):
         # print ('After binary search: s[0][a] = {}' .format(self.G.nodes[0]['a']))
         # exit ()
 
-
         # By hook or by crook, now we have a feasible solution        
         if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'B4 push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
                    (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))     
             self.print_sol_to_log()
         
-        # if (self.t == 27027):      
-            # print ('b4 calling push-up: s[1][a] = {}' .format (self.G.nodes[1]['a']))    
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'after push-up: s[0][cur RCs] = {}, s[0][a] = {}\n' .format 
@@ -624,28 +617,17 @@ class SFC_mig_simulator (object):
         Returns true iff a feasible sol was found
         """
         
-        if (self.t == 27026):
-            printf (self.log_output_file, 'begin bu. a={}, used = {}  ' .format (
-                self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==0] )))
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)]
            
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
-                if (self.t==27026 and s==0):
-                    printf (self.log_output_file, 'a={} used = {}. usr={}\n' .format (
-                        self.G.nodes[0]['a'], 
-                        sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==0] ),
-                        usr.id))
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl   = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
                 elif (len (usr.B)-1 == lvl):
                     return False
-        if (self.t == 27026):
-            printf (self.log_output_file, 'end bu. a={}, used = {}\n' .format (
-                self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==0] )))
         return True
 
     def rd_new_usrs_line (self, line, new_usrs = True):
@@ -668,19 +650,45 @@ class SFC_mig_simulator (object):
                          C_u = 10)
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
-
-            # # else: # the line details old, existing user, who moved
-            #     list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
-            #     usr = list_of_usr[0]
-            #     usr_cur_cpu = usr.B[usr.lvl]
-            #     self.CPUAll_single_usr (usr)
-            #     if (usr.lvl <= len (usr.B) and usr.B[usr.lvl] <= usr_cur_cpu): # can satisfy delay constraint while leaving the chain in its cur location and CPU budget 
-            #             continue
-            #     # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
-            #     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-            #     # dis-place this user (mark it as having nor assigned level, neither assigned server) 
-            #     usr.lvl   = -1
-            #     usr.nxt_s = -1
+            AP_id = int(tuple[1])
+            if (AP_id >= self.num_of_leaves):
+                if (self.warned_about_too_large_ap == False):
+                    print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+                    self.warned_about_too_large_ap = True
+                AP_id = self.num_of_leaves-1
+            s = self.ap2s[AP_id]
+            usr.S_u.append (s)
+            self.G.nodes[s]['Hs'].append(usr)
+            for lvl in (range (len(usr.B)-1)):
+                s = self.parent_of(s)
+                usr.S_u.append (s)
+                self.G.nodes[s]['Hs'].append(usr)                       
+                    
+    def rd_old_usrs_line (self, line, new_usrs = True):
+        """
+        Read a line detailing the new usrs just joined the system, in an ".ap" file.
+        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        """
+        splitted_line = line[0].split ("\n")[0].split (")")
+            # if (new_usrs): # this is a line of new users
+        for tuple in splitted_line:
+            if (len(tuple) <= 1):
+                break
+            tuple = tuple.split("(")
+            tuple   = tuple[1].split (',')
+            
+            list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
+            usr = list_of_usr[0]
+            usr_cur_cpu = usr.B[usr.lvl]
+            self.CPUAll_single_usr (usr)
+            if (usr.lvl <= len (usr.B) and usr.B[usr.lvl] <= usr_cur_cpu): # can satisfy delay constraint while leaving the chain in its cur location and CPU budget 
+                    continue
+            # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
+            self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+            # dis-place this user (mark it as having nor assigned level, neither assigned server) 
+            usr.lvl   = -1
+            usr.nxt_s = -1
 
             AP_id = int(tuple[1])
             if (AP_id > self.num_of_leaves):
@@ -694,8 +702,7 @@ class SFC_mig_simulator (object):
             for lvl in (range (len(usr.B)-1)):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
-                self.G.nodes[s]['Hs'].append(usr)                       
-                    
+                self.G.nodes[s]['Hs'].append(usr)                               
     
     def calc_sol_cost_SS (self):
         """
@@ -707,21 +714,7 @@ class SFC_mig_simulator (object):
                         self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
                         self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self._in_chain[chain]] + \
                         (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
-            
-            
-    def print_vars (self):
-        """
-        Print the decision variables. Each variable is printed with the constraints that it's >=0  
-        """
-        if (self.write_to_prb_file):
-            for __ in self.n:
-                printf (self.prb_output_file, 'var X{} >= 0;\n' .format (__['id'], __['id']) )
-            printf (self.prb_output_file, '\n')
-        if (self.write_to_mod_file):
-            printf (self.mod_output_file, 'int num_of_dvars = {};\n' .format (len(self.n)))
-            printf (self.mod_output_file, 'range dvar_indices = 0..num_of_dvars-1;\n')
-            printf (self.mod_output_file, 'dvar boolean X[dvar_indices];\n\n')
-     
+                
     def inc_array (self, ar, min_val, max_val):
         """
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
@@ -741,7 +734,7 @@ if __name__ == "__main__":
     # Gen static LP problem
     t = time.time()
     my_simulator = SFC_mig_simulator (verbose = VERBOSE_RES_AND_DETAILED_LOG)
-    my_simulator.simulate()
+    my_simulator.simulate ('alg_lp')
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()
     # my_simulator.init_problem  ()

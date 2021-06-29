@@ -199,7 +199,6 @@ class SFC_mig_simulator (object):
         """
         print a solution for DPM to the output log file 
         """
-        return
         used_cpu_in = self.used_cpu_in ()
         printf (self.res_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
             self.t, 
@@ -481,8 +480,9 @@ class SFC_mig_simulator (object):
                     for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
                         self.G.nodes[s]['Hs'].remove (usr)
                     del (usr)
-                printf (self.log_output_file, 'Ending  left usrs: Rcs={}, a={}, used cpu direct={:.0f}, Cs={}\t chains {}\n' .format (
-                        self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'],sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),self.G.nodes[0]['cpu cap'],[usr.id for usr in self.usrs if usr.cur_s==s]))
+                if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+                    printf (self.log_output_file, 'Ending  left usrs: Rcs={}, a={}, used cpu direct={:.0f}, Cs={}\t chains {}\n' .format (
+                            self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'],sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),self.G.nodes[0]['cpu cap'],[usr.id for usr in self.usrs if usr.cur_s==s]))
                 continue
         
             elif (splitted_line[0] == "new_usrs:"):              
@@ -565,7 +565,8 @@ class SFC_mig_simulator (object):
         Top-level alg'
         """
         
-        printf (self.log_output_file, 'beginning alg top\n')
+        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            printf (self.log_output_file, 'beginning alg top\n')
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         if (not(self.bottom_up())):
             if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
@@ -718,7 +719,7 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (verbose = VERBOSE_RES_AND_DETAILED_LOG)
+    my_simulator = SFC_mig_simulator (verbose = VERBOSE_ONLY_RES)
     my_simulator.simulate ('alg_top')
     # my_simulator.calc_sol_cost_SS ()
     # my_simulator.check_greedy_alg ()

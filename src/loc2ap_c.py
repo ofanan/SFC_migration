@@ -27,7 +27,7 @@ class loc2ap_c (object):
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
 
-        self.max_x, self.max_y = 12000, 12000 # size of the square cell of each AP, in meters.
+        self.max_x, self.max_y = 13622, 11457 # size of the square cell of each AP, in meters.
         self.verbose           = verbose 
         self.usrs              = []
         self.use_sq_cells      = use_sq_cells
@@ -93,20 +93,33 @@ class loc2ap_c (object):
             plt.legend()
             plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
             plt.clf()
+            
+    def find_max_X_max_Y (self):
+        max_x, max_y = 0, 0
+        for i in range (9):
+            usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
+            print ('checking file {}' .format (usrs_loc_file_name)) 
+            usrs_loc_file           = open ('../res/' + usrs_loc_file_name,  "r") 
+            for line in usrs_loc_file: 
+                line = line.split ('\n')[0] 
+                if (line.split ("//")[0] == ""):
+                    continue
+                
+                splitted_line = line.split (" ")
         
-    def parse_file (self, usrs_loc_file_name):
+                if (splitted_line[0] in ['t', 'usrs_that_left:', 'new_or_moved:']):
+                    continue
+                max_x, max_y = max (max_x, float(splitted_line[2])), max (max_y, float(splitted_line[3]))
+        print ('max_x = {}, max_y = {}' .format (max_x, max_y))
+
+
+    def parse_file (self):
         """
         - Read the input about the users locations.
         - Write the appropriate user-to-PoA connections to the file self.ap_file
         """
-        self.usrs_loc_file_name = usrs_loc_file_name
-        usrs_loc_file           = open ('../res/' + self.usrs_loc_file_name,  "r") 
-        if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
-            self.ap_file        = open ("../res/" + usrs_loc_file_name.split(".")[0] + ".ap",  "w+")  
-            printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
-            printf (self.ap_file, 'num_of_APs = {}\n' .format (self.num_of_APs))
         
-        for line in usrs_loc_file: 
+        for line in self.usrs_loc_file: 
     
             # remove the new-line character at the end (if any), and ignore comments lines 
             line = line.split ('\n')[0] 
@@ -158,19 +171,43 @@ class loc2ap_c (object):
             self.plot_num_of_vehs_per_ap ()
      
     def print_intermediate_res (self): 
+        """
+        Print the current aggregate results; used for having intermediate results when running long simulation.
+        """
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for ap in range (self.num_of_APs):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
     
+    def parse_files (self, files_prefix, num_of_files = 1):
+        """
+        Parse one or more ".loc" files, named "files_prefix_i.loc", where i = 0, 1, ... num_of_files-1
+        E.g. if files_prefix = vehicles and num_of_files = 2,
+        this function will parse the files vehicles_0.loc, vehicles_1.loc
+        for each of the parsed files, the function will:
+        1. output the number of vehicles at each ap. AND/OR
+        2. output the APs of all new/left/moved users at each time slot.
+        The exact behavior is by the value of self.verbose
+        """
+        self.files_prefix = files_prefix
+        if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+            self.ap_file        = open ("../res/" + files_prefix + ".ap", "w+")  
+            printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
+            printf (self.ap_file, 'num_of_APs = {}\n' .format (self.num_of_APs))
+        
+        for i in range (num_of_files): 
+            self.usrs_loc_file_name = files_prefix + '_{}.loc' .format (i)
+            self.usrs_loc_file      = open ('../res/' + self.usrs_loc_file_name,  "r") 
+            self.parse_file             ()
+            self.print_intermediate_res ()
+            i += 1
+        self.post_processing ()
+        
 if __name__ == '__main__':
     max_power_of_4 = 3        
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
-    
-    for i in range (9): 
-        usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
-        my_loc2ap.parse_file             (usrs_loc_file_name)
-        my_loc2ap.print_intermediate_res ()
-        i += 1
-    my_loc2ap.post_processing ()
+    my_loc2ap.parse_files ('vehicles', 1)
+
+    # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
+    # my_loc2ap.find_max_X_max_Y ()    

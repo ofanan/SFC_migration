@@ -32,7 +32,7 @@ if __name__ == "__main__":
             #     printf (loc_output_file, 't={}: act={} moving={}\n' 
             #              .format (traci.simulation.getTime(), traci.vehicle.getIDCount(), traci.vehicle.getIDCount() - len ([v for v in traci.vehicle.getIDList() if traci.vehicle.getSpeed(v)==0])))
             printf (loc_output_file, '\nt = {:.0f}\n' .format (traci.simulation.getTime()))
-            cur_list_of_vehicles = [veh for veh in traci.vehicle.getIDList() if traci.vehicle.getSpeed(veh)>0]
+            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] # if traci.vehicle.getSpeed(veh_key)>0]
             left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
                                                                veh['id'] not in (ids2recycle)), veh_key2id)) 
             printf (loc_output_file, 'usrs_that_left: ')
@@ -53,7 +53,9 @@ if __name__ == "__main__":
                         veh_id = num_of_vehicles # pick a new ID
                         num_of_vehicles += 1
                     veh_key2id.append({'key' : veh_key, 'id' : veh_id}) #, 'new' : True}) 
-                else: # already seen this veh_key in the sim' --> extract its id from the hash 
+                else: # already seen this veh_key in the sim' --> extract its id from the hash
+                    if (traci.vehicle.getSpeed(veh_key) == 0): # the usr didn't move in the last slot - no need to report of its movement 
+                        continue
                     type = 'o' # will indicate that this is a old vehicle 
                     veh_id = filtered_list[0]['id'] 
                 position = traci.vehicle.getPosition(veh_key)

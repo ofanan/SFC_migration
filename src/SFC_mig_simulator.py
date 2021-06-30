@@ -1,7 +1,8 @@
 # Bugs: 
-# 1. Bottom-up seems to run each time on all users, rather than only on new users. (Hs?)
-# 2. binary_search doesn't init / resets the available cap' at each server correctly 
-# 3. Should comment-in the call to plp, and to bottom_up only for critical chains in alg_top
+# push-up doesn't increase all usrs (only some of them).
+# improve syntax of .loc, and change loc2ap_c.py accordingly.
+# change plp. Possibly use for it a different "usr_c" type.
+# Check the inter-time-slots issue for alg top. Is the calc of mig' cost correct?
 
 import networkx as nx
 import numpy as np

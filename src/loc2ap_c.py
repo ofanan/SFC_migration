@@ -145,6 +145,9 @@ class loc2ap_c (object):
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     printf(self.ap_file, '\n{}\n' .format (line))
+                    
+                usrs_that_left = [int(id) for id in splitted_line[1].split(' ') if id!= '']
+                self.usrs = list (filter (lambda usr : (usr['id'] not in usrs_that_left), self.usrs))
                 continue
     
             elif (splitted_line[0] != 'new_or_moved:'): 
@@ -198,18 +201,18 @@ class loc2ap_c (object):
             printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
             printf (self.ap_file, 'num_of_APs = {}\n' .format (self.num_of_APs))
         
-        for i in range (num_of_files): 
+        for i in range (num_of_files):
             self.usrs_loc_file_name = files_prefix + '_{}.loc' .format (i)
             self.usrs_loc_file      = open ('../res/' + self.usrs_loc_file_name,  "r") 
             self.parse_file             ()
             self.print_intermediate_res ()
-            i += 1
+				  
         self.post_processing ()
         
 if __name__ == '__main__':
     max_power_of_4 = 3        
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
-    my_loc2ap.parse_files ('vehicles', 1)
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
+    my_loc2ap.parse_files ('vehicles', 3)
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

@@ -1,5 +1,3 @@
-
-
 import numpy as np
 import math
 import itertools 
@@ -129,7 +127,8 @@ class loc2ap_c (object):
             splitted_line = line.split (" ")
     
             if (splitted_line[0] == "t"):
-                printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
+                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+                    printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
                 continue
     
@@ -222,9 +221,9 @@ class loc2ap_c (object):
         self.post_processing ()
         
 if __name__ == '__main__':
-    max_power_of_4 = 3        
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
-    my_loc2ap.parse_files (files_prefix='short', num_of_files=2)
+    max_power_of_4 = 3
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
+    my_loc2ap.parse_files (files_prefix='vehicles', num_of_files=1)
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

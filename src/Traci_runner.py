@@ -41,7 +41,7 @@ if __name__ == "__main__":
             printf (loc_output_file, '\n')
             if (len (left_in_this_cycle) > 0):
                 ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in left_in_this_cycle]))) # add to ids2recycle the IDs of all cars that left
-            printf (loc_output_file, 'new_or_moved:\n')
+            printf (loc_output_file, 'new_or_moved: ')
             for veh_key in cur_list_of_vehicles: 
                 filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs
                 if (len(filtered_list) == 0): # first time this veh_key appears in the simulation
@@ -57,7 +57,7 @@ if __name__ == "__main__":
                     type = 'o' # will indicate that this is a old vehicle 
                     veh_id = filtered_list[0]['id'] 
                 position = traci.vehicle.getPosition(veh_key)
-                printf (loc_output_file, "{} {} {:.0f} {:.0f} \n" .format (type, veh_id, position[0], position[1]))
+                printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1]))
     
             sys.stdout.flush()
             traci.simulationStep()

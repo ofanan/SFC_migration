@@ -96,23 +96,21 @@ class loc2ap_c (object):
             plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
             plt.clf()
             
-    def find_max_X_max_Y (self):
-        max_x, max_y = 0, 0
-        for i in range (9):
-            usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
-            print ('checking file {}' .format (usrs_loc_file_name)) 
-            usrs_loc_file           = open ('../res/' + usrs_loc_file_name,  "r") 
-            for line in usrs_loc_file: 
-                line = line.split ('\n')[0] 
-                if (line.split ("//")[0] == ""):
-                    continue
-                
-                splitted_line = line.split (" ")
-        
-                if (splitted_line[0] in ['t', 'usrs_that_left:', 'new_or_moved:']):
-                    continue
-                max_x, max_y = max (max_x, float(splitted_line[2])), max (max_y, float(splitted_line[3]))
-        print ('max_x = {}, max_y = {}' .format (max_x, max_y))
+    # def find_max_X_max_Y (self):
+    #     max_x, max_y = 0, 0
+    #     for i in range (9):
+    #         usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
+    #         print ('checking file {}' .format (usrs_loc_file_name)) 
+    #         usrs_loc_file           = open ('../res/' + usrs_loc_file_name,  "r") 
+    #         for line in usrs_loc_file: 
+    #             line = line.split ('\n')[0] 
+    #             if (line.split ("//")[0] == ""):
+    #                 continue
+    #
+    #             splitted_line = line.split (" ")
+    #
+    #             Code isn't complete here. Need to be revised
+    #     print ('max_x = {}, max_y = {}' .format (max_x, max_y))
 
 
     def parse_file (self):
@@ -131,37 +129,49 @@ class loc2ap_c (object):
             splitted_line = line.split (" ")
     
             if (splitted_line[0] == "t"):
+                printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
-                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
-                    self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
-                    printf(self.ap_file, '\n{}' .format (line)) # print the header of the current time: "t = ..."
-                if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
-                    self.cnt_num_of_vehs_per_ap ()
-                for usr in self.usrs: # mark all existing usrs as old
-                    usr['new'] = False
-                    usr['cur ap'] = usr ['nxt ap']
                 continue
     
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
-                    printf(self.ap_file, '\n{}\n' .format (line))
+                    printf(self.ap_file, '{}\n' .format (line))
                     
                 usrs_that_left = [int(id) for id in splitted_line[1].split(' ') if id!= '']
                 self.usrs = list (filter (lambda usr : (usr['id'] not in usrs_that_left), self.usrs))
                 continue
     
-            elif (splitted_line[0] != 'new_or_moved:'): 
-                nxt_ap = self.loc2ap (float(splitted_line[2]), float(splitted_line[3]))
-                usr_id = np.uint16(splitted_line[1])
-                if (splitted_line[0] == 'n'): # new vehicle
-                    self.usrs.append (
-                        {'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
-                else: # existing user, who moved
-                    list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
-                    if (len(list_of_usr) == 0):
-                        print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
-                        exit ()
-                    list_of_usr[0]['nxt ap'] = nxt_ap
+            elif (splitted_line[0] == 'new_or_moved:'): 
+                splitted_line = splitted_line[1:] # the rest of this line details the locations of users that are either new, or old (existing) users who moved during the last time slot
+                if (splitted_line !=['']):
+
+                    splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
+                    for tuple in splitted_line: 
+                        if (len(tuple) <= 1):
+                            break
+                        tuple = tuple.split("(")
+                        tuple   = tuple[1].split (',')
+
+                        nxt_ap = self.loc2ap (float(tuple[2]), float(tuple[3]))
+                        usr_id = np.uint16(tuple[1])
+                        if (tuple[0] == 'n'): # new vehicle
+                            self.usrs.append (
+                                {'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
+                        else: # existing user, who moved
+                            list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
+                            if (len(list_of_usr) == 0):
+                                print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
+                                exit ()
+                            list_of_usr[0]['nxt ap'] = nxt_ap
+
+                # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
+                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+                    self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
+                if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+                    self.cnt_num_of_vehs_per_ap ()
+                for usr in self.usrs: # mark all existing usrs as old
+                    usr['new'] = False
+                    usr['cur ap'] = usr ['nxt ap']
     
     def post_processing (self):
         """
@@ -198,8 +208,10 @@ class loc2ap_c (object):
         self.files_prefix = files_prefix
         if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
             self.ap_file        = open ("../res/" + files_prefix + ".ap", "w+")  
-            printf (self.ap_file, '// File format:\n//time = t: (1,a1),(2,a2), ...\n//where aX is the Point-of-Access of user X at time t\n')
-            printf (self.ap_file, 'num_of_APs = {}\n' .format (self.num_of_APs))
+            printf (self.ap_file, '// File format:\n//for each time slot:\n')
+            printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
+            printf (self.ap_file, '// "new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
+            printf (self.ap_file, '// "old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
         for i in range (num_of_files):
             self.usrs_loc_file_name = files_prefix + '_{}.loc' .format (i)
@@ -211,8 +223,8 @@ class loc2ap_c (object):
         
 if __name__ == '__main__':
     max_power_of_4 = 3        
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    my_loc2ap.parse_files ('vehicles', 3)
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_AP)
+    my_loc2ap.parse_files (files_prefix='short', num_of_files=2)
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

@@ -1,10 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 from printf import printf 
-
-
 
 t_idx   = 0
 alg_idx = 1

@@ -2,7 +2,7 @@ class usr_c (object):
     """
     class for of "user" 
     """ 
-    def __init__ (self, id, cur_cpu=0, theta_times_lambda=[1,1,1], target_delay=3, mig_cost=1, C_u=15, cur_s = -1, nxt_s = -1):
+    def __init__ (self, id, cur_cpu=0, theta_times_lambda=[1,1,1], target_delay=5, mig_cost=1, C_u=15, cur_s = -1, nxt_s = -1):
         self.id                 = id
         self.cur_cpu            = cur_cpu
         self.theta_times_lambda = theta_times_lambda

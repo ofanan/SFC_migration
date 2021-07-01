@@ -40,10 +40,10 @@ class SFC_mig_simulator (object):
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)    
+    calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)     
     
     # # calculate the migration cost incurred for a usr if located on a given lvl
-    calc_mig_cost = lambda self, usr, lvl : (usr.S_u[usr.lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
+    calc_mig_cost = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
           
     # Calculate the number of CPU units actually used in each server
     used_cpu_in = lambda self: np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
@@ -56,7 +56,7 @@ class SFC_mig_simulator (object):
 
     # Returns the server to which a given user is currently assigned
     cur_server_of = lambda self, usr: usr.S_u[usr.lvl] 
-   
+     
     def calc_rsrc_aug (self):
         """
         Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
@@ -707,24 +707,12 @@ class SFC_mig_simulator (object):
             if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget 
                 continue
             
-            # printf (self.log_output_file, 'usr {} is critical. S_u = {}\n' .format (usr.id, usr.S_u)) $$$
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU 
             self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
             usr.lvl   = -1
             usr.nxt_s = -1
 
-    def calc_sol_cost_CLP (self):
-        """
-        Calculate the total cost of a CLP (Co-Located Placement), where all the VMs of each chain are co-located on a single server.
-        """
-        total_cost = 0
-        for chain in range(self.NUM_OF_CHAINS):
-            total_cost += self.CPU_cost[self.chain_nxt_loc[chain]] * self.chain_nxt_total_alloc[chain] + \
-                        self.path_bw_cost[self.PoA_of_user[chain]]  [self.chain_nxt_loc[chain]] * self.lambda_v[chain][0] + \
-                        self.path_bw_cost[self.chain_nxt_loc[chain]][self.PoA_of_user[chain]]   * self.lambda_v[chain][self._in_chain[chain]] + \
-                        (self.chain_cur_loc[chain] != self.chain_nxt_loc[chain]) * self.chain_mig_cost[chain]
-                
     def inc_array (self, ar, min_val, max_val):
         """
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
@@ -741,9 +729,8 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 1, children_per_node=2)
+    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 2, children_per_node=2)
     my_simulator.simulate ('alg_top')
-    # my_simulator.calc_sol_cost_CLP ()
     # my_simulator.check_greedy_alg ()
     # my_simulator.init_problem  ()
     #

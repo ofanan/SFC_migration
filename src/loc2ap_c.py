@@ -14,10 +14,10 @@ VERBOSE_AP_AND_CNT = 3
 class loc2ap_c (object):
     """
     Accept as input a .loc file (a file detailing the locations of all the new users / users who moved at each slot).
-    Output a .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
-    """
-
-    
+    Optional outputs:
+    - An .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
+    - A cnt of the number of vehicles in each cell
+    """   
     # inline function for the files location-to-AP mapping
     # currently this function always maps assuming square cells.
     loc2ap = lambda self, x, y : self.loc2ap_using_sq_cells (x, y)
@@ -27,8 +27,8 @@ class loc2ap_c (object):
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
 
-        self.max_x, self.max_y = 13622, 11457 # size of the square cell of each AP, in meters.
-        self.verbose           = verbose 
+        self.max_x, self.max_y = 13622, 11457 # size of the total area, in meters
+        self.verbose           = verbose      # verbose level - defining which outputs will be written
         self.usrs              = []
         self.use_sq_cells      = use_sq_cells
         if (self.use_sq_cells):
@@ -58,24 +58,23 @@ class loc2ap_c (object):
     
     def print_usrs_ap (self):
         """
-        Format-prints the users' AP, as caclulated earlier, to the .ap output file
+        Format-prints the users' AP, as caclculated earlier, to the .ap output file
         """
-        
         new_usrs = list (filter (lambda usr: usr['new'], self.usrs))
         if (len (new_usrs) > 0):
             printf (self.ap_file, 'new_usrs: ')
             for usr in new_usrs: # for every new usr
                 self.print_usr_ap (usr)
 
-        old_usrs = list (filter (lambda usr: (usr['new']==False) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
+        moved_old_usrs = list (filter (lambda usr: (usr['new']==False) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
         printf (self.ap_file, '\nold_usrs: ')
-        for usr in old_usrs: # for every existing usr
+        for usr in moved_old_usrs: 
             self.print_usr_ap (usr)
             usr['cur ap'] = usr['nxt ap']
                 
     def cnt_num_of_vehs_per_ap (self):
         """
-        Count the number of vehicles associated with each AP during the simulation.
+        Count the number of vehicles associated with each AP at the current parsed simulation step.
         """
         for ap in range(self.num_of_APs): 
             self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
@@ -110,13 +109,11 @@ class loc2ap_c (object):
     #             Code isn't complete here. Need to be revised
     #     print ('max_x = {}, max_y = {}' .format (max_x, max_y))
 
-
     def parse_file (self):
         """
-        - Read the input about the users locations.
-        - Write the appropriate user-to-PoA connections to the file self.ap_file
+        - Read and parse input ".loc" file, detailing the users locations 
+        - Write the appropriate user-to-PoA connections to the file self.ap_file, or to files summing the number of vehicles per cell.
         """
-        
         for line in self.usrs_loc_file: 
     
             # remove the new-line character at the end (if any), and ignore comments lines 
@@ -126,7 +123,7 @@ class loc2ap_c (object):
     
             splitted_line = line.split (" ")
     
-            if (splitted_line[0] == "t"):
+            if (splitted_line[0] == "t"): # reached the next simulation time slot
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
@@ -174,7 +171,7 @@ class loc2ap_c (object):
     
     def post_processing (self):
         """
-        Post processing after finished parse all the input file(s).
+        Post processing after finished parsing all the input file(s).
         The post processing may include:
         - Adding some lines to the output .ap file.
         - Plot the num_of_vehs 
@@ -223,7 +220,7 @@ class loc2ap_c (object):
 if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    my_loc2ap.parse_files (files_prefix='vehicles', num_of_files=1)
+    my_loc2ap.parse_files (files_prefix='vehicles', num_of_files=9)
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

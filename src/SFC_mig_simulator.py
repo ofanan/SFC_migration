@@ -16,7 +16,7 @@ import pulp as plp
 from usr_c import usr_c # class of the users
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
-from scipy.optimize import linprog
+# from scipy.optimize import linprog
 from cmath import sqrt
 
 # Levels of verbose (which output is generated)
@@ -26,8 +26,9 @@ VERBOSE_RES_AND_LOG           = 2 # Write to a file the total cost and rsrc aug.
 VERBOSE_RES_AND_DETAILED_LOG  = 3 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
 
 class SFC_mig_simulator (object):
-
-
+    """
+    Run a simulation of the Service Function Chains migration problem.
+    """
     #############################################################################
     # Inline functions
     #############################################################################
@@ -62,9 +63,7 @@ class SFC_mig_simulator (object):
         Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
         """
         used_cpu_in = self.used_cpu_in ()
-        return max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1) 
-
-    
+        return max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1)    
          
     def reset_sol (self):
         """
@@ -79,50 +78,62 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs']
         # print ('in rst sol: RCS={}, a={}' .format (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))
 
-    def solve_by_scipy_linprog (self):
-        """
-        Find a fractional optimal solution using Python's scipy.optimize.linprog library
-        """
-        self.decision_vars  = []
-        id                  = 0
-        for usr in self.usrs:
-            for lvl in range(len(usr.B)):
-                self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
-                id += 1
+    # def solve_by_scipy_linprog (self):
+    #     """
+    #     Currently unused, because we switched to using Python's pulp linear solver, which is much faster.
+    #     Find a fractional optimal solution using Python's scipy.optimize.linprog library.
+    #     """
+    #     self.decision_vars  = []
+    #     id                  = 0
+    #     for usr in self.usrs:
+    #         for lvl in range(len(usr.B)):
+    #             self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
+    #             id += 1
+    #
+    #     # Adding the CPU cap' constraints
+    #     # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
+    #     A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
+    #     for s in self.G.nodes():
+    #         for decision_var in filter (lambda item : item.s == s, self.decision_vars):
+    #             A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
+    #
+    #     for decision_var in self.decision_vars:
+    #         A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
+    #     b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
+    #     b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
+    #     res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
+    #                    A_ub   = A, 
+    #                    b_ub   = b_ub, 
+    #                    bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
+    #
+    #     if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+    #         printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
+    #         printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
+    #         if (res.success == True): # successfully solved
+    #             if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+    #                 for i in [i for i in range(len(res.x)) if res.x[i]>0]:
+    #                     printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
+    #                            self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
+    #         else: 
+    #             printf (self.log_output_file, '// status codes: 1: Iteration limit reached. 2. Infeasible. 3. Unbounded. 4. Numerical difficulties.\n')
 
-        # Adding the CPU cap' constraints
-        # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
-        A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
-        for s in self.G.nodes():
-            for decision_var in filter (lambda item : item.s == s, self.decision_vars):
-                A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
-
-        for decision_var in self.decision_vars:
-            A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
-        b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
-        b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-        res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
-                       A_ub   = A, 
-                       b_ub   = b_ub, 
-                       bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
-        
-        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-            printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-            printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-            if (res.success == True): # successfully solved
-                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                    for i in [i for i in range(len(res.x)) if res.x[i]>0]:
-                        printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
-                               self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
-            else: 
-                printf (self.log_output_file, '// status codes: 1: Iteration limit reached. 2. Infeasible. 3. Unbounded. 4. Numerical difficulties.\n')
+    # def calc_decision_var_cost (self):
+    #     """
+    #     Not complete yet.
+    #     Caluclate the cost of setting a decision var, when using the linear prog'
+    #     """
+    #     # consider the BW and CPU cost
+    #     cost = self.link_cost_of_SSP_at_lvl[decision_var.lvl] + self.CPU_cost_at_lvl[decision_var.lvl] * decision_var.usr.B[decision_var.lvl] 
+    #
+    #     # Add the mig cost
+    #     list_of_cur_st_param = list(filter (lambda cur_st : cur_st.usr==decision_var.usr and cur_st.s == decision_var.s, self.cur_state))
+    #     cost += self.uniform_mig_cost * len (usr.theta_times_lambda) * list_of_cur_st_param[0].value 
 
     def solve_by_plp (self):
         """
-        Find a fractional optimal solution using Python's pulp library.
+        Find an optimal fractional solution using Python's pulp LP library.
         pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
         """
-
         printf (self.log_output_file, 'Starting LP\n')
         model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize)
         self.d_vars  = [] # decision variables  
@@ -132,13 +143,15 @@ class SFC_mig_simulator (object):
             single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
                 plp_lp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
-                self.d_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_lp_var=plp_lp_var))
+                decision_var = decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_lp_var=plp_lp_var) # generate a decision var, containing the lp var + details about its meaning 
+                self.d_vars.append (decision_var)
                 single_place_const += plp_lp_var
-                obj_func           += self.calc_chain_cost_homo (usr, lvl) * plp_lp_var 
+                obj_func           += self.calc_chain_cost_homo (decision_var) * plp_lp_var # add the cost of this decision var to the objective func 
                 id += 1
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
 
+        # Generate CPU capacity constraints
         for s in self.G.nodes():
             cpu_cap_const = []
             for d_var in list (filter (lambda item : item.s == s, self.d_vars)): # for every decision variable meaning placing a chain on this server 
@@ -173,15 +186,16 @@ class SFC_mig_simulator (object):
         """
         For debugging / analysis:
         print the cost of each chain. 
-        """
-        
+        """     
         for usr in self.usrs:
             chain_cost = self.calc_chain_cost_homo (usr, usr.lvl)  
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
     def init_output_file (self, file_name):
         """
-        Open an output file for writing, overwriting previous content in that file 
+        Open an output file for writing, overwriting previous content in that file. 
+        Input: output file name.
+        Output: file descriptor.  
         """
         with open('../res/' + file_name, 'w') as FD:
             FD.write('')                
@@ -190,7 +204,7 @@ class SFC_mig_simulator (object):
 
     def init_res_file (self):
         """
-        Open the res file for writing and write initial comments line on it
+        Open the res file for writing.
         """
         self.res_file_name = "../res/" + self.ap_file_name.split(".")[0] + ".res"  
         self.res_output_file = self.init_output_file(self.res_file_name)
@@ -204,10 +218,9 @@ class SFC_mig_simulator (object):
         printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
         printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s.\n//C_s = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
 
-
     def print_sol_to_res (self):
         """
-        print a solution for DPM to the output log file 
+        print a solution for the problem to the output log file 
         """
         used_cpu_in = self.used_cpu_in ()
         printf (self.res_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
@@ -217,7 +230,7 @@ class SFC_mig_simulator (object):
 
     def print_sol_to_log (self):
         """
-        print a solution for DPM to the output log file 
+        print a detailed solution for to the output log file 
         """
         used_cpu_in = self.used_cpu_in ()
         printf (self.log_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
@@ -246,10 +259,9 @@ class SFC_mig_simulator (object):
         
     def push_up (self):
         """
-        Push chains up: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
+        Push-up chains: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
         Do that when chains are sorted in a decreasing order of the # of CPU units they're currently using.
         """
-        
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling push-up ()
         heapq._heapify_max(self.usrs)
@@ -273,10 +285,12 @@ class SFC_mig_simulator (object):
                     heapq.heappush(self.usrs, usr) # push back to the heap the user we have just pushed-up
                     n = 0 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
-            n += 1
+            else:
+                n += 1
                             
     def reduce_cost (self):
         """
+        Currently unused
         Reduce cost alg': take a feasible solution, and greedily decrease the cost 
         by changing the placement of a single chain, using a gradient method, as long as this is possible.
         """        
@@ -305,8 +319,8 @@ class SFC_mig_simulator (object):
    
     def CPUAll_single_usr (self, usr): 
         """
-        CPUAll algorithm:
-        calculate the minimal CPU allocation required by a given usr, when the highest server on which u is located is s.
+        CPUAll algorithm, for a single usr:
+        calculate the minimal CPU allocation required by the given usr, when the highest server on which u is located is s.
         The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
@@ -338,6 +352,7 @@ class SFC_mig_simulator (object):
             
     def fix_usr_params (self, usrs):
         """
+        Currently unused.
         For each of the given users, fix the following parameters:
         target_delay, mig_cost, C_u
         """
@@ -413,11 +428,9 @@ class SFC_mig_simulator (object):
 
     def __init__ (self, ap_file_name = 'shorter.ap', verbose = -1, tree_height = 3, children_per_node = 4):
         """
-        Init a toy example - topology (e.g., chains, VMs, target_delays etc.).
         """
-        
+               
         self.verbose                    = verbose
-        
         # Network parameters
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
@@ -438,7 +451,12 @@ class SFC_mig_simulator (object):
 
     def simulate (self, alg):
         """
-        Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
+        Simulate the whole simulation:
+        At each time step:
+        - Read and parse from an input ".ap" file the AP cells of each user who moved. 
+        - solve the problem (the "nxt_st), using the chosen alg: LP, or ALG_TOP (our alg).
+        - Write outputs results and/or logs to files.
+        - update cur_st = nxt_st
         """
 
         self.alg = alg
@@ -566,9 +584,8 @@ class SFC_mig_simulator (object):
     
     def alg_top (self):
         """
-        Top-level alg'
+        Our top-level alg'
         """
-        
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'beginning alg top\n')
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
@@ -588,23 +605,22 @@ class SFC_mig_simulator (object):
             self.print_sol_to_log()
         printf (self.log_output_file, 'finished alg top\n')
 
-    def update_available_cpu_by_sol (self):
-        """
-        Update the available capacity at each server to: 
-        the (possibly augmented) CPU capacity at this server - the total CPU assigned to users by the solution.
-        NOTE: this function assumes that every user is already exclusively located in its "nxt_s" location! 
-        """
-        for s in self.G.nodes():
-            self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s == s])                
-
-    
+    # def update_available_cpu_by_sol (self):
+    #     """
+    #     Currently unused.
+    #     Update the available capacity at each server to: 
+    #     the (possibly augmented) CPU capacity at this server - the total CPU assigned to users by the solution.
+    #     NOTE: this function assumes that every user is already exclusively located in its "nxt_s" location! 
+    #     """
+    #     for s in self.G.nodes():
+    #         self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s == s])                
+   
     def bottom_up (self):
         """
         Bottom-up alg'. 
         Looks for a feasible sol'.
         Returns true iff a feasible sol was found
-        """
-        
+        """        
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)]
@@ -700,9 +716,9 @@ class SFC_mig_simulator (object):
                 usr.S_u.append (s)
                 self.G.nodes[s]['Hs'].append(usr)                               
     
-    def calc_sol_cost_SS (self):
+    def calc_sol_cost_CLP (self):
         """
-        Calculate the total cost of an SS (single-server per-chain) full solution.
+        Calculate the total cost of a CLP (Co-Located Placement), where all the VMs of each chain are co-located on a single server.
         """
         total_cost = 0
         for chain in range(self.NUM_OF_CHAINS):
@@ -715,6 +731,7 @@ class SFC_mig_simulator (object):
         """
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
         output: the same array, where the value is incremented by 1 
+        Used for finding a brute-force solution.
         """
         for idx in range (ar.size-1, -1, -1):
             if (ar[idx] < max_val[idx]):
@@ -723,13 +740,12 @@ class SFC_mig_simulator (object):
             ar[idx] = min_val[idx]
         return ar 
      
-          
 if __name__ == "__main__":
 
     t = time.time()
     my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 1, children_per_node=2)
     my_simulator.simulate ('alg_top')
-    # my_simulator.calc_sol_cost_SS ()
+    # my_simulator.calc_sol_cost_CLP ()
     # my_simulator.check_greedy_alg ()
     # my_simulator.init_problem  ()
     #

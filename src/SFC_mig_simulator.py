@@ -1,5 +1,4 @@
 # Bugs: 
-# push-up doesn't increase all usrs (only some of them).
 # improve syntax of .loc, and change loc2ap_c.py accordingly.
 # change plp. Possibly use for it a different "usr_c" type.
 # Check the inter-time-slots issue for alg top. Is the calc of mig' cost correct?
@@ -239,7 +238,7 @@ class SFC_mig_simulator (object):
             self.calc_rsrc_aug())) 
         
         for s in self.G.nodes():
-            printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu direct={:.0f}, Cs={}\t chains {}\n' .format (
+            printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}\t chains {}\n' .format (
                     s,
                     self.G.nodes[s]['cur RCs'],
                     self.G.nodes[s]['a'],
@@ -492,22 +491,13 @@ class SFC_mig_simulator (object):
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
-                if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                    printf (self.log_output_file, 'Beginning left usrs: Rcs={}, a={}, used cpu ={:.0f}, Cs={}\t chains {}\n' .format (
-                            self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'], sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ), self.G.nodes[0]['cpu cap'], [usr.id for usr in self.usrs if usr.cur_s==s]))
 
-                # usrs_that_left = list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs))
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
                     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the resources held by that usr       
                     
                     # Remove the usr from the list of "descended users" on any server s 
-                    for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
-                        self.G.nodes[s]['Hs'].remove (usr)
                     del (usr)
-                if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-                    printf (self.log_output_file, 'Ending  left usrs: Rcs={}, a={}, used cpu direct={:.0f}, Cs={}\t chains {}\n' .format (
-                            self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a'],sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),self.G.nodes[0]['cpu cap'],[usr.id for usr in self.usrs if usr.cur_s==s]))
                 continue
         
             elif (splitted_line[0] == "new_usrs:"):              
@@ -539,6 +529,8 @@ class SFC_mig_simulator (object):
                 printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
              usr.cur_s = usr.nxt_s        
+        for s in self.G.nodes(): # Clean the list of 'unallocated usrs, for them server s is delay-feasible" (Hs) on each server 
+            self.G.nodes[s]['Hs'] = []
         
     def binary_search (self):
         """
@@ -618,14 +610,16 @@ class SFC_mig_simulator (object):
     def bottom_up (self):
         """
         Bottom-up alg'. 
+        Assigns all self.usrs that weren't assigned yet (either new usrs, or old usrs that moved, and now they don't satisfy the target delay).
         Looks for a feasible sol'.
         Returns true iff a feasible sol was found
         """        
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
             lvl = self.G.nodes[s]['lvl']
-            Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)]
+            Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
            
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
+                printf (self.log_output_file, 's = {}. usr {} is critical. S_u = {}\n' .format (s, usr.id, usr.S_u)) 
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl   = lvl
@@ -652,9 +646,8 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             tuple   = tuple[1].split (',')
             
-            usr = usr_c (id = int(tuple[0]), # (np.fromstring (tuple[0], dtype=np.uint16), 
+            usr = usr_c (id = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
                          theta_times_lambda=self.uniform_theta_times_lambda,
-                         target_delay = 15,
                          C_u = 10)
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
@@ -690,25 +683,20 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             tuple   = tuple[1].split (',')
             
-            list_of_usr = list(filter (lambda usr : usr.id == int(tuple[1]), self.usrs))
+            list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
             usr = list_of_usr[0]
             usr_cur_cpu = usr.B[usr.lvl]
-            self.CPUAll_single_usr (usr)
-            if (usr.lvl <= len (usr.B) and usr.B[usr.lvl] <= usr_cur_cpu): # can satisfy delay constraint while leaving the chain in its cur location and CPU budget 
-                    continue
-            # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
-            self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-            # dis-place this user (mark it as having nor assigned level, neither assigned server) 
-            usr.lvl   = -1
-            usr.nxt_s = -1
-
-            AP_id = int(tuple[1])
+            AP_id       = int(tuple[1])
             if (AP_id > self.num_of_leaves):
                 AP_id = self.num_of_leaves-1
                 if (self.warned_about_too_large_ap == False):
                     print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
                     self.warned_about_too_large_ap = True
+            self.CPUAll_single_usr (usr)
+
+            # update the list of delay-feasible servers for this usr
             s = self.ap2s[AP_id]
+            usr.S_u = []
             usr.S_u.append (s)
             self.G.nodes[s]['Hs'].append(usr)
             for lvl in (range (len(usr.B)-1)):
@@ -716,6 +704,16 @@ class SFC_mig_simulator (object):
                 usr.S_u.append (s)
                 self.G.nodes[s]['Hs'].append(usr)                               
     
+            if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget 
+                continue
+            
+            # printf (self.log_output_file, 'usr {} is critical. S_u = {}\n' .format (usr.id, usr.S_u)) $$$
+            # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
+            # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU 
+            self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+            usr.lvl   = -1
+            usr.nxt_s = -1
+
     def calc_sol_cost_CLP (self):
         """
         Calculate the total cost of a CLP (Co-Located Placement), where all the VMs of each chain are co-located on a single server.

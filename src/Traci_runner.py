@@ -9,13 +9,16 @@ from printf import printf
 if __name__ == "__main__":
 
     traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true']) 
-    warmup_period = 3600*7.5
-    traci.simulationStep (warmup_period) # simulate without output until our required time (time starts at 00:00). 
+    warmup_period           = 3600*7.5
+    sim_length              = 3600*1.5
+    len_of_time_slot_in_sec = 60  
+    if (warmup_period > 0):
+        traci.simulationStep (warmup_period) # simulate without output until our required time (time starts at 00:00). 
     veh_key2id            = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
     ids2recycle           = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
     left_in_this_cycle    = []
     num_of_vehicles       = 0
-    num_of_output_files   = 9
+    num_of_output_files   = 2
     
     for i in range (num_of_output_files):
         
@@ -23,15 +26,23 @@ if __name__ == "__main__":
         with open(output_file_name, 'w') as loc_output_file:
             loc_output_file.write('')                
         loc_output_file  = open (output_file_name,  "w")
-        printf (loc_output_file, '// locations of vehicles\n// format:\n// type usr_id x y, where:\n// type is either \'o\' (old veh), or \'n\' (new veh in the sim). (x,y) are the coodinates of the vehicle with this usr_id.\n' )
+        printf (loc_output_file, '// locations of vehicles. Format:\n')
+        printf (loc_output_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
+        printf (loc_output_file, '// format for vehicles that are new (just joined the sim), or moved:\n')
+        printf (loc_output_file, '// (type,usr_id,x,y)   where:\n')
+        printf (loc_output_file, '// type is either o (old veh), or n (new veh in the sim). (x,y) are the coodinates of the vehicle with this usr_id.\n')
         # 3600*1.5
-        while (traci.simulation.getTime() < warmup_period + 3600*1.5*(i+1) / num_of_output_files and traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
+        while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
             
-            # # print statistics of the number of cars along the simulation
-            # if (traci.simulation.getTime() % 60 ==0):
+            cur_sim_time = traci.simulation.getTime() 
+            if (cur_sim_time >= warmup_period + sim_length*(i+1) / num_of_output_files):
+                print ('Successfully finished writing to file {}' .format (output_file_name))
+                break
+            # print statistics of the number of cars along the simulation
+            # if (cur_sim_time % 60 ==0):
             #     printf (loc_output_file, 't={}: act={} moving={}\n' 
-            #              .format (traci.simulation.getTime(), traci.vehicle.getIDCount(), traci.vehicle.getIDCount() - len ([v for v in traci.vehicle.getIDList() if traci.vehicle.getSpeed(v)==0])))
-            printf (loc_output_file, '\nt = {:.0f}\n' .format (traci.simulation.getTime()))
+            #              .format (cur_sim_time, traci.vehicle.getIDCount(), traci.vehicle.getIDCount() - len ([v for v in traci.vehicle.getIDList() if traci.vehicle.getSpeed(v)==0])))
+            printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] # if traci.vehicle.getSpeed(veh_key)>0]
             left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
                                                                veh['id'] not in (ids2recycle)), veh_key2id)) 
@@ -62,5 +73,5 @@ if __name__ == "__main__":
                 printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1]))
     
             sys.stdout.flush()
-            traci.simulationStep()
+            traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
     traci.close()

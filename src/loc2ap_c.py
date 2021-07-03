@@ -14,7 +14,7 @@ VERBOSE_AP_AND_CNT = 3
 class loc2ap_c (object):
     """
     Accept as input a .loc file (a file detailing the locations of all the new users / users who moved at each slot).
-    Optional outputs:
+    Optional outputs: 
     - An .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
     - A cnt of the number of vehicles in each cell
     """   
@@ -191,7 +191,7 @@ class loc2ap_c (object):
             for ap in range (self.num_of_APs):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
     
-    def parse_files (self, files_prefix, num_of_files = 1):
+    def parse_files (self, loc_file_names):
         """
         Parse one or more ".loc" files, named "files_prefix_i.loc", where i = 0, 1, ... num_of_files-1
         E.g. if files_prefix = vehicles and num_of_files = 2,
@@ -201,16 +201,16 @@ class loc2ap_c (object):
         2. output the APs of all new/left/moved users at each time slot.
         The exact behavior is by the value of self.verbose
         """
-        self.files_prefix = files_prefix
         if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
-            self.ap_file        = open ("../res/" + files_prefix + ".ap", "w+")  
+            self.ap_file        = open ("../res/" + loc_file_names[0].split('.')[0] + ".ap", "w+")  
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
+            printf (self.ap_file, '//for each time slot:\n')
             printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
-            printf (self.ap_file, '// "new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
-            printf (self.ap_file, '// "old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
+            printf (self.ap_file, '"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
+            printf (self.ap_file, '"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
-        for i in range (num_of_files):
-            self.usrs_loc_file_name = files_prefix + '_{}.loc' .format (i)
+        for file_name in loc_file_names: #i in range (num_of_files):
+            self.usrs_loc_file_name = file_name
             self.usrs_loc_file      = open ('../res/' + self.usrs_loc_file_name,  "r") 
             self.parse_file             ()
             self.print_intermediate_res ()
@@ -220,7 +220,7 @@ class loc2ap_c (object):
 if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    my_loc2ap.parse_files (files_prefix='vehicles', num_of_files=9)
+    my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

@@ -46,7 +46,9 @@ class Res_file_parser (object):
         plt.show ()
      
     def plot_num_of_vehs_per_ap (self):
-        # Open input and output files
+        """
+        Read the number of vehicels at each cell, as written in the input files, and extract from here plots. 
+        """
         input_file  = open ("../res/num_of_vehs_per_ap.ap", "r")  
         
         num_of_vehs_per_ap_per_t = []
@@ -64,7 +66,7 @@ class Res_file_parser (object):
                 num_of_vehs_in_cur_ap.append (int(cur_num_of_vehs_in_this_ap))
             
             num_of_vehs_per_ap_per_t.append (num_of_vehs_in_cur_ap)            
-                
+        
         for plot_num in range (16):
             for ap in range (4*plot_num, 4*(plot_num+1)):
                 plt.title ('Number of vehicles in each cell')

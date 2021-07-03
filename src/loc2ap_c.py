@@ -89,6 +89,7 @@ class loc2ap_c (object):
                 plt.title ('Number of vehicles in each cell')
                 plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
                 plt.ylabel ('Number of vehicles')
+                plt.ylabel ('time [minutes, starting in 07:30]')
             plt.legend()
             plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
             plt.clf()
@@ -218,7 +219,7 @@ class loc2ap_c (object):
 if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    my_loc2ap.parse_files (['vehicles_0730.loc', 'vehicles_0741.loc', 'vehicles_0751.loc', 'vehicles_0801.loc', 'vehicles_0811.loc', 'vehicles_0821.loc', 'vehicles_0831.loc', 'vehicles_0841.loc', 'vehicles_0851.loc', 'vehicles_0900.loc'])
+    my_loc2ap.parse_files (['vehicles_0730.loc']) #, 'vehicles_0741.loc', 'vehicles_0751.loc', 'vehicles_0801.loc', 'vehicles_0811.loc', 'vehicles_0821.loc', 'vehicles_0831.loc', 'vehicles_0841.loc', 'vehicles_0851.loc', 'vehicles_0900.loc'])
     # my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 

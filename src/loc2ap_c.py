@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 from usr_c import usr_c # class of the users
 from printf import printf
 
-VERBOSE_AP         = 1
-VERBOSE_CNT        = 2
-VERBOSE_AP_AND_CNT = 3
+VERBOSE_NO_TXT      = 0
+VERBOSE_AP          = 1
+VERBOSE_CNT         = 2
+VERBOSE_AP_AND_CNT  = 3
 
 class loc2ap_c (object):
     """
@@ -78,6 +79,29 @@ class loc2ap_c (object):
         """
         for ap in range(self.num_of_APs): 
             self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
+
+    def rd_num_of_vehs_per_ap (self, input_file_name):
+        """
+        Read the number of vehicels at each cell, as written in the input files. 
+        """
+        input_file  = open ('../res/' + input_file_name, "r")  
+        
+        self.num_of_vehs_in_ap = []
+        for line in input_file:
+            
+            if (line == "\n" or line.split ("//")[0] == ""):
+                continue
+        
+            num_of_vehs_in_cur_ap = []
+            line = line.split ("\n")[0]
+            splitted_line = line.split (":")
+            # ap_num = splitted_line[0].split("_")[-1]
+            splitted_line = splitted_line[1].split('[')[1].split(']')[0].split(', ')
+            for cur_num_of_vehs_in_this_ap in splitted_line:
+                num_of_vehs_in_cur_ap.append (int(cur_num_of_vehs_in_this_ap))
+            
+            num_of_vehs_in_ap.append (num_of_vehs_in_cur_ap)            
+        
         
     def plot_num_of_vehs_per_ap (self):    
         """
@@ -89,7 +113,7 @@ class loc2ap_c (object):
                 plt.title ('Number of vehicles in each cell')
                 plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
                 plt.ylabel ('Number of vehicles')
-                plt.ylabel ('time [minutes, starting in 07:30]')
+                plt.xlabel ('time [minutes, starting at 07:30]')
             plt.legend()
             plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
             plt.clf()
@@ -219,6 +243,8 @@ class loc2ap_c (object):
 if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
+    # my_loc2ap.rd_num_of_vehs_per_ap ('num_of_vehs_per_ap.ap')
+    # my_loc2ap.plot_num_of_vehs_per_ap ()
     my_loc2ap.parse_files (['vehicles_0730.loc']) #, 'vehicles_0741.loc', 'vehicles_0751.loc', 'vehicles_0801.loc', 'vehicles_0811.loc', 'vehicles_0821.loc', 'vehicles_0831.loc', 'vehicles_0841.loc', 'vehicles_0851.loc', 'vehicles_0900.loc'])
     # my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 

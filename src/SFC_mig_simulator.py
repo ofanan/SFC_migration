@@ -1,5 +1,4 @@
 # Bugs: 
-# improve syntax of .loc, and change loc2ap_c.py accordingly.
 # change plp. Possibly use for it a different "usr_c" type.
 # Check the inter-time-slots issue for alg top. Is the calc of mig' cost correct?
 
@@ -180,7 +179,6 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
                    d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
         
-
     def print_cost_per_usr (self):
         """
         For debugging / analysis:
@@ -229,7 +227,7 @@ class SFC_mig_simulator (object):
 
     def print_sol_to_log (self):
         """
-        print a detailed solution for to the output log file 
+        print a detailed solution for the mig' problem to the output log file 
         """
         used_cpu_in = self.used_cpu_in ()
         printf (self.log_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
@@ -450,19 +448,30 @@ class SFC_mig_simulator (object):
 
     def simulate (self, alg):
         """
+        Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
+        """
+        self.alg = alg
+        print ('Simulating {}. num of leaves = {}. ap file = {}' .format (self.alg, self.num_of_leaves, self.ap_file_name))
+        if (self.alg == 'alg_top'):
+            self.simulate_alg_top()
+        elif (self.alg == 'alg_lp'):
+            self.simulate_alg_lp ();
+        else:
+            print ('Sorry, alg {} is not implemented yet')
+            exit ()
+    
+    def simulate_alg_top (self):
+        """
         Simulate the whole simulation:
         At each time step:
         - Read and parse from an input ".ap" file the AP cells of each user who moved. 
-        - solve the problem (the "nxt_st), using the chosen alg: LP, or ALG_TOP (our alg).
+        - solve the problem using alg_top (our alg). 
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
         """
-
-        self.alg = alg
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             self.init_log_file()
              
-        print ('Simulating. num of leaves = {}. ap file = {}' .format (self.num_of_leaves, self.ap_file_name))
         # reset Hs        
         for s in self.G.nodes():
             self.G.nodes[s]['Hs'] = [] 
@@ -507,6 +516,14 @@ class SFC_mig_simulator (object):
                 
                 self.solve_mig_prob ()
                 continue
+        """
+        Simulate the whole simulation:
+        At each time step:
+        - Read and parse from an input ".ap" file the AP cells of each user who moved. 
+        - solve the problem (the "nxt_st), using the chosen alg: LP, or ALG_TOP (our alg).
+        - Write outputs results and/or logs to files.
+        - update cur_st = nxt_st
+        """
 
     def solve_mig_prob (self):
         """

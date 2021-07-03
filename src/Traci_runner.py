@@ -15,7 +15,7 @@ class Traci_runner (object):
 
     
     def __init__ (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = VERBOSE_LOC_ONLY):
-        traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true']) 
+        traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
         warmup_period           = warmup_period 
         sim_length              = sim_length 
         len_of_time_slot_in_sec = len_of_time_slot_in_sec  
@@ -47,7 +47,7 @@ class Traci_runner (object):
             while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
                 
                 cur_sim_time = traci.simulation.getTime() 
-                if (cur_sim_time > warmup_period + sim_length*(i+1) / num_of_output_files):
+                if (cur_sim_time >= warmup_period + sim_length*(i+1) / num_of_output_files):
                     print ('Successfully finished writing to file {}' .format (output_file_name))
                     break
                 
@@ -91,13 +91,16 @@ class Traci_runner (object):
         
                 if (self.verbose in [VERBOSE_DEBUG_ONLY, VERBOSE_LOC_AND_DEBUG]):
                     printf (debug_file, 'new={}\n' .format (new_veh_cnt))
+                    if  (traci.vehicle.getIDCount() != len(cur_list_of_vehicles)):
+                        print ('Error: Traci num of vehs differs from my count. See .log file')
+                        exit ()
                 sys.stdout.flush()
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
 
 if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*7.5,
-                                    sim_length              = 3600*1.5,
+                                    sim_length              = 3600*0.5,
                                     len_of_time_slot_in_sec = 60,
-                                    num_of_output_files     = 9, 
-                                    verbose                 = VERBOSE_LOC_ONLY)
+                                    num_of_output_files     = 3, 
+                                    verbose                 = VERBOSE_LOC_AND_DEBUG)

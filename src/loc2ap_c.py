@@ -47,7 +47,7 @@ class loc2ap_c (object):
         Input:  (x,y) location data
         Output: ap that covers this area
         """
-        ap = 0
+        ap = np.int8(0)
         x_offset, y_offset = x, y
         cur_edge = self.max_x / 2
         for p in range (self.max_power_of_4):
@@ -132,8 +132,7 @@ class loc2ap_c (object):
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     printf(self.ap_file, '{}\n' .format (line))
-                    
-                usrs_that_left = [int(id) for id in splitted_line[1].split(' ') if id!= '']
+                usrs_that_left = [int(id) for id in splitted_line[1:] if id!= '']                
                 self.usrs = list (filter (lambda usr : (usr['id'] not in usrs_that_left), self.usrs))
                 continue
     
@@ -151,8 +150,7 @@ class loc2ap_c (object):
                         nxt_ap = self.loc2ap (float(tuple[2]), float(tuple[3]))
                         usr_id = np.uint16(tuple[1])
                         if (tuple[0] == 'n'): # new vehicle
-                            self.usrs.append (
-                                {'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
+                            self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
                         else: # existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0):
@@ -220,7 +218,8 @@ class loc2ap_c (object):
 if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
+    my_loc2ap.parse_files (['vehicles_0730.loc', 'vehicles_0741.loc', 'vehicles_0751.loc', 'vehicles_0801.loc', 'vehicles_0811.loc', 'vehicles_0821.loc', 'vehicles_0831.loc', 'vehicles_0841.loc', 'vehicles_0851.loc', 'vehicles_0900.loc'])
+    # my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

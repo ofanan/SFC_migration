@@ -1,8 +1,10 @@
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 import math
 import itertools 
 import time
-import matplotlib.pyplot as plt
 
 from usr_c import usr_c # class of the users
 from printf import printf
@@ -21,7 +23,7 @@ class loc2ap_c (object):
     """   
     # inline function for the files location-to-AP mapping
     # currently this function always maps assuming square cells.
-    loc2ap = lambda self, x, y : self.loc2ap_using_sq_cells (x, y)
+    loc2ap = lambda self, x, y : self.loc2ap_using_rect_cells (x, y)
     
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
@@ -42,19 +44,20 @@ class loc2ap_c (object):
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w+')
         
-    def loc2ap_using_sq_cells (self, x, y):
+    def loc2ap_using_rect_cells (self, x, y):
         """
-        Finding the AP covering the user's area, assuming that the number of APs is a power of 4.
+        Finding the AP covering the user's area, assuming that the number of APs is a power of 4, and rectangular cells.
         Input:  (x,y) location data
         Output: ap that covers this area
         """
         ap = np.int8(0)
         x_offset, y_offset = x, y
-        cur_edge = self.max_x / 2
+        x_edge, y_edge = 0.5*self.max_x, 0.5*self.max_y
         for p in range (self.max_power_of_4):
-            ap += 4**(self.max_power_of_4-1-p)*int(2 * (y_offset // cur_edge) + x_offset // cur_edge)
-            x_offset, y_offset = x_offset % cur_edge, y_offset % cur_edge   
-            cur_edge /= 2
+            ap += 4**(self.max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge)
+            x_offset, y_offset = x_offset % x_edge, y_offset % y_edge   
+            x_edge /= 2
+            y_edge /= 2
         return ap
     
     def print_usrs_ap (self):
@@ -102,6 +105,30 @@ class loc2ap_c (object):
             
             self.num_of_vehs_in_ap.append (num_of_vehs_in_cur_ap)            
         
+    def heatmap_of_avg_num_of_vehs_per_ap (self):
+
+        num_of_cells_in_x, num_of_cells_in_y = int(math.sqrt (self.num_of_APs)), int(math.sqrt (self.num_of_APs))
+        offset_x          = self.max_x // (2*num_of_cells_in_x)        
+        offset_y          = self.max_y // (2*num_of_cells_in_y)        
+        tile_to_loc       = np.empty (self.num_of_APs, dtype = 'uint8')
+        ap                = 0
+        for y in range (offset_x, self.max_y, self.max_y // num_of_cells_in_x): 
+            for x in range (offset_y, self.max_x, self.max_x // num_of_cells_in_x): 
+                # print ('loc=({},{}), ap={}' .format (x,y, self.loc2ap(x, y)))
+                tile_to_loc[ap] = self.loc2ap(x, y)
+                ap+=1
+
+        avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
+        # print ('{}\n' .format (avg_num_of_vehs_per_ap.reshape ([num_of_cells_in_x, num_of_cells_in_x])))
+        heatmap_val = np.array ([avg_num_of_vehs_per_ap[tile_to_loc[i]] for i in range (self.num_of_APs)]).reshape ( [num_of_cells_in_x, num_of_cells_in_x])
+        
+        # print ('{}\n' .format (heatmap_val))
+
+        # Create a dataset
+        df = pd.DataFrame (heatmap_val, columns=["0","1","2","3","4","5","6","7"])
+        
+        # # Default heatmap
+        p1 = sns.heatmap(df)
         
     def plot_num_of_vehs_per_ap (self):    
         """
@@ -245,7 +272,8 @@ if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_NO_TXT)
     my_loc2ap.rd_num_of_vehs_per_ap ('num_of_vehs_per_ap.ap')
-    my_loc2ap.plot_num_of_vehs_per_ap ()
+    #my_loc2ap.plot_num_of_vehs_per_ap ()
+    my_loc2ap.heatmap_of_avg_num_of_vehs_per_ap ()
 
     # my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 

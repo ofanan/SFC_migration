@@ -1,7 +1,7 @@
 # Bugs: 
 # change plp. Possibly use for it a different "usr_c" type.
 # Check the inter-time-slots issue for alg top. Is the calc of mig' cost correct?
-
+# u11 isn't placed at all after the run of bottom-up!
 import networkx as nx
 import numpy as np
 import math
@@ -45,7 +45,7 @@ class SFC_mig_simulator (object):
     calc_mig_cost = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
           
     # Calculate the number of CPU units actually used in each server
-    used_cpu_in = lambda self: np.array ([self.G.nodes[s]['cur RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
+    used_cpu_in = lambda self: np.array ([self.G.nodes[s]['RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
           
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
@@ -73,47 +73,9 @@ class SFC_mig_simulator (object):
             usr.lvl   = -1
             usr.nxt_s = -1
         for s in self.G.nodes():
-            self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs']
-        # print ('in rst sol: RCS={}, a={}' .format (self.G.nodes[0]['cur RCs'], self.G.nodes[0]['a']))
+            self.G.nodes[s]['a'] = self.G.nodes[s]['RCs']
+        # print ('in rst sol: RCS={}, a={}' .format (self.G.nodes[0]['RCs'], self.G.nodes[0]['a']))
 
-    # def solve_by_scipy_linprog (self):
-    #     """
-    #     Currently unused, because we switched to using Python's pulp linear solver, which is much faster.
-    #     Find a fractional optimal solution using Python's scipy.optimize.linprog library.
-    #     """
-    #     self.decision_vars  = []
-    #     id                  = 0
-    #     for usr in self.usrs:
-    #         for lvl in range(len(usr.B)):
-    #             self.decision_vars.append (decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl]))
-    #             id += 1
-    #
-    #     # Adding the CPU cap' constraints
-    #     # A will hold the decision vars' coefficients. b will hold the bound: the constraints are: Ax<=b 
-    #     A = np.zeros ([len (self.G.nodes) + len (self.usrs), len(self.decision_vars)], dtype = 'int16')
-    #     for s in self.G.nodes():
-    #         for decision_var in filter (lambda item : item.s == s, self.decision_vars):
-    #             A[s][decision_var.id] = decision_var.usr.B[decision_var.lvl]
-    #
-    #     for decision_var in self.decision_vars:
-    #         A[len(self.G.nodes) + decision_var.usr.id][decision_var.id] = -1
-    #     b_ub = - np.ones (len(self.G.nodes) + len(self.usrs), dtype='int16')  
-    #     b_ub[self.G.nodes()] = [self.G.nodes[s]['cpu cap'] for s in range(len(self.G.nodes))]
-    #     res = linprog ([self.calc_chain_cost_homo (decision_var.usr, decision_var.lvl) for decision_var in self.decision_vars], 
-    #                    A_ub   = A, 
-    #                    b_ub   = b_ub, 
-    #                    bounds = [[0.0, 1.0] for line in range (len(self.decision_vars))])
-    #
-    #     if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-    #         printf (self.res_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-    #         printf (self.log_output_file, 't{}.LP.stts{} {:.2f}\n' .format(self.t, res.status, res.fun))
-    #         if (res.success == True): # successfully solved
-    #             if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-    #                 for i in [i for i in range(len(res.x)) if res.x[i]>0]:
-    #                     printf (self.log_output_file, '\nu {} lvl {:.0f} loc {:.0f} val {:.2f}' .format(
-    #                            self.decision_vars[i].usr.id,self.decision_vars[i].lvl,self.decision_vars[i].s,res.x[i]))
-    #         else: 
-    #             printf (self.log_output_file, '// status codes: 1: Iteration limit reached. 2. Infeasible. 3. Unbounded. 4. Numerical difficulties.\n')
 
     # def calc_decision_var_cost (self):
     #     """
@@ -212,8 +174,7 @@ class SFC_mig_simulator (object):
         """
         self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.log'  
         self.log_output_file = self.init_output_file(self.log_file_name)
-        printf (self.log_output_file, '// format: s : used / C_s   chains[u1, u2, ...]\n')
-        printf (self.log_output_file, '// where: s = number of server. used = capacity used by the sol on server s.\n//C_s = non-augmented capacity of s. u1, u2, ... = chains placed on s.\n' )
+        printf (self.log_output_file, '//RCs = augmented capacity of server s. a=available capacity. C_s = non-augmented capacity of s.\n' )
 
     def print_sol_to_res (self):
         """
@@ -238,7 +199,7 @@ class SFC_mig_simulator (object):
         for s in self.G.nodes():
             printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}\t chains {}\n' .format (
                     s,
-                    self.G.nodes[s]['cur RCs'],
+                    self.G.nodes[s]['RCs'],
                     self.G.nodes[s]['a'],
                     sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),
                     #used_cpu_in[s],
@@ -269,6 +230,8 @@ class SFC_mig_simulator (object):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
+                    if (self.debug):
+                        print ('inc CPU at s{}. dec CPU at s{}. usr {}' .format (usr.S_u[usr.lvl], usr.S_u[lvl], usr.id))
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
@@ -284,36 +247,7 @@ class SFC_mig_simulator (object):
                     break
             else:
                 n += 1
-                            
-    def reduce_cost (self):
-        """
-        Currently unused
-        Reduce cost alg': take a feasible solution, and greedily decrease the cost 
-        by changing the placement of a single chain, using a gradient method, as long as this is possible.
-        """        
-        # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
-        # before calling reduce_cost ()
-        while (1):
-            lvl_star = -1; max_reduction = 0 # init default values for the maximal reduction cost func', and for the argmax indices 
-            for usr in self.usrs:
-                for lvl in range(len (usr.B)): # for each level in which there's a delay-feasible server for this usr
-                    if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl 
-                        reduction = self.calc_chain_cost_homo (usr, usr.lvl) - self.calc_chain_cost_homo (usr, lvl)
-                        if (reduction > max_reduction):  
-                            usr2mov       = usr
-                            lvl_star      = lvl
-                            max_reduction = reduction 
-            if (max_reduction == 0): # cannot decrease cost anymore
-                break
-            
-            # move usr2mov from its current lvl to lvl_star, and update Y, a, accordingly
-            self.G.nodes [usr2mov.S_u[usr2mov.lvl]] ['a'] += usr2mov.B[usr2mov.lvl] # inc the available CPU at the prev loc of the moved usr
-            dst_server = usr2mov.S_u[lvl_star] 
-            self.G.nodes [dst_server]   ['a'] -= usr2mov .B[lvl_star]           # dec the available CPU at the new loc of the moved usr
-            print ('id of usr2mov = {}, old lvl = {}, lvl_star = {}, max_reduction = {}' .format(usr2mov.id, usr2mov.lvl, lvl_star, max_reduction))
-            usr2mov.lvl   = lvl_star
-            usr2mov.nxt_s = dst_server  
-   
+
     def CPUAll_single_usr (self, usr): 
         """
         CPUAll algorithm, for a single usr:
@@ -359,9 +293,9 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.cpu_cap_at_lvl    = np.array ([1000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+        self.cpu_cap_at_lvl    = np.array ([10 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
-        self.link_cost_at_lvl  = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
+        self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
@@ -426,7 +360,8 @@ class SFC_mig_simulator (object):
     def __init__ (self, ap_file_name = 'shorter.ap', verbose = -1, tree_height = 3, children_per_node = 4):
         """
         """
-               
+              
+        self.debug                      = True 
         self.verbose                    = verbose
         # Network parameters
         self.tree_height                = tree_height
@@ -475,7 +410,7 @@ class SFC_mig_simulator (object):
         # reset Hs        
         for s in self.G.nodes():
             self.G.nodes[s]['Hs'] = [] 
-            self.G.nodes[s]['cur RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
+            self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
 
         # Open input and output files
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
@@ -560,8 +495,8 @@ class SFC_mig_simulator (object):
         
         # init cur RCs and a(s) to the number of available CPU in each server, assuming maximal rsrc aug' 
         for s in self.G.nodes():
-            self.G.nodes[s]['cur RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
-            self.G.nodes[s]['a']       = self.G.nodes[s]['cur RCs'] #currently-available rsrcs at server s  
+            self.G.nodes[s]['RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
+            self.G.nodes[s]['a']       = self.G.nodes[s]['RCs'] #currently-available rsrcs at server s  
 
         if (not (self.bottom_up ())):
             print ('did not find a feasible sol even with maximal rsrc aug')
@@ -569,27 +504,31 @@ class SFC_mig_simulator (object):
 
         # Now we know that we found an initial feasible sol 
                    
-        ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
+        ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
         while True: 
             
             # Check if the binary search converged 
             # check_ar = np.array ([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool') 
             if ( np.array([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool').all()):
-                used_cpu = self.used_cpu_in ()
-                print ('used cpu in s[0] = {}' .format (used_cpu[0]))
+                for s in self.G.nodes():
+                    self.G.nodes[s]['RCs'] = math.floor (ub[s])  
+                self.reset_sol()
+                res = self.bottom_up()
+                if (self.debug):
+                    print ('finished binary search. res = {}. usr11.lvl={}' .format (res, self.usrs[11].lvl))
                 return 
 
             # Update the available capacity at each server according to the value of resource augmentation for this iteration            
             for s in self.G.nodes():
-                self.G.nodes[s]['cur RCs'] = math.floor (0.5*(ub[s] + lb[s]))  
+                self.G.nodes[s]['RCs'] = math.floor (0.5*(ub[s] + lb[s]))  
             self.reset_sol()
 
             # Solve using bottom-up
             if (self.bottom_up()):
-                ub = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])        
+                ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])        
             else:
-                lb = np.array([self.G.nodes[s]['cur RCs'] for s in self.G.nodes()])
+                lb = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])
     
     def alg_top (self):
         """
@@ -604,10 +543,13 @@ class SFC_mig_simulator (object):
             self.binary_search()
 
         # By hook or by crook, now we have a feasible solution        
-        if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]):
+        if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): #$$$$$$$$$
             printf (self.log_output_file, 'b4 push-up\n')
             self.print_sol_to_log()
         
+        # if (self.debug):
+        #     for usr in self.usrs:
+        #         print ('b4 push-up: usr{}.lvl={}' .format (usr.id, usr.lvl))
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'after push-up\n')
@@ -622,7 +564,7 @@ class SFC_mig_simulator (object):
     #     NOTE: this function assumes that every user is already exclusively located in its "nxt_s" location! 
     #     """
     #     for s in self.G.nodes():
-    #         self.G.nodes[s]['a'] = self.G.nodes[s]['cur RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s == s])                
+    #         self.G.nodes[s]['a'] = self.G.nodes[s]['RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s == s])                
    
     def bottom_up (self):
         """
@@ -636,13 +578,18 @@ class SFC_mig_simulator (object):
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
            
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
-                printf (self.log_output_file, 's = {}. usr {} is critical. S_u = {}\n' .format (s, usr.id, usr.S_u)) 
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl   = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
+                    if (self.debug and usr.id==11):
+                        print ('placed u{} on lvl{}, s{}' .format (usr.id, usr.lvl, usr.nxt_s))
                 elif (len (usr.B)-1 == lvl):
+                    if (self.debug and usr.id==1):
+                        print ('failed to place u11')
                     return False
+        if (self.debug):
+            print ('usr[11].lvl={}, nxt_s={}' .format (self.usrs[11].lvl, self.usrs[11].nxt_s))
         return True
 
     def rd_new_usrs_line (self, line):
@@ -748,20 +695,3 @@ if __name__ == "__main__":
     t = time.time()
     my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 2, children_per_node=2)
     my_simulator.simulate ('alg_top')
-    # my_simulator.check_greedy_alg ()
-    # my_simulator.init_problem  ()
-    #
-    # # Gen dynamic LP problem
-    # t = time.time()
-    # for leaf in my_simulator.leaves:
-        # my_simulator.gen_lp_problem(leaf)
-        #
-        #
-    # my_simulator.gen_lp_problem_old ()
-    # printf (lp_time_summary_file, 'Gen dynamic LP took {:.4f} seconds\n' .format (float (time.time() - t)))
-    #
-    # # Solve the LP problem
-    # t = time.time()
-    # my_simulator.run_lp_Cplex()
-    # printf (lp_time_summary_file, 'Solving the LP took {:.4f} seconds\n' .format (float (time.time() - t)))
-

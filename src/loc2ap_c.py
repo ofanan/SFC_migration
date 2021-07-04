@@ -100,7 +100,7 @@ class loc2ap_c (object):
             for cur_num_of_vehs_in_this_ap in splitted_line:
                 num_of_vehs_in_cur_ap.append (int(cur_num_of_vehs_in_this_ap))
             
-            num_of_vehs_in_ap.append (num_of_vehs_in_cur_ap)            
+            self.num_of_vehs_in_ap.append (num_of_vehs_in_cur_ap)            
         
         
     def plot_num_of_vehs_per_ap (self):    
@@ -109,7 +109,8 @@ class loc2ap_c (object):
         """
         for plot_num in range (4**(self.max_power_of_4-1)):
             for ap in range (4*plot_num, 4*(plot_num+1)):
-                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
+                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+                    printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
                 plt.title ('Number of vehicles in each cell')
                 plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
                 plt.ylabel ('Number of vehicles')
@@ -242,10 +243,10 @@ class loc2ap_c (object):
         
 if __name__ == '__main__':
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    # my_loc2ap.rd_num_of_vehs_per_ap ('num_of_vehs_per_ap.ap')
-    # my_loc2ap.plot_num_of_vehs_per_ap ()
-    my_loc2ap.parse_files (['vehicles_0730.loc']) #, 'vehicles_0741.loc', 'vehicles_0751.loc', 'vehicles_0801.loc', 'vehicles_0811.loc', 'vehicles_0821.loc', 'vehicles_0831.loc', 'vehicles_0841.loc', 'vehicles_0851.loc', 'vehicles_0900.loc'])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_NO_TXT)
+    my_loc2ap.rd_num_of_vehs_per_ap ('num_of_vehs_per_ap.ap')
+    my_loc2ap.plot_num_of_vehs_per_ap ()
+
     # my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 

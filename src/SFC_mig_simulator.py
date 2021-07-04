@@ -197,15 +197,19 @@ class SFC_mig_simulator (object):
             self.calc_rsrc_aug())) 
         
         for s in self.G.nodes():
+            used_cpu_in_s = sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
             printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}\t chains {}\n' .format (
                     s,
                     self.G.nodes[s]['RCs'],
                     self.G.nodes[s]['a'],
-                    sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s] ),
-                    #used_cpu_in[s],
+                    used_cpu_in_s,
                     self.G.nodes[s]['cpu cap'],
                     [usr.id for usr in self.usrs if usr.nxt_s==s]))
-
+            if (used_cpu_in_s + self.G.nodes[s]['a'] != self.G.nodes[s]['RCs']):
+                printf (self.log_output_file, 'Error in using cpu utilization of s{}' .format (s))
+                print ('Error in using cpu utilization. Please see the log file: {}' .format (self.log_file_name))
+                exit ()           
+            
     def print_heap (self):
         """
         print the id, level and CPU of each user in a heap.
@@ -230,8 +234,6 @@ class SFC_mig_simulator (object):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
-                    if (self.debug):
-                        print ('inc CPU at s{}. dec CPU at s{}. usr {}' .format (usr.S_u[usr.lvl], usr.S_u[lvl], usr.id))
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
@@ -360,9 +362,11 @@ class SFC_mig_simulator (object):
     def __init__ (self, ap_file_name = 'shorter.ap', verbose = -1, tree_height = 3, children_per_node = 4):
         """
         """
-              
-        self.debug                      = True 
+        
+        # verbose and debug      
+        self.debug                      = False 
         self.verbose                    = verbose
+        
         # Network parameters
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
@@ -376,7 +380,7 @@ class SFC_mig_simulator (object):
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         
-        # Names of output files
+        # Init output files
         if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             self.init_res_file() 
         self.gen_parameterized_tree ()
@@ -515,8 +519,6 @@ class SFC_mig_simulator (object):
                     self.G.nodes[s]['RCs'] = math.floor (ub[s])  
                 self.reset_sol()
                 res = self.bottom_up()
-                if (self.debug):
-                    print ('finished binary search. res = {}. usr11.lvl={}' .format (res, self.usrs[11].lvl))
                 return 
 
             # Update the available capacity at each server according to the value of resource augmentation for this iteration            
@@ -547,9 +549,6 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'b4 push-up\n')
             self.print_sol_to_log()
         
-        # if (self.debug):
-        #     for usr in self.usrs:
-        #         print ('b4 push-up: usr{}.lvl={}' .format (usr.id, usr.lvl))
         self.push_up ()
         if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
             printf (self.log_output_file, 'after push-up\n')
@@ -582,14 +581,8 @@ class SFC_mig_simulator (object):
                     usr.nxt_s = s
                     usr.lvl   = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
-                    if (self.debug and usr.id==11):
-                        print ('placed u{} on lvl{}, s{}' .format (usr.id, usr.lvl, usr.nxt_s))
                 elif (len (usr.B)-1 == lvl):
-                    if (self.debug and usr.id==1):
-                        print ('failed to place u11')
                     return False
-        if (self.debug):
-            print ('usr[11].lvl={}, nxt_s={}' .format (self.usrs[11].lvl, self.usrs[11].nxt_s))
         return True
 
     def rd_new_usrs_line (self, line):

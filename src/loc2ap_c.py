@@ -107,6 +107,14 @@ class loc2ap_c (object):
         
     def heatmap_of_avg_num_of_vehs_per_ap (self):
 
+        # uniform_data = np.random.rand(10, 12)
+        # my_heatmap = sns.heatmap(uniform_data)
+        # plt.show()
+
+        # my_heatmap.plot.show()
+        # my_heatmap.plot.save_fig('../res/rgrg.jpg')
+        # print ('rgrgrg') 
+        # exit ()
         num_of_cells_in_x, num_of_cells_in_y = int(math.sqrt (self.num_of_APs)), int(math.sqrt (self.num_of_APs))
         offset_x          = self.max_x // (2*num_of_cells_in_x)        
         offset_y          = self.max_y // (2*num_of_cells_in_y)        
@@ -128,7 +136,9 @@ class loc2ap_c (object):
         df = pd.DataFrame (heatmap_val, columns=["0","1","2","3","4","5","6","7"])
         
         # # Default heatmap
-        p1 = sns.heatmap(df)
+        my_heatmap = sns.heatmap(df)
+        plt.show()
+        #my_heatmap
         
     def plot_num_of_vehs_per_ap (self):    
         """

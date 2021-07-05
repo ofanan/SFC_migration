@@ -107,39 +107,55 @@ class loc2ap_c (object):
         
     def heatmap_of_avg_num_of_vehs_per_ap (self):
 
-        # uniform_data = np.random.rand(10, 12)
-        # my_heatmap = sns.heatmap(uniform_data)
-        # plt.show()
-
-        # my_heatmap.plot.show()
-        # my_heatmap.plot.save_fig('../res/rgrg.jpg')
-        # print ('rgrgrg') 
-        # exit ()
-        num_of_cells_in_x, num_of_cells_in_y = int(math.sqrt (self.num_of_APs)), int(math.sqrt (self.num_of_APs))
-        offset_x          = self.max_x // (2*num_of_cells_in_x)        
-        offset_y          = self.max_y // (2*num_of_cells_in_y)        
-        tile_to_loc       = np.empty (self.num_of_APs, dtype = 'uint8')
-        ap                = 0
-        for y in range (offset_x, self.max_y, self.max_y // num_of_cells_in_x): 
-            for x in range (offset_y, self.max_x, self.max_x // num_of_cells_in_x): 
-                # print ('loc=({},{}), ap={}' .format (x,y, self.loc2ap(x, y)))
-                tile_to_loc[ap] = self.loc2ap(x, y)
-                ap+=1
-
+        self.tile2ap()
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
-        # print ('{}\n' .format (avg_num_of_vehs_per_ap.reshape ([num_of_cells_in_x, num_of_cells_in_x])))
-        heatmap_val = np.array ([avg_num_of_vehs_per_ap[tile_to_loc[i]] for i in range (self.num_of_APs)]).reshape ( [num_of_cells_in_x, num_of_cells_in_x])
+        heatmap_val = np.array ([avg_num_of_vehs_per_ap[self.tile_to_ap[i]] for i in range (self.num_of_APs)]).reshape ( [self.num_of_cells_in_x, self.num_of_cells_in_x])
         
-        # print ('{}\n' .format (heatmap_val))
+        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_val, columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
+        plt.title ('avg num of vehicles per cell')
+        # plt.show()
+        plt.savefig('../res/heatmap.jpg')
+        
+    # def tile2ap (self, power_of_4):
+    #     """
+    #     prepare a translation of the "Tile" (line-by-line regular index given to cells) to the number of AP.
+    #     """
+    #
+    #     self.tile_to_ap       = np.empty (self.num_of_APs, dtype = 'uint8')
+    #     self.num_of_cells_in_x, self.num_of_cells_in_y = int(math.sqrt (self.num_of_APs)), int(math.sqrt (self.num_of_APs))
+    #     offset_x          = self.max_x // (2*self.num_of_cells_in_x)        
+    #     offset_y          = self.max_y // (2*self.num_of_cells_in_y)        
+    #     ap                = 0
+    #     for y in range (offset_x, self.max_y, self.max_y // self.num_of_cells_in_x): 
+    #         for x in range (offset_y, self.max_x, self.max_x // self.num_of_cells_in_x): 
+    #             self.tile_to_ap[ap] = self.loc2ap(x, y)
+    #             ap+=1 
+    
+    def tile2ap (self, lvl):
+        """
+        prepare a translation of the "Tile" (line-by-line regular index given to cells) to the number of AP.
+        """
+        if (lvl == 0):
+            power = lvl
+            n = int(math.sqrt (self.num_of_APs/4**power))
+            self.tile_to_ap       = np.empty (n**2, dtype = 'uint8')
+            offset_x          = self.max_x // (2*n)        
+            offset_y          = self.max_y // (2*n)        
+            ap                = 0
+            for y in range (offset_x, self.max_y, self.max_y // n): 
+                for x in range (offset_y, self.max_x, self.max_x // n): 
+                    self.tile_to_ap[ap] = self.loc2ap(x, y)
+                    ap+=1 
+        elif (lvl == 1):
+            self.tile_to_ap = [0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15] 
+        elif (lvl == 2):
+            self.tile_to_ap = [0,1,2,3]
+        elif (lvl == 3):
+            self.tile_to_ap = [0]
+        else:
+            print ('Sorry, the level of 4 you chose is still unsupported by tile2ap')
+            exit ()
 
-        # Create a dataset
-        df = pd.DataFrame (heatmap_val, columns=["0","1","2","3","4","5","6","7"])
-        
-        # # Default heatmap
-        my_heatmap = sns.heatmap(df)
-        plt.show()
-        #my_heatmap
-        
     def plot_num_of_vehs_per_ap (self):    
         """
         Plot for each ap the number of vehicles associated with it along the trace.
@@ -277,15 +293,44 @@ class loc2ap_c (object):
             self.print_intermediate_res ()
 				  
         self.post_processing ()
+
+    def print_as_sq_mat (self, output_file, mat):
+        n = int (math.sqrt(len(mat)))
+        mat = mat.reshape (n, n)
+        for x in range (n):
+            for y in range (n):
+                printf (output_file, '{}\t' .format (mat[x][y]))
+            printf (output_file, '\n')
+    
+    def print_num_of_vehs_per_server (self):
+
+        # with open ('../res/num_of_vehs_per_server.ap', 'w') as output_file:
+        #      output_file.write ('avg num of cars per server\n')
+        output_file = open ('../res/num_of_vehs_per_server.ap', 'w')
+        printf (output_file, 'avg num of cars per server\n')
+        avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
+        for lvl in range (self.max_power_of_4):
+            self.tile2ap (lvl)
+            heatmap_val = np.array ([avg_num_of_vehs_per_ap[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))], dtype='int16')
+            printf (output_file, '\nlevel {}\n******************\n' .format (lvl))
+            self.print_as_sq_mat (output_file, heatmap_val)
+            reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4)
+            avg_num_of_vehs_per_ap = np.array([np.average(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int')#.reshape (4,4)
         
+        printf (output_file, '\nlevel {}\n******************\n{}' .format (self.max_power_of_4, np.average(heatmap_val)))
+            
+    
 if __name__ == '__main__':
     max_power_of_4 = 3
+    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
+    # my_loc2ap.parse_files (['vehicles_0730-0930_every_min.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
+
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_NO_TXT)
     my_loc2ap.rd_num_of_vehs_per_ap ('num_of_vehs_per_ap.ap')
-    #my_loc2ap.plot_num_of_vehs_per_ap ()
-    my_loc2ap.heatmap_of_avg_num_of_vehs_per_ap ()
+    # #my_loc2ap.plot_num_of_vehs_per_ap ()
+    my_loc2ap.print_num_of_vehs_per_server ()
+    # my_loc2ap.heatmap_of_avg_num_of_vehs_per_ap ()
 
-    # my_loc2ap.parse_files (['vehicles_0900.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

@@ -31,8 +31,10 @@ class loc2ap_c (object):
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
 
-        self.max_x, self.max_y = 13622, 11457 # size of the total area, in meters
         self.verbose           = verbose      # verbose level - defining which outputs will be written
+        self.debug             = True 
+        
+        self.max_x, self.max_y = 13622, 11457 # size of the total area, in meters
         self.usrs              = []
         self.use_sq_cells      = use_sq_cells
         if (self.use_sq_cells):
@@ -244,6 +246,8 @@ class loc2ap_c (object):
                 if (self.verbose in [VERBOSE_DEMOGRAPHY]):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left, self.usrs)): 
                         self.left[usr['cur ap']][-1] += 1 # inc the # of vehicles left from this cell ('cur ap' of the usrs who left)
+                        if (self.debug and usr['cur ap'] == 3):
+                            print ('usr {} left the system' .format(usr['id']))
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left), self.usrs))
                 continue
     
@@ -264,6 +268,8 @@ class loc2ap_c (object):
                             self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
                             if (self.verbose in [VERBOSE_DEMOGRAPHY]): 
                                 self.joined[nxt_ap][-1] += 1 # inc the # of usrs that joined this cell
+                                if (self.debug and nxt_ap == 3):
+                                    print ('new usr {} joined' .format(usr_id))
                         else: # existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0):
@@ -273,6 +279,10 @@ class loc2ap_c (object):
                             if (self.verbose in [VERBOSE_DEMOGRAPHY] and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
                                 self.joined[nxt_ap][-1] += 1 # inc the # of usrs that joined this cell
                                 self.left  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
+                                if (self.debug and list_of_usr[0]['cur ap'] == 3):
+                                    print ('usr {} left the cell' .format(list_of_usr[0]['id']))
+                                if (self.debug and nxt_ap == 3):
+                                    print ('usr {} joined' .format(usr_id))
 
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):

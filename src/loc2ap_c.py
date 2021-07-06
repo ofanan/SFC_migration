@@ -4,15 +4,16 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import math
 import itertools 
-import time
+import time 
 
 from usr_c import usr_c # class of the users
 from printf import printf
 
-VERBOSE_NO_TXT      = 0
-VERBOSE_AP          = 1
-VERBOSE_CNT         = 2
-VERBOSE_AP_AND_CNT  = 3
+VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
+VERBOSE_AP              = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
+VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
+VERBOSE_AP_AND_CNT      = 3 # Generate both ".ap" and ".txt" files, as detailed above.
+VERBOSE_DEMOGRAPHY      = 4 # Collect data about the # of vehicles entering / leaving each cell, at each time slot
 
 class loc2ap_c (object):
     """
@@ -38,11 +39,14 @@ class loc2ap_c (object):
             self.max_power_of_4    = max_power_of_4
             self.num_of_APs        = 4**max_power_of_4
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
-            self.num_of_vehs_in_ap = np.empty (4**self.max_power_of_4, dtype = 'object')
-            for ap in range(self.num_of_APs): 
-                self.num_of_vehs_in_ap[ap] = []
+            self.num_of_vehs_in_ap = [[] for ap in range(self.num_of_APs)]
+        if (self.verbose in [VERBOSE_DEMOGRAPHY]):
+            self.usrs_demography_file = open ('../res/vehicles.demography.txt', 'w+')
+            self.joined = [[] for ap in range(self.num_of_APs)]
+            self.left   = [[] for ap in range(self.num_of_APs)]
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
-            self.num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w+')
+            self.num_of_vehs_file_name = '../res/num_of_vehs_per_ap_{}aps.txt' .format (4**self.max_power_of_4)
+            self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
         
     def loc2ap_using_rect_cells (self, x, y):
         """
@@ -83,6 +87,24 @@ class loc2ap_c (object):
         for ap in range(self.num_of_APs): 
             self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
 
+    
+    def print_demography (self):
+        """
+        Used for debug.
+        Prints the number of vehicles that joined/left each cell during the last simulated time slot.
+        """
+        for ap in range(self.num_of_APs):
+            printf (self.usrs_demography_file, 'ap {}: joined {}. left {}\n' .format (ap, self.joined[ap], self.left[ap]))
+        printf (self.usrs_demography_file, '\n')                                        
+
+    def calc_demography_per_ap (self):
+        """
+        calculates the number of vehicles that joined/left each cell during the last simulated time slot.
+        """
+        for ap in range(self.num_of_APs): 
+            self.joined[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap and usr['cur ap'] != ap, self.usrs) )))
+            self.left[ap].append   (len (list (filter (lambda usr: usr['cur ap'] == ap and usr['nxt ap'] != ap, self.usrs) )))
+        
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
         Read the number of vehicels at each cell, as written in the input files. 
@@ -105,32 +127,34 @@ class loc2ap_c (object):
             
             self.num_of_vehs_in_ap.append (num_of_vehs_in_cur_ap)            
         
-    def heatmap_of_avg_num_of_vehs_per_ap (self):
+    def invert_mat_bottom_up (self, mat):
+        """
+        Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
+        Hence, need to swap the matrix upside-down
+        """ 
+        inverted_mat = np.empty (mat.shape, dtype = 'uint16')
+        for i in range (mat.shape[0]):
+            inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
+        return inverted_mat        
 
-        self.tile2ap()
+    def heatmap_of_avg_num_of_vehs_per_ap (self):
+        """
+        Plot a heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
+        """
+
+        self.tile2ap (lvl=0)
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
-        heatmap_val = np.array ([avg_num_of_vehs_per_ap[self.tile_to_ap[i]] for i in range (self.num_of_APs)]).reshape ( [self.num_of_cells_in_x, self.num_of_cells_in_x])
+        n = int (math.sqrt(len(avg_num_of_vehs_per_ap)))
+        heatmap_val = np.array ([int(avg_num_of_vehs_per_ap[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ( [n, n])
         
+        # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
+        # Hence, need to swap the matrix upside-down
+        heatmap_val = self.invert_mat_bottom_up(heatmap_val)
         my_heatmap = sns.heatmap (pd.DataFrame (heatmap_val, columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of vehicles per cell')
+        plt.title ('avg num of cars per cell')
         # plt.show()
         plt.savefig('../res/heatmap.jpg')
         
-    # def tile2ap (self, power_of_4):
-    #     """
-    #     prepare a translation of the "Tile" (line-by-line regular index given to cells) to the number of AP.
-    #     """
-    #
-    #     self.tile_to_ap       = np.empty (self.num_of_APs, dtype = 'uint8')
-    #     self.num_of_cells_in_x, self.num_of_cells_in_y = int(math.sqrt (self.num_of_APs)), int(math.sqrt (self.num_of_APs))
-    #     offset_x          = self.max_x // (2*self.num_of_cells_in_x)        
-    #     offset_y          = self.max_y // (2*self.num_of_cells_in_y)        
-    #     ap                = 0
-    #     for y in range (offset_x, self.max_y, self.max_y // self.num_of_cells_in_x): 
-    #         for x in range (offset_y, self.max_x, self.max_x // self.num_of_cells_in_x): 
-    #             self.tile_to_ap[ap] = self.loc2ap(x, y)
-    #             ap+=1 
-    
     def tile2ap (self, lvl):
         """
         prepare a translation of the "Tile" (line-by-line regular index given to cells) to the number of AP.
@@ -242,6 +266,8 @@ class loc2ap_c (object):
                     self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
                 if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
                     self.cnt_num_of_vehs_per_ap ()
+                if (self.verbose in [VERBOSE_DEMOGRAPHY]):
+                    self.calc_demography_per_ap ()
                 for usr in self.usrs: # mark all existing usrs as old
                     usr['new'] = False
                     usr['cur ap'] = usr ['nxt ap']
@@ -257,16 +283,30 @@ class loc2ap_c (object):
             printf(self.ap_file, "\n")   
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.plot_num_of_vehs_per_ap ()
+        if (self.verbose in [VERBOSE_DEMOGRAPHY]):
+            self.usrs_demography_file = open ('../res/vehicles.demography.txt', 'w')
+            print ('b4: {}' .format (self.left[5]))
+            
+            for ap in range (self.num_of_APs):
+                #self.joined[ap].pop()
+                self.left  [ap].pop()    
+            print ('after: {}' .format (self.left[5]))
+            self.print_demography()
+
      
     def print_intermediate_res (self): 
         """
         Print the current aggregate results; used for having intermediate results when running long simulation.
         """
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
-            self.num_of_vehs_output_file = open ('../res/num_of_vehs_per_ap.ap', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
+            self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for ap in range (self.num_of_APs):
-                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
+                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap]))
+        if (self.verbose == VERBOSE_DEMOGRAPHY): 
+            self.usrs_demography_file   = open ('../res/vehicles.demography.txt', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
+            printf (self.usrs_demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
+            self.print_demography()
     
     def parse_files (self, loc_file_names):
         """
@@ -295,42 +335,53 @@ class loc2ap_c (object):
         self.post_processing ()
 
     def print_as_sq_mat (self, output_file, mat):
-        n = int (math.sqrt(len(mat)))
+        """
+        Receive a vector ("mat"), reshape it and format-print it to the given output file as a square mat.
+        """
+        n = int (math.sqrt(mat.shape[0] * mat.shape[1]))
         mat = mat.reshape (n, n)
         for x in range (n):
             for y in range (n):
                 printf (output_file, '{}\t' .format (mat[x][y]))
             printf (output_file, '\n')
     
-    def print_num_of_vehs_per_server (self):
-
-        # with open ('../res/num_of_vehs_per_server.ap', 'w') as output_file:
-        #      output_file.write ('avg num of cars per server\n')
-        output_file = open ('../res/num_of_vehs_per_server.ap', 'w')
+    def print_num_of_vehs_per_server (self, output_file_name):
+        """
+        Print the number of vehicles in the sub-tree below each server, assuming that the simulated area is iteratively partitioned to rectangular cells,
+        so that the number of cells is a power of 4. 
+        """
+        output_file = open ('../res/' + output_file_name, 'w')
         printf (output_file, 'avg num of cars per server\n')
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
         for lvl in range (self.max_power_of_4):
-            self.tile2ap (lvl)
-            heatmap_val = np.array ([avg_num_of_vehs_per_ap[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))], dtype='int16')
+            self.tile2ap (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            heatmap_val = np.array ([avg_num_of_vehs_per_ap[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))], dtype='int16').reshape (int(math.sqrt(len(self.tile_to_ap))), int(math.sqrt(len(self.tile_to_ap)))) # extract the required value at each relevant area, by averaging the values of avg_num_of_vehs_per_ap at that area 
+            heatmap_val = self.invert_mat_bottom_up(heatmap_val)
             printf (output_file, '\nlevel {}\n******************\n' .format (lvl))
             self.print_as_sq_mat (output_file, heatmap_val)
-            reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4)
-            avg_num_of_vehs_per_ap = np.array([np.average(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int')#.reshape (4,4)
+            reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
+            avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
         
         printf (output_file, '\nlevel {}\n******************\n{}' .format (self.max_power_of_4, np.average(heatmap_val)))
             
     
 if __name__ == '__main__':
     max_power_of_4 = 3
-    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_CNT)
-    # my_loc2ap.parse_files (['vehicles_0730-0930_every_min.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
+    # gamad_file = open ('../res/gamad.txt', 'w+')
+    # printf (gamad_file, 'rgrgrg')
+    # gamad_file = open ('../res/gamad.txt', 'w')
+    # printf (gamad_file, 'abcd')
+    
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_DEMOGRAPHY)
+    my_loc2ap.parse_files (['short_0.loc'])#, 'vehicles_0910.loc', 'vehicles_0920.loc', 'vehicles_0930.loc', 'vehicles_0940.loc', 'vehicles_0950.loc'])
 
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_NO_TXT)
-    my_loc2ap.rd_num_of_vehs_per_ap ('num_of_vehs_per_ap.ap')
-    # #my_loc2ap.plot_num_of_vehs_per_ap ()
-    my_loc2ap.print_num_of_vehs_per_server ()
+    # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
+    # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
+    # my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
+    # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
+    # my_loc2ap.plot_num_of_vehs_per_ap ()
+    # my_loc2ap.print_num_of_vehs_per_server (output_file_name)
     # my_loc2ap.heatmap_of_avg_num_of_vehs_per_ap ()
-
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

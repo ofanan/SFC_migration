@@ -16,9 +16,6 @@ class Traci_runner (object):
     
     def __init__ (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = VERBOSE_LOC_ONLY):
         traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
-        warmup_period           = warmup_period 
-        sim_length              = sim_length 
-        len_of_time_slot_in_sec = len_of_time_slot_in_sec  
         veh_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         ids2recycle             = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
         left_in_this_cycle      = []
@@ -31,7 +28,7 @@ class Traci_runner (object):
                 debug_file  = open (debug_file_name,  "w")
             
         if (warmup_period > 0):
-            traci.simulationStep (warmup_period) # simulate without output until our required time (time starts at 00:00). 
+            traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
             output_file_name = '../res/vehicles_' + secs2hour(traci.simulation.getTime()) + '.loc' 
@@ -99,8 +96,8 @@ class Traci_runner (object):
         traci.close()
 
 if __name__ == '__main__':
-    my_Traci_runner = Traci_runner (warmup_period           = 3600*7.5,
-                                    sim_length              = 3600*2,
-                                    len_of_time_slot_in_sec = 60,
-                                    num_of_output_files     = 1, 
+    my_Traci_runner = Traci_runner (warmup_period           = 3600*8,
+                                    sim_length              = 3600*0.5,
+                                    len_of_time_slot_in_sec = 1,
+                                    num_of_output_files     = 3, 
                                     verbose                 = VERBOSE_LOC_AND_DEBUG)

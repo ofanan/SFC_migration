@@ -97,13 +97,14 @@ class loc2ap_c (object):
             printf (self.usrs_demography_file, 'ap {}: joined {}. left {}\n' .format (ap, self.joined[ap], self.left[ap]))
         printf (self.usrs_demography_file, '\n')                                        
 
-    def calc_demography_per_ap (self):
-        """
-        calculates the number of vehicles that joined/left each cell during the last simulated time slot.
-        """
-        for ap in range(self.num_of_APs): 
-            self.joined[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap and usr['cur ap'] != ap, self.usrs) )))
-            self.left[ap].append   (len (list (filter (lambda usr: usr['cur ap'] == ap and usr['nxt ap'] != ap, self.usrs) )))
+    # def calc_demography_per_ap (self):
+    #     """
+    #     calculates the number of vehicles that joined/left each cell during the last simulated time slot.
+    #     """
+    #     for ap in range(self.num_of_APs): 
+    #         self.joined[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap and usr['cur ap'] != ap, self.usrs) )) + 
+    #                                 len (list (filter (lambda usr: usr['nxt ap'] == ap and usr['new'],          self.usrs))))
+    #         self.left[ap].append   (len (list (filter (lambda usr: usr['cur ap'] == ap and usr['nxt ap'] != ap, self.usrs) )))
         
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
@@ -230,13 +231,20 @@ class loc2ap_c (object):
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
+                if (self.verbose in [VERBOSE_DEMOGRAPHY]):
+                    for ap in range (self.num_of_APs): 
+                        self.joined[ap].append(0)
+                        self.left  [ap].append(0)
                 continue
     
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     printf(self.ap_file, '{}\n' .format (line))
-                usrs_that_left = [int(id) for id in splitted_line[1:] if id!= '']                
-                self.usrs = list (filter (lambda usr : (usr['id'] not in usrs_that_left), self.usrs))
+                ids_of_usrs_that_left = [int(id) for id in splitted_line[1:] if id!= '']                
+                if (self.verbose in [VERBOSE_DEMOGRAPHY]):
+                    for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left, self.usrs)): 
+                        self.left[usr['cur ap']][-1] += 1 # inc the # of vehicles left from this cell ('cur ap' of the usrs who left)
+                self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left), self.usrs))
                 continue
     
             elif (splitted_line[0] == 'new_or_moved:'): 
@@ -254,20 +262,25 @@ class loc2ap_c (object):
                         usr_id = np.uint16(tuple[1])
                         if (tuple[0] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
+                            if (self.verbose in [VERBOSE_DEMOGRAPHY]): 
+                                self.joined[nxt_ap][-1] += 1 # inc the # of usrs that joined this cell
                         else: # existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0):
                                 print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
                                 exit ()
                             list_of_usr[0]['nxt ap'] = nxt_ap
+                            if (self.verbose in [VERBOSE_DEMOGRAPHY] and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
+                                self.joined[nxt_ap][-1] += 1 # inc the # of usrs that joined this cell
+                                self.left  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
 
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
                 if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
                     self.cnt_num_of_vehs_per_ap ()
-                if (self.verbose in [VERBOSE_DEMOGRAPHY]):
-                    self.calc_demography_per_ap ()
+                # if (self.verbose in [VERBOSE_DEMOGRAPHY]): #$$$$$$$$
+                #     self.calc_demography_per_ap ()
                 for usr in self.usrs: # mark all existing usrs as old
                     usr['new'] = False
                     usr['cur ap'] = usr ['nxt ap']
@@ -285,12 +298,9 @@ class loc2ap_c (object):
             self.plot_num_of_vehs_per_ap ()
         if (self.verbose in [VERBOSE_DEMOGRAPHY]):
             self.usrs_demography_file = open ('../res/vehicles.demography.txt', 'w')
-            print ('b4: {}' .format (self.left[5]))
-            
-            for ap in range (self.num_of_APs):
-                #self.joined[ap].pop()
-                self.left  [ap].pop()    
-            print ('after: {}' .format (self.left[5]))
+            # for ap in range (self.num_of_APs):
+            #     # self.joined[ap].remove(0)
+            #     self.left  [ap].pop()    
             self.print_demography()
 
      

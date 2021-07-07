@@ -112,38 +112,41 @@ class loc2ap_c (object):
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
         """
         self.joined_sim_via = [self.joined_sim_via [ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
-        self.joined     = [self.joined     [ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
-        avg_joined      = np.array ([np.average(self.joined[ap])     for ap in range(self.num_of_APs)])  
-        avg_left        = np.array ([np.average(self.left[ap])   for ap in range(self.num_of_APs)]) 
+        self.joined         = [self.joined     [ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
+        avg_joined          = np.array ([np.average(self.joined[ap])     for ap in range(self.num_of_APs)])  
+        avg_left            = np.array ([np.average(self.left[ap])   for ap in range(self.num_of_APs)]) 
         avg_joined_sim_via  = np.array ([np.average(self.joined_sim_via[ap]) for ap in range(self.num_of_APs)])  
-        avg_left_sim_via    = np.array ([np.average(self.left_sim_via  [ap]) for ap in range(self.num_of_APs)]) 
-        n = int (math.sqrt(len(avg_left)))
+        avg_left_sim_via    = np.array ([np.average(self.left_sim_via  [ap]) for ap in range(self.num_of_APs)])
+        n                   = int (math.sqrt(len(avg_left)))
         
-        # # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
-        # # Hence, need to swap the matrix upside-down
+        # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
+        # Hence, need to swap the matrix upside-down
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_joined[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([float(avg_joined[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_joined.jpg')
         
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_left[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([float(avg_left[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that left cell every sec in {}' .format (time_period_str))
+        plt.title ('avg num of cars that left cell every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_left.jpg')
-
+        
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_joined_sim_via[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([float(avg_joined_sim_via[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that joined the sim at every sec in {}' .format (time_period_str))
+        plt.title ('avg num of cars that joined the sim at every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_joined_sim_via.jpg')
-
-        plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_left_sim_via  [self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+        
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([avg_left_sim_via  [self.tile_to_ap[i]] for i in range (self.num_of_APs)]).reshape ([n, n])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that left the sim at every sec in {}' .format (time_period_str))
+        plt.title ('avg num of cars that left the sim at every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_left_sim_via.jpg')
+
+        # plt.figure ()
+        # my_heatmap = sns.heatmap ( pd.DataFrame(np.random.rand (3,3), columns=['a','b','c']))
+        # plt.show ()
 
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
@@ -172,7 +175,7 @@ class loc2ap_c (object):
         Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         Hence, need to swap the matrix upside-down
         """ 
-        inverted_mat = np.empty (mat.shape, dtype = 'uint16')
+        inverted_mat = np.empty (mat.shape)
         for i in range (mat.shape[0]):
             inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
         return inverted_mat        
@@ -191,7 +194,6 @@ class loc2ap_c (object):
         heatmap_val = self.invert_mat_bottom_up(heatmap_val)
         my_heatmap = sns.heatmap (pd.DataFrame (heatmap_val, columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('avg num of cars per cell')
-        # plt.show()
         plt.savefig('../res/heatmap_num_vehs.jpg')
         
     def tile2ap (self, lvl):
@@ -283,7 +285,8 @@ class loc2ap_c (object):
                 ids_of_usrs_that_left = [int(id) for id in splitted_line[1:] if id!= '']                
                 if (self.verbose in [VERBOSE_DEMOGRAPHY]):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left, self.usrs)): 
-                        self.left_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell 
+                        self.left_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
+                        # print (self.left_sim_via) #$$$
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left), self.usrs))
                 continue
     

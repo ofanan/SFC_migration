@@ -83,7 +83,7 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*7.5,
-                                    sim_length              = 4, #3600*0.5,
+                                    sim_length              = 3600*2,
                                     len_of_time_slot_in_sec = 1,
                                     num_of_output_files     = 1, 
                                     verbose                 = VERBOSE_LOC_ONLY)

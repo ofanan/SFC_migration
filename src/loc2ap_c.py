@@ -93,7 +93,6 @@ class loc2ap_c (object):
     
     def print_demography (self):
         """
-        Used for debug.
         Prints the number of vehicles that joined/left each cell during the last simulated time slot.
         """
         for ap in range(self.num_of_APs):
@@ -101,9 +100,9 @@ class loc2ap_c (object):
         printf (self.usrs_demography_file, '\n')                                        
 
     def plot_demography_heatmap (self):
-            # for ap in range (self.num_of_APs):
-            #     # self.joined[ap].remove(0)
-            #     self.left  [ap].pop()    
+        """
+        Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
+        """
 
         self.joined = [self.joined[ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
         avg_joined_ap = np.array ([np.average(self.joined[ap]) for ap in range(self.num_of_APs)])  

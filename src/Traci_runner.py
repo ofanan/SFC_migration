@@ -64,9 +64,11 @@ class Traci_runner (object):
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulation
                         type = 'n' # will indicate that this is a new vehicle 
                         if (len (ids2recycle) > 0): # can recycle an ID of a veh that left
+                            # type = 'r' # will indicate that this is a recycled vehicle's id 
                             veh_id = ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
                             veh_key2id = list (filter (lambda veh : veh['id'] != veh_id, veh_key2id)) # remove the old {veh_key, veh_id} tuple from the veh_key2id map 
                         else:
+                            # type = 'n' # will indicate that this is a new vehicle 
                             veh_id = len (veh_key2id) # pick a new ID
                         veh_key2id.append({'key' : veh_key, 'id' : veh_id}) # insert the new veh into the db 
                     else: # already seen this veh_key in the sim' --> extract its id from the hash
@@ -85,5 +87,5 @@ if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*7.5,
                                     sim_length              = 3600*2,
                                     len_of_time_slot_in_sec = 1,
-                                    num_of_output_files     = 1, 
+                                    num_of_output_files     = 12, 
                                     verbose                 = VERBOSE_LOC_ONLY)

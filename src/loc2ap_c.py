@@ -15,6 +15,11 @@ VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehi
 VERBOSE_AP_AND_CNT      = 3 # Generate both ".ap" and ".txt" files, as detailed above.
 VERBOSE_DEMOGRAPHY      = 4 # Collect data about the # of vehicles entering / leaving each cell, at each time slot
 
+# # types of vehicles' id
+# new      = 0 # a new (unused before) vehicle's id
+# old      = 1 # a vehicle that already exists in the sim
+# recycled = 2 # a recycled id, namely, a new vehicle using an id of an old vehicle, who left.  
+
 class loc2ap_c (object):
     """
     Accept as input a .loc file (a file detailing the locations of all the new users / users who moved at each slot).
@@ -44,8 +49,10 @@ class loc2ap_c (object):
             self.num_of_vehs_in_ap = [[] for ap in range(self.num_of_APs)]
         if (self.verbose in [VERBOSE_DEMOGRAPHY]):
             self.usrs_demography_file = open ('../res/vehicles.demography.txt', 'w+')
-            self.joined = [[] for ap in range(self.num_of_APs)]
-            self.left   = [[] for ap in range(self.num_of_APs)]
+            self.joined         = [[] for ap in range(self.num_of_APs)]
+            self.left           = [[] for ap in range(self.num_of_APs)]
+            self.joined_sim_via = [[] for ap in range(self.num_of_APs)]
+            self.left_sim_via   = [[] for ap in range(self.num_of_APs)]
         if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
             self.num_of_vehs_file_name = '../res/num_of_vehs_per_ap_{}aps.txt' .format (4**self.max_power_of_4)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
@@ -71,15 +78,15 @@ class loc2ap_c (object):
         """
         Format-prints the users' AP, as caclculated earlier, to the .ap output file
         """
-        new_usrs = list (filter (lambda usr: usr['new'], self.usrs))
-        if (len (new_usrs) > 0):
-            printf (self.ap_file, 'new_usrs: ')
-            for usr in new_usrs: # for every new usr
+        usrs = list (filter (lambda usr: usr['type']==new, self.usrs))
+        if (len (usrs) > 0):
+            printf (self.ap_file, 'usrs: ')
+            for usr in usrs: # for every new usr
                 self.print_usr_ap (usr)
 
-        moved_old_usrs = list (filter (lambda usr: (usr['new']==False) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
+        usrs = list (filter (lambda usr: (usr['type']!=new) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
         printf (self.ap_file, '\nold_usrs: ')
-        for usr in moved_old_usrs: 
+        for usr in usrs: 
             self.print_usr_ap (usr)
             usr['cur ap'] = usr['nxt ap']
                 
@@ -96,32 +103,47 @@ class loc2ap_c (object):
         Prints the number of vehicles that joined/left each cell during the last simulated time slot.
         """
         for ap in range(self.num_of_APs):
-            printf (self.usrs_demography_file, 'ap {}: joined {}. left {}\n' .format (ap, self.joined[ap], self.left[ap]))
+            printf (self.usrs_demography_file, 'ap {}: joined {}\n joined_sim_via{}\n. left {}\n left_sim_via {}\n' .format (
+                                                ap, self.joined[ap], self.joined_sim_via[ap], self.left[ap], self.left_sim_via[ap]))
         printf (self.usrs_demography_file, '\n')                                        
 
     def plot_demography_heatmap (self):
         """
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
         """
-
-        self.joined = [self.joined[ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
-        avg_joined_ap = np.array ([np.average(self.joined[ap]) for ap in range(self.num_of_APs)])  
-        avg_left_ap   = np.array ([np.average(self.left[ap])   for ap in range(self.num_of_APs)]) 
-        n = int (math.sqrt(len(avg_left_ap)))
+        self.joined_sim_via = [self.joined_sim_via [ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
+        self.joined     = [self.joined     [ap].pop() for ap in range(self.num_of_APs)] # Remove the first slot, in which all vehs 'join']
+        avg_joined      = np.array ([np.average(self.joined[ap])     for ap in range(self.num_of_APs)])  
+        avg_left        = np.array ([np.average(self.left[ap])   for ap in range(self.num_of_APs)]) 
+        avg_joined_sim_via  = np.array ([np.average(self.joined_sim_via[ap]) for ap in range(self.num_of_APs)])  
+        avg_left_sim_via    = np.array ([np.average(self.left_sim_via  [ap]) for ap in range(self.num_of_APs)]) 
+        n = int (math.sqrt(len(avg_left)))
         
         # # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         # # Hence, need to swap the matrix upside-down
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_joined_ap[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_joined[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that joined cell every sec in 0800-0830')
+        plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_joined.jpg')
         
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_left_ap[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_left[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that left cell every sec in 0800-0830')
+        plt.title ('avg num of cars that left cell every sec in {}' .format (time_period_str))
         plt.savefig('../res/heatmap_cars_left.jpg')
+
+        plt.figure()
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_joined_sim_via[self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
+        plt.title ('avg num of cars that joined the sim at every sec in {}' .format (time_period_str))
+        plt.savefig('../res/heatmap_cars_joined_sim_via.jpg')
+
+        plt.figure()
+        my_heatmap = sns.heatmap (pd.DataFrame (self.invert_mat_bottom_up(np.array ([int(avg_left_sim_via  [self.tile_to_ap[i]]) for i in range (self.num_of_APs)]).reshape ([n, n])), 
+                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
+        plt.title ('avg num of cars that left the sim at every sec in {}' .format (time_period_str))
+        plt.savefig('../res/heatmap_cars_left_sim_via.jpg')
 
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
@@ -249,8 +271,10 @@ class loc2ap_c (object):
                 self.t = int(splitted_line[2])
                 if (self.verbose in [VERBOSE_DEMOGRAPHY]):
                     for ap in range (self.num_of_APs): 
-                        self.joined[ap].append(0)
-                        self.left  [ap].append(0)
+                        self.joined        [ap].append(0)
+                        self.left          [ap].append(0)
+                        self.joined_sim_via[ap].append(0)
+                        self.left_sim_via  [ap].append(0)
                 continue
     
             elif (splitted_line[0] == 'usrs_that_left:'):
@@ -259,17 +283,17 @@ class loc2ap_c (object):
                 ids_of_usrs_that_left = [int(id) for id in splitted_line[1:] if id!= '']                
                 if (self.verbose in [VERBOSE_DEMOGRAPHY]):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left, self.usrs)): 
-                        self.left[usr['cur ap']][-1] += 1 # inc the # of vehicles left from this cell ('cur ap' of the usrs who left)
+                        self.left_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell 
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left), self.usrs))
                 continue
     
             elif (splitted_line[0] == 'new_or_moved:'): 
                 splitted_line = splitted_line[1:] # the rest of this line details the locations of users that are either new, or old (existing) users who moved during the last time slot
-                if (splitted_line !=['']):
+                if (splitted_line !=['']): # Is there a non-empty list of vehicles that are old / new / recycled?  
 
                     splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
-                    for tuple in splitted_line: 
-                        if (len(tuple) <= 1):
+                    for tuple in splitted_line:  
+                        if (len(tuple) <= 1): # no more new vehicles in this list. #$$$$$$$$$$$$ or <1?>
                             break
                         tuple = tuple.split("(")
                         tuple   = tuple[1].split (',')
@@ -279,17 +303,23 @@ class loc2ap_c (object):
                         if (tuple[0] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
                             if (self.verbose in [VERBOSE_DEMOGRAPHY]): 
-                                self.joined[nxt_ap][-1] += 1 # inc the # of usrs that joined this cell
-                        else: # existing user, who moved
+                                self.joined_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
+                        elif (tuple[0] == 'o'): # recycled vehicle's id, or an existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0):
-                                print  ('Error at t={}: input file={}. Did not find old usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
+                                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
                                 exit ()
                             list_of_usr[0]['nxt ap'] = nxt_ap
                             if (self.verbose in [VERBOSE_DEMOGRAPHY] and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
-                                self.joined[nxt_ap][-1] += 1 # inc the # of usrs that joined this cell
+                                self.joined[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this cell
                                 self.left  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
-
+                                # if (tuple[0] == 'r'): # a recycled user
+                                #     self.joined_sim_via[nxt_ap][-1]                   += 1 # inc the # of usrs that joined the sim' via this cell
+                                #     self.left_sim_via  [list_of_usr[0]['cur ap']][-1] += 1
+                        else:
+                            print ('Wrong type of usr.')
+                            exit () 
+                                    
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
                 if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
                     self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
@@ -394,7 +424,8 @@ if __name__ == '__main__':
     # printf (gamad_file, 'abcd')
     
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_DEMOGRAPHY)
-    my_loc2ap.parse_files (['vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
+    my_loc2ap.time_period_str = '0730_0740'
+    my_loc2ap.parse_files (['short_0.loc', 'short_1.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

@@ -234,6 +234,7 @@ class SFC_mig_simulator (object):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
+                    Add here: is it cheaper to move the chain?
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     

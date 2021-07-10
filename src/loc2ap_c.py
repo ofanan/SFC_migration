@@ -12,10 +12,8 @@ from printf import printf
 VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
 VERBOSE_AP              = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
 VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
-VERBOSE_AP_AND_CNT      = 3 # Generate both ".ap" and ".txt" files, as detailed above.
-VERBOSE_DEMOGRAPHY      = 4 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
-VERBOSE_SPEED           = 5 # Collect data about the speed of vehicles in each cell, at each time slot`
-VERBOSE_SPEED_AND_DEMO  = 6 # Collect data about the speed of vehicles in each cell, at each time slot`
+VERBOSE_DEMOGRAPHY      = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
+VERBOSE_SPEED           = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
 
 type_idx   = 0
 veh_id_idx = 1
@@ -473,9 +471,9 @@ if __name__ == '__main__':
     # exit ()
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_SPEED])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_CNT, VERBOSE_DEMOGRAPHY, VERBOSE_SPEED])
     my_loc2ap.time_period_str = '' #'0730_0740'
-    my_loc2ap.parse_files (['shorter.loc']) #(['vehicles_s_speed_0730.loc']) #, 'vehicles_0740.loc', 'vehicles_0750.loc', 'vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
+    my_loc2ap.parse_files (['vehicles_n_speed_0730.loc']) #(['vehicles_s_speed_0730.loc']) #, 'vehicles_0740.loc', 'vehicles_0750.loc', 'vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

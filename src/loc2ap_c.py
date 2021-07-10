@@ -53,18 +53,18 @@ class loc2ap_c (object):
         if (self.use_sq_cells):
             self.max_power_of_4    = max_power_of_4
             self.num_of_APs        = 4**max_power_of_4
-        if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+        if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_in_ap = [[] for ap in range(self.num_of_APs)]
-        if (self.verbose in [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO]):
+        if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.demography_file = open ('../res/vehicles_demography.txt', 'w+')
             self.joined          = [[] for ap in range(self.num_of_APs)]
             self.left            = [[] for ap in range(self.num_of_APs)]
             self.joined_sim_via  = [[] for ap in range(self.num_of_APs)]
             self.left_sim_via    = [[] for ap in range(self.num_of_APs)]
-        if (self.verbose in [VERBOSE_SPEED, VERBOSE_SPEED_AND_DEMO]):
+        if (VERBOSE_SPEED in self.verbose):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
             self.speed           = [{'speed' : 0, 'num of smpls' : 0} for ap in range(self.num_of_APs)]
-        if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+        if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_file_name = '../res/num_of_vehs_per_ap_{}aps.txt' .format (4**self.max_power_of_4)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
         self.tile2ap (lvl=0) # tile2ap translates the number as a "tile" (XY grid) to the ID of the covering AP.
@@ -204,15 +204,17 @@ class loc2ap_c (object):
         """
         Plot a heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
         """
+        plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('avg num of cars per cell')
         plt.savefig('../res/heatmap_num_vehs.jpg')
         
-    def plot_speed_per_ap_heatmap (self):
+    def plot_speed_heatmap (self):
         """
         Plot a heatmap, showing the average speed of vehicles at each cell.
         """
+        plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap ([self.speed[ap]['speed'] for ap in range(self.num_of_APs)]), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('speed in each cell')
@@ -249,7 +251,7 @@ class loc2ap_c (object):
         """
         for plot_num in range (4**(self.max_power_of_4-1)):
             for ap in range (4*plot_num, 4*(plot_num+1)):
-                if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+                if (VERBOSE_CNT in self.verbose):
                     printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
                 plt.title ('Number of vehicles in each cell')
                 plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
@@ -290,10 +292,10 @@ class loc2ap_c (object):
             splitted_line = line.split (" ")
     
             if (splitted_line[0] == "t"): # reached the next simulation time slot
-                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+                if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
-                if (self.verbose in [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO]):
+                if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for ap in range (self.num_of_APs): 
                         self.joined        [ap].append(0)
                         self.left          [ap].append(0)
@@ -302,10 +304,10 @@ class loc2ap_c (object):
                 continue
     
             elif (splitted_line[0] == 'usrs_that_left:'):
-                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+                if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '{}\n' .format (line))
                 ids_of_usrs_that_left = [int(id) for id in splitted_line[1:] if id!= '']                
-                if (self.verbose in [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO]):
+                if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left, self.usrs)): 
                         self.left_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
                         # print (self.left_sim_via) #$$$
@@ -327,7 +329,7 @@ class loc2ap_c (object):
                         nxt_ap = self.loc2ap (float(tuple[x_pos_idx]), float(tuple[y_pos_idx]))
                         if (tuple[type_idx] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
-                            if (self.verbose in [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO]): 
+                            if (VERBOSE_DEMOGRAPHY in self.verbose): 
                                 self.joined        [nxt_ap][-1] += 1 # inc the # of usrs that joined this cell at this cycle
                                 self.joined_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
                         elif (tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
@@ -336,22 +338,22 @@ class loc2ap_c (object):
                                 print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
                                 exit ()
                             list_of_usr[0]['nxt ap'] = nxt_ap
-                            if (self.verbose in [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO] and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
+                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
                                 self.joined[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this cell
                                 self.left  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
                         else:
                             print ('Wrong type of usr.')
                             exit () 
-                        if (self.verbose in [VERBOSE_SPEED, VERBOSE_SPEED_AND_DEMO]):
+                        if (VERBOSE_SPEED in self.verbose):
                             self.speed[nxt_ap] = {'speed' : (float(tuple[speed_idx]) + self.speed[nxt_ap]['num of smpls'] * self.speed[nxt_ap]['speed'])/(self.speed[nxt_ap]['num of smpls'] + 1), 
                                                   'num of smpls' : self.speed[nxt_ap]['num of smpls'] + 1}
                             
                             # print ('self.speed[{}]={}' .format(nxt_ap, self.speed[nxt_ap])) #$$$$
                                     
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
-                if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+                if (VERBOSE_AP in self.verbose):
                     self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
-                if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+                if (VERBOSE_CNT in self.verbose):
                     self.cnt_num_of_vehs_per_ap ()
                 for usr in self.usrs: # mark all existing usrs as old
                     usr['new'] = False
@@ -364,34 +366,34 @@ class loc2ap_c (object):
         - Adding some lines to the output .ap file.
         - Plot the num_of_vehs 
         """
-        if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+        if (VERBOSE_AP in self.verbose):
             printf(self.ap_file, "\n")   
-        if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+        if (VERBOSE_CNT in self.verbose):
             self.plot_num_of_vehs_per_ap ()
-        if (self.verbose in [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO]):
+        if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.plot_demography_heatmap()
-        if (self.verbose in [VERBOSE_SPEED, VERBOSE_SPEED_AND_DEMO]):
+        if (VERBOSE_SPEED in self.verbose):
             
             # first, fix the speed, as we assumed a first car with speed '0'.
             for ap in [ap for ap in range (self.num_of_APs) if (self.speed[ap]['num of smpls'] > 0)]:
                 self.speed[ap]['speed'] = self.speed[ap]['speed'] * (self.speed[ap]['num of smpls'] +1) / self.speed[ap]['num of smpls']
             self.print_speed()
-            self.plot_speed_per_ap_heatmap()
+            self.plot_speed_heatmap()
      
     def print_intermediate_res (self): 
         """
         Print the current aggregate results; used for having intermediate results when running long simulation.
         """
-        if (self.verbose in [VERBOSE_CNT, VERBOSE_AP_AND_CNT]):
+        if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for ap in range (self.num_of_APs):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap]))
-        if (self.verbose == VERBOSE_DEMOGRAPHY, VERBOSE_SPEED_AND_DEMO): 
+        if (VERBOSE_DEMOGRAPHY in self.verbose): 
             self.demography_file   = open ('../res/vehicles_demography.txt', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
             self.print_demography()
-        if (self.verbose == VERBOSE_SPEED, VERBOSE_SPEED_AND_DEMO): 
+        if (VERBOSE_SPEED in self.verbose): 
             self.speed_file   = open ('../res/vehicles_speed.txt', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.speed_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
             self.print_speed()
@@ -406,7 +408,7 @@ class loc2ap_c (object):
         2. output the APs of all new/left/moved users at each time slot.
         The exact behavior is by the value of self.verbose
         """
-        if (self.verbose in [VERBOSE_AP, VERBOSE_AP_AND_CNT]):
+        if (VERBOSE_AP in self.verbose):
             self.ap_file        = open ("../res/" + loc_file_names[0].split('.')[0] + ".ap", "w+")  
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
             printf (self.ap_file, '//for each time slot:\n')
@@ -471,7 +473,7 @@ if __name__ == '__main__':
     # exit ()
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_SPEED_AND_DEMO)
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_SPEED])
     my_loc2ap.time_period_str = '' #'0730_0740'
     my_loc2ap.parse_files (['shorter.loc']) #(['vehicles_s_speed_0730.loc']) #, 'vehicles_0740.loc', 'vehicles_0750.loc', 'vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
 

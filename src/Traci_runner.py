@@ -10,6 +10,7 @@ from secs2hour import secs2hour
 VERBOSE_LOC_ONLY      = 1
 VERBOSE_DEBUG_ONLY    = 2
 VERBOSE_LOC_AND_DEBUG = 3
+VERBOSE_LOC_AND_SPEED = 4
 
 class Traci_runner (object):
 
@@ -38,9 +39,13 @@ class Traci_runner (object):
             printf (loc_output_file, '// locations of vehicles. Format:\n')
             printf (loc_output_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
             printf (loc_output_file, '// format for vehicles that are new (just joined the sim), or moved:\n')
-            printf (loc_output_file, '// (type,usr_id,x,y)   where:\n')
-            printf (loc_output_file, '// type is either o (old veh), or n (new veh in the sim). (x,y) are the coodinates of the vehicle with this usr_id.\n')
-                       
+            if (self.verbose == VERBOSE_LOC_AND_SPEED): 
+                printf (loc_output_file, '// (type,usr_id,x,y,s)   where:\n')
+                printf (loc_output_file, '// type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id. s is the speed of this user.\n')
+            else:
+                printf (loc_output_file, '// (type,usr_id,x,y)   where:\n')
+                printf (loc_output_file, '// type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id.\n')
+                
             while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
                 
                 cur_sim_time = traci.simulation.getTime() 
@@ -77,7 +82,10 @@ class Traci_runner (object):
                         type = 'o' # will indicate that this is a old vehicle 
                         veh_id = filtered_list[0]['id'] 
                     position = traci.vehicle.getPosition(veh_key)
-                    printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1]))
+                    if (self.verbose == VERBOSE_LOC_AND_SPEED): 
+                        printf (loc_output_file, "({},{},{:.0f},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
+                    else:
+                        printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1]))
         
                 sys.stdout.flush()
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
@@ -85,7 +93,7 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*7.5,
-                                    sim_length              = 3600*2,
+                                    sim_length              = 600, #3600*2,
                                     len_of_time_slot_in_sec = 1,
-                                    num_of_output_files     = 12, 
-                                    verbose                 = VERBOSE_LOC_ONLY)
+                                    num_of_output_files     = 1, 
+                                    verbose                 = VERBOSE_LOC_AND_SPEED)

@@ -442,7 +442,7 @@ class loc2ap_c (object):
             reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
             avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
         
-if __name__ == '__main__':
+if __name__ == '__main__': 
     # gamad = [[1,2,3], [4,5,6]]
     # print (gamad)    
     # gamad = [gamad[ap][1:] for ap in range (2)]

@@ -52,7 +52,7 @@ class loc2ap_c (object):
         self.verbose           = verbose      # verbose level - defining which outputs will be written
         self.debug             = False 
         
-        self.max_x, self.max_y = GLOBAL_MAX_X/2, GLOBAL_MAX_Y/2 # size of the total area, in meters
+        self.max_x, self.max_y = MAX_X, MAX_Y # borders of the simulated area, in meters
         self.usrs              = []
         self.use_sq_cells      = use_sq_cells
         if (self.use_sq_cells):
@@ -92,11 +92,11 @@ class loc2ap_c (object):
     
     def print_usrs_ap (self):
         """
-        Format-prints the users' AP, as caclculated earlier, to the .ap output file
+        Format-prints the users' AP, as calculated earlier, to the .ap output file
         """
         usrs = list (filter (lambda usr: usr['new'], self.usrs))
         if (len (usrs) > 0):
-            printf (self.ap_file, 'usrs: ')
+            printf (self.ap_file, 'new_usrs: ')
             for usr in usrs: # for every new usr
                 self.print_usr_ap (usr)
 

@@ -10,12 +10,13 @@ import time
 import random
 import heapq
 import pulp as plp
+from cmath import sqrt
+# from scipy.optimize import linprog # currently unused
 
 from usr_c import usr_c # class of the users
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
-# from scipy.optimize import linprog
-from cmath import sqrt
+import loc2ap_c
 
 # Levels of verbose (which output is generated)
 VERBOSE_NO_OUTPUT             = 0
@@ -34,12 +35,12 @@ class SFC_mig_simulator (object):
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
     # calculate the total cost of a solution
-    calc_sol_cost = lambda self: sum ([self.calc_chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
+    calc_sol_cost = lambda self: sum ([self.chain_cost_homo (usr, usr.lvl) for usr in self.usrs])
    
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    calc_chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)     
+    chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)     
     
     # # calculate the migration cost incurred for a usr if located on a given lvl
     calc_mig_cost = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
@@ -63,7 +64,7 @@ class SFC_mig_simulator (object):
         used_cpu_in = self.used_cpu_in ()
         return max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1)    
          
-    def reset_sol (self):
+    def rst_sol (self):
         """
         Reset the solution, namely, Dis-place all users. This is done by: 
         1. Resetting the placement of each user to a concrete level in the tree, and to a concrete server.
@@ -106,7 +107,7 @@ class SFC_mig_simulator (object):
                 decision_var = decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_lp_var=plp_lp_var) # generate a decision var, containing the lp var + details about its meaning 
                 self.d_vars.append (decision_var)
                 single_place_const += plp_lp_var
-                obj_func           += self.calc_chain_cost_homo (decision_var) * plp_lp_var # add the cost of this decision var to the objective func 
+                obj_func           += self.chain_cost_homo (decision_var) * plp_lp_var # add the cost of this decision var to the objective func 
                 id += 1
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
@@ -147,7 +148,7 @@ class SFC_mig_simulator (object):
         print the cost of each chain. 
         """     
         for usr in self.usrs:
-            chain_cost = self.calc_chain_cost_homo (usr, usr.lvl)  
+            chain_cost = self.chain_cost_homo (usr, usr.lvl)  
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
     def init_output_file (self, file_name):
@@ -206,7 +207,7 @@ class SFC_mig_simulator (object):
                     self.G.nodes[s]['cpu cap'],
                     [usr.id for usr in self.usrs if usr.nxt_s==s]))
             if (used_cpu_in_s + self.G.nodes[s]['a'] != self.G.nodes[s]['RCs']):
-                printf (self.log_output_file, 'Error in using cpu utilization of s{}' .format (s))
+                printf (self.log_output_file, 'Error in calculating the cpu utilization of s{}' .format (s))
                 print ('Error in using cpu utilization. Please see the log file: {}' .format (self.log_file_name))
                 exit ()           
             
@@ -233,8 +234,7 @@ class SFC_mig_simulator (object):
         while n < len (self.usrs):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
-                if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl]): # if there's enough available space to move u to level lvl
-                    Add here: is it cheaper to move the chain?
+                if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_homo(usr, lvl) < self.chain_cost_homo(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
                     self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
@@ -414,7 +414,7 @@ class SFC_mig_simulator (object):
              
         # reset Hs        
         for s in self.G.nodes():
-            self.G.nodes[s]['Hs'] = [] 
+            self.G.nodes[s]['Hs']  = [] 
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
 
         # Open input and output files
@@ -486,22 +486,20 @@ class SFC_mig_simulator (object):
                 printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
              usr.cur_s = usr.nxt_s        
-        for s in self.G.nodes(): # Clean the list of 'unallocated usrs, for them server s is delay-feasible" (Hs) on each server 
-            self.G.nodes[s]['Hs'] = []
         
     def binary_search (self):
         """
         Binary search for a feasible sol that minimizes the resource augmentation R.
         The search is done by calling bottom_up ().
         """
-        self.reset_sol() # dis-allocate all users
+        self.rst_sol() # dis-allocate all users
         self.CPUAll(self.usrs) 
         max_R = self.calc_upr_bnd_rsrc_aug () 
         
         # init cur RCs and a(s) to the number of available CPU in each server, assuming maximal rsrc aug' 
         for s in self.G.nodes():
             self.G.nodes[s]['RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
-            self.G.nodes[s]['a']       = self.G.nodes[s]['RCs'] #currently-available rsrcs at server s  
+            self.G.nodes[s]['a']   = self.G.nodes[s]['RCs'] #currently-available rsrcs at server s  
 
         if (not (self.bottom_up ())):
             print ('did not find a feasible sol even with maximal rsrc aug')
@@ -509,23 +507,22 @@ class SFC_mig_simulator (object):
 
         # Now we know that we found an initial feasible sol 
                    
-        ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
+        ub = np.array([self.G.nodes[s]['RCs']     for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
         while True: 
-            
-            # Check if the binary search converged 
-            # check_ar = np.array ([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool') 
-            if ( np.array([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool').all()):
-                for s in self.G.nodes():
+             
+            if ( np.array([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool').all()): # Did the binary search converged?
+                for s in self.G.nodes(): # Yep, so allocate this minimal found amount of rsrc aug to all servers
                     self.G.nodes[s]['RCs'] = math.floor (ub[s])  
-                self.reset_sol()
+                self.rst_sol()         # and re-solve the prob'
                 res = self.bottom_up()
                 return 
 
+            # Now we know that the binary search haven't converged yet
             # Update the available capacity at each server according to the value of resource augmentation for this iteration            
             for s in self.G.nodes():
                 self.G.nodes[s]['RCs'] = math.floor (0.5*(ub[s] + lb[s]))  
-            self.reset_sol()
+            self.rst_sol()
 
             # Solve using bottom-up
             if (self.bottom_up()):
@@ -546,7 +543,7 @@ class SFC_mig_simulator (object):
             self.binary_search()
 
         # By hook or by crook, now we have a feasible solution        
-        if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): #$$$$$$$$$
+        if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): 
             printf (self.log_output_file, 'b4 push-up\n')
             self.print_sol_to_log()
         
@@ -612,7 +609,8 @@ class SFC_mig_simulator (object):
             AP_id = int(tuple[1])
             if (AP_id >= self.num_of_leaves):
                 if (self.warned_about_too_large_ap == False):
-                    print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+                    print ('********* WARNING: Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {} *********' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+                    exit ()
                     self.warned_about_too_large_ap = True
                 AP_id = self.num_of_leaves-1
             s = self.ap2s[AP_id]
@@ -642,6 +640,9 @@ class SFC_mig_simulator (object):
             tuple   = tuple[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
+            if (len(list_of_usr) == 0):
+                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.ap_file_name, tuple[0]))
+                exit ()
             usr = list_of_usr[0]
             usr_cur_cpu = usr.B[usr.lvl]
             AP_id       = int(tuple[1])
@@ -652,7 +653,12 @@ class SFC_mig_simulator (object):
                     self.warned_about_too_large_ap = True
             self.CPUAll_single_usr (usr)
 
-            # update the list of delay-feasible servers for this usr
+            # update the list of delay-feasible servers for this usr:
+            # first, remove this usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location...
+            for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+                self.G.nodes[s]['Hs'].remove (usr) 
+            
+            # next, add this usr to the Hs of every server to which it belongs at its new location
             s = self.ap2s[AP_id]
             usr.S_u = []
             usr.S_u.append (s)

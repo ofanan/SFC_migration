@@ -10,8 +10,8 @@ from usr_c import usr_c # class of the users
 from printf import printf
 
 # size of the city's area, in meters. In the simulation we may consider only a part of this large area.
-GLOBAL_MAX_X, GLOBAL_MAX_Y = 13622, 11457 
-MAX_X,        MAX_Y        = GLOBAL_MAX_X/2, GLOBAL_MAX_Y/2 
+GLOBAL_MAX_X, GLOBAL_MAX_Y = int(13622), int(11457) 
+MAX_X,        MAX_Y        = GLOBAL_MAX_X, GLOBAL_MAX_Y #//2 
 LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X/4,   GLOBAL_MAX_Y/4]  )
 
 # Verbose levels, defining the outputs produced
@@ -478,9 +478,9 @@ if __name__ == '__main__':
     # exit ()
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_CNT, VERBOSE_DEMOGRAPHY, VERBOSE_SPEED])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP])
     my_loc2ap.time_period_str = '' #'0730_0740'
-    my_loc2ap.parse_files (['vehicles_n_speed_0730.loc']) #(['vehicles_s_speed_0730.loc']) #, 'vehicles_0740.loc', 'vehicles_0750.loc', 'vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
+    my_loc2ap.parse_files (['short_0.loc']) #(['vehicles_s_speed_0730.loc']) #, 'vehicles_0740.loc', 'vehicles_0750.loc', 'vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

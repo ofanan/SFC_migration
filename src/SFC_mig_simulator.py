@@ -296,7 +296,7 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.cpu_cap_at_lvl    = np.array ([10 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+        self.cpu_cap_at_lvl    = np.array ([1000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
@@ -443,17 +443,14 @@ class SFC_mig_simulator (object):
 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
-                    self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the resources held by that usr       
-                    
-                    # Remove the usr from the list of "descended users" on any server s 
-                    del (usr)
+                    self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
+                    self.usrs.remove (usr)                    
                 continue
         
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
-                self.rd_old_usrs_line (splitted_line[1:])
-                
+                self.rd_old_usrs_line (splitted_line[1:])                
                 self.solve_mig_prob ()
                 continue
         """
@@ -509,6 +506,7 @@ class SFC_mig_simulator (object):
                    
         ub = np.array([self.G.nodes[s]['RCs']     for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
         lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
+        
         while True: 
              
             if ( np.array([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool').all()): # Did the binary search converged?
@@ -527,6 +525,9 @@ class SFC_mig_simulator (object):
             # Solve using bottom-up
             if (self.bottom_up()):
                 ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])        
+                if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): 
+                    printf (self.log_output_file, 'In bottom-up IF\n')
+                    self.print_sol_to_log()
             else:
                 lb = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])
     
@@ -651,14 +652,10 @@ class SFC_mig_simulator (object):
                 if (self.warned_about_too_large_ap == False):
                     print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
                     self.warned_about_too_large_ap = True
+                    exit ()
             self.CPUAll_single_usr (usr)
 
-            # update the list of delay-feasible servers for this usr:
-            # first, remove this usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location...
-            for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
-                self.G.nodes[s]['Hs'].remove (usr) 
-            
-            # next, add this usr to the Hs of every server to which it belongs at its new location
+            # Add this usr to the Hs of every server to which it belongs at its new location
             s = self.ap2s[AP_id]
             usr.S_u = []
             usr.S_u.append (s)
@@ -670,13 +667,23 @@ class SFC_mig_simulator (object):
     
             if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget 
                 continue
-            
+            # Free the resources of this user in its old, current place
+            self.rmv_usr_rsrcs (usr)            
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU 
-            self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
             usr.lvl   = -1
             usr.nxt_s = -1
 
+    def rmv_usr_rsrcs (self, usr):
+        """
+        Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
+        and increase the avilable rsrcs of the srvr that currently place this usr
+        """
+        for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+            self.G.nodes[s]['Hs'].remove (usr) 
+        self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+            
+    
     def inc_array (self, ar, min_val, max_val):
         """
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
@@ -693,5 +700,5 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 2, children_per_node=2)
+    my_simulator = SFC_mig_simulator (ap_file_name = 'short_0.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 3, children_per_node=4)
     my_simulator.simulate ('alg_top')

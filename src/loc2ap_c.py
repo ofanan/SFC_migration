@@ -9,13 +9,20 @@ import time
 from usr_c import usr_c # class of the users
 from printf import printf
 
+# size of the city's area, in meters. In the simulation we may consider only a part of this large area.
+GLOBAL_MAX_X, GLOBAL_MAX_Y = 13622, 11457 
+MAX_X,        MAX_Y        = GLOBAL_MAX_X/2, GLOBAL_MAX_Y/2 
+LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X/4,   GLOBAL_MAX_Y/4]  )
+
+# Verbose levels, defining the outputs produced
 VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
 VERBOSE_AP              = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
 VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
 VERBOSE_DEMOGRAPHY      = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
 VERBOSE_SPEED           = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
 
-type_idx   = 0
+# Indices of the various field within the input '.loc' file 
+type_idx   = 0 # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
 veh_id_idx = 1
 x_pos_idx  = 2
 y_pos_idx  = 3
@@ -45,7 +52,7 @@ class loc2ap_c (object):
         self.verbose           = verbose      # verbose level - defining which outputs will be written
         self.debug             = False 
         
-        self.max_x, self.max_y = 13622, 11457 # size of the total area, in meters
+        self.max_x, self.max_y = GLOBAL_MAX_X/2, GLOBAL_MAX_Y/2 # size of the total area, in meters
         self.usrs              = []
         self.use_sq_cells      = use_sq_cells
         if (self.use_sq_cells):

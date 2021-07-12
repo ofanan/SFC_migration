@@ -539,12 +539,6 @@ class SFC_mig_simulator (object):
             self.rst_sol()
 
             # Solve using bottom-up
-            if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): #$$$
-                self.debug=True 
-                self.check_cpu_usage_all_srvrs()
-                list_of_usr = list (filter (lambda usr: usr.id == 3038, self.usrs))
-                usr3038 = list_of_usr[0]
-                printf (self.log_output_file, '******* usr{}.nxt_s={}, usr{}.lvl={} *********\n' .format (usr3038.id, usr3038.nxt_s, usr3038.id, usr3038.lvl)) 
             if (self.bottom_up()):
                 if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): 
                     printf (self.log_output_file, 'In bottom-up IF\n')
@@ -597,18 +591,11 @@ class SFC_mig_simulator (object):
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).v
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
-            if (self.debug and s==11): #$$$$
-                printf (self.log_output_file, 'H{}={}\n' .format (s, [usr.id for usr in Hs]))
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl   = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
-                    if (self.debug and s==11 and usr.id == 3038): #$$$
-                        used_cpu_in_s = self.used_cpu_in (s)
-                        printf (self.log_output_file, 's{}[a]={}. used cpu={} a={}, Rcs={}. Inserted usr {} with B={}\n' .format (
-                                s, self.G.nodes[s]['a'], used_cpu_in_s, self.G.nodes[s]['a'], self.G.nodes[s]['RCs'], usr.id, usr.B))
-                        self.check_cpu_usage_single_srvr(s)
                 elif (len (usr.B)-1 == lvl):
                     return False
         return True

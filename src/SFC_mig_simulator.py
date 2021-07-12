@@ -46,7 +46,7 @@ class SFC_mig_simulator (object):
     calc_mig_cost = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
           
     # Calculate the number of CPU units actually used in each server
-    used_cpu_in = lambda self: np.array ([self.G.nodes[s]['RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
+    used_cpu_in_all_srvrs = lambda self: np.array ([self.G.nodes[s]['RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
           
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
@@ -56,12 +56,15 @@ class SFC_mig_simulator (object):
 
     # Returns the server to which a given user is currently assigned
     cur_server_of = lambda self, usr: usr.S_u[usr.lvl] 
+
+    # Returns the total amount of cpu used by users at a certain server
+    used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
      
     def calc_rsrc_aug (self):
         """
         Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
         """
-        used_cpu_in = self.used_cpu_in ()
+        used_cpu_in = self.used_cpu_in_all_srvrs ()
         return max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1)    
          
     def rst_sol (self):
@@ -181,7 +184,7 @@ class SFC_mig_simulator (object):
         """
         print a solution for the problem to the output log file 
         """
-        used_cpu_in = self.used_cpu_in ()
+        used_cpu_in = self.used_cpu_in_all_srvrs ()
         printf (self.res_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
             self.t, 
             self.calc_sol_cost(),
@@ -191,14 +194,13 @@ class SFC_mig_simulator (object):
         """
         print a detailed solution for the mig' problem to the output log file 
         """
-        used_cpu_in = self.used_cpu_in ()
         printf (self.log_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
             self.t, 
             self.calc_sol_cost(),
             self.calc_rsrc_aug())) 
         
         for s in self.G.nodes():
-            used_cpu_in_s = sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
+            used_cpu_in_s = self.used_cpu_in (s)
             printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}\t chains {}\n' .format (
                     s,
                     self.G.nodes[s]['RCs'],
@@ -206,10 +208,24 @@ class SFC_mig_simulator (object):
                     used_cpu_in_s,
                     self.G.nodes[s]['cpu cap'],
                     [usr.id for usr in self.usrs if usr.nxt_s==s]))
-            if (used_cpu_in_s + self.G.nodes[s]['a'] != self.G.nodes[s]['RCs']):
-                printf (self.log_output_file, 'Error in calculating the cpu utilization of s{}' .format (s))
-                print ('Error in using cpu utilization. Please see the log file: {}' .format (self.log_file_name))
-                exit ()           
+            self.check_cpu_usage_single_srvr(s)
+            
+    def check_cpu_usage_all_srvrs (self):
+        """
+        Used for debug. Checks for all cells whether the allocated cpu + the available cpu = the total cpu.
+        """
+        for s in self.G.nodes():
+            self.check_cpu_usage_single_srvr (s)
+            
+    def check_cpu_usage_single_srvr (self, s):
+        """
+        Used for debug. Checks for all cells whether the allocated cpu + the available cpu = the total cpu.
+        """
+        if (self.used_cpu_in(s) + self.G.nodes[s]['a'] != self.G.nodes[s]['RCs']):
+            printf (self.log_output_file, 'Error in calculating the cpu utilization of s{}: used_cpu = {}, a={}, Rcs={}' .format 
+                    (s, self.used_cpu_in(s), self.G.nodes[s]['a'], self.G.nodes[s]['RCs']))
+            print ('Error in using cpu utilization. Please see the log file: {}' .format (self.log_file_name))
+            exit ()           
             
     def print_heap (self):
         """
@@ -523,11 +539,18 @@ class SFC_mig_simulator (object):
             self.rst_sol()
 
             # Solve using bottom-up
+            if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): #$$$
+                self.debug=True 
+                self.check_cpu_usage_all_srvrs()
+                list_of_usr = list (filter (lambda usr: usr.id == 3038, self.usrs))
+                usr3038 = list_of_usr[0]
+                printf (self.log_output_file, '******* usr{}.nxt_s={}, usr{}.lvl={} *********\n' .format (usr3038.id, usr3038.nxt_s, usr3038.id, usr3038.lvl)) 
             if (self.bottom_up()):
-                ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])        
                 if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): 
                     printf (self.log_output_file, 'In bottom-up IF\n')
+                    self.check_cpu_usage_all_srvrs()
                     self.print_sol_to_log()
+                ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])        
             else:
                 lb = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])
     
@@ -571,15 +594,21 @@ class SFC_mig_simulator (object):
         Looks for a feasible sol'.
         Returns true iff a feasible sol was found
         """        
-        for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).
+        for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).v
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
-           
+            if (self.debug and s==11): #$$$$
+                printf (self.log_output_file, 'H{}={}\n' .format (s, [usr.id for usr in Hs]))
             for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl   = lvl
                     self.G.nodes[s]['a'] -= usr.B[lvl]
+                    if (self.debug and s==11 and usr.id == 3038): #$$$
+                        used_cpu_in_s = self.used_cpu_in (s)
+                        printf (self.log_output_file, 's{}[a]={}. used cpu={} a={}, Rcs={}. Inserted usr {} with B={}\n' .format (
+                                s, self.G.nodes[s]['a'], used_cpu_in_s, self.G.nodes[s]['a'], self.G.nodes[s]['RCs'], usr.id, usr.B))
+                        self.check_cpu_usage_single_srvr(s)
                 elif (len (usr.B)-1 == lvl):
                     return False
         return True

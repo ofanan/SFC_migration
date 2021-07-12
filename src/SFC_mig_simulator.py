@@ -19,10 +19,9 @@ from printf import printf
 import loc2ap_c
 
 # Levels of verbose (which output is generated)
-VERBOSE_NO_OUTPUT             = 0
-VERBOSE_ONLY_RES              = 1 # Write to a file the total cost and rsrc aug. upon every event
-VERBOSE_RES_AND_LOG           = 2 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
-VERBOSE_RES_AND_DETAILED_LOG  = 3 # Write to a file the total cost and rsrc aug. upon every event + write a detailed ".log" file
+VERBOSE_RES      = 1 # Write to a file the total cost and rsrc aug. upon every event
+VERBOSE_LOG      = 2 # Write to a ".log" file
+VERBOSE_ADD_LOG  = 3 # Write to a detailed ".log" file
 
 class SFC_mig_simulator (object):
     """
@@ -126,12 +125,12 @@ class SFC_mig_simulator (object):
         # solve using another solver: solve(GLPK(msg = 0))
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
         
-        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+        if (VERBOSE__RES in self.verbose):
             printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
-            if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
-                printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+        if (VERBOSE_LOG in self.verbose):
+            printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
                                                                             #plp.LpStatus[model.status]))
-        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG): # successfully solved
+        if (VERBOSE_DETAILED_LOG in self.verbose): # successfully solved
             if (model.status == 1): 
                 for d_var in self.d_vars: 
                     if d_var.plp_lp_var.value() > 0:
@@ -398,7 +397,7 @@ class SFC_mig_simulator (object):
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         
         # Init output files
-        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+        if (VERBOSE_RES in self.verbose):
             self.init_res_file() 
         self.gen_parameterized_tree ()
 
@@ -425,7 +424,7 @@ class SFC_mig_simulator (object):
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
         """
-        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+        if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
              
         # reset Hs        
@@ -435,7 +434,7 @@ class SFC_mig_simulator (object):
 
         # Open input and output files
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
-        if (self.verbose == VERBOSE_RES_AND_LOG):
+        if (VERBOSE_RES in self.verbose):
             self.init_log_file()
             
         self.usrs = []
@@ -451,7 +450,7 @@ class SFC_mig_simulator (object):
 
             if (splitted_line[0] == "t"):
                 self.t = int(splitted_line[2])
-                if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+                if (VERBOSE_LOG in self.verbose):
                     printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
                 continue
         
@@ -483,7 +482,7 @@ class SFC_mig_simulator (object):
         Solve the mig' problem for this time slot, using the self.alg algorithm (e.g., lp, or our algorithm).
         """
         
-        if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
+        if (VERBOSE_ADD_LOG in self.verbose):
             self.last_rt = time.time()
         if (self.alg == 'alg_lp'): 
             self.solve_by_plp () 
@@ -493,10 +492,10 @@ class SFC_mig_simulator (object):
             print ('sorry, but the requested algorithm {} is not supported' .format (self.alg))
             exit ()
 
-        if (self.verbose in [VERBOSE_ONLY_RES, VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+        if (VERBOSE_RES in self.verbose):
             self.print_sol_to_res()
-            if (self.verbose == VERBOSE_RES_AND_DETAILED_LOG):
-                printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+        if (VERBOSE_ADD_LOG in self.verbose):
+            printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
              usr.cur_s = usr.nxt_s        
         
@@ -540,7 +539,7 @@ class SFC_mig_simulator (object):
 
             # Solve using bottom-up
             if (self.bottom_up()):
-                if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): 
+                if (VERBOSE_ADD_LOG in self.verbose): 
                     printf (self.log_output_file, 'In bottom-up IF\n')
                     self.check_cpu_usage_all_srvrs()
                     self.print_sol_to_log()
@@ -552,21 +551,21 @@ class SFC_mig_simulator (object):
         """
         Our top-level alg'
         """
-        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+        if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 'beginning alg top\n')
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         if (not(self.bottom_up())):
-            if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+            if (VERBOSE_LOG in self.verbose):
                 printf (self.log_output_file, 'By binary search:\n')
             self.binary_search()
 
         # By hook or by crook, now we have a feasible solution        
-        if (self.verbose in [VERBOSE_RES_AND_DETAILED_LOG]): 
+        if (VERBOSE_ADD_LOG in self.verbose): 
             printf (self.log_output_file, 'b4 push-up\n')
             self.print_sol_to_log()
         
         self.push_up ()
-        if (self.verbose in [VERBOSE_RES_AND_LOG, VERBOSE_RES_AND_DETAILED_LOG]):
+        if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up\n')
             self.print_sol_to_log()
         printf (self.log_output_file, 'finished alg top\n')
@@ -716,5 +715,5 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'short_0.ap', verbose = VERBOSE_RES_AND_DETAILED_LOG, tree_height = 3, children_per_node=4)
+    my_simulator = SFC_mig_simulator (ap_file_name = 'short_0.ap', verbose = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG], tree_height = 3, children_per_node=4)
     my_simulator.simulate ('alg_top')

@@ -430,7 +430,7 @@ class SFC_mig_simulator (object):
              
         # reset Hs        
         for s in self.G.nodes():
-            self.G.nodes[s]['Hs']  = [] 
+            self.G.nodes[s]['Hs']  = set() 
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
 
         # Open input and output files
@@ -646,11 +646,11 @@ class SFC_mig_simulator (object):
             s = self.ap2s[AP_id]
             usr.S_u.append (s)
             if (self.alg != 'alg_lp'): # the LP solver doesn't need the 'Hs' (list of chains that may be located on each server while satisfying the delay constraint)
-                self.G.nodes[s]['Hs'].append(usr) # Hs is the list of chains that may be located on each server while satisfying the delay constraint
+                self.G.nodes[s]['Hs'].add(usr) # Hs is the list of chains that may be located on each server while satisfying the delay constraint
                 for lvl in (range (len(usr.B)-1)):
                     s = self.parent_of(s)
                     usr.S_u.append (s)
-                    self.G.nodes[s]['Hs'].append(usr)                       
+                    self.G.nodes[s]['Hs'].add(usr)                       
                     
     def rd_old_usrs_line (self, line):
         """
@@ -688,11 +688,11 @@ class SFC_mig_simulator (object):
             s = self.ap2s[AP_id]
             usr.S_u = []
             usr.S_u.append (s)
-            self.G.nodes[s]['Hs'].append(usr)
+            self.G.nodes[s]['Hs'].add(usr)
             for lvl in (range (len(usr.B)-1)):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
-                self.G.nodes[s]['Hs'].append(usr)                               
+                self.G.nodes[s]['Hs'].add(usr)                               
     
             if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget 
                 continue

@@ -81,7 +81,7 @@ class SFC_mig_simulator (object):
         """
         used_cpu_in = self.used_cpu_in_all_srvrs ()
         return max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1)    
-         
+
     def rst_sol (self):
         """
         Reset the solution, namely, Dis-place all users. This is done by: 
@@ -108,6 +108,21 @@ class SFC_mig_simulator (object):
     #     list_of_cur_st_param = list(filter (lambda cur_st : cur_st.usr==decision_var.usr and cur_st.s == decision_var.s, self.cur_state))
     #     cost += self.uniform_mig_cost * len (usr.theta_times_lambda) * list_of_cur_st_param[0].value 
 
+    def chain_cost_from_non_CLP_state  (self, usr, lvl):
+        """
+        Calculates the cost of locating the whole chain of a given user on a server at a given lvl in its Su.
+        This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
+        """
+        # First, calculate the mig' costs
+        cost = 1 #Assume that the whole chain is gonna mig'
+        list_of_cur_state_params = list (filter (lambda param: param.usr == usr and param.s == usr.S_u[lvl]), self.cur_state_params)
+        if (len (list_of_cur_state_params)) > 0: # there's currently at least some fraction of the chain on the suggested destination
+            cost -= list_of_cur_state_params[0].cur_st 
+        cost *= self.calc_mig_cost (usr, lvl)
+        
+        # Add the cpu and the link costs
+        cost += self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_SSP_at_lvl[lvl]
+         
     def solve_by_plp (self):
         """
         Find an optimal fractional solution using Python's pulp LP library.
@@ -146,8 +161,8 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
                                                                             #plp.LpStatus[model.status]))
-        if (VERBOSE_DETAILED_LOG in self.verbose): # successfully solved
-            if (model.status == 1): 
+        if (VERBOSE_DETAILED_LOG in self.verbose): 
+            if (model.status == 1): # successfully solved
                 for d_var in self.d_vars: 
                     if d_var.plp_lp_var.value() > 0:
                         printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(

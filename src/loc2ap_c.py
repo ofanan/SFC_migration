@@ -316,7 +316,6 @@ class loc2ap_c (object):
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left, self.usrs)): 
                         self.left_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
-                        # print (self.left_sim_via) #$$$
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left), self.usrs))
                 continue
     
@@ -333,6 +332,9 @@ class loc2ap_c (object):
 
                         usr_id = np.uint16(tuple[veh_id_idx])
                         nxt_ap = self.loc2ap (float(tuple[x_pos_idx]), float(tuple[y_pos_idx]))
+                        if (VERBOSE_DEBUG in self.verbose and nxt_ap >= self.num_of_APs):
+                            print ('Error at t={}: got ap num {}. usr={}, x={:.0f},y={:.0f}' .format (self.t, nxt_ap, usr_id, tuple[x_pos_idx], tuple[y_pos_idx]))
+                            exit ()
                         if (tuple[type_idx] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
                             if (VERBOSE_DEMOGRAPHY in self.verbose): 
@@ -419,8 +421,8 @@ class loc2ap_c (object):
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
             printf (self.ap_file, '//for each time slot:\n')
             printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
-            printf (self.ap_file, '"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
-            printf (self.ap_file, '"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
+            printf (self.ap_file, '//"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
+            printf (self.ap_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
         for file_name in loc_file_names: #i in range (num_of_files):
             self.usrs_loc_file_name = file_name
@@ -469,19 +471,11 @@ class loc2ap_c (object):
             avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
         
 if __name__ == '__main__': 
-    # gamad = [[1,2,3], [4,5,6]]
-    # print (gamad)    
-    # gamad = [gamad[ap][1:] for ap in range (2)]
-    # # for ap in range(2):
-    # #     gamad[ap] = gamad [ap][1:]
-    # #     # del (gamad[ap][0])
-    # print (gamad)    
-    # exit ()
 
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_SPEED])
     my_loc2ap.time_period_str = '' #'0730_0740'
-    my_loc2ap.parse_files (['vehicles_0730.loc']) #(['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
+    my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

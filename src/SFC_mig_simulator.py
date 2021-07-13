@@ -18,6 +18,7 @@ from printf import printf
 import loc2ap_c
 
 # Levels of verbose (which output is generated)
+VERBOSE_DEBUG    = 0
 VERBOSE_RES      = 1 # Write to a file the total cost and rsrc aug. upon every event
 VERBOSE_LOG      = 2 # Write to a ".log" file
 VERBOSE_ADD_LOG  = 3 # Write to a detailed ".log" file
@@ -58,6 +59,7 @@ class SFC_mig_simulator (object):
     # Returns the total amount of cpu used by users at a certain server
     used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
 
+    lp_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] for d_var in list (filter (lambda d_var : d_var.s == s and d_var.plp_var.value() > 0, self.d_vars))]))
     
     def set_last_time (self):
         """
@@ -114,14 +116,11 @@ class SFC_mig_simulator (object):
         This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
         """
         # First, calculate the mig' costs
-        cost = 1 #Assume that the whole chain is gonna mig'
-        list_of_cur_state_params = list (filter (lambda param: param.usr == usr and param.s == usr.S_u[lvl]), self.cur_state_params)
-        if (len (list_of_cur_state_params)) > 0: # there's currently at least some fraction of the chain on the suggested destination
-            cost -= list_of_cur_state_params[0].cur_st 
-        cost *= self.calc_mig_cost (usr, lvl)
-        
-        # Add the cpu and the link costs
-        cost += self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_SSP_at_lvl[lvl]
+        frac_of_chain_that_migrates = 1 #Assume that the whole chain is gonna mig'
+        list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s == usr.S_u[lvl], self.cur_st_params))
+        if (len (list_of_relevant_cur_st_params)) > 0: # there's currently at least some fraction of the chain on the suggested destination
+            frac_of_chain_that_migrates -= list_of_relevant_cur_st_params[0].cur_st 
+        return frac_of_chain_that_migrates * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_SSP_at_lvl[lvl]
          
     def solve_by_plp (self):
         """
@@ -136,11 +135,11 @@ class SFC_mig_simulator (object):
         for usr in self.usrs:
             single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
-                plp_lp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
-                decision_var = decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_lp_var=plp_lp_var) # generate a decision var, containing the lp var + details about its meaning 
+                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
+                decision_var = decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
                 self.d_vars.append (decision_var)
-                single_place_const += plp_lp_var
-                obj_func           += self.chain_cost_homo (decision_var) * plp_lp_var # add the cost of this decision var to the objective func 
+                single_place_const += plp_var
+                obj_func           += self.chain_cost_from_non_CLP_state (usr, lvl) * plp_var # add the cost of this decision var to the objective func
                 id += 1
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
@@ -149,31 +148,26 @@ class SFC_mig_simulator (object):
         for s in self.G.nodes():
             cpu_cap_const = []
             for d_var in list (filter (lambda item : item.s == s, self.d_vars)): # for every decision variable meaning placing a chain on this server 
-                cpu_cap_const += (d_var.usr.B[d_var.lvl] * d_var.plp_lp_var) # Add the overall cpu of this chain, if located on s
+                cpu_cap_const += (d_var.usr.B[d_var.lvl] * d_var.plp_var) # Add the overall cpu of this chain, if located on s
             if (cpu_cap_const != []):
-                model += (cpu_cap_const <= self.G.nodes[s]['cpu cap']) 
+                model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
 
         # solve using another solver: solve(GLPK(msg = 0))
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
         
-        if (VERBOSE__RES in self.verbose):
+        if (VERBOSE_RES in self.verbose):
             printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
                                                                             #plp.LpStatus[model.status]))
-        if (VERBOSE_DETAILED_LOG in self.verbose): 
+        if (VERBOSE_LOG in self.verbose): 
             if (model.status == 1): # successfully solved
-                for d_var in self.d_vars: 
-                    if d_var.plp_lp_var.value() > 0:
-                        printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
-                               d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
+                self.print_lp_sol_to_log ()
             else:
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
 
+        exit ()
         # Make the solution the "current state", for the next time slot  
-        for d_var in self.d_vars: 
-            printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
-                   d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_lp_var.value()))
         
     def print_cost_per_usr (self):
         """
@@ -219,6 +213,21 @@ class SFC_mig_simulator (object):
             self.t, 
             self.calc_sol_cost(),
             self.calc_rsrc_aug())) 
+
+    def print_lp_sol_to_log (self):
+        """
+        print a lp fractional solution for the problem to the output log file 
+        """
+        # for usr in self.usrs:
+        #     for decision_var in list (filter (lambda decision_var : decision_var.usr == usr and decision_var, self.decision_vars)): # list_of_relevant_decision_vars =
+        for s in self.G.nodes():
+            printf (self.log_output_file, 's{} RCs={} used_cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.lp_used_cpu_in (s) ))
+
+        if (VERBOSE_ADD_LOG in self.verbose): 
+            for d_var in self.d_vars: 
+                if d_var.plp_var.value() > 0:
+                    printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
+                           d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_var.value()))            
 
     def print_sol_to_log (self):
         """
@@ -330,13 +339,6 @@ class SFC_mig_simulator (object):
         for usr in usrs:
             self.CPUAll_single_usr(usr)
             
-    def fix_usr_params (self, usrs):
-        """
-        Currently unused.
-        For each of the given users, fix the following parameters:
-        target_delay, mig_cost, C_u
-        """
-            
     def gen_parameterized_tree (self):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
@@ -426,6 +428,7 @@ class SFC_mig_simulator (object):
         self.uniform_target_delay       = 20
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
+        self.usrs                       = []
         
         # Init output files
         if (VERBOSE_RES in self.verbose):
@@ -455,15 +458,21 @@ class SFC_mig_simulator (object):
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
         """
+        self.cur_st_params = []
+        # Init RCs       
+        self.rsrc_aug = 1
+        for s in self.G.nodes():
+            self.G.nodes[s]['RCs'] = self.rsrc_aug * self.G.nodes[s]['cpu cap'] # for now, assume no resource aug' 
+
+        print ('rsrc aug = {}' .format (self.rsrc_aug))
+        
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
         # Open input and output files
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
         if (VERBOSE_RES in self.verbose):
             self.init_log_file()
-            
-        self.usrs = []
-        
+                    
         for line in self.ap_file: 
         
             # Ignore comments and emtpy lines
@@ -491,9 +500,13 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line_lp (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
+            if (VERBOSE_DEBUG in self.verbose and (len(self.usrs)==0)):
+                print ('Error: there are no usrs')
+                exit ()
             self.set_last_time()
             self.solve_by_plp () 
             self.print_sol_to_res_and_log ()
+            exit () #$$$
             
     def simulate_alg_top (self):
         """
@@ -507,7 +520,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
              
-        # reset Hs        
+        # reset Hs and RCs       
         for s in self.G.nodes():
             self.G.nodes[s]['Hs']  = set() 
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
@@ -517,8 +530,6 @@ class SFC_mig_simulator (object):
         if (VERBOSE_RES in self.verbose):
             self.init_log_file()
             
-        self.usrs = []
-
         for line in self.ap_file: 
 
             # Ignore comments lines
@@ -547,7 +558,7 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line (splitted_line[1:])                
                 self.set_last_time()
-                self.solve_by_plp () 
+                self.alg_top()
                 self.print_sol_to_res_and_log ()
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                      usr.cur_s = usr.nxt_s        

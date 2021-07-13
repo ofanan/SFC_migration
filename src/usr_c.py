@@ -1,6 +1,6 @@
 class usr_c (object):
     """
-    class for of "user" 
+    class of "user", used by alg_top 
     """ 
     def __init__ (self, id, theta_times_lambda=[1,1,1], target_delay=6, mig_cost=1, C_u=15, cur_s = -1, nxt_s = -1):
         self.id                 = id

@@ -1,7 +1,5 @@
 # Bugs: 
 # change plp. Possibly use for it a different "usr_c" type.
-# Check the inter-time-slots issue for alg top. Is the calc of mig' cost correct?
-# u11 isn't placed at all after the run of bottom-up!
 import networkx as nx
 import numpy as np
 import math
@@ -13,7 +11,8 @@ import pulp as plp
 from cmath import sqrt
 # from scipy.optimize import linprog # currently unused
 
-from usr_c import usr_c # class of the users
+from usr_c    import usr_c    # class of the users of alg
+from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
 import loc2ap_c
@@ -375,7 +374,7 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = -1, tree_height = 3, children_per_node = 4):
+    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4):
         """
         """
         
@@ -410,14 +409,66 @@ class SFC_mig_simulator (object):
         if (self.alg == 'alg_top'):
             self.simulate_alg_top()
         elif (self.alg == 'alg_lp'):
-            self.simulate_alg_lp ();
+            self.simulate_lp ();
         else:
             print ('Sorry, alg {} is not implemented yet')
             exit ()
     
+    def simulate_lp (self):
+        """
+        Simulate the whole simulation, using a LP fractional solution.
+        At each time step:
+        - Read and parse from an input ".ap" file the AP cells of each user who moved. 
+        - solve the problem using a LP, using Python's Pulp LP solver. 
+        - Write outputs results and/or logs to files.
+        - update cur_st = nxt_st
+        """
+        if (VERBOSE_LOG in self.verbose):
+            self.init_log_file()
+        # Open input and output files
+        self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
+        if (VERBOSE_RES in self.verbose):
+            self.init_log_file()
+            
+        self.usrs = []
+        
+        for line in self.ap_file: 
+        
+            # Ignore comments and emtpy lines
+            if (line == "\n" or line.split ("//")[0] == ""):
+                continue
+        
+            line = line.split ('\n')[0]
+            splitted_line = line.split (" ")
+        
+            if (splitted_line[0] == "t"):
+                self.t = int(splitted_line[2])
+                if (VERBOSE_LOG in self.verbose):
+                    printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+                continue
+        
+            elif (splitted_line[0] == "usrs_that_left:"):
+        
+                for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
+        
+                    self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
+                    self.usrs.remove  (usr)                    
+                continue
+        
+            elif (splitted_line[0] == "new_usrs:"):              
+                self.rd_new_usrs_line_lp (splitted_line[1:])
+            elif (splitted_line[0] == "old_usrs:"):              
+                self.rd_old_usrs_line_lp (splitted_line[1:])
+                print ("halleluya")                
+                exit ()
+                self.solve_mig_prob_lp ()
+                continue      
+            
+            
+
     def simulate_alg_top (self):
         """
-        Simulate the whole simulation:
+        Simulate the whole simulation, using our algorithm, alg_top.
         At each time step:
         - Read and parse from an input ".ap" file the AP cells of each user who moved. 
         - solve the problem using alg_top (our alg). 
@@ -466,7 +517,7 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line (splitted_line[1:])                
-                self.solve_mig_prob ()
+                self.solve_by_plp () 
                 continue
         """
         Simulate the whole simulation:
@@ -599,6 +650,38 @@ class SFC_mig_simulator (object):
                     return False
         return True
 
+    def rd_new_usrs_line_lp (self, line):
+        """
+        Read a line detailing the new usrs just joined the system, in an ".ap" file, when looking for a LP solution for the problem
+        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        """
+    
+        if (line ==[]):
+            return # no new users
+    
+        splitted_line = line[0].split ("\n")[0].split (")")
+    
+        for tuple in splitted_line:
+            if (len(tuple) <= 1):
+                break
+            tuple = tuple.split("(")
+            tuple   = tuple[1].split (',')
+    
+            usr = usr_lp_c (id = int(tuple[0])) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
+            self.CPUAll_single_usr (usr)
+            self.usrs.append (usr)
+            AP_id = int(tuple[1])
+            if (AP_id >= self.num_of_leaves):
+                if (self.warned_about_too_large_ap == False):
+                    print ('********* WARNING: Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {} *********' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+                    exit ()
+            s = self.ap2s[AP_id]
+            usr.S_u.append (s)
+            for lvl in (range (len(usr.B)-1)):
+                s = self.parent_of(s)
+                usr.S_u.append (s)
+
     def rd_new_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
@@ -631,12 +714,11 @@ class SFC_mig_simulator (object):
                 AP_id = self.num_of_leaves-1
             s = self.ap2s[AP_id]
             usr.S_u.append (s)
-            if (self.alg != 'alg_lp'): # the LP solver doesn't need the 'Hs' (list of chains that may be located on each server while satisfying the delay constraint)
-                self.G.nodes[s]['Hs'].add(usr) # Hs is the list of chains that may be located on each server while satisfying the delay constraint
-                for lvl in (range (len(usr.B)-1)):
-                    s = self.parent_of(s)
-                    usr.S_u.append (s)
-                    self.G.nodes[s]['Hs'].add(usr)                       
+            self.G.nodes[s]['Hs'].add(usr) # Hs is the list of chains that may be located on each server while satisfying the delay constraint
+            for lvl in (range (len(usr.B)-1)):
+                s = self.parent_of(s)
+                usr.S_u.append (s)
+                self.G.nodes[s]['Hs'].add(usr)                       
                     
     def rd_old_usrs_line (self, line):
         """
@@ -671,9 +753,8 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr (usr)
 
             # Add this usr to the Hs of every server to which it belongs at its new location
-            s = self.ap2s[AP_id]
-            usr.S_u = []
-            usr.S_u.append (s)
+            s       = self.ap2s[AP_id]
+            usr.S_u = [s]
             self.G.nodes[s]['Hs'].add(usr)
             for lvl in (range (len(usr.B)-1)):
                 s = self.parent_of(s)
@@ -688,6 +769,46 @@ class SFC_mig_simulator (object):
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU 
             usr.lvl   = -1
             usr.nxt_s = -1
+
+    def rd_old_usrs_line_lp (self, line):
+        """
+        Read a line detailing the new usrs just joined the system, in an ".ap" file, when using a LP solver for the problem.
+        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        """
+        if (line == []): # if the list of old users that moved is empty
+            return
+        
+        splitted_line = line[0].split ("\n")[0].split (")")
+
+        for tuple in splitted_line:
+            if (len(tuple) <= 1):
+                break
+            tuple = tuple.split("(")
+            tuple   = tuple[1].split (',')
+            
+            list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
+            if (len(list_of_usr) == 0):
+                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.ap_file_name, tuple[0]))
+                exit ()
+            usr    = list_of_usr[0]
+            AP_id  = int(tuple[1])
+            if (AP_id > self.num_of_leaves):
+                AP_id = self.num_of_leaves-1
+                if (self.warned_about_too_large_ap == False):
+                    print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+                    exit ()
+            self.CPUAll_single_usr (usr)
+
+            # Add this usr to the Hs of every server to which it belongs at its new location
+            s       = self.ap2s[AP_id]
+            usr.S_u = [s]
+            for lvl in (range (len(usr.B)-1)):
+                s = self.parent_of(s)
+                usr.S_u.append (s)
+    
+            # Free the resources of this user in its old, current place
+            self.rmv_usr_rsrcs (usr)            
 
     def rmv_usr_rsrcs (self, usr):
         """
@@ -715,5 +836,5 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'short_0.ap', verbose = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG], tree_height = 3, children_per_node=4)
-    my_simulator.simulate ('alg_top')
+    my_simulator = SFC_mig_simulator (ap_file_name = 'short_0.ap', verbose = [VERBOSE_RES, VERBOSE_LOG], tree_height = 3, children_per_node=4)
+    my_simulator.simulate ('alg_lp')

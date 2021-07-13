@@ -11,7 +11,7 @@ from printf import printf
 
 # size of the city's area, in meters. In the simulation we may consider only a part of this large area.
 GLOBAL_MAX_X, GLOBAL_MAX_Y = int(13622), int(11457) 
-MAX_X,        MAX_Y        = GLOBAL_MAX_X, GLOBAL_MAX_Y #//2 
+MAX_X,        MAX_Y        = GLOBAL_MAX_X//2, GLOBAL_MAX_Y//2  
 LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X/4,   GLOBAL_MAX_Y/4]  )
 
 # Verbose levels, defining the outputs produced
@@ -165,7 +165,7 @@ class loc2ap_c (object):
 
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
-        Read the number of vehicels at each cell, as written in the input files. 
+        Read the number of vehicles at each cell, as written in the input files. 
         """
         input_file  = open ('../res/' + input_file_name, "r")  
         
@@ -222,7 +222,7 @@ class loc2ap_c (object):
         plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap ([self.speed[ap]['speed'] for ap in range(self.num_of_APs)]), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('speed in each cell')
+        plt.title ('avg speed in each cell')
         plt.savefig('../res/heatmap_speed.jpg')
         
     def tile2ap (self, lvl):
@@ -480,7 +480,7 @@ if __name__ == '__main__':
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP])
     my_loc2ap.time_period_str = '' #'0730_0740'
-    my_loc2ap.parse_files (['short_0.loc']) #(['vehicles_s_speed_0730.loc']) #, 'vehicles_0740.loc', 'vehicles_0750.loc', 'vehicles_0800.loc', 'vehicles_0810.loc', 'vehicles_0820.loc'])
+    my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

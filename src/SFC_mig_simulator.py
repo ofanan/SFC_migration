@@ -178,30 +178,31 @@ class SFC_mig_simulator (object):
             chain_cost = self.chain_cost_homo (usr, usr.lvl)  
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
-    def init_output_file (self, file_name):
-        """
-        Open an output file for writing, overwriting previous content in that file. 
-        Input: output file name.
-        Output: file descriptor.  
-        """
-        with open('../res/' + file_name, 'w') as FD:
-            FD.write('')                
-        FD  = open ('../res/' + file_name,  "w")
-        return FD
+    # def init_output_file (self, file_name, overwrite=False):
+    #     """
+    #     Open an output file for writing, overwriting previous content in that file. 
+    #     Input: output file name.
+    #     Output: file descriptor.  
+    #     """
+    #     if (overwrite):
+    #         with open('../res/' + file_name, 'w') as FD:
+    #             FD.write('')                
+    #     FD  = open ('../res/' + file_name,  "w")
+    #     return FD
 
     def init_res_file (self):
         """
         Open the res file for writing.
         """
         self.res_file_name = "../res/" + self.ap_file_name.split(".")[0] + ".res"  
-        self.res_output_file = self.init_output_file(self.res_file_name)
+        self.res_output_file =  open ('../res/' + self.res_file_name,  "a") 
 
-    def init_log_file (self):
+    def init_log_file (self, overwrite = True):
         """
         Open the log file for writing and write initial comments lines on it
         """
         self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.log'  
-        self.log_output_file = self.init_output_file(self.log_file_name)
+        self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s. a=available capacity. C_s = non-augmented capacity of s.\n' )
 
     def print_sol_to_res (self):

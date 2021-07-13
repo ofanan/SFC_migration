@@ -473,7 +473,7 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_SPEED])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED])
     my_loc2ap.time_period_str = '' #'0730_0740'
     my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 

@@ -14,6 +14,13 @@ VERBOSE_SPEED = 3
 
 class Traci_runner (object):
 
+    # Returns the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
+    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key)) - loc2ap_c.LOWER_LEFT_CORNER
+
+    # Checks whether the given vehicle is within the simulated area.
+    # Input: key of a vehicle.
+    # Output: True iff this vehicle is within the simulated area.
+    is_in_simulated_area  = lambda self, position : False if (position[0] < 0 or position[0] > loc2ap_c.MAX_X or position[1] < 0 or position[1] > loc2ap_c.MAX_Y) else True 
     
     def __init__ (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
@@ -49,7 +56,7 @@ class Traci_runner (object):
                     break
                 
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.get_relative_position(veh_key)] # list of vehs currently found within the simulated area.
+                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
                 left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
                                                                    veh['id']  not in (ids2recycle)), veh_key2id)) 
                 veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
@@ -75,27 +82,28 @@ class Traci_runner (object):
                             continue
                         type = 'o' # will indicate that this is a old vehicle 
                         veh_id = filtered_list[0]['id'] 
+                    position = self.get_relative_position (veh_key)
                     if (VERBOSE_SPEED in self.verbose): 
-                        printf (loc_output_file, "({},{},{:.0f},{:.0f},{:.0f})" .format (type, veh_id, self.position[0], self.position[1], traci.vehicle.getSpeed(veh_key)))
+                        printf (loc_output_file, "({},{},{:.0f},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
                     elif (VERBOSE_LOC in self.verbose):
-                        printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, self.position[0], self.position[1]))
+                        printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1]))
         
                 sys.stdout.flush()
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
 
-    def get_relative_position (self, veh_key):
-       """
-       Writes the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
-        and checks whether this vehicle is within the simulated area.
-       Input: key of a vehicle.
-       Output: True iff this vehicle is within the simulated area.
-       In addition, the function writes to self.position the relative [x,y] position of this vehicle.
-       """ 
-       self.position = np.array(traci.vehicle.getPosition(veh_key)) - loc2ap_c.LOWER_LEFT_CORNER
-       if (self.position[0] < 0 or self.position[0] > loc2ap_c.MAX_X or self.position[1] < 0 or self.position[1] > loc2ap_c.MAX_Y):
-           return False
-       return True 
+    # def get_relative_position (self, veh_key):
+    #    """
+    #    Writes the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
+    #     and checks whether this vehicle is within the simulated area.
+    #    Input: key of a vehicle.
+    #    Output: True iff this vehicle is within the simulated area.
+    #    In addition, the function writes to self.position the relative [x,y] position of this vehicle.
+    #    """ 
+    #    self.position = np.array(traci.vehicle.getPosition(veh_key)) - loc2ap_c.LOWER_LEFT_CORNER
+    #    if (self.position[0] < 0 or self.position[0] > loc2ap_c.MAX_X or self.position[1] < 0 or self.position[1] > loc2ap_c.MAX_Y):
+    #        return False
+    #    return True 
 
 if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*7.5,

@@ -57,6 +57,23 @@ class SFC_mig_simulator (object):
 
     # Returns the total amount of cpu used by users at a certain server
     used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
+
+    
+    def set_last_time (self):
+        """
+        If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
+        """
+        if (VERBOSE_ADD_LOG in self.verbose):
+            self.last_rt = time.time()
+     
+    def print_sol_to_res_and_log (self):
+        """
+        Print to the res and/or log files the solution and/or additional info.
+        """
+        if (VERBOSE_RES in self.verbose):
+            self.print_sol_to_res()
+        if (VERBOSE_ADD_LOG in self.verbose):
+            printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
      
     def calc_rsrc_aug (self):
         """
@@ -459,13 +476,10 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line_lp (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
-                print ("halleluya")                
-                exit ()
-                self.solve_mig_prob_lp ()
-                continue      
+            self.set_last_time()
+            self.solve_by_plp () 
+            self.print_sol_to_res_and_log ()
             
-            
-
     def simulate_alg_top (self):
         """
         Simulate the whole simulation, using our algorithm, alg_top.
@@ -517,39 +531,12 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line (splitted_line[1:])                
+                self.set_last_time()
                 self.solve_by_plp () 
-                continue
-        """
-        Simulate the whole simulation:
-        At each time step:
-        - Read and parse from an input ".ap" file the AP cells of each user who moved. 
-        - solve the problem (the "nxt_st), using the chosen alg: LP, or ALG_TOP (our alg).
-        - Write outputs results and/or logs to files.
-        - update cur_st = nxt_st
-        """
-
-    def solve_mig_prob (self):
-        """
-        Solve the mig' problem for this time slot, using the self.alg algorithm (e.g., lp, or our algorithm).
-        """
-        
-        if (VERBOSE_ADD_LOG in self.verbose):
-            self.last_rt = time.time()
-        if (self.alg == 'alg_lp'): 
-            self.solve_by_plp () 
-        elif (self.alg ==  'alg_top'):
-            self.alg_top ()
-        else: 
-            print ('sorry, but the requested algorithm {} is not supported' .format (self.alg))
-            exit ()
-
-        if (VERBOSE_RES in self.verbose):
-            self.print_sol_to_res()
-        if (VERBOSE_ADD_LOG in self.verbose):
-            printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
-        for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
-             usr.cur_s = usr.nxt_s        
-        
+                self.print_sol_to_res_and_log ()
+                for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
+                     usr.cur_s = usr.nxt_s        
+               
     def binary_search (self):
         """
         Binary search for a feasible sol that minimizes the resource augmentation R.

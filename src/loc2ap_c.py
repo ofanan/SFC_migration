@@ -20,6 +20,7 @@ VERBOSE_AP              = 1 # Generate ".ap" file, detailing the current cell of
 VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
 VERBOSE_DEMOGRAPHY      = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
 VERBOSE_SPEED           = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
+VERBOSE_DEBUG           = 11
 
 # Indices of the various field within the input '.loc' file 
 type_idx   = 0 # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
@@ -340,7 +341,7 @@ class loc2ap_c (object):
                         elif (tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0):
-                                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, splitted_line[1]))
+                                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
                                 exit ()
                             list_of_usr[0]['nxt ap'] = nxt_ap
                             if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
@@ -357,7 +358,7 @@ class loc2ap_c (object):
                                     
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
                 if (VERBOSE_AP in self.verbose):
-                    self.print_usrs_ap() # First, print the APs of the users in the PREVIOUS cycles
+                    self.print_usrs_ap() # Print the APs of the users 
                 if (VERBOSE_CNT in self.verbose):
                     self.cnt_num_of_vehs_per_ap ()
                 for usr in self.usrs: # mark all existing usrs as old
@@ -478,9 +479,9 @@ if __name__ == '__main__':
     # exit ()
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_SPEED])
     my_loc2ap.time_period_str = '' #'0730_0740'
-    my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
+    my_loc2ap.parse_files (['vehicles_0730.loc']) #(['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

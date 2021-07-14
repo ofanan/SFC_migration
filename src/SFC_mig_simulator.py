@@ -60,8 +60,14 @@ class SFC_mig_simulator (object):
     # Returns the total amount of cpu used by users at a certain server
     used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
 
-    lp_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] for d_var in list (filter (lambda d_var : d_var.s == s and d_var.plp_var.value() > 0, self.d_vars))]))
+    lp_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.plp_var.value() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
     
+    # Calculates the cost of locating the whole chain of a given user on a server at a given lvl in its Su.
+    # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
+    chain_cost_from_non_CLP_state = lambda self, usr, lvl: \
+                    sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
+                    self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
+
     def set_last_time (self):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
@@ -111,27 +117,6 @@ class SFC_mig_simulator (object):
     #     list_of_cur_st_param = list(filter (lambda cur_st : cur_st.usr==decision_var.usr and cur_st.s == decision_var.s, self.cur_state))
     #     cost += self.uniform_mig_cost * len (usr.theta_times_lambda) * list_of_cur_st_param[0].value 
 
-    def chain_cost_from_non_CLP_state  (self, usr, lvl):
-        """
-        Calculates the cost of locating the whole chain of a given user on a server at a given lvl in its Su.
-        This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
-        """
-        # First, calculate the mig' costs
-        # frac_of_chain_that_migrates = 1 #Assume that the whole chain is gonna mig'
-        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
-        # if (len (list_of_relevant_cur_st_params)) > 0: # there's currently at least some fraction of the chain on the suggested destination
-        #     frac_of_chain_that_migrates -= list_of_relevant_cur_st_params[0].cur_st 
-        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
-        # frac_of_chain_that_migrates = sum (np.array [param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] )
-        
-        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
-        # frac_of_chain_that_migrates = sum (np.array ([param.cur_st for param in 
-                                                      # list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] ))
-        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
-        # frac_of_chain_that_migrates = sum (np.array ([param.cur_st for param in 
-        #                                                list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] ))
-        return sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
-         
     def solve_by_plp (self):
         """
         Find an optimal fractional solution using Python's pulp LP library.
@@ -164,9 +149,6 @@ class SFC_mig_simulator (object):
 
         # solve using another solver: solve(GLPK(msg = 0))
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
-        print (model)
-        print ('model cost={}' .format (model.objective.value()))
-        # printf (self.res_output_file, 'cost={:.2f}\n' .format(model.objective.value())) 
         
         if (VERBOSE_RES in self.verbose):
             printf (self.res_output_file, 't{}\n' .format(self.t)) 
@@ -181,7 +163,6 @@ class SFC_mig_simulator (object):
             else:
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
 
-        print (model)
         exit ()
         # Make the solution the "current state", for the next time slot  
         

@@ -126,8 +126,11 @@ class SFC_mig_simulator (object):
         
         # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
         # frac_of_chain_that_migrates = sum (np.array ([param.cur_st for param in 
-        #                                               list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] ))
-        return sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) #* self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
+                                                      # list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] ))
+        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
+        # frac_of_chain_that_migrates = sum (np.array ([param.cur_st for param in 
+        #                                                list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] ))
+        return sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
          
     def solve_by_plp (self):
         """
@@ -161,8 +164,13 @@ class SFC_mig_simulator (object):
 
         # solve using another solver: solve(GLPK(msg = 0))
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
+        print (model)
+        print ('model cost={}' .format (model.objective.value()))
+        # printf (self.res_output_file, 'cost={:.2f}\n' .format(model.objective.value())) 
         
         if (VERBOSE_RES in self.verbose):
+            printf (self.res_output_file, 't{}\n' .format(self.t)) 
+            printf (self.res_output_file, 'plp.stts{} \n' .format(model.status)) 
             printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
@@ -173,6 +181,7 @@ class SFC_mig_simulator (object):
             else:
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
 
+        print (model)
         exit ()
         # Make the solution the "current state", for the next time slot  
         
@@ -859,5 +868,5 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = [VERBOSE_RES, VERBOSE_LOG], tree_height = 2, children_per_node=2)
-    my_simulator.simulate ('alg_top')
+    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG], tree_height = 2, children_per_node=2)
+    my_simulator.simulate ('alg_lp')

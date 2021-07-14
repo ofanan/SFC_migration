@@ -140,6 +140,15 @@ class loc2ap_c (object):
         self.joined         = [self.joined[ap][1:]         for ap in range (self.num_of_APs)]
         self.joined_sim_via = [self.joined_sim_via[ap][1:] for ap in range (self.num_of_APs)]
 
+        print ('avg num of vehs that: joined a cell={}  ' .format 
+               (np.average ([np.average(self.joined[ap]) for ap in range(self.num_of_APs)])))
+        print ('left a cell={}' .format 
+               (np.average ([np.average(self.left[ap]) for ap in range(self.num_of_APs)])))
+        print ('joined the simulated area={}' .format 
+               (np.average ([np.average(self.joined_sim_via[ap]) for ap in range(self.num_of_APs)])))
+        print ('left the simulated area={}' .format 
+               (np.average ([np.average(self.left_sim_via[ap]) for ap in range(self.num_of_APs)])))
+
         plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined[ap]) for ap in range(self.num_of_APs)])), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
@@ -476,8 +485,8 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED, VERBOSE_DEBUG])
-    my_loc2ap.time_period_str = '0730_0830'
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_DEMOGRAPHY, VERBOSE_CNT, VERBOSE_SPEED])
+    my_loc2ap.time_period_str = 'short' #0730_0830'
     my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)

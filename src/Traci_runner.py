@@ -15,19 +15,21 @@ VERBOSE_SPEED = 3
 class Traci_runner (object):
 
     # Returns the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
-    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key)) - loc2ap_c.LOWER_LEFT_CORNER
+    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER
 
     # Checks whether the given vehicle is within the simulated area.
     # Input: key of a vehicle.
     # Output: True iff this vehicle is within the simulated area.
-    is_in_simulated_area  = lambda self, position : False if (position[0] < 0 or position[0] > loc2ap_c.MAX_X or position[1] < 0 or position[1] > loc2ap_c.MAX_Y) else True 
+    is_in_simulated_area  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y) else True 
     
     def __init__ (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
+        # 8328 8592
         traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
         veh_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         ids2recycle             = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
         left_in_this_cycle      = []
         self.verbose            = verbose
+        
         
         if (warmup_period > 0):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
@@ -84,9 +86,9 @@ class Traci_runner (object):
                         veh_id = filtered_list[0]['id'] 
                     position = self.get_relative_position (veh_key)
                     if (VERBOSE_SPEED in self.verbose): 
-                        printf (loc_output_file, "({},{},{:.0f},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
+                        printf (loc_output_file, "({},{},{},{},{:.0f})" .format (type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
                     elif (VERBOSE_LOC in self.verbose):
-                        printf (loc_output_file, "({},{},{:.0f},{:.0f})" .format (type, veh_id, position[0], position[1]))
+                        printf (loc_output_file, "({},{},{},{})" .format (type, veh_id, position[0], position[1]))
         
                 sys.stdout.flush()
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)

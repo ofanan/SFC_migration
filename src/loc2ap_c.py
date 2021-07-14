@@ -12,7 +12,7 @@ from printf import printf
 # size of the city's area, in meters. In the simulation we may consider only a part of this large area.
 GLOBAL_MAX_X, GLOBAL_MAX_Y = int(13622), int(11457) 
 MAX_X,        MAX_Y        = GLOBAL_MAX_X//2, GLOBAL_MAX_Y//2  
-LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X/4,   GLOBAL_MAX_Y/4]  )
+LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X//4,   GLOBAL_MAX_Y//4], dtype='int16')
 
 # Verbose levels, defining the outputs produced
 VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
@@ -85,7 +85,7 @@ class loc2ap_c (object):
         x_offset, y_offset = x, y
         x_edge, y_edge = 0.5*self.max_x, 0.5*self.max_y
         for p in range (self.max_power_of_4):
-            ap += 4**(self.max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge)
+            ap += 4**(self.max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) #Y: 5728/2864
             x_offset, y_offset = x_offset % x_edge, y_offset % y_edge   
             x_edge /= 2
             y_edge /= 2
@@ -296,7 +296,7 @@ class loc2ap_c (object):
                 continue
     
             splitted_line = line.split (" ")
-    
+            
             if (splitted_line[0] == "t"): # reached the next simulation time slot
                 if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
@@ -308,7 +308,7 @@ class loc2ap_c (object):
                         self.joined_sim_via[ap].append(0)
                         self.left_sim_via  [ap].append(0)
                 continue
-    
+
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '{}\n' .format (line))
@@ -332,6 +332,12 @@ class loc2ap_c (object):
 
                         usr_id = np.uint16(tuple[veh_id_idx])
                         nxt_ap = self.loc2ap (float(tuple[x_pos_idx]), float(tuple[y_pos_idx]))
+                        if (VERBOSE_DEBUG in self.verbose and nxt_ap not in range(self.num_of_APs)):
+                            print ('Error: t = {} usr={}, nxt_ap={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_aps={} ' .format (self.t, usr_id, nxt_ap, tuple[x_pos_idx], tuple[y_pos_idx], MAX_X, MAX_Y, self.num_of_APs))
+                            print ('Calling loc2ap again for deubgging')
+                            nxt_ap = self.loc2ap (float(tuple[x_pos_idx]), float(tuple[y_pos_idx]))
+                            exit ()
+
                         if (VERBOSE_DEBUG in self.verbose and nxt_ap >= self.num_of_APs):
                             print ('Error at t={}: got ap num {}. usr={}, x={:.0f},y={:.0f}' .format (self.t, nxt_ap, usr_id, tuple[x_pos_idx], tuple[y_pos_idx]))
                             exit ()
@@ -356,8 +362,6 @@ class loc2ap_c (object):
                             self.speed[nxt_ap] = {'speed' : (float(tuple[speed_idx]) + self.speed[nxt_ap]['num of smpls'] * self.speed[nxt_ap]['speed'])/(self.speed[nxt_ap]['num of smpls'] + 1), 
                                                   'num of smpls' : self.speed[nxt_ap]['num of smpls'] + 1}
                             
-                            # print ('self.speed[{}]={}' .format(nxt_ap, self.speed[nxt_ap])) #$$$$
-                                    
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
                 if (VERBOSE_AP in self.verbose):
                     self.print_usrs_ap() # Print the APs of the users 
@@ -465,7 +469,6 @@ class loc2ap_c (object):
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
         for lvl in range (self.max_power_of_4):
             self.tile2ap (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
-            printf (output_file, '\nlevel {}\n******************\n' .format (lvl))
             self.print_as_sq_mat (output_file, self.vec_to_heatmap (avg_num_of_vehs_per_ap))
             reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
             avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
@@ -473,8 +476,8 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED])
-    my_loc2ap.time_period_str = '' #'0730_0740'
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY, VERBOSE_SPEED, VERBOSE_DEBUG])
+    my_loc2ap.time_period_str = '0730_0830'
     my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)

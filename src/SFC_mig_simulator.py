@@ -1,5 +1,6 @@
 # Bugs: 
-# change plp. Possibly use for it a different "usr_c" type.
+# plp has RCs > 30 for s0? 
+# Plp's cost is higher than that of alg_top? probably due to added mig' cost
 import networkx as nx
 import numpy as np
 import math
@@ -39,7 +40,7 @@ class SFC_mig_simulator (object):
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_SSP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)     
+    chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_CLP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)     
     
     # # calculate the migration cost incurred for a usr if located on a given lvl
     calc_mig_cost = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
@@ -104,7 +105,7 @@ class SFC_mig_simulator (object):
     #     Caluclate the cost of setting a decision var, when using the linear prog'
     #     """
     #     # consider the BW and CPU cost
-    #     cost = self.link_cost_of_SSP_at_lvl[decision_var.lvl] + self.CPU_cost_at_lvl[decision_var.lvl] * decision_var.usr.B[decision_var.lvl] 
+    #     cost = self.link_cost_of_CLP_at_lvl[decision_var.lvl] + self.CPU_cost_at_lvl[decision_var.lvl] * decision_var.usr.B[decision_var.lvl] 
     #
     #     # Add the mig cost
     #     list_of_cur_st_param = list(filter (lambda cur_st : cur_st.usr==decision_var.usr and cur_st.s == decision_var.s, self.cur_state))
@@ -116,11 +117,17 @@ class SFC_mig_simulator (object):
         This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
         """
         # First, calculate the mig' costs
-        frac_of_chain_that_migrates = 1 #Assume that the whole chain is gonna mig'
-        list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s == usr.S_u[lvl], self.cur_st_params))
-        if (len (list_of_relevant_cur_st_params)) > 0: # there's currently at least some fraction of the chain on the suggested destination
-            frac_of_chain_that_migrates -= list_of_relevant_cur_st_params[0].cur_st 
-        return frac_of_chain_that_migrates * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_SSP_at_lvl[lvl]
+        # frac_of_chain_that_migrates = 1 #Assume that the whole chain is gonna mig'
+        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
+        # if (len (list_of_relevant_cur_st_params)) > 0: # there's currently at least some fraction of the chain on the suggested destination
+        #     frac_of_chain_that_migrates -= list_of_relevant_cur_st_params[0].cur_st 
+        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
+        # frac_of_chain_that_migrates = sum (np.array [param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] )
+        
+        # list_of_relevant_cur_st_params = list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))
+        # frac_of_chain_that_migrates = sum (np.array ([param.cur_st for param in 
+        #                                               list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))] ))
+        return sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) #* self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
          
     def solve_by_plp (self):
         """
@@ -315,7 +322,7 @@ class SFC_mig_simulator (object):
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
-        slack = [usr.target_delay - self.link_delay_of_SSP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
+        slack = [usr.target_delay - self.link_delay_of_CLP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
         slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
         usr.B = [] # usr.B will hold a list of the budgets required for placing u on each level 
         mu = np.array ([math.floor(usr.theta_times_lambda[i]) + 1 for i in range (len(usr.theta_times_lambda))]) # minimal feasible budget
@@ -345,14 +352,16 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.cpu_cap_at_lvl    = np.array ([1000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+        self.cpu_cap_at_lvl    = np.array ([10 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+        if (self.ap_file_name != 'shorter.ap'):
+            self.cpu_cap_at_lvl *= 100
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
-        self.link_cost_of_SSP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
-        self.link_delay_of_SSP_at_lvl = [2 * sum([self.link_delay_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
+        self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
+        self.link_delay_of_CLP_at_lvl = [2 * sum([self.link_delay_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
         
         self.G = self.G.to_directed()
 
@@ -374,7 +383,7 @@ class SFC_mig_simulator (object):
                     self.G.nodes[shortest_path[s][root][lvl]]['a']         = self.cpu_cap_at_lvl[lvl] # initially, there is no rsrc augmentation, and the available capacity of each server is exactly its CPU capacity.
                     # # The lines below are for case one likes to vary the link and cpu costs of distinct servers on the same level. 
                     # self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
-                    # self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_SSP_at_lvl[lvl]
+                    # self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_CLP_at_lvl[lvl]
                     # # Iterate over all children of node i
                     # for n in self.G.neighbors(i):
                     #     if (n > i):
@@ -850,5 +859,5 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'short_0.ap', verbose = [VERBOSE_RES, VERBOSE_LOG], tree_height = 3, children_per_node=4)
-    my_simulator.simulate ('alg_lp')
+    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = [VERBOSE_RES, VERBOSE_LOG], tree_height = 2, children_per_node=2)
+    my_simulator.simulate ('alg_top')

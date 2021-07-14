@@ -1,6 +1,3 @@
-# Bugs: 
-# plp has RCs > 30 for s0? 
-# Plp's cost is higher than that of alg_top? probably due to added mig' cost
 import networkx as nx
 import numpy as np
 import math
@@ -125,6 +122,8 @@ class SFC_mig_simulator (object):
         printf (self.log_output_file, 'Starting LP\n')
         model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize)
         self.d_vars  = [] # decision variables  
+        printf (self.log_output_file, 't = {}. params = {}. d_vars = {}\n' .format (self.t, self.cur_st_params, self.d_vars)) #$$$
+
         obj_func     = [] # objective function
         id           = 0  # cntr for the id of the decision variables 
         for usr in self.usrs:
@@ -151,21 +150,14 @@ class SFC_mig_simulator (object):
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
         
         if (VERBOSE_RES in self.verbose):
-            printf (self.res_output_file, 't{}\n' .format(self.t)) 
-            printf (self.res_output_file, 'plp.stts{} \n' .format(model.status)) 
             printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
-                                                                            #plp.LpStatus[model.status]))
-        if (VERBOSE_LOG in self.verbose): 
             if (model.status == 1): # successfully solved
                 self.print_lp_sol_to_log ()
             else:
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
 
-        exit ()
-        # Make the solution the "current state", for the next time slot  
-        
     def print_cost_per_usr (self):
         """
         For debugging / analysis:
@@ -500,14 +492,10 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line_lp (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
-            if (VERBOSE_DEBUG in self.verbose and (len(self.usrs)==0)):
-                print ('Error: there are no usrs')
-                exit ()
-            self.set_last_time()
-            self.solve_by_plp () 
-            self.print_sol_to_res_and_log ()
-            exit () #$$$
-            
+                self.set_last_time()
+                self.solve_by_plp () 
+                self.cur_st_params = self.d_vars
+                    
     def simulate_alg_top (self):
         """
         Simulate the whole simulation, using our algorithm, alg_top.
@@ -848,6 +836,12 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
+    # gamad = [1, 2, 3, 4]
+    # nanas = gamad
+    # print (nanas)
+    # print (gamad)
+    # print (nanas)
+    # exit ()
     t = time.time()
     my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG], tree_height = 2, children_per_node=2)
     my_simulator.simulate ('alg_lp')

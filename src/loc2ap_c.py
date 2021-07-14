@@ -113,7 +113,6 @@ class loc2ap_c (object):
         """
         for ap in range(self.num_of_APs): 
             self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
-
     
     def print_demography (self):
         """
@@ -172,7 +171,7 @@ class loc2ap_c (object):
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('avg num of cars that left the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_left_sim_via.jpg')
-
+        
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
         Read the number of vehicles at each cell, as written in the input files. 
@@ -215,7 +214,7 @@ class loc2ap_c (object):
         # Hence, need to swap the matrix upside-down
         return self.invert_mat_bottom_up(heatmap_val)
 
-    def plot_num_of_vehs_per_ap_heatmap (self):
+    def plot_num_of_vehs_heatmap (self):
         """
         Plot a heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
         """
@@ -260,7 +259,7 @@ class loc2ap_c (object):
             print ('Sorry, the level of 4 you chose is still unsupported by tile2ap')
             exit ()
 
-    def plot_num_of_vehs_per_ap (self):    
+    def plot_num_of_vehs_per_ap_graph (self):    
         """
         Plot for each ap the number of vehicles associated with it along the trace.
         """
@@ -390,7 +389,8 @@ class loc2ap_c (object):
         if (VERBOSE_AP in self.verbose):
             printf(self.ap_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
-            self.plot_num_of_vehs_per_ap ()
+            self.plot_num_of_vehs_per_ap_graph ()
+            self.plot_num_of_vehs_heatmap()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
@@ -486,17 +486,17 @@ if __name__ == '__main__':
 
     max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_DEMOGRAPHY, VERBOSE_CNT, VERBOSE_SPEED])
-    my_loc2ap.time_period_str = 'short' #0730_0830'
+    my_loc2ap.time_period_str = '0730_0830'
     my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
-    # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = VERBOSE_POST_PROCESSING)
+    # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
-    # my_loc2ap.rd_num_of_vehs_per_ap  (input_file_name)
+    # my_loc2ap.rd_num_of_vehs_per_ap  ('num_of_vehs_per_ap_64aps.txt')
     # # my_loc2ap.print_num_of_vehs_diffs ()
     # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
-    # # my_loc2ap.plot_num_of_vehs_per_ap ()
+    # # my_loc2ap.plot_num_of_vehs_per_ap_graph ()
     # my_loc2ap.print_num_of_vehs_per_server (output_file_name)
-    # my_loc2ap.plot_num_of_vehs_per_ap_heatmap ()
+    # my_loc2ap.plot_num_of_vehs_heatmap ()
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

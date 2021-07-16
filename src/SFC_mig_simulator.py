@@ -143,7 +143,7 @@ class SFC_mig_simulator (object):
                 self.print_lp_sol_to_log ()
         else:
             printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
-            print  ('Running the LP failed. status={}\n' .format(plp.LpStatus[model.status]))
+            print  ('Running the LP failed. status={}' .format(plp.LpStatus[model.status]))
             exit ()
 
     def print_cost_per_usr (self):
@@ -320,8 +320,8 @@ class SFC_mig_simulator (object):
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
-        self.cpu_cap_at_lvl    = np.array ([30    * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
-                                 np.array ([1000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+        self.cpu_cap_at_lvl    = np.array ([30  * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
+                                 np.array ([702 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -382,7 +382,7 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4):
+    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4, run_to_calc_rsrc_aug=False):
         """
         """
         
@@ -392,6 +392,7 @@ class SFC_mig_simulator (object):
         # Network parameters
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
+        self.run_to_calc_rsrc_aug       = run_to_calc_rsrc_aug
         self.uniform_mig_cost           = 1
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -559,7 +560,7 @@ class SFC_mig_simulator (object):
         """
         self.rst_sol() # dis-allocate all users
         self.CPUAll(self.usrs) 
-        max_R = self.calc_upr_bnd_rsrc_aug () 
+        max_R = 16 if self.run_to_calc_rsrc_aug else self.calc_upr_bnd_rsrc_aug ()   
         
         # init cur RCs and a(s) to the number of available CPU in each server, assuming maximal rsrc aug' 
         for s in self.G.nodes():
@@ -606,7 +607,7 @@ class SFC_mig_simulator (object):
         Our top-level alg'
         """
         if (VERBOSE_LOG in self.verbose):
-            printf (self.log_output_file, 'beginning alg top\n')
+            printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         
         if (not(self.bottom_up())):
@@ -623,7 +624,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up\n')
             self.print_sol_to_log()
-        printf (self.log_output_file, 'finished alg top\n')
+            printf (self.log_output_file, 'finished alg top\n')
 
     def bottom_up (self):
         """
@@ -812,7 +813,6 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['Hs'].remove (usr) 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
             
-    
     def inc_array (self, ar, min_val, max_val):
         """
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
@@ -829,9 +829,11 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    ap_file_name = 'short_0.ap'
-    my_simulator = SFC_mig_simulator (ap_file_name      = ap_file_name, 
-                                      verbose           = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_DEBUG], 
-                                      tree_height       = 2 if ap_file_name=='shorter.ap' else 3, 
-                                      children_per_node = 2 if ap_file_name=='shorter.ap' else 4)
-    my_simulator.simulate ('alg_lp')
+    ap_file_name = 'vehicles_n_speed_0730.ap'
+    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                      verbose               = [VERBOSE_RES, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
+                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                      run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  
+                                      )
+    my_simulator.simulate ('alg_top')

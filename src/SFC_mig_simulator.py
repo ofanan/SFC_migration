@@ -101,19 +101,6 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['a'] = self.G.nodes[s]['RCs']
         # print ('in rst sol: RCS={}, a={}' .format (self.G.nodes[0]['RCs'], self.G.nodes[0]['a']))
 
-
-    # def calc_decision_var_cost (self):
-    #     """
-    #     Not complete yet.
-    #     Caluclate the cost of setting a decision var, when using the linear prog'
-    #     """
-    #     # consider the BW and CPU cost
-    #     cost = self.link_cost_of_CLP_at_lvl[decision_var.lvl] + self.CPU_cost_at_lvl[decision_var.lvl] * decision_var.usr.B[decision_var.lvl] 
-    #
-    #     # Add the mig cost
-    #     list_of_cur_st_param = list(filter (lambda cur_st : cur_st.usr==decision_var.usr and cur_st.s == decision_var.s, self.cur_state))
-    #     cost += self.uniform_mig_cost * len (usr.theta_times_lambda) * list_of_cur_st_param[0].value 
-
     def solve_by_plp (self):
         """
         Find an optimal fractional solution using Python's pulp LP library.
@@ -144,17 +131,20 @@ class SFC_mig_simulator (object):
             if (cpu_cap_const != []):
                 model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
 
-        # solve using another solver: solve(GLPK(msg = 0))
-        model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output
+        model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output # to solve it using another solver: solve(GLPK(msg = 0))
         
         if (VERBOSE_RES in self.verbose):
-            printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
-        if (VERBOSE_LOG in self.verbose):
+            printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value()))
+        sol_status = plp.LpStatus[model.status] 
+        if (VERBOSE_LOG in self.verbose):            
             printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
-            if (model.status == 1): # successfully solved
+        if (model.status == 1): # successfully solved
+            if (VERBOSE_LOG in self.verbose):            
                 self.print_lp_sol_to_log ()
-            else:
-                printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
+        else:
+            printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
+            print  ('Running the LP failed. status={}\n' .format(plp.LpStatus[model.status]))
+            exit ()
 
     def print_cost_per_usr (self):
         """
@@ -165,18 +155,6 @@ class SFC_mig_simulator (object):
             chain_cost = self.chain_cost_homo (usr, usr.lvl)  
             print ('cost of usr {} = {}' .format (u, chain_cost))
         
-    # def init_output_file (self, file_name, overwrite=False):
-    #     """
-    #     Open an output file for writing, overwriting previous content in that file. 
-    #     Input: output file name.
-    #     Output: file descriptor.  
-    #     """
-    #     if (overwrite):
-    #         with open('../res/' + file_name, 'w') as FD:
-    #             FD.write('')                
-    #     FD  = open ('../res/' + file_name,  "w")
-    #     return FD
-
     def init_res_file (self):
         """
         Open the res file for writing.
@@ -190,7 +168,7 @@ class SFC_mig_simulator (object):
         """
         self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + ('detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
-        printf (self.log_output_file, '//RCs = augmented capacity of server s. a=available capacity. C_s = non-augmented capacity of s.\n' )
+        printf (self.log_output_file, '//RCs = augmented capacity of server s\n' )
 
     def print_sol_to_res (self):
         """
@@ -204,10 +182,8 @@ class SFC_mig_simulator (object):
 
     def print_lp_sol_to_log (self):
         """
-        print a lp fractional solution for the problem to the output log file 
+        print a lp fractional solution to the output log file 
         """
-        # for usr in self.usrs:
-        #     for decision_var in list (filter (lambda decision_var : decision_var.usr == usr and decision_var, self.decision_vars)): # list_of_relevant_decision_vars =
         for s in self.G.nodes():
             printf (self.log_output_file, 's{} RCs={} used cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.lp_used_cpu_in (s) ))
 
@@ -219,7 +195,7 @@ class SFC_mig_simulator (object):
 
     def print_sol_to_log (self):
         """
-        print a detailed solution for the mig' problem to the output log file 
+        print the solution found by alg' for the mig' problem to the output log file 
         """
         printf (self.log_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
             self.t, 
@@ -244,11 +220,11 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, '\n')
 
         if (VERBOSE_DEBUG in self.verbose): 
-            self.check_cpu_usage_all_srvrs ()
+            self.check_cpu_usage_all_srvrs () #Checks for all servers whether the allocated cpu + the available cpu = the total cpu. 
             
     def check_cpu_usage_all_srvrs (self):
         """
-        Used for debug. Checks for all cells whether the allocated cpu + the available cpu = the total cpu.
+        Used for debug. Checks for all servers whether the allocated cpu + the available cpu = the total cpu.
         """
         for s in self.G.nodes():
             self.check_cpu_usage_single_srvr (s)
@@ -345,7 +321,7 @@ class SFC_mig_simulator (object):
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.cpu_cap_at_lvl    = np.array ([30    * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
-                                 np.array ([10000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+                                 np.array ([1000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -356,7 +332,7 @@ class SFC_mig_simulator (object):
         shortest_path = nx.shortest_path(self.G)
 
         # levelize the tree (assuming a balanced tree)
-        self.ap2s             = []  
+        self.ap2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server.
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         for s in self.G.nodes(): # for every server
@@ -422,7 +398,7 @@ class SFC_mig_simulator (object):
         self.uniform_link_cost          = 1
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
-        self.uniform_target_delay       = 10 #[ms]
+        self.uniform_target_delay       = 20 #[ms]
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
@@ -433,15 +409,22 @@ class SFC_mig_simulator (object):
         if (VERBOSE_DEBUG in self.verbose):
             self.debug_file = open ('../res/debug.txt', 'w') 
 
-        self.gen_parameterized_tree ()
+        self.gen_parameterized_tree  ()
+        self.delay_const_sanity_check()
 
-        # Sanity check for the usr parameters' feasibility
+    def delay_const_sanity_check (self):
+        """
+        Sanity check for the usr parameters' feasibility.
+        """
         usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, C_u=self.uniform_Cu)
         self.CPUAll_single_usr (usr) 
         if (len(usr.B)==0):
             print ('Error: cannot satisfy delay constraints of usr {}, even on a leaf. theta_times_lambda={}, target_delay ={}' .format (
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()
+        if (self.link_delay_of_CLP_at_lvl[-1] > self.uniform_target_delay):
+            print ('Error: the network delay at the root > target delay. Hence, no user can use the root server.')
+            exit ()     
 
     def simulate (self, alg):
         """
@@ -642,19 +625,9 @@ class SFC_mig_simulator (object):
             self.print_sol_to_log()
         printf (self.log_output_file, 'finished alg top\n')
 
-    # def update_available_cpu_by_sol (self):
-    #     """
-    #     Currently unused.
-    #     Update the available capacity at each server to: 
-    #     the (possibly augmented) CPU capacity at this server - the total CPU assigned to users by the solution.
-    #     NOTE: this function assumes that every user is already exclusively located in its "nxt_s" location! 
-    #     """
-    #     for s in self.G.nodes():
-    #         self.G.nodes[s]['a'] = self.G.nodes[s]['RCs'] - sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s == s])                
-   
     def bottom_up (self):
         """
-        Bottom-up alg'. 
+        Our bottom-up alg'. 
         Assigns all self.usrs that weren't assigned yet (either new usrs, or old usrs that moved, and now they don't satisfy the target delay).
         Looks for a feasible sol'.
         Returns true iff a feasible sol was found

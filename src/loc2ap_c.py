@@ -139,13 +139,13 @@ class loc2ap_c (object):
         self.joined         = [self.joined[ap][1:]         for ap in range (self.num_of_APs)]
         self.joined_sim_via = [self.joined_sim_via[ap][1:] for ap in range (self.num_of_APs)]
 
-        print ('avg num of vehs that: joined a cell={}  ' .format 
+        print ('avg num of vehs that: joined a cell={:.2f}  ' .format 
                (np.average ([np.average(self.joined[ap]) for ap in range(self.num_of_APs)])))
-        print ('left a cell={}' .format 
+        print ('left a cell={:.2f}' .format 
                (np.average ([np.average(self.left[ap]) for ap in range(self.num_of_APs)])))
-        print ('joined the simulated area={}' .format 
+        print ('joined the simulated area={:.2f}' .format 
                (np.average ([np.average(self.joined_sim_via[ap]) for ap in range(self.num_of_APs)])))
-        print ('left the simulated area={}' .format 
+        print ('left the simulated area={:.2f}' .format 
                (np.average ([np.average(self.left_sim_via[ap]) for ap in range(self.num_of_APs)])))
 
         plt.figure()
@@ -477,6 +477,7 @@ class loc2ap_c (object):
         printf (output_file, 'avg num of cars per server\n')
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
         for lvl in range (self.max_power_of_4):
+            printf (output_file, '\nlvl {}\n********************************\n' .format(lvl))
             self.tile2ap (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
             self.print_as_sq_mat (output_file, self.vec_to_heatmap (avg_num_of_vehs_per_ap))
             reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
@@ -485,17 +486,17 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_DEMOGRAPHY, VERBOSE_CNT, VERBOSE_SPEED])
-    my_loc2ap.time_period_str = '0730_0830'
-    my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
+    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_DEMOGRAPHY, VERBOSE_CNT, VERBOSE_SPEED])
+    # my_loc2ap.time_period_str = '0730_0830'
+    # my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
-    # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
-    # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
-    # my_loc2ap.rd_num_of_vehs_per_ap  ('num_of_vehs_per_ap_64aps.txt')
+    my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
+    input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
+    my_loc2ap.rd_num_of_vehs_per_ap  ('num_of_vehs_per_ap_64aps.txt')
     # # my_loc2ap.print_num_of_vehs_diffs ()
-    # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
+    output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
     # # my_loc2ap.plot_num_of_vehs_per_ap_graph ()
-    # my_loc2ap.print_num_of_vehs_per_server (output_file_name)
+    my_loc2ap.print_num_of_vehs_per_server (output_file_name)
     # my_loc2ap.plot_num_of_vehs_heatmap ()
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 

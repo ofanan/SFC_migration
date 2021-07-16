@@ -119,10 +119,8 @@ class SFC_mig_simulator (object):
         Find an optimal fractional solution using Python's pulp LP library.
         pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
         """
-        printf (self.log_output_file, 'Starting LP\n')
         model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize)
         self.d_vars  = [] # decision variables  
-        printf (self.log_output_file, 't = {}. params = {}. d_vars = {}\n' .format (self.t, self.cur_st_params, self.d_vars)) #$$$
 
         obj_func     = [] # objective function
         id           = 0  # cntr for the id of the decision variables 
@@ -190,7 +188,7 @@ class SFC_mig_simulator (object):
         """
         Open the log file for writing and write initial comments lines on it
         """
-        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.log'  
+        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + ('detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s. a=available capacity. C_s = non-augmented capacity of s.\n' )
 
@@ -211,7 +209,7 @@ class SFC_mig_simulator (object):
         # for usr in self.usrs:
         #     for decision_var in list (filter (lambda decision_var : decision_var.usr == usr and decision_var, self.decision_vars)): # list_of_relevant_decision_vars =
         for s in self.G.nodes():
-            printf (self.log_output_file, 's{} RCs={} used_cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.lp_used_cpu_in (s) ))
+            printf (self.log_output_file, 's{} RCs={} used cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.lp_used_cpu_in (s) ))
 
         if (VERBOSE_ADD_LOG in self.verbose): 
             for d_var in self.d_vars: 
@@ -230,14 +228,23 @@ class SFC_mig_simulator (object):
         
         for s in self.G.nodes():
             used_cpu_in_s = self.used_cpu_in (s)
-            printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}\t chains {}\n' .format (
-                    s,
-                    self.G.nodes[s]['RCs'],
-                    self.G.nodes[s]['a'],
-                    used_cpu_in_s,
-                    self.G.nodes[s]['cpu cap'],
-                    [usr.id for usr in self.usrs if usr.nxt_s==s]))
-            self.check_cpu_usage_single_srvr(s)
+            chains_in_s   = [usr.id for usr in self.usrs if usr.nxt_s==s]
+            if (used_cpu_in_s > 0): 
+                printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}, num_of_chains={}' .format (
+                        s,
+                        self.G.nodes[s]['RCs'],
+                        self.G.nodes[s]['a'],
+                        used_cpu_in_s,
+                        self.G.nodes[s]['cpu cap'],
+                        len (chains_in_s),                       
+                        ))
+                if (VERBOSE_ADD_LOG in self.verbose): 
+                    printf (self.log_output_file, '\t chains {}\n' .format (chains_in_s))
+                else: 
+                    printf (self.log_output_file, '\n')
+
+        if (VERBOSE_DEBUG in self.verbose): 
+            self.check_cpu_usage_all_srvrs ()
             
     def check_cpu_usage_all_srvrs (self):
         """
@@ -334,12 +341,11 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.cpu_cap_at_lvl    = np.array ([10 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
-        if (self.ap_file_name != 'shorter.ap'):
-            self.cpu_cap_at_lvl *= 100
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
-        self.link_delay_at_lvl = np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
+        self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
+        self.cpu_cap_at_lvl    = np.array ([30    * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
+                                 np.array ([10000 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -405,7 +411,6 @@ class SFC_mig_simulator (object):
         """
         
         # verbose and debug      
-        self.debug                      = False 
         self.verbose                    = verbose
         
         # Network parameters
@@ -415,9 +420,9 @@ class SFC_mig_simulator (object):
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 1
-        self.uniform_theta_times_lambda = [1, 1, 1]
-        self.uniform_Cu                 = 15 
-        self.uniform_target_delay       = 20
+        self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
+        self.uniform_Cu                 = 20 
+        self.uniform_target_delay       = 10 #[ms]
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
@@ -425,7 +430,18 @@ class SFC_mig_simulator (object):
         # Init output files
         if (VERBOSE_RES in self.verbose):
             self.init_res_file() 
+        if (VERBOSE_DEBUG in self.verbose):
+            self.debug_file = open ('../res/debug.txt', 'w') 
+
         self.gen_parameterized_tree ()
+
+        # Sanity check for the usr parameters' feasibility
+        usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, C_u=self.uniform_Cu)
+        self.CPUAll_single_usr (usr) 
+        if (len(usr.B)==0):
+            print ('Error: cannot satisfy delay constraints of usr {}, even on a leaf. theta_times_lambda={}, target_delay ={}' .format (
+                    usr.id, usr.theta_times_lambda, usr.target_delay))
+            exit ()
 
     def simulate (self, alg):
         """
@@ -477,14 +493,12 @@ class SFC_mig_simulator (object):
             if (splitted_line[0] == "t"):
                 self.t = int(splitted_line[2])
                 if (VERBOSE_LOG in self.verbose):
-                    printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+                    printf (self.log_output_file, '\n\ntime = {}\n**************************************\n' .format (self.t))
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
         
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
-        
-                    self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
                     self.usrs.remove  (usr)                    
                 continue
         
@@ -547,6 +561,10 @@ class SFC_mig_simulator (object):
                 self.rd_old_usrs_line (splitted_line[1:])                
                 self.set_last_time()
                 self.alg_top()
+                if (VERBOSE_DEBUG in self.verbose): 
+                    for usr in self.usrs:
+                        if (usr.lvl==-1):
+                            printf (self.debug_file, 'Error: t={} usr {} is not located\n' .format (self.t, usr.id))
                 self.print_sol_to_res_and_log ()
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                      usr.cur_s = usr.nxt_s        
@@ -593,8 +611,9 @@ class SFC_mig_simulator (object):
             if (self.bottom_up()):
                 if (VERBOSE_ADD_LOG in self.verbose): 
                     printf (self.log_output_file, 'In bottom-up IF\n')
-                    self.check_cpu_usage_all_srvrs()
                     self.print_sol_to_log()
+                    if (VERBOSE_DEBUG in self.verbose):
+                        self.check_cpu_usage_all_srvrs()
                 ub = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])        
             else:
                 lb = np.array([self.G.nodes[s]['RCs'] for s in self.G.nodes()])
@@ -606,6 +625,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 'beginning alg top\n')
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
+        
         if (not(self.bottom_up())):
             if (VERBOSE_LOG in self.verbose):
                 printf (self.log_output_file, 'By binary search:\n')
@@ -669,7 +689,7 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             tuple   = tuple[1].split (',')
     
-            usr = usr_lp_c (id = int(tuple[0])) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
+            usr = usr_lp_c (id = int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
             AP_id = int(tuple[1])
@@ -701,9 +721,10 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             tuple   = tuple[1].split (',')
             
-            usr = usr_c (id = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
-                         theta_times_lambda=self.uniform_theta_times_lambda,
-                         C_u = 10)
+            usr = usr_c (id                 = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
+                         theta_times_lambda = self.uniform_theta_times_lambda,
+                         target_delay       = self.uniform_target_delay,
+                         C_u                = self.uniform_Cu)
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
             AP_id = int(tuple[1])
@@ -751,25 +772,26 @@ class SFC_mig_simulator (object):
                     print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
                     self.warned_about_too_large_ap = True
                     exit ()
-            self.CPUAll_single_usr (usr)
+            self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
 
             # Add this usr to the Hs of every server to which it belongs at its new location
             s       = self.ap2s[AP_id]
             usr.S_u = [s]
-            self.G.nodes[s]['Hs'].add(usr)
             for lvl in (range (len(usr.B)-1)):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
-                self.G.nodes[s]['Hs'].add(usr)                               
     
-            if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget 
+            if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget
                 continue
-            # Free the resources of this user in its old, current place
-            self.rmv_usr_rsrcs (usr)            
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
-            # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU 
+            # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
+            self.rmv_usr_rsrcs (usr) # Free the resources of this user in its current place            
             usr.lvl   = -1
             usr.nxt_s = -1
+
+            # Add the usr to the 'Hs' (set of relevant usrs) at each of its delay-feasible servers
+            for s in usr.S_u:
+                self.G.nodes[s]['Hs'].add(usr)                               
 
     def rd_old_usrs_line_lp (self, line):
         """
@@ -808,9 +830,6 @@ class SFC_mig_simulator (object):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
     
-            # Free the resources of this user in its old, current place
-            self.rmv_usr_rsrcs (usr)            
-
     def rmv_usr_rsrcs (self, usr):
         """
         Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
@@ -836,12 +855,10 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
-    # gamad = [1, 2, 3, 4]
-    # nanas = gamad
-    # print (nanas)
-    # print (gamad)
-    # print (nanas)
-    # exit ()
     t = time.time()
-    my_simulator = SFC_mig_simulator (ap_file_name = 'shorter.ap', verbose = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG], tree_height = 2, children_per_node=2)
+    ap_file_name = 'short_0.ap'
+    my_simulator = SFC_mig_simulator (ap_file_name      = ap_file_name, 
+                                      verbose           = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_DEBUG], 
+                                      tree_height       = 2 if ap_file_name=='shorter.ap' else 3, 
+                                      children_per_node = 2 if ap_file_name=='shorter.ap' else 4)
     my_simulator.simulate ('alg_lp')

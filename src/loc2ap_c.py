@@ -241,7 +241,7 @@ class loc2ap_c (object):
         if (lvl == 0):
             power = lvl
             n = int(math.sqrt (self.num_of_APs/4**power))
-            self.tile_to_ap       = np.empty (n**2, dtype = 'uint8')
+            self.tile_to_ap   = np.empty (n**2, dtype = 'uint8')
             offset_x          = self.max_x // (2*n)        
             offset_y          = self.max_y // (2*n)        
             ap                = 0

@@ -20,7 +20,7 @@ VERBOSE_DEBUG    = 0
 VERBOSE_RES      = 1 # Write to a file the total cost and rsrc aug. upon every event
 VERBOSE_LOG      = 2 # Write to a ".log" file
 VERBOSE_ADD_LOG  = 3 # Write to a detailed ".log" file
-VERBOSE_LVL_MOB  = 5
+VERBOSE_MOB      = 4 # Write data about the mobility of usrs, and about the num of migrated chains per cycle
 
 class SFC_mig_simulator (object):
     """
@@ -75,12 +75,20 @@ class SFC_mig_simulator (object):
      
     def print_sol_to_res_and_log (self):
         """
-        Print to the res and/or log files the solution and/or additional info.
+        Print to the res, log, and debug files the solution and/or additional info.
         """
+        if (VERBOSE_DEBUG in self.verbose): 
+            for usr in self.usrs:
+                if (usr.lvl==-1):
+                    printf (self.debug_file, 'Error: t={} usr {} is not located\n' .format (self.t, usr.id))
         if (VERBOSE_RES in self.verbose):
             self.print_sol_to_res()
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+        if (VERBOSE_MOB in self.verbose):
+            for usr in list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)): # for every usr that migrated
+                self.mig_from_to_lvl[self.G.nodes[usr.cur_s]['lvl']] [self.G.nodes[usr.nxt_s]['lvl']] += 1
+            
      
     def calc_rsrc_aug (self):
         """
@@ -135,10 +143,10 @@ class SFC_mig_simulator (object):
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output # to solve it using another solver: solve(GLPK(msg = 0))
         
         if (VERBOSE_RES in self.verbose):
-            printf (self.res_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value()))
+            printf (self.res_output_file, 't{}.lp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value()))
         sol_status = plp.LpStatus[model.status] 
         if (VERBOSE_LOG in self.verbose):            
-            printf (self.log_output_file, 't{}.plp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+            printf (self.log_output_file, 't{}.lp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_lp_sol_to_log ()
@@ -167,7 +175,7 @@ class SFC_mig_simulator (object):
         """
         Open the log file for writing and write initial comments lines on it
         """
-        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + ('detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
+        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + ('.detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s\n' )
 
@@ -217,9 +225,10 @@ class SFC_mig_simulator (object):
                         ))
                 if (VERBOSE_ADD_LOG in self.verbose): 
                     printf (self.log_output_file, '\t chains {}\n' .format (chains_in_s))
+                if (VERBOSE_ADD_LOG in self.verbose and used_cpu_in_s > 0): 
+                    printf (self.log_output_file, '\t chains {}\n' .format (chains_in_s))
                 else: 
                     printf (self.log_output_file, '\n')
-
         if (VERBOSE_DEBUG in self.verbose): 
             self.check_cpu_usage_all_srvrs () #Checks for all servers whether the allocated cpu + the available cpu = the total cpu. 
             
@@ -405,16 +414,15 @@ class SFC_mig_simulator (object):
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
         
-        # Open input and output files
-        self.ap_file = open ("../res/" + self.ap_file_name, "r")  
+        # Init output files
         if (VERBOSE_RES in self.verbose):
             self.init_res_file() 
         if (VERBOSE_DEBUG in self.verbose):
             self.debug_file = open ('../res/debug.txt', 'w') 
-        if (VERBOSE_LVL_MOB in self.verbose):
-            self.lvl_mob_file = open ('../res/lvl_mob.txt', 'w')
-            self.num_of_migs_from_lvl_to_lvl = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int')
-            
+        if (VERBOSE_MOB in self.verbose):
+            self.mig_from_to_lvl = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int')
+            self.num_of_moves     = int(0)
+
         self.gen_parameterized_tree  ()
         self.delay_const_sanity_check()
 
@@ -429,32 +437,27 @@ class SFC_mig_simulator (object):
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()
         if (self.link_delay_of_CLP_at_lvl[-1] > self.uniform_target_delay):
-            print ('Error: the network delay at the root > target delay. Hence, no user can use the root server.')
-            exit ()
-            
+            print ('**** Warning: the network delay at the root > target delay. Hence, no user can use the root server. ****')
+            if (self.ap_file_name not in ['shorter.ap', 'short_0.ap', 'short_1.ap']):
+                exit ()     
+
     def simulate (self, alg):
         """
         Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
         """
-        self.alg = alg
+        self.alg        = alg
+        self.is_first_t = True # Will indicate that this is the first simulated time slot
+        if (VERBOSE_LOG in self.verbose):
+            self.init_log_file()
+             
         print ('Simulating {}. num of leaves = {}. ap file = {}' .format (self.alg, self.num_of_leaves, self.ap_file_name))
         if (self.alg == 'alg_top'):
-            self.simulate_alg_top()
+            self.simulate_algs()
         elif (self.alg == 'alg_lp'):
             self.simulate_lp ();
         else:
             print ('Sorry, alg {} is not implemented yet')
             exit ()
-    
-        if (VERBOSE_LVL_MOB in self.verbose):
-            printf (self.lvl_mob_file, '// results for running alg {} on input file {} \n' .format (self.alg, self.ap_file_name))
-            printf (self.lvl_mob_file, '// results for running alg {} on input file {} with {} leaves\n' .format (self.alg, self.ap_file_name, self.num_of_leaves))
-            printf (self.lvl_mob_file, '// total num of migs = {}\n' .format (np.sum(self.num_of_migs_from_lvl_to_lvl)))
-            printf (self.lvl_mob_file, '// index i,j in the matrix below represents the total num of migs from lvl i to lvl j\n\n')
-            for src_lvl in range(self.tree_height+1): 
-                for dst_lvl in range(self.tree_height+1):
-                    printf (self.lvl_mob_file, '{}\t' .format (self.num_of_migs_from_lvl_to_lvl[src_lvl][dst_lvl]))
-                printf (self.lvl_mob_file, '\n') 
     
     def simulate_lp (self):
         """
@@ -475,6 +478,10 @@ class SFC_mig_simulator (object):
         
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
+        # Open input and output files
+        self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
+        if (VERBOSE_RES in self.verbose):
+            self.init_log_file()
                     
         for line in self.ap_file: 
         
@@ -486,9 +493,7 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
         
             if (splitted_line[0] == "t"):
-                self.t = int(splitted_line[2])
-                if (VERBOSE_LOG in self.verbose):
-                    printf (self.log_output_file, '\n\ntime = {}\n**************************************\n' .format (self.t))
+                self.rd_line_t (splitted_line[2])
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
@@ -505,22 +510,34 @@ class SFC_mig_simulator (object):
                 self.solve_by_plp () 
                 self.cur_st_params = self.d_vars
                     
-    def simulate_alg_top (self):
+    def rd_line_t (self, time_str):
         """
-        Simulate the whole simulation, using our algorithm, alg_top.
+        read the line describing a new time slot in the input file. Init some variables accordingly.
+        """ 
+        self.t = int(time_str)
+        if (self.is_first_t):
+            self.init_t     = self.t
+            self.is_first_t = False
+        if (VERBOSE_LOG in self.verbose):
+            printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+                    
+    def simulate_algs (self):
+        """
+        Simulate the whole simulation, using an algorithm (rather than a LP solver).
         At each time step:
         - Read and parse from an input ".ap" file the AP cells of each user who moved. 
         - solve the problem using alg_top (our alg). 
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
         """
-             
         # reset Hs and RCs       
         for s in self.G.nodes():
             self.G.nodes[s]['Hs']  = set() 
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
 
-        if (VERBOSE_LOG in self.verbose):
+        # Open input and output files
+        self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
+        if (VERBOSE_RES in self.verbose):
             self.init_log_file()
             
         for line in self.ap_file: 
@@ -533,9 +550,7 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
 
             if (splitted_line[0] == "t"):
-                self.t = int(splitted_line[2])
-                if (VERBOSE_LOG in self.verbose):
-                    printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+                self.rd_line_t (splitted_line[2])
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
@@ -549,17 +564,73 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
-                self.rd_old_usrs_line (splitted_line[1:])                
-                self.set_last_time()
-                self.alg_top()
-                if (VERBOSE_DEBUG in self.verbose): 
-                    for usr in self.usrs:
-                        if (usr.lvl==-1):
-                            printf (self.debug_file, 'Error: t={} usr {} is not located\n' .format (self.t, usr.id))
+                self.rd_old_usrs_line (splitted_line[1:])         
+                if (VERBOSE_LOG in self.verbose):
+                    self.set_last_time()
+                    
+                if (self.alg == 'alg_top'):
+                    self.alg_top()
+                elif (self.alg == 'alg_worst_fit'):
+                    self.alg_worst_fit()
+                else:
+                    print ('Sorry, the alg {} that you selected is not supported' .format (self.alg))
+                    exit ()
+                    
                 self.print_sol_to_res_and_log ()
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
-                     usr.cur_s = usr.nxt_s        
-               
+                     usr.cur_s = usr.nxt_s
+                     
+        if (VERBOSE_MOB in self.verbose):
+            self.print_mob ()        
+    
+    def print_mob (self):
+        """
+        print statistics about the number of usrs who moved, and the num of migrations between every two levels in the tree.
+        """
+        self.mob_file_name   = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.mob.log'  
+        self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
+
+        printf (self.mob_output_file, '// results for running alg alg_top on input file {}\n' .format (self.ap_file_name))
+        printf (self.mob_output_file, '// results for running alg alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
+
+        sim_t = float(self.t - self.init_t)
+        printf (self.mob_output_file, 'avg num of usrs that moved per slot = {:.0f}\n' .format (float(self.num_of_moves) / sim_t))
+        self.mig_from_to_lvl = np.divide (self.mig_from_to_lvl, sim_t)
+        printf (self.mob_output_file, 'avg num of usrs that migrated per slot = {:.0f}\n\n' .format (np.sum (self.mig_from_to_lvl) ))
+        printf (self.mob_output_file, '// index i,j in the matrix below represents the total num of migs from lvl i to lvl j\n')
+        for lvl_src in range (self.tree_height+1):
+            for lvl_dst in range (self.tree_height+1):
+                printf (self.mob_output_file, '{:.0f}\t' .format (self.mig_from_to_lvl[lvl_src][lvl_dst]))
+            printf (self.mob_output_file, '\n')
+    
+    def alg_worst_fit (self):
+        """
+        Run the worst-fit alg' for the mig' problem.
+        """
+        critical_usrs = list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) # critical_usrs <- all usrs not placed
+        
+        # first, handle the old, existing usrs, in an increasing order of the available cpu on the currently-hosting server
+        for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1, critical_usrs)), 
+                           key = lambda usr : self.G.nodes[usr.cur_s]['a']): 
+            self.worst_fit_place_usr (usr)
+    
+        # next, handle the new usrs, namely, that are not currently hosted on any server
+        for usr in list (filter (lambda usr : usr.cur_s==-1, critical_usrs)): 
+            self.worst_fit_place_usr (usr)    
+
+    # def worst_fit_place_usr (self, usr):
+    #     """
+    #     Try to place the given usr on a server, chosen in a worst-fit manner
+    #     """
+    #     delay_feasible_servers = sorted (usr.S_u, key = lambda s : self.G.nodes{s]['a']) SHOULD CHANGE HERE TO DEC' ORDER. Then, may merge it w/ the next line
+    #     for s in delay_feasible_servers: # for every delay-feasible server 
+    #         if (self.G.nodes[s]['a'] > usr.B[self.G.nodes[s]['lvl']]): # is the available cpu at this server > the required cpu for this usr at this lvl 
+    #             usr.nxt_s = s
+    #             usr.lvl   = self.G.nodes[s]['lvl']
+    #             return True
+    #     print  ('Worst-fit failed to locate a usr. t={}, usr={}' .format (self.t, usr.id))        
+    #     printf (self.log_output_file, 't={}: failed to locate usr={}' .format (self.t, usr.id))        
+    
     def binary_search (self):
         """
         Binary search for a feasible sol that minimizes the resource augmentation R.
@@ -632,9 +703,6 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'after push-up\n')
             self.print_sol_to_log()
             printf (self.log_output_file, 'finished alg top\n')
-        if (VERBOSE_LVL_MOB in self.verbose and self.t > 0):
-            for usr in [usr for usr in self.usrs if usr.cur_s != usr.nxt_s]: # for every migrated usr
-                self.num_of_migs_from_lvl_to_lvl[self.G.nodes[usr.cur_s]['lvl']] [self.G.nodes[usr.nxt_s]['lvl']]
 
     def bottom_up (self):
         """
@@ -736,6 +804,8 @@ class SFC_mig_simulator (object):
             return
         
         splitted_line = line[0].split ("\n")[0].split (")")
+        if (VERBOSE_MOB in self.verbose):
+            self.num_of_moves += len (splitted_line)
 
         for tuple in splitted_line:
             if (len(tuple) <= 1):
@@ -769,6 +839,7 @@ class SFC_mig_simulator (object):
                 continue
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
+
             self.rmv_usr_rsrcs (usr) # Free the resources of this user in its current place            
             usr.lvl   = -1
             usr.nxt_s = -1
@@ -839,9 +910,9 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    ap_file_name = 'shorter.ap' #'vehicles_n_speed_0730.ap'
+    ap_file_name = 'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBOSE_LVL_MOB], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_MOB], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  

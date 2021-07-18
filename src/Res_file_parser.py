@@ -41,7 +41,8 @@ class Res_file_parser (object):
            
             self.parse_line(line)
             # if (not(self.dict in self.list_of_dicts)): # verify that such an item doesn't already exist in the list. However, if using list_of_dicts, no need for this check 
-            self.list_of_dicts.append(self.dict)
+            if ( not(self.dict in self.list_of_dicts)):
+                self.list_of_dicts.append(self.dict)
                 
 
         self.input_file.close
@@ -74,9 +75,12 @@ class Res_file_parser (object):
         return list_to_filter
 
     def compare_algs (self):
-        lp_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
-        
-
+        # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
+        # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
+        lp_costs  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])] )
+        alg_costs = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])])
+        ratio     = np.divide (alg_costs, lp_costs)
+        print ('max_ratio = {}' .format (np.max (ratio)))
 
     def plot_num_of_vehs (self):
         # Open input and output files

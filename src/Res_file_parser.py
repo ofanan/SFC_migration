@@ -4,7 +4,7 @@ import numpy as np
 from printf import printf 
 
 t_idx         =  0
-alg_idx       =  1
+solver_idx    =  1
 stts_idx      = -1
 num_of_fields = 2
 
@@ -49,7 +49,7 @@ class Res_file_parser (object):
 
     def parse_line (self, line):
 
-        splitted_line = line.split ("|")
+        splitted_line = line.split (" | ")
          
         settings          = splitted_line[0]
         cost              = float(splitted_line[1].split("=")[1])
@@ -58,10 +58,10 @@ class Res_file_parser (object):
         if len (splitted_line) < num_of_fields:
             print ("encountered a format error. Splitted line is {}" .format (splitted_line))
             return False
-        
+               
         self.dict = {
             "t"          : int (splitted_settings [t_idx].split('t')[1]),
-            "alg"        : splitted_settings      [alg_idx],
+            "solver"     : splitted_settings      [solver_idx],
             "cost"       : float(splitted_line[1].split(" = ")[1])
             }
 
@@ -77,9 +77,10 @@ class Res_file_parser (object):
     def compare_algs (self):
         # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
         # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
-        lp_costs  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])] )
-        alg_costs = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])])
-        ratio     = np.divide (alg_costs, lp_costs)
+        lp_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'lp',  self.list_of_dicts)), key = lambda item : item['t'])] )
+        alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'alg', self.list_of_dicts)), key = lambda item : item['t'])])
+        ratio     = np.divide (alg_cost, lp_cost)
+        print (ratio)
         print ('max_ratio = {}' .format (np.max (ratio)))
 
     def plot_num_of_vehs (self):
@@ -102,6 +103,6 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('shorter.res') #('vehicles_n_speed_0730.res') 
+    my_res_file_parser.parse_file ('vehicles_n_speed_0730.res') # ('shorter.res')  
     my_res_file_parser.compare_algs ()        
     

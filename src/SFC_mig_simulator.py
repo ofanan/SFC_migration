@@ -65,6 +65,12 @@ class SFC_mig_simulator (object):
     chain_cost_from_non_CLP_state = lambda self, usr, lvl: \
                     sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
                     self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
+                    
+    # Write an output line for the LP sol, to a given output file (given as a FD==file descriptor) 
+    write_lp_res_line = lambda self, FD, model : printf (FD, 't{}.lp.stts{} | cost = {:.2f}\n' .format(self.t, model.status, model.objective.value()))
+
+    # Print a solution for the problem to the output res file 
+    print_sol_to_res = lambda self : printf (self.res_output_file, 't{}.alg | cost = {:.2f} | rsrc_aug = {:.2f}\n' .format(self.t, self.calc_sol_cost(), self.calc_rsrc_aug())) 
 
     def set_last_time (self):
         """
@@ -143,10 +149,10 @@ class SFC_mig_simulator (object):
         model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output # to solve it using another solver: solve(GLPK(msg = 0))
         
         if (VERBOSE_RES in self.verbose):
-            printf (self.res_output_file, 't{}.lp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value()))
+            self.write_lp_res_line (self.res_output_file, model)
         sol_status = plp.LpStatus[model.status] 
         if (VERBOSE_LOG in self.verbose):            
-            printf (self.log_output_file, 't{}.lp.stts{} cost={:.2f}\n' .format(self.t, model.status, model.objective.value())) 
+            self.write_lp_res_line (self.log_output_file, model)
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_lp_sol_to_log ()
@@ -178,16 +184,6 @@ class SFC_mig_simulator (object):
         self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + ('.detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s\n' )
-
-    def print_sol_to_res (self):
-        """
-        print a solution for the problem to the output log file 
-        """
-        used_cpu_in = self.used_cpu_in_all_srvrs ()
-        printf (self.res_output_file, 't{}.alg cost={:.2f} rsrc_aug={:.2f}\n' .format(
-            self.t, 
-            self.calc_sol_cost(),
-            self.calc_rsrc_aug())) 
 
     def print_lp_sol_to_log (self):
         """
@@ -910,7 +906,7 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    ap_file_name = 'vehicles_n_speed_0730.ap'
+    ap_file_name = 'shorter.ap' #'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_MOB], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 

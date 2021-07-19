@@ -77,7 +77,7 @@ class SFC_mig_simulator (object):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
         """
-        if (VERBOSE_ADD_LOG in self.verbose):
+        if (VERBOSE_LOG in self.verbose):
             self.last_rt = time.time()
      
     def print_sol_to_res_and_log (self):
@@ -609,16 +609,10 @@ class SFC_mig_simulator (object):
         """
         critical_usrs = list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) # critical_usrs <- all usrs not placed
         
-        if (VERBOSE_DEBUG in self.verbose): #$$$
-            for s in self.G.nodes():
-                printf (self.log_output_file, 's{}[a]={} \n' .format (s, self.G.nodes[s]['a']))
         # first, handle the old, existing usrs, in an increasing order of the available cpu on the currently-hosting server
         for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1, critical_usrs)), 
                            key = lambda usr : self.G.nodes[usr.cur_s]['a']): 
-            if (self.worst_fit_place_usr (usr)): # successfully migrated the usr
-                self.G.nodes[usr.cur_s]['a'] -= usr.cur_cpu # release the cpu used by this usr in its current place 
-                if (VERBOSE_DEBUG in self.verbose): #$$$
-                    printf (self.log_output_file, 'usr={}. s1[a]={} \n' .format (usr.id, self.G.nodes[1]['a']))
+            self.worst_fit_place_usr (usr) # successfully migrated the usr
     
         # next, handle the new usrs, namely, that are not currently hosted on any server
         for usr in list (filter (lambda usr : usr.cur_s==-1, critical_usrs)): 
@@ -637,9 +631,7 @@ class SFC_mig_simulator (object):
                 mig_dst   = self.G.nodes[s]['id'] # id of the migration's destination
                 usr.nxt_s = mig_dst # mark this server as this usr's place in the next slot
 #                usr.lvl   = self.G.nodes[s]['lvl']
-                self.G.nodes[s]['a'] -= usr.B[self.G.nodes[mig_dst]['lvl']] # dec' the available cpu at the dest' accordingly. If this is an old user, it's the caller's responsibility to inc' the cpu at the mig's src accordingly.
-                # if (VERBOSE_DEBUG in self.verbose and s==1): #$$$$
-                #     printf (self.log_output_file, 's{}[a]={} \n' .format (s, self.G.nodes[s]['a']))
+                self.G.nodes[s]['a'] -= usr.B[self.G.nodes[mig_dst]['lvl']] # dec' the available cpu at the dest' accordingly. If this is an old user, the resources it used in the current location were already released by rd_old_usrs_line ()
                 return True
         print  ('Worst-fit failed to locate a usr. t={}, usr={}' .format (self.t, usr.id))        
         printf (self.log_output_file, 't={}: failed to locate usr={}\n' .format (self.t, usr.id))        

@@ -103,7 +103,8 @@ class SFC_mig_simulator (object):
         Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
         """
         used_cpu_in = self.used_cpu_in_all_srvrs ()
-        return max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1)    
+        self.min_R  = max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), 1) # this is the minimal rsrc aug to be used from now and on  
+        return self.min_R    
 
     def rst_sol (self):
         """
@@ -317,7 +318,7 @@ class SFC_mig_simulator (object):
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.cpu_cap_at_lvl    = np.array ([30  * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
-                                 np.array ([702 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
+                                 np.array ([560 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -445,6 +446,7 @@ class SFC_mig_simulator (object):
              
         print ('Simulating {}. num of leaves = {}. ap file = {}' .format (self.alg, self.num_of_leaves, self.ap_file_name))
         if (self.alg in ['alg_top', 'worst_fit']):
+            self.min_R = 1 # minimum amount of rsrc aug'
             self.simulate_algs()
         elif (self.alg == 'alg_lp'):
             self.simulate_lp ();
@@ -513,6 +515,9 @@ class SFC_mig_simulator (object):
             self.is_first_t = False
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+        if (self.alg in ['alg_top'] and (self.t % 100 == 1)):
+            for usr in self.usrs:
+                usr.calc_rand_id ()
                     
     def simulate_algs (self):
         """
@@ -545,7 +550,7 @@ class SFC_mig_simulator (object):
             if (splitted_line[0] == "t"):
                 self.rd_line_t (splitted_line[2])
                 continue
-        
+                
             elif (splitted_line[0] == "usrs_that_left:"):
 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
@@ -596,12 +601,13 @@ class SFC_mig_simulator (object):
         # plot the mobility
         plt.figure()
         plt.title ('Migrations and mobility at each cycle')
-        plt.plot (range(int(sim_len)), self.num_of_moves_in_cycle, label='num of usrs moved to another cell', linestyle='None',  marker='o', markersize = 4)
-        plt.plot (range(int(sim_len)), self.num_of_migs_in_cycle, label='num of chains migrated by the algorithm', linestyle='None',  marker='.', markersize = 4)
+        plt.plot (range(int(sim_len)), self.num_of_moves_in_cycle, label='Total vehicles moved to another cell [number/sec]', linestyle='None',  marker='o', markersize = 4)
+        plt.plot (range(int(sim_len)), self.num_of_migs_in_cycle, label='Total chains migrated to another server [number/sec]', linestyle='None',  marker='.', markersize = 4)
         plt.xlabel ('time [seconds, starting at 07:30]')
         plt.legend()
         plt.savefig ('../res/{}.mob.jpg' .format(self.ap_file_name.split('.')[0]))
         plt.clf()
+    
     
     def alg_worst_fit (self):
         """
@@ -657,7 +663,7 @@ class SFC_mig_simulator (object):
         # Now we know that we found an initial feasible sol 
                    
         ub = np.array([self.G.nodes[s]['RCs']     for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
-        lb = np.array([self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
+        lb = np.array([self.min_R * self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
         
         while True: 
              
@@ -721,7 +727,7 @@ class SFC_mig_simulator (object):
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).v
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
-            for usr in sorted (Hs, key = lambda usr : len(usr.B)): # for each chain in Hs, in an increasing order of level ('L')
+            for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id)): # for each chain in Hs, in an increasing order of level ('L')
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     usr.nxt_s = s
                     usr.lvl   = lvl
@@ -922,9 +928,9 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
-    ap_file_name = 'shorter.ap' #'vehicles_n_speed_0730.ap'
+    ap_file_name = 'vehicles_n_speed_0730.ap' #'shorter.ap' #'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  

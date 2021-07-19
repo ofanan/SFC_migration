@@ -1,4 +1,10 @@
+import random
+
+min_rand_id = 1
+max_rand_id = 1000
+
 class usr_c (object):
+
     """
     class of "user", used by alg_top 
     """ 
@@ -12,7 +18,11 @@ class usr_c (object):
         self.S_u                = []    # List of servers that are delay-feasible for this usr.
         self.cur_s              = cur_s # current placement (server)
         self.nxt_s              = nxt_s # next (scheduled) server
-         
+        self.calc_rand_id()
+             
+    def calc_rand_id (self):
+        self.rand_id = random.randint (min_rand_id, max_rand_id)
+  
     def __lt__ (self, other):
         """
         Used to sort usrs, based on the number of CPU units they use

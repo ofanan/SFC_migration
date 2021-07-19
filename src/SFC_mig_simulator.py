@@ -7,6 +7,7 @@ import random
 import heapq
 import pulp as plp
 from cmath import sqrt
+import matplotlib.pyplot as plt
 # from scipy.optimize import linprog # currently unused
 
 from usr_c    import usr_c    # class of the users of alg
@@ -92,10 +93,11 @@ class SFC_mig_simulator (object):
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         if (VERBOSE_MOB in self.verbose):
-            for usr in list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)): # for every usr that migrated
+            usrs_who_migrated_at_this_cycle = list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs))
+            self.num_of_migs_in_cycle.append (len(usrs_who_migrated_at_this_cycle))
+            for usr in usrs_who_migrated_at_this_cycle: 
                 self.mig_from_to_lvl[self.G.nodes[usr.cur_s]['lvl']] [self.G.nodes[usr.nxt_s]['lvl']] += 1
             
-     
     def calc_rsrc_aug (self):
         """
         Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
@@ -114,7 +116,6 @@ class SFC_mig_simulator (object):
             usr.nxt_s = -1
         for s in self.G.nodes():
             self.G.nodes[s]['a'] = self.G.nodes[s]['RCs']
-        # print ('in rst sol: RCS={}, a={}' .format (self.G.nodes[0]['RCs'], self.G.nodes[0]['a']))
 
     def solve_by_plp (self):
         """
@@ -161,15 +162,6 @@ class SFC_mig_simulator (object):
             print  ('Running the LP failed. status={}' .format(plp.LpStatus[model.status]))
             exit ()
 
-    def print_cost_per_usr (self):
-        """
-        For debugging / analysis:
-        print the cost of each chain. 
-        """     
-        for usr in self.usrs:
-            chain_cost = self.chain_cost_homo (usr, usr.lvl)  
-            print ('cost of usr {} = {}' .format (u, chain_cost))
-        
     def init_res_file (self):
         """
         Open the res file for writing.
@@ -269,8 +261,8 @@ class SFC_mig_simulator (object):
             usr = self.usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_homo(usr, lvl) < self.chain_cost_homo(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
-                    self.G.nodes [usr.S_u[usr.lvl]] ['a'] += usr.B[usr.lvl] # inc the available CPU at the prev loc of the moved usr  
-                    self.G.nodes [usr.S_u[lvl]]     ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
+                    self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previosly-suggested place for this usr  
+                    self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
                     # update usr.lvl and usr.nxt_s accordingly 
                     usr.lvl      = lvl               
@@ -416,8 +408,9 @@ class SFC_mig_simulator (object):
         if (VERBOSE_DEBUG in self.verbose):
             self.debug_file = open ('../res/debug.txt', 'w') 
         if (VERBOSE_MOB in self.verbose):
-            self.mig_from_to_lvl = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int')
-            self.num_of_moves     = int(0)
+            self.num_of_moves_in_cycle = [] # self.num_of_moves_in_cycle[t] will hold the num of usrs who moved at cycle t.   
+            self.num_of_migs_in_cycle  = [] # self.num_of_migs[t] will hold the num of chains that the alg' migrated in cycle t.
+            self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
         self.gen_parameterized_tree  ()
         self.delay_const_sanity_check()
@@ -445,6 +438,12 @@ class SFC_mig_simulator (object):
         self.is_first_t = True # Will indicate that this is the first simulated time slot
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
+        if (VERBOSE_MOB in self.verbose):
+            self.mob_file_name   = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.mob.log'  
+            self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
+            printf (self.mob_output_file, '// results for running alg alg_top on input file {}\n' .format (self.ap_file_name))
+            printf (self.mob_output_file, '// results for running alg alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
+            printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
              
         print ('Simulating {}. num of leaves = {}. ap file = {}' .format (self.alg, self.num_of_leaves, self.ap_file_name))
         if (self.alg == 'alg_top'):
@@ -575,7 +574,7 @@ class SFC_mig_simulator (object):
                 self.print_sol_to_res_and_log ()
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                      usr.cur_s = usr.nxt_s
-                     
+            
         if (VERBOSE_MOB in self.verbose):
             self.print_mob ()        
     
@@ -583,21 +582,29 @@ class SFC_mig_simulator (object):
         """
         print statistics about the number of usrs who moved, and the num of migrations between every two levels in the tree.
         """
-        self.mob_file_name   = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.mob.log'  
-        self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
 
-        printf (self.mob_output_file, '// results for running alg alg_top on input file {}\n' .format (self.ap_file_name))
-        printf (self.mob_output_file, '// results for running alg alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
-
-        sim_t = float(self.t - self.init_t)
-        printf (self.mob_output_file, 'avg num of usrs that moved per slot = {:.0f}\n' .format (float(self.num_of_moves) / sim_t))
-        self.mig_from_to_lvl = np.divide (self.mig_from_to_lvl, sim_t)
-        printf (self.mob_output_file, 'avg num of usrs that migrated per slot = {:.0f}\n\n' .format (np.sum (self.mig_from_to_lvl) ))
-        printf (self.mob_output_file, '// index i,j in the matrix below represents the total num of migs from lvl i to lvl j\n')
+        sim_len = float(self.t - self.init_t)
+        del (self.num_of_migs_in_cycle[0]) # remove the mig' recorded in the first cycle, which is irrelevant (corner case)
+        printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moves_in_cycle)) / sim_len))
+        printf (self.mob_output_file, '// avg num of usrs who migrated per slot = {:.0f}\n' .format (float(sum(self.num_of_migs_in_cycle)) / sim_len))
+        avg_num_of_migs_to_from_per_slot = np.divide (self.mig_from_to_lvl, sim_len)
         for lvl_src in range (self.tree_height+1):
             for lvl_dst in range (self.tree_height+1):
-                printf (self.mob_output_file, '{:.0f}\t' .format (self.mig_from_to_lvl[lvl_src][lvl_dst]))
+                printf (self.mob_output_file, '{:.0f}\t' .format (avg_num_of_migs_to_from_per_slot[lvl_src][lvl_dst]))
             printf (self.mob_output_file, '\n')
+        printf (self.mob_output_file, 'moves_in_slot = {}\n' .format (self.num_of_moves_in_cycle))
+        printf (self.mob_output_file, 'migs_in_slot = {}\n'  .format (self.num_of_migs_in_cycle))
+
+        # plot the mobility
+        plt.figure()
+        plt.title ('Migrations and mobility at each cycle')
+        plt.plot (range(int(sim_len)), self.num_of_moves_in_cycle, label='num of usrs moved to another cell')
+        plt.plot (range(int(sim_len)), self.num_of_migs_in_cycle, label='num of chains migrated by the algorithm')
+        plt.xlabel ('time [seconds, starting at 07:30]')
+        plt.legend()
+        plt.savefig ('../res/{}.mob.jpg' .format(self.ap_file_name.split('.')[0]))
+        plt.clf()
+        plt.show ()
     
     def alg_worst_fit (self):
         """
@@ -688,6 +695,8 @@ class SFC_mig_simulator (object):
             if (VERBOSE_LOG in self.verbose):
                 printf (self.log_output_file, 'By binary search:\n')
             self.binary_search()
+            # if (VERBOSE_MOB in self.verbose):
+            #     printf (self.mob_output_file, 'Calling binary search\n')
 
         # By hook or by crook, now we have a feasible solution        
         if (VERBOSE_ADD_LOG in self.verbose): 
@@ -799,9 +808,9 @@ class SFC_mig_simulator (object):
         if (line == []): # if the list of old users that moved is empty
             return
         
-        splitted_line = line[0].split ("\n")[0].split (")")
-        if (VERBOSE_MOB in self.verbose):
-            self.num_of_moves += len (splitted_line)
+        splitted_line = list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
+        if (VERBOSE_MOB in self.verbose and self.t > self.init_t):
+            self.num_of_moves_in_cycle.append (len (splitted_line)) # record the num of usrs who moved at this cycle  
 
         for tuple in splitted_line:
             if (len(tuple) <= 1):
@@ -906,9 +915,9 @@ class SFC_mig_simulator (object):
 if __name__ == "__main__":
 
     t = time.time()
-    ap_file_name = 'shorter.ap' #'vehicles_n_speed_0730.ap'
+    ap_file_name = 'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_MOB], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_MOB, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  

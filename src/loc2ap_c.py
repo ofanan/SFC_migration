@@ -187,7 +187,6 @@ class loc2ap_c (object):
             num_of_vehs_in_cur_ap = []
             line = line.split ("\n")[0]
             splitted_line = line.split (":")
-            # ap_num = splitted_line[0].split("_")[-1]
             splitted_line = splitted_line[1].split('[')[1].split(']')[0].split(', ')
             for cur_num_of_vehs_in_this_ap in splitted_line:
                 num_of_vehs_in_cur_ap.append (int(cur_num_of_vehs_in_this_ap))

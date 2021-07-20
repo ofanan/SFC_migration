@@ -80,7 +80,7 @@ class Res_file_parser (object):
         lp_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'lp',  self.list_of_dicts)), key = lambda item : item['t'])] )
         alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'alg', self.list_of_dicts)), key = lambda item : item['t'])])
         ratio     = np.divide (alg_cost, lp_cost)
-        print ('max_ratio = {}' .format (np.max (ratio)))
+        print ('max_ratio = {}, avg ratio = {}' .format (np.max (ratio), np.average(ratio)))
 
     def plot_num_of_vehs (self):
         # Open input and output files

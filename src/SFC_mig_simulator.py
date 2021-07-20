@@ -172,6 +172,7 @@ class SFC_mig_simulator (object):
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_lp_sol_to_log ()
+                printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         else:
             printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
             print  ('Running the LP failed. status={}' .format(plp.LpStatus[model.status]))
@@ -970,7 +971,7 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
-    ap_file_name = 'short_0.ap' #'vehicles_n_speed_0730.ap'
+    ap_file_name = 'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 

@@ -75,7 +75,7 @@ class SFC_mig_simulator (object):
     write_lp_res_line = lambda self, FD, model : printf (FD, 't{}.lp.stts{} | cost = {:.0f}\n' .format(self.t, model.status, model.objective.value()))
 
     # Print a solution for the problem to the output res file 
-    print_sol_res_line = lambda self, output_file : printf (output_file, 't{}.{}.stts{} | cost = {:.0f} | rsrc_aug = {:.2f}\n' .format(self.t, self.alg, self.stts, self.calc_sol_cost(), self.calc_rsrc_aug())) 
+    print_sol_res_line = lambda self, output_file : printf (output_file, 't{}.{}.stts{} | cost = {:.0f} | rsrc_aug = {:.2f}\n' .format(self.t, self.alg, self.stts, self.calc_sol_cost(), self.rsrc_aug)) 
 
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
 
@@ -103,7 +103,9 @@ class SFC_mig_simulator (object):
         if (VERBOSE_DEBUG in self.verbose and self.stts==sccs): 
             for usr in self.usrs:
                 if (usr.lvl==-1):
-                    printf (self.debug_file, 'Error: t={} usr {} is not placed\n' .format (self.t, usr.id))
+                    error_msg = 'Error: t={}. stts={}, but usr {} is not placed\n' .format (self.t, self.stts, usr.id)
+                    print  (error_msg)
+                    printf (self.debug_file, error_msg)
                     exit ()
         if (VERBOSE_MOB in self.verbose):
             usrs_who_migrated_at_this_cycle = list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs))
@@ -111,13 +113,13 @@ class SFC_mig_simulator (object):
             for usr in usrs_who_migrated_at_this_cycle: 
                 self.mig_from_to_lvl[self.G.nodes[usr.cur_s]['lvl']] [self.G.nodes[usr.nxt_s]['lvl']] += 1
             
-    def calc_rsrc_aug (self):
+    def update_rsrc_aug (self):
         """
         Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
         """
         used_cpu_in = self.used_cpu_in_all_srvrs ()
-        self.min_R  = max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), self.min_R) # this is the minimal rsrc aug to be used from now and on    
-        return self.min_R    
+        self.rsrc_aug  = max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), self.rsrc_aug) # this is the minimal rsrc aug to be used from now and on    
+        return self.rsrc_aug
 
     def rst_sol (self):
         """
@@ -453,15 +455,26 @@ class SFC_mig_simulator (object):
             printf (self.mob_output_file, '// results for running alg alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
             printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
              
-        print ('Simulating {}. num of leaves = {}. ap file = {}' .format (self.alg, self.num_of_leaves, self.ap_file_name))
+        print ('Simulating {}. num of leaves = {}. ap file = {} ' .format (self.alg, self.num_of_leaves, self.ap_file_name))
+        self.stts     = sccs
+        self.rsrc_aug = 1
+        self.set_augmented_cpu_in_all_srvrs ()
+        print ('rsrc aug = {}' .format (self.rsrc_aug))
         if (self.alg in ['our_alg', 'wfit']):
-            self.min_R = 1 # minimum amount of rsrc aug'
             self.simulate_algs()
         elif (self.alg == 'alg_lp'):
             self.simulate_lp ();
         else:
             print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
             exit ()
+
+    def set_augmented_cpu_in_all_srvrs (self):
+        """
+        Set the capacity in each server to its cpu capacity, time the resource augmentation. 
+        """
+        for s in self.G.nodes():
+            self.G.nodes[s]['RCs'] = self.rsrc_aug * self.G.nodes[s]['cpu cap'] # for now, assume no resource aug' 
+
     
     def simulate_lp (self):
         """
@@ -473,12 +486,6 @@ class SFC_mig_simulator (object):
         - update cur_st = nxt_st
         """
         self.cur_st_params = []
-        # Init RCs       
-        self.rsrc_aug = 1
-        for s in self.G.nodes():
-            self.G.nodes[s]['RCs'] = self.rsrc_aug * self.G.nodes[s]['cpu cap'] # for now, assume no resource aug' 
-
-        print ('rsrc aug = {}' .format (self.rsrc_aug))
         
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
@@ -537,7 +544,6 @@ class SFC_mig_simulator (object):
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
         """
-        self.stts = sccs
         
         # reset Hs and RCs       
         for s in self.G.nodes():
@@ -694,7 +700,7 @@ class SFC_mig_simulator (object):
         """
         
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
-        if (placement_alg()):
+        if (placement_alg() == sccs):
             return sccs
 
         # Couldn't solve the problem without additional rsrc aug --> begin a binary search for the amount of rsrc aug' needed.
@@ -710,23 +716,32 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
             self.G.nodes[s]['a']   = self.G.nodes[s]['RCs'] #currently-available rsrcs at server s  
 
-        if (not (self.placement_alg ())):
+        if (placement_alg() != sccs):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
 
         # Now we know that we found an initial feasible sol 
                    
-        ub = np.array([self.G.nodes[s]['RCs']     for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
-        lb = np.array([self.min_R * self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
+        ub = np.array([                self.G.nodes[s]['RCs']     for s in self.G.nodes()]) # upper-bnd on the (augmented) cpu cap' that may be required
+        lb = np.array([self.rsrc_aug * self.G.nodes[s]['cpu cap'] for s in self.G.nodes()]) # lower-bnd on the (augmented) cpu cap' that may be required
+        
+        print ('ub[0]={}, lb[0]={}' .format (ub[0], lb[0])) #$$$
         
         while True: 
              
             if ( np.array([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool').all()): # Did the binary search converged?
                 for s in self.G.nodes(): # Yep, so allocate this minimal found amount of rsrc aug to all servers
-                    self.G.nodes[s]['RCs'] = math.floor (ub[s])  
+                    self.G.nodes[s]['RCs'] = math.ceil (ub[s])  
                 self.rst_sol()         # and re-solve the prob'
-                res = self.placement_alg()
-                return 
+                if (placement_alg() == sccs): 
+                    self.update_rsrc_aug () # update the rsrc augmnetation to the lvl used in practice by the fesible sol found by this binary search
+                    return sccs
+                
+                # We've got a prob', Houston
+                print ('Error in the binary search: though I found a feasible sol, but actually this sol is not feasible')
+                exit ()
+                
+            print ('ub[0]={}, lb[0]={}' .format (ub[0], lb[0])) #$$$
 
             # Now we know that the binary search haven't converged yet
             # Update the available capacity at each server according to the value of resource augmentation for this iteration            
@@ -735,7 +750,7 @@ class SFC_mig_simulator (object):
             self.rst_sol()
 
             # Solve using the given placement alg'
-            if (self.placement_alg()):
+            if (placement_alg() == sccs):
                 if (VERBOSE_ADD_LOG in self.verbose): 
                     printf (self.log_output_file, 'In bottom-up IF\n')
                     self.print_sol_to_log()

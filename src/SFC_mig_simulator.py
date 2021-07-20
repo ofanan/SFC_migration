@@ -536,12 +536,14 @@ class SFC_mig_simulator (object):
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
         """
+        self.stts = sccs
+        
         # reset Hs and RCs       
         for s in self.G.nodes():
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
             if (self.alg in ['alg_top']):
                 self.G.nodes[s]['Hs']  = set() 
-
+        
         # Open input and output files
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
         if (VERBOSE_RES in self.verbose):
@@ -571,8 +573,7 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):  
-                if (self.stts == sccs):            
-                    self.rd_old_usrs_line (splitted_line[1:])
+                self.rd_old_usrs_line (splitted_line[1:])
                 if (VERBOSE_LOG in self.verbose):
                     self.set_last_time()
                     

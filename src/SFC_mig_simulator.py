@@ -77,6 +77,8 @@ class SFC_mig_simulator (object):
     # Print a solution for the problem to the output res file 
     print_sol_res_line = lambda self, output_file : printf (output_file, 't{}.{}.stts{} | cost = {:.2f} | rsrc_aug = {:.2f}\n' .format(self.t, self.alg, self.stts, self.calc_sol_cost(), self.calc_rsrc_aug())) 
 
+    parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
+
     def set_last_time (self):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
@@ -95,7 +97,7 @@ class SFC_mig_simulator (object):
             self.print_sol_res_line(self.log_output_file)
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
             self.print_sol_to_log()
-            if (self.stts == fail):
+            if (self.stts != sccs):
                 printf (self.log_output_file, 'Note: the solution above is partial, as the alg did not find a feasible solution\n')
                 return         
         if (VERBOSE_DEBUG in self.verbose and self.stts==sccs): 
@@ -536,8 +538,9 @@ class SFC_mig_simulator (object):
         """
         # reset Hs and RCs       
         for s in self.G.nodes():
-            self.G.nodes[s]['Hs']  = set() 
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
+            if (self.alg in ['alg_top']):
+                self.G.nodes[s]['Hs']  = set() 
 
         # Open input and output files
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
@@ -567,8 +570,9 @@ class SFC_mig_simulator (object):
         
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line (splitted_line[1:])
-            elif (splitted_line[0] == "old_usrs:"):              
-                self.rd_old_usrs_line (splitted_line[1:])         
+            elif (splitted_line[0] == "old_usrs:"):  
+                if (self.stts == sccs):            
+                    self.rd_old_usrs_line (splitted_line[1:])
                 if (VERBOSE_LOG in self.verbose):
                     self.set_last_time()
                     
@@ -784,10 +788,7 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
             AP_id = int(tuple[1])
-            if (AP_id >= self.num_of_leaves):
-                if (self.warned_about_too_large_ap == False):
-                    print ('********* WARNING: Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {} *********' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
-                    exit ()
+            # self.check_AP_id (AP_id)
             s = self.ap2s[AP_id]
             usr.S_u.append (s)
             for lvl in (range (len(usr.B)-1)):
@@ -810,7 +811,7 @@ class SFC_mig_simulator (object):
             if (len(tuple) <= 1):
                 break
             tuple = tuple.split("(")
-            tuple   = tuple[1].split (',')
+            tuple = tuple[1].split (',')
             
             usr = usr_c (id                 = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
                          theta_times_lambda = self.uniform_theta_times_lambda,
@@ -819,19 +820,17 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
             AP_id = int(tuple[1])
-            if (AP_id >= self.num_of_leaves):
-                if (self.warned_about_too_large_ap == False):
-                    print ('********* WARNING: Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {} *********' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
-                    exit ()
-                    self.warned_about_too_large_ap = True
-                AP_id = self.num_of_leaves-1
+            # self.check_AP_id (AP_id)
             s = self.ap2s[AP_id]
             usr.S_u.append (s)
-            self.G.nodes[s]['Hs'].add(usr) # Hs is the list of chains that may be located on each server while satisfying the delay constraint
             for lvl in (range (len(usr.B)-1)):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
-                self.G.nodes[s]['Hs'].add(usr)                       
+            
+            # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
+            if (self.alg in ['alg_top']):
+                for s in self.usr.S_u:
+                    self.G.nodes[s]['Hs'].add(usr)                       
                     
     def rd_old_usrs_line (self, line):
         """
@@ -842,7 +841,7 @@ class SFC_mig_simulator (object):
         if (line == []): # if the list of old users that moved is empty
             return
         
-        splitted_line = list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
+        splitted_line = self.parse_old_usrs_line(line)
         if (VERBOSE_MOB in self.verbose and self.t > self.init_t):
             self.num_of_moves_in_cycle.append (len (splitted_line)) # record the num of usrs who moved at this cycle  
 
@@ -850,7 +849,7 @@ class SFC_mig_simulator (object):
             if (len(tuple) <= 1):
                 break
             tuple = tuple.split("(")
-            tuple   = tuple[1].split (',')
+            tuple = tuple[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
             if (len(list_of_usr) == 0):
@@ -859,12 +858,7 @@ class SFC_mig_simulator (object):
             usr = list_of_usr[0]
             usr.cur_cpu = usr.B[usr.lvl]
             AP_id       = int(tuple[1])
-            if (AP_id > self.num_of_leaves):
-                AP_id = self.num_of_leaves-1
-                if (self.warned_about_too_large_ap == False):
-                    print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
-                    self.warned_about_too_large_ap = True
-                    exit ()
+            # self.check_AP_id (AP_id)
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
 
             # Add this usr to the Hs of every server to which it belongs at its new location
@@ -874,9 +868,10 @@ class SFC_mig_simulator (object):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
     
-            if (usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget
+            # If this alg ues 'Hs', we have to update it, so that for each server, 
+            # Hs of a server includes a usr only if s is delay-feasible for this usr also after the usr moved. 
+            if (self.alg in ['alg_top'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget
                 
-                # However, we need to update the 'Hs', so that for each server, Hs includes this usr only if s is delay-feasible for this usr also after the usr moved. 
                 for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
                     self.G.nodes[s]['Hs'].remove (usr) 
                 for s in usr.S_u:
@@ -889,9 +884,11 @@ class SFC_mig_simulator (object):
             usr.lvl   = -1
             usr.nxt_s = -1
 
-            # Add the usr to the 'Hs' (set of relevant usrs) at each of its delay-feasible servers
-            for s in usr.S_u:
-                self.G.nodes[s]['Hs'].add(usr)                               
+            # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
+            # Hs is the set of relevant usrs) at each of its delay-feasible server
+            if (self.alg in ['alg_top']):
+                for s in usr.S_u:
+                    self.G.nodes[s]['Hs'].add(usr)                               
 
     def rd_old_usrs_line_lp (self, line):
         """
@@ -902,13 +899,13 @@ class SFC_mig_simulator (object):
         if (line == []): # if the list of old users that moved is empty
             return
         
-        splitted_line = line[0].split ("\n")[0].split (")")
+        splitted_line = self.parse_old_usrs_line(line)
 
         for tuple in splitted_line:
             if (len(tuple) <= 1):
                 break
             tuple = tuple.split("(")
-            tuple   = tuple[1].split (',')
+            tuple = tuple[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
             if (len(list_of_usr) == 0):
@@ -916,11 +913,7 @@ class SFC_mig_simulator (object):
                 exit ()
             usr    = list_of_usr[0]
             AP_id  = int(tuple[1])
-            if (AP_id > self.num_of_leaves):
-                AP_id = self.num_of_leaves-1
-                if (self.warned_about_too_large_ap == False):
-                    print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
-                    exit ()
+            # self.check_AP_id (AP_id)
             self.CPUAll_single_usr (usr)
 
             # Add this usr to the Hs of every server to which it belongs at its new location
@@ -930,14 +923,25 @@ class SFC_mig_simulator (object):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
     
+    def check_AP_id (self, AP_id):
+        if (AP_id >= self.num_of_leaves):
+            AP_id = self.num_of_leaves-1
+        if (self.warned_about_too_large_ap == False):
+            print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+            exit ()
+    
     def rmv_usr_rsrcs (self, usr):
         """
         Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
         and increase the avilable rsrcs of the srvr that currently place this usr
         """
+        self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+        if (self.alg not in ['alg_top']):
+            return 
+        
+        # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
         for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
             self.G.nodes[s]['Hs'].remove (usr) 
-        self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
             
     def inc_array (self, ar, min_val, max_val):
         """

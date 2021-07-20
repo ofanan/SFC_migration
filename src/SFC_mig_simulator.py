@@ -460,7 +460,7 @@ class SFC_mig_simulator (object):
         elif (self.alg == 'alg_lp'):
             self.simulate_lp ();
         else:
-            print ('Sorry, alg {} is not implemented yet')
+            print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
             exit ()
     
     def simulate_lp (self):
@@ -581,11 +581,11 @@ class SFC_mig_simulator (object):
                     
                 # solve the prob' using the requested alg'    
                 if   (self.alg == 'our_alg'):
-                    self.stts = self.alg_top(self.bottom_up())
+                    self.stts = self.alg_top(self.bottom_up)
                 elif (self.alg == 'wfit'):
-                    self.stts = self.alg_top(self.alg_worst_fit())
+                    self.stts = self.alg_top(self.alg_worst_fit)
                 else:
-                    print ('Sorry, the alg {} that you selected is not supported' .format (self.alg))
+                    print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
                 # By hook or by crook, now we have a feasible solution     
@@ -956,9 +956,9 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
-    ap_file_name = 'vehicles_n_speed_0730.ap'
+    ap_file_name = 'short_0.ap' #'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  

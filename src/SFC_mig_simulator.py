@@ -3,7 +3,6 @@ import numpy as np
 import math
 import itertools 
 import time
-import random
 import heapq
 import pulp as plp
 from cmath import sqrt
@@ -642,7 +641,7 @@ class SFC_mig_simulator (object):
         Run the worst-fit alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
-        for usr in self.usrs: #sorted (self.usrs, key = lambda usr : self.G.nodes[usr.B][-1]):
+        for usr in sorted (self.usrs, key = lambda usr : (usr.B[-1], usr.rand_id)):
             if ( not (self.worst_fit_place_usr (usr))):
                 return fail
         return sccs
@@ -656,7 +655,7 @@ class SFC_mig_simulator (object):
         
         # first, handle the old, existing usrs, in an increasing order of the available cpu on the currently-hosting server
         for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1 and usr.nxt_s==-1, critical_usrs)), 
-                           key = lambda usr : self.G.nodes[usr.cur_s]['a']): 
+                           key = lambda usr : (self.G.nodes[usr.cur_s]['a'], usr.rand_id)): 
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()
                 return self.alg_worst_fit_reshuffle()
@@ -971,7 +970,7 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
-    ap_file_name = 'vehicles_n_speed_0730.ap'
+    ap_file_name = 'short_0.ap' #'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_RES, VERBOSE_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 

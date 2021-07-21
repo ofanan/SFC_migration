@@ -506,14 +506,14 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 3
-    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_DEMOGRAPHY, VERBOSE_CNT, VERBOSE_SPEED])
-    # my_loc2ap.time_period_str = '0730_0830'
-    # my_loc2ap.parse_files (['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_CNT])
+    my_loc2ap.time_period_str = '0830_0831'
+    my_loc2ap.parse_files (['vehicles_n_speed_0830.loc'])#(['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
-    my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
-    input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
-    my_loc2ap.rd_num_of_vehs_per_ap  ('num_of_vehs_per_ap_64aps.txt')
-    my_loc2ap.plot_tot_num_of_vehs_over_t_graph()
+    # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
+    # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
+    # my_loc2ap.rd_num_of_vehs_per_ap  ('num_of_vehs_per_ap_64aps.txt')
+    # my_loc2ap.plot_tot_num_of_vehs_over_t_graph()
     # # my_loc2ap.print_num_of_vehs_diffs ()
     # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
     # my_loc2ap.plot_num_of_vehs_per_ap_graph ()

@@ -77,10 +77,11 @@ class Res_file_parser (object):
     def compare_algs (self):
         # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
         # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
-        lp_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'lp',  self.list_of_dicts)), key = lambda item : item['t'])] )
+        ffit_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'ffit',  self.list_of_dicts)), key = lambda item : item['t'])] )
         alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'our_alg', self.list_of_dicts)), key = lambda item : item['t'])])
-        ratio     = np.divide (alg_cost[1:3339], lp_cost[1:3339])
+        ratio     = np.divide (alg_cost, ffit_cost)
         print ('max_ratio = {}, avg ratio = {}' .format (np.max (ratio), np.average(ratio)))
+        print (ratio)
 
     def plot_num_of_vehs (self):
         # Open input and output files
@@ -102,6 +103,6 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('vehicles_n_speed_0730.res') # ('shorter.res')  
+    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831.res') # ('shorter.res')  
     my_res_file_parser.compare_algs ()        
     

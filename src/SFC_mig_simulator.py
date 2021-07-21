@@ -68,7 +68,7 @@ class SFC_mig_simulator (object):
     # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
     chain_cost_from_non_CLP_state = lambda self, usr, lvl: \
                     sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
-                    self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
+                    len (usr.theta_times_lambda) * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
                     
     # Write an output line for the LP sol, to a given output file (given as a FD==file descriptor) 
     write_lp_res_line = lambda self, FD, model : printf (FD, 't{}.lp.stts{} | cost = {:.0f}\n' .format(self.t, model.status, model.objective.value()))
@@ -439,7 +439,7 @@ class SFC_mig_simulator (object):
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
         self.run_to_calc_rsrc_aug       = run_to_calc_rsrc_aug
-        self.uniform_mig_cost           = 10
+        self.uniform_mig_cost           = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 3
@@ -493,7 +493,7 @@ class SFC_mig_simulator (object):
             if (self.ap_file_name not in ['shorter.ap', 'short_0.ap', 'short_1.ap']):
                 exit ()     
 
-    def simulate (self, alg, final_slot_to_simulate=99999):
+    def simulate (self, alg, final_slot_to_simulate=99999, initial_rsrc_aug=1):
         """
         Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
         """
@@ -511,7 +511,7 @@ class SFC_mig_simulator (object):
              
         print ('Simulating {}. num of leaves = {}. ap file = {} ' .format (self.alg, self.num_of_leaves, self.ap_file_name))
         self.stts     = sccs
-        self.rsrc_aug = 1
+        self.rsrc_aug = initial_rsrc_aug
         self.set_augmented_cpu_in_all_srvrs ()
         print ('rsrc aug = {}' .format (self.rsrc_aug))
         if (self.alg in ['our_alg', 'wfit', 'ffit']):
@@ -655,7 +655,6 @@ class SFC_mig_simulator (object):
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
-                # By hook or by crook, now we have a feasible solution     
                 if (self.stts == sccs and self.alg == 'our_alg'):  
                     self.push_up ()
                     if (VERBOSE_LOG in self.verbose):
@@ -711,9 +710,12 @@ class SFC_mig_simulator (object):
         Run the first-fit alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
-        for usr in sorted (self.usrs, key = lambda usr : usr.rand_id):
-            if ( not (self.first_fit_place_usr (usr))):
+        for usr in self.usrs: #sorted (self.usrs, key = lambda usr : usr.rand_id):
+            if (self.first_fit_place_usr(usr) != sccs):
                 return fail
+            # if (VERBOSE_DEBUG in self.verbose and usr.id >= 2770): #$$$
+            #     list_of_usr_2770 = list (filter (lambda usr : usr.id == 2770, self.usrs))
+            #     printf (self.debug_file, 'u2770.nxt_s={}\n' .format (list_of_usr_2770[0].nxt_s))
         return sccs
     
     def first_fit (self):
@@ -722,10 +724,13 @@ class SFC_mig_simulator (object):
         Returns sccs if found a feasible placement, fail otherwise
         """
 
-        for usr in sorted (self.critical_usrs(), key = lambda usr : usr.rand_id):
-            if ( not (self.first_fit_place_usr (usr))): # failed to find a feasible sol' when considering only the critical usrs
+        for usr in self.critical_usrs(): #sorted (self.critical_usrs(), key = lambda usr : usr.rand_id):
+            if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
                 self.rst_sol()
                 return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
+            # if (VERBOSE_DEBUG in self.verbose and usr.id >= 2770): #$$$
+            #     list_of_usr_2770 = list (filter (lambda usr : usr.id == 2770, self.usrs))
+            #     printf (self.debug_file, 'u2770.nxt_s={}\n' .format (list_of_usr_2770[0].nxt_s))
         return sccs
     
     def first_fit_place_usr (self, usr):
@@ -1073,14 +1078,14 @@ class SFC_mig_simulator (object):
      
 if __name__ == "__main__":
 
-    ap_file_name = 'short_0.ap' #'vehicles_n_speed_0730.ap'
+    ap_file_name = 'vehicles_n_speed_0830_0831.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_RES, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  
                                       )
-    my_simulator.simulate (alg='ffit', final_slot_to_simulate = 27060)# 
+    my_simulator.simulate (alg='ffit', final_slot_to_simulate = 30660, initial_rsrc_aug=1.59) 
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

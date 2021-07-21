@@ -274,6 +274,27 @@ class loc2ap_c (object):
             plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
             plt.clf()
             
+    def plot_tot_num_of_vehs_over_t_graph (self):    
+        """
+        Plot for each ap the number of vehicles associated with it along the trace.
+        """
+        # print (self.num_of_vehs_in_ap[0])
+        gamad = np.sum ([self.num_of_vehs_in_ap[ap][0] for ap in range(self.num_of_APs)])
+        tot_num_of_vehs = [np.sum ([self.num_of_vehs_in_ap[ap][t] for ap in range(self.num_of_APs)]) for t in range(len(self.num_of_vehs_in_ap[0]))]
+        # print (tot_num_of_vehs)
+        # gamad = range(len(self.num_of_vehs_in_ap[0]))
+        # for i in range(len(self.num_of_vehs_in_ap[0])):
+        #     print (i)
+        # exit ()
+        #print (range(3))
+        # print (range(len(self.num_of_vehs_in_ap[0])))
+        plt.title ('Total Number of Vehicles')
+        plt.plot (range(len(self.num_of_vehs_in_ap[0])), tot_num_of_vehs)
+        plt.ylabel ('Number of Vehicles')
+        plt.xlabel ('time [seconds, starting at 07:30]')
+        plt.savefig ('../res/z.jpg')
+        plt.clf()
+
     # def find_max_X_max_Y (self):
     #     max_x, max_y = 0, 0
     #     for i in range (9):
@@ -492,10 +513,11 @@ if __name__ == '__main__':
     my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
     input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
     my_loc2ap.rd_num_of_vehs_per_ap  ('num_of_vehs_per_ap_64aps.txt')
+    my_loc2ap.plot_tot_num_of_vehs_over_t_graph()
     # # my_loc2ap.print_num_of_vehs_diffs ()
-    output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
-    # # my_loc2ap.plot_num_of_vehs_per_ap_graph ()
-    my_loc2ap.print_num_of_vehs_per_server (output_file_name)
+    # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
+    # my_loc2ap.plot_num_of_vehs_per_ap_graph ()
+    # my_loc2ap.print_num_of_vehs_per_server (output_file_name)
     # my_loc2ap.plot_num_of_vehs_heatmap ()
 
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 

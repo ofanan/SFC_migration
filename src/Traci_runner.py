@@ -30,6 +30,8 @@ class Traci_runner (object):
         left_in_this_cycle      = []
         self.verbose            = verbose
         
+        print ('Running Traci on the period from {:.0f} to {:.0f}. Will write res to {} output files' .format (warmup_period, warmup_period+sim_length, num_of_output_files))
+        
         
         if (warmup_period > 0):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
@@ -111,5 +113,5 @@ if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*8.5,
                                     sim_length              = 61, #3600*1,
                                     len_of_time_slot_in_sec = 1,
-                                    num_of_output_files     = 6, 
+                                    num_of_output_files     = 1, 
                                     verbose                 = [VERBOSE_LOC, VERBOSE_SPEED])

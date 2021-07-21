@@ -96,8 +96,10 @@ class SFC_mig_simulator (object):
         """
         prints to a file statistics about the cost of each component in the cost function (cpu, link, and migration). 
         """
-        
-        total_cost = [self.total_cpu_cost_in_slot[t] + self.total_link_cost_in_slot[t] + self.total_mig_cost_in_slot[t] for t in range(len(self.total_cpu_cost_in_slot))]        
+        del (self.total_cpu_cost_in_slot[0])
+        del (self.total_link_cost_in_slot[0])
+        del (self.total_mig_cost_in_slot[0])
+        total_cost = [self.total_cpu_cost_in_slot[t] + self.total_link_cost_in_slot[t] + self.total_mig_cost_in_slot[t] for t in range(len(self.total_cpu_cost_in_slot))] #Ignore the cost in the first slot, in which there're no mig        
         printf (self.cost_comp_output_file, 'total_cost = {}\n' .format (total_cost))
         printf (self.cost_comp_output_file, 'cpu_cost={}\nlink_cost={}\nmig_cost={}\n' .format (
                 self.total_cpu_cost_in_slot, self.total_link_cost_in_slot, self.total_mig_cost_in_slot))
@@ -105,8 +107,8 @@ class SFC_mig_simulator (object):
         cpu_cost_ratio  = [self.total_cpu_cost_in_slot[t]/total_cost[t]  for t in range(len(total_cost))]
         link_cost_ratio = [self.total_link_cost_in_slot[t]/total_cost[t] for t in range(len(total_cost))]
         mig_cost_ratio  = [self.total_mig_cost_in_slot[t]/total_cost[t]  for t in range(len(total_cost))]
-        printf (self.cost_comp_output_file, 'cpu_cost_ratio = {:.3f}\nlink_cost_ratio = {:.3f}\nmig_cost_ratio = {:.3f}\n'.format (
-            cpu_cost_ratio, link_cost_ratio, link_cost_ratio))
+        printf (self.cost_comp_output_file, 'cpu_cost_ratio = {}\nlink_cost_ratio = {}\nmig_cost_ratio = {}\n'.format (
+            cpu_cost_ratio, link_cost_ratio, mig_cost_ratio))
             
         printf (self.cost_comp_output_file, 'avg ratio are: cpu={:.3f}, link={:.3f}, mig={:.3f}\n' .format (
             np.average(cpu_cost_ratio), np.average(link_cost_ratio), np.average(mig_cost_ratio) ) )
@@ -440,7 +442,7 @@ class SFC_mig_simulator (object):
         self.uniform_mig_cost           = 10
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
-        self.uniform_link_cost          = 10
+        self.uniform_link_cost          = 3
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
         self.uniform_target_delay       = 20 #[ms]
@@ -544,7 +546,7 @@ class SFC_mig_simulator (object):
         # Open input and output files
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
         if (VERBOSE_RES in self.verbose):
-            self.init_log_file()
+            self.init_res_file()
                     
         for line in self.ap_file: 
         
@@ -579,8 +581,8 @@ class SFC_mig_simulator (object):
         """ 
         self.t = int(time_str)
         if (self.is_first_t):
-            self.init_t     = self.t
-            if (self.final_slot_to_simulate < self.init):
+            self.first_slot     = self.t
+            if (self.final_slot_to_simulate < self.first_slot):
                 print ('Error: final slot stated is earlier than the first simulation slot')
             self.is_first_t = False
         if (VERBOSE_LOG in self.verbose):
@@ -682,7 +684,7 @@ class SFC_mig_simulator (object):
         print statistics about the number of usrs who moved, and the num of migrations between every two levels in the tree.
         """
 
-        sim_len = float(self.t - self.init_t)
+        sim_len = float(self.t - self.first_slot)
         del (self.num_of_migs_in_slot[0]) # remove the mig' recorded in the first slot, which is irrelevant (corner case)
         printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moves_in_slot)) / sim_len))
         printf (self.mob_output_file, '// avg num of usrs who migrated per slot = {:.0f}\n' .format (float(sum(self.num_of_migs_in_slot)) / sim_len))
@@ -734,8 +736,7 @@ class SFC_mig_simulator (object):
         
         for s in reversed(usr.S_u):
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
-                usr.nxt_s = s
-                usr.lvl   = self.G.nodes[s]['lvl'] 
+                self.place_usr_on_s (usr, s)
                 return sccs
         return fail
     
@@ -788,10 +789,7 @@ class SFC_mig_simulator (object):
         delay_feasible_servers = sorted (usr.S_u, key = lambda s : self.G.nodes[s]['a'], reverse=True) # sort the delay-feasible servers in a dec' order of available resources (worst-fit approach)
         for s in delay_feasible_servers: # for every delay-feasible server 
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
-                mig_dst   = self.G.nodes[s]['id'] # id of the migration's destination
-                usr.nxt_s = mig_dst # mark this server as this usr's place in the next slot
-                usr.lvl   = self.G.nodes[s]['lvl']
-                self.G.nodes[s]['a'] -= usr.B[self.G.nodes[mig_dst]['lvl']] # dec' the available cpu at the dest' accordingly. If this is an old user, the resources it used in the current location were already released by rd_old_usrs_line ()
+                self.place_usr_on_s(usr, self.G.nodes[s]['id'] )
                 return True
         return False  
     
@@ -870,12 +868,18 @@ class SFC_mig_simulator (object):
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
             for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id)): # for each chain in Hs, in an increasing order of level ('L')
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
-                    usr.nxt_s = s
-                    usr.lvl   = lvl
-                    self.G.nodes[s]['a'] -= usr.B[lvl]
+                    self.place_usr_on_s (usr, s)
                 elif (len (usr.B)-1 == lvl):
                     return fail
         return sccs
+
+    def place_usr_on_s (self, usr, s):
+        """
+        Place the given usr on the given srvr, and reduce s's available cpu accordingly.
+        """
+        usr.nxt_s             = s
+        usr.lvl               = self.G.nodes[s]['lvl']
+        self.G.nodes[s]['a'] -= usr.B[self.G.nodes[s]['lvl']]
 
     def rd_new_usrs_line_lp (self, line):
         """
@@ -953,7 +957,7 @@ class SFC_mig_simulator (object):
             return
         
         splitted_line = self.parse_old_usrs_line(line)
-        if (VERBOSE_MOB in self.verbose and self.t > self.init_t):
+        if (VERBOSE_MOB in self.verbose and self.t > self.first_slot):
             self.num_of_moves_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
 
         for tuple in splitted_line:
@@ -1071,7 +1075,7 @@ if __name__ == "__main__":
 
     ap_file_name = 'short_0.ap' #'vehicles_n_speed_0730.ap'
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_DEBUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  

@@ -495,12 +495,12 @@ class SFC_mig_simulator (object):
             if (self.ap_file_name not in ['shorter.ap', 'short_0.ap', 'short_1.ap']):
                 exit ()     
 
-    def simulate (self, alg, final_slot_to_simulate=99999, initial_rsrc_aug=1):
+    def simulate (self, alg, sim_len_in_slots=99999, initial_rsrc_aug=1):
         """
         Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
         """
-        self.alg         = alg
-        self.final_slot_to_simulate = final_slot_to_simulate
+        self.alg              = alg
+        self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
@@ -560,7 +560,7 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
         
             if (splitted_line[0] == "t"):
-                self.rd_line_t (splitted_line[2])
+                self.rd_t_line (splitted_line[2])
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
@@ -577,15 +577,14 @@ class SFC_mig_simulator (object):
                 self.solve_by_plp () 
                 self.cur_st_params = self.d_vars
                     
-    def rd_line_t (self, time_str):
+    def rd_t_line (self, time_str):
         """
         read the line describing a new time slot in the input file. Init some variables accordingly.
         """ 
         self.t = int(time_str)
         if (self.is_first_t):
             self.first_slot     = self.t
-            if (self.final_slot_to_simulate < self.first_slot):
-                print ('Error: final slot stated is earlier than the first simulation slot')
+            self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
             self.is_first_t = False
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
@@ -624,7 +623,7 @@ class SFC_mig_simulator (object):
             splitted_line = line.split (" ")
 
             if (splitted_line[0] == "t"):
-                self.rd_line_t (splitted_line[2])
+                self.rd_t_line (splitted_line[2])
                 if (self.t > self.final_slot_to_simulate):
                     self.post_processing ()
                     exit ()
@@ -1085,7 +1084,7 @@ if __name__ == "__main__":
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  
                                       )
-    my_simulator.simulate (alg='ffit', final_slot_to_simulate = 30603, initial_rsrc_aug=1) 
+    my_simulator.simulate (alg='ffit', sim_len_in_slots = 3, initial_rsrc_aug=1) 
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

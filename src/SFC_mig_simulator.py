@@ -126,7 +126,7 @@ class SFC_mig_simulator (object):
         """
         Print to the res, log, and debug files the solution and/or additional info.
         """
-        if (VERBOSE_RES in self.verbose):
+        if (VERBOSE_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
             self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost())
         elif (VERBOSE_COST_COMP in self.verbose):
             self.calc_sol_cost_components()
@@ -234,7 +234,7 @@ class SFC_mig_simulator (object):
             self.res_output_file =  open ('../res/' + self.res_file_name,  "w")
             printf (self.res_output_file, '// format: t{T}.{Alg}.cpu{C}.stts{s} | cost = c, where\n// T is the slot cnt (read from the input file)\n')
             printf (self.res_output_file, '// Alg is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
-            printf (self.res_output_file, '// c is the total cost of the solution\n') 
+            printf (self.res_output_file, '// c is the total cost of the solution\n\n') 
 
     def init_log_file (self, overwrite = True):
         """
@@ -378,8 +378,8 @@ class SFC_mig_simulator (object):
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
-        self.cpu_cap_at_lvl    = np.array ([30  * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
-                                 np.array ([560 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
+        self.cpu_cap_at_lvl    = np.array ([30                   * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
+                                 np.array ([self.cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -440,7 +440,7 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4):
+    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4, cpu_cap_at_leaf=561):
         """
         """
         
@@ -450,6 +450,7 @@ class SFC_mig_simulator (object):
         # Network parameters
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
+        self.cpu_cap_at_leaf            = cpu_cap_at_leaf
         self.uniform_mig_cost           = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -552,6 +553,20 @@ class SFC_mig_simulator (object):
             printf (self.mob_output_file, '// results for running alg alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
             printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
     
+    def rd_t_line (self, time_str):
+        """
+        read the line describing a new time slot in the input file. Init some variables accordingly.
+        """ 
+        self.t = int(time_str)
+        if (self.is_first_t):
+            self.first_slot     = self.t
+            self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
+        if (VERBOSE_LOG in self.verbose):
+            printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+        if (self.alg in ['our_alg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
+            for usr in self.usrs:
+                usr.calc_rand_id ()
+                    
     def simulate_lp (self):
         """
         Simulate the whole simulation, using a LP fractional solution.
@@ -574,6 +589,9 @@ class SFC_mig_simulator (object):
         
             if (splitted_line[0] == "t"):
                 self.rd_t_line (splitted_line[2])
+                if (self.t >= self.final_slot_to_simulate):
+                    self.post_processing ()
+                    return 
                 continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
@@ -589,24 +607,7 @@ class SFC_mig_simulator (object):
                 self.set_last_time()
                 self.stts = self.alg_top(self.solve_by_plp)
                 self.cur_st_params = self.d_vars
-                    
-    def rd_t_line (self, time_str):
-        """
-        read the line describing a new time slot in the input file. Init some variables accordingly.
-        """ 
-        self.t = int(time_str)
-        if (self.is_first_t):
-            self.first_slot     = self.t
-            self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
             self.is_first_t = False
-        if (VERBOSE_LOG in self.verbose):
-            printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        if (self.alg in ['our_alg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
-            for usr in self.usrs:
-                usr.calc_rand_id ()
-        if (self.t > self.final_slot_to_simulate):
-            self.post_processing ()
-            exit ()
                     
     def simulate_algs (self):
         """
@@ -624,11 +625,6 @@ class SFC_mig_simulator (object):
             if (self.alg in ['our_alg']):
                 self.G.nodes[s]['Hs']  = set() 
         
-        # Open input and output files
-        self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
-        if (VERBOSE_RES in self.verbose):
-            self.init_log_file()
-            
         for line in self.ap_file: 
 
             # Ignore comments lines
@@ -640,6 +636,9 @@ class SFC_mig_simulator (object):
 
             if (splitted_line[0] == "t"):
                 self.rd_t_line (splitted_line[2])
+                if (self.t >= self.final_slot_to_simulate):
+                    self.post_processing ()
+                    return 
                 continue
                 
             elif (splitted_line[0] == "usrs_that_left:"):
@@ -680,6 +679,7 @@ class SFC_mig_simulator (object):
                 
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                      usr.cur_s = usr.nxt_s
+                self.is_first_t = False
         
         self.post_processing()
     
@@ -813,12 +813,16 @@ class SFC_mig_simulator (object):
     def alg_top (self, placement_alg):
         """
         Binary search for a feasible sol that minimizes the resource augmentation R.
-        The search is done by calling bottom_up ().
+        The search is done by calling the placement_alg given as input.
         """
         
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         if (placement_alg() == sccs):
             return sccs
+
+        # # Now we know that the run failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
+        # if (CALC_RSRC_AUG not in self.verbose):
+        #     return fail
 
         # Couldn't solve the problem without additional rsrc aug --> begin a binary search for the amount of rsrc aug' needed.
         if (VERBOSE_LOG in self.verbose):
@@ -833,7 +837,9 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['RCs'] = math.ceil (max_R * self.G.nodes[s]['cpu cap']) 
             self.G.nodes[s]['a']   = self.G.nodes[s]['RCs'] #currently-available rsrcs at server s  
 
-        if (placement_alg() != sccs):
+        self.stts = placement_alg() 
+        if (self.stts != sccs):
+            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost())
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
 
@@ -1088,18 +1094,41 @@ class SFC_mig_simulator (object):
             ar[idx] = min_val[idx]
         return ar 
      
-if __name__ == "__main__":
 
+
+def run_cost_vs_rsrc_sim ():
+    
+    for cpu_cap in [(561 + 56*i) for i in range (10, 11)]:
+        for alg in ['ffit']:
+            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                              verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
+                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                              cpu_cap_at_leaf       = cpu_cap
+                                              )
+        
+            my_simulator.simulate (alg              = alg,  
+                                   sim_len_in_slots = 2, 
+                                   initial_rsrc_aug = 1
+                                   )     
+     
+if __name__ == "__main__":
+    
     ap_file_name = 'vehicles_n_speed_0830_0831.ap'
+    run_cost_vs_rsrc_sim ()
+    exit ()
+
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBOSE_DEBUG, CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
-                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4
+                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                      cpu_cap_at_leaf       = 562
                                       )
 
-    my_simulator.simulate (alg='lp', # pick an algorithm from the list: ['lp', 'our_alg', 'wfit', 'ffit'] 
-                           sim_len_in_slots = 61, 
-                           initial_rsrc_aug=1) 
+    my_simulator.simulate (alg              ='our_alg', # pick an algorithm from the list: ['lp', 'our_alg', 'wfit', 'ffit'] 
+                           sim_len_in_slots = 3, 
+                           initial_rsrc_aug =1
+                           ) 
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

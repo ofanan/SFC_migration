@@ -56,15 +56,15 @@ class Res_file_parser (object):
         cost              = float(splitted_line[1].split("=")[1])
         splitted_settings = settings.split (".")
 
-        if len (splitted_line) < num_of_fields:
+        if len (splitted_settings) < num_of_fields:
             print ("encountered a format error. Splitted line is {}" .format (splitted_line))
-            return False
+            exit ()
                
         self.dict = {
-            "t"     : int (splitted_settings [t_idx].split('t')[1]),
+            "t"     : int (splitted_settings [t_idx]   .split('t')[1]),
             "alg"   : splitted_settings      [alg_idx],
-            "cpu"   : int (splitted_settings [cpu_idx].split("cpu")[1]),  
-            "stts"  : int (splitted_settings [cpu_idx].split("stts")[1]),  
+            "cpu"   : int (splitted_settings [cpu_idx] .split("cpu")[1]),  
+            "stts"  : int (splitted_settings [stts_idx].split("stts")[1]),  
             "cost"  : float(splitted_line[1].split(" = ")[1])
             }
 
@@ -73,7 +73,7 @@ class Res_file_parser (object):
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
         """
-        if (alg_mode != None):
+        if (alg != None):
             list_to_filter = list (filter (lambda item : item['alg'] == alg, list_to_filter))    
         if (cpu != -1):
             list_to_filter = list (filter (lambda item : item['cpu'] == cpu, list_to_filter))    
@@ -98,7 +98,7 @@ class Res_file_parser (object):
         if (not (addplot_str == None)):
             printf (self.output_file, addplot_str)
         for dict in sorted (list_of_dict, key = lambda i: i[key_to_sort]):
-            printf (self.output_file, '({:.0f}, {:.04f})' .format (dict[key_to_sort], dict['cost']))
+            printf (self.output_file, '({:.0f}, {:.0f})' .format (dict[key_to_sort], dict['cost']))
         printf (self.output_file, self.end_add_plot_str)
         if (not (add_legend_str == None)): # if the caller requested to print an "add legend" str          
             printf (self.output_file, '\t\t{}{}' .format (self.add_legend_str, legend_entry))    
@@ -109,14 +109,14 @@ class Res_file_parser (object):
     def plot_cost_vs_rsrcs (self):
         opt_list = self.gen_filtered_list (self.list_of_dicts, alg='lp', cpu=561, stts=1)
         
-        self.print_single_tikz_plot(opt_list, t)
+        self.print_single_tikz_plot(opt_list, key_to_sort='t')
 
     def compare_algs (self):
         # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
         # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
-        ffit_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'ffit',  self.list_of_dicts)), key = lambda item : item['t'])] )
-        alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['solver'] == 'our_alg', self.list_of_dicts)), key = lambda item : item['t'])])
-        ratio     = np.divide (alg_cost, ffit_cost)
+        opt_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'lp',  self.list_of_dicts)), key = lambda item : item['t'])] )
+        alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'our_alg', self.list_of_dicts)), key = lambda item : item['t'])])
+        ratio     = np.divide (alg_cost, opt_cost)
         print ('max_ratio = {}, avg ratio = {}' .format (np.max (ratio), np.average(ratio)))
         print (ratio)
 
@@ -140,6 +140,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831.res') # ('shorter.res')  
-    my_res_file_parser.plot_cost_vs_rsrcs ()        
+    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831.res') # ('shorter.res')
+    my_res_file_parser.compare_algs()  
+    # my_res_file_parser.plot_cost_vs_rsrcs ()        
     

@@ -7,6 +7,7 @@ import heapq
 import pulp as plp
 from cmath import sqrt
 import matplotlib.pyplot as plt
+import random
 # from scipy.optimize import linprog # currently unused
 
 from usr_c    import usr_c    # class of the users of alg
@@ -84,7 +85,7 @@ class SFC_mig_simulator (object):
     
     # returns a list of the critical usrs
     critical_usrs = lambda self : list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) 
-    
+
     def set_last_time (self):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
@@ -450,6 +451,7 @@ class SFC_mig_simulator (object):
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
         self.max_R                      = 4 # maximal rsrc augmenation to consider
+        random.seed (42)                    # Use a fixed pseudo-number seed 
         
         # Init output files
         if (VERBOSE_RES in self.verbose):
@@ -587,7 +589,7 @@ class SFC_mig_simulator (object):
             self.is_first_t = False
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        if (self.alg in ['our_alg', 'wfit', 'ffit'] and (self.t % 100 == 1)): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
+        if (self.alg in ['our_alg', 'wfit', 'ffit'] and (self.t % 10  == 1)): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
             for usr in self.usrs:
                 usr.calc_rand_id ()
                     
@@ -710,12 +712,9 @@ class SFC_mig_simulator (object):
         Run the first-fit alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
-        for usr in self.usrs: #sorted (self.usrs, key = lambda usr : usr.rand_id):
+        for usr in sorted (self.usrs, key = lambda usr : usr.rand_id):
             if (self.first_fit_place_usr(usr) != sccs):
                 return fail
-            # if (VERBOSE_DEBUG in self.verbose and usr.id >= 2770): #$$$
-            #     list_of_usr_2770 = list (filter (lambda usr : usr.id == 2770, self.usrs))
-            #     printf (self.debug_file, 'u2770.nxt_s={}\n' .format (list_of_usr_2770[0].nxt_s))
         return sccs
     
     def first_fit (self):
@@ -724,7 +723,7 @@ class SFC_mig_simulator (object):
         Returns sccs if found a feasible placement, fail otherwise
         """
 
-        for usr in self.critical_usrs(): #sorted (self.critical_usrs(), key = lambda usr : usr.rand_id):
+        for usr in sorted (self.critical_usrs(), key = lambda usr : usr.rand_id):
             if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
                 self.rst_sol()
                 return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
@@ -770,7 +769,8 @@ class SFC_mig_simulator (object):
                 return self.worst_fit_reshuffle()
                         
         # next, handle the new usrs, namely, that are not currently hosted on any server
-        for usr in list (filter (lambda usr : usr.cur_s==-1 and usr.nxt_s==-1, critical_usrs)): 
+        for usr in sorted (list (filter (lambda usr : usr.cur_s==-1 and usr.nxt_s==-1, critical_usrs),
+                           key = lambda usr : usr.rand_id)): 
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()
                 return self.worst_fit_reshuffle()
@@ -1085,7 +1085,7 @@ if __name__ == "__main__":
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       run_to_calc_rsrc_aug  = True # When true, this run will binary-search the minimal resource aug. needed to find a feasible sol. for the prob'  
                                       )
-    my_simulator.simulate (alg='ffit', final_slot_to_simulate = 30660, initial_rsrc_aug=1.59) 
+    my_simulator.simulate (alg='ffit', final_slot_to_simulate = 30603, initial_rsrc_aug=1) 
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

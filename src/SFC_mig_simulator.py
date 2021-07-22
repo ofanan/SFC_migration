@@ -674,8 +674,8 @@ class SFC_mig_simulator (object):
                         printf (self.log_output_file, 'after push-up\n')
                 
                 self.print_sol_to_res_and_log ()
-                if (self.stts==fail):
-                    self.rst_sol()
+                if (self.stts!=sccs):
+                    return # Currently, we don't try to further simulate, once alg fails to find a sol even for a single slot
                 
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                      usr.cur_s = usr.nxt_s
@@ -817,12 +817,13 @@ class SFC_mig_simulator (object):
         """
         
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
-        if (placement_alg() == sccs):
+        self.stts = placement_alg()
+        if (self.stts == sccs):
             return sccs
 
-        # # Now we know that the run failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
-        # if (CALC_RSRC_AUG not in self.verbose):
-        #     return fail
+        # Now we know that the run failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
+        if (CALC_RSRC_AUG not in self.verbose):
+            return self.stts
 
         # Couldn't solve the problem without additional rsrc aug --> begin a binary search for the amount of rsrc aug' needed.
         if (VERBOSE_LOG in self.verbose):
@@ -1073,6 +1074,7 @@ class SFC_mig_simulator (object):
         Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
         and increase the avilable rsrcs of the srvr that currently place this usr
         """
+        #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
         if (self.alg not in ['our_alg']):
             return 
@@ -1098,8 +1100,8 @@ class SFC_mig_simulator (object):
 
 def run_cost_vs_rsrc_sim ():
     
-    for cpu_cap in [(561 + 56*i) for i in range (10, 11)]:
-        for alg in ['ffit']:
+    for cpu_cap in [(561 + 56*i) for i in range (1,11)]:
+        for alg in ['lp']:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
@@ -1108,7 +1110,7 @@ def run_cost_vs_rsrc_sim ():
                                               )
         
             my_simulator.simulate (alg              = alg,  
-                                   sim_len_in_slots = 2, 
+                                   sim_len_in_slots = 61, 
                                    initial_rsrc_aug = 1
                                    )     
      

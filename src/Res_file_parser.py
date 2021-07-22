@@ -68,19 +68,19 @@ class Res_file_parser (object):
             "cost"  : float(splitted_line[1].split(" = ")[1])
             }
 
-    def gen_filtered_list (self, list_to_filter, alg = None, cpu = -1, stts = -1, t = -1):
+    def gen_filtered_list (self, list_to_filter, t = -1, alg = None, cpu = -1, stts = -1):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
         """
+        if (t != -1):
+            list_to_filter = list (filter (lambda item : item['t'] == t, list_to_filter))    
         if (alg != None):
             list_to_filter = list (filter (lambda item : item['alg'] == alg, list_to_filter))    
         if (cpu != -1):
             list_to_filter = list (filter (lambda item : item['cpu'] == cpu, list_to_filter))    
         if (stts != -1):
             list_to_filter = list (filter (lambda item : item['stts'] == stts, list_to_filter))    
-        if (cpu != -1):
-            list_to_filter = list (filter (lambda item : item['cpu'] == cpu, list_to_filter))    
         return list_to_filter
 
     def print_single_tikz_plot (self, list_of_dict, key_to_sort, addplot_str = None, add_legend_str = None, legend_entry = None):
@@ -106,10 +106,16 @@ class Res_file_parser (object):
         printf (self.output_file, '\n\n')    
 
 
-    def plot_cost_vs_rsrcs (self):
-        opt_list = self.gen_filtered_list (self.list_of_dicts, alg='lp', cpu=561, stts=1)
+    def plot_cost_vs_rsrcs_normalized (self):
+        opt_list     = self.gen_filtered_list (self.list_of_dicts, alg='lp',      t=30601, stts=1)
+        norm_factor  = opt_list[-1]['cost']
+        our_alg_list = self.gen_filtered_list (self.list_of_dicts, alg='our_alg', t=30601, stts=1)
         
-        self.print_single_tikz_plot(opt_list, key_to_sort='t')
+        # for alg in  
+        # self.print_single_tikz_plot ([opt_list[i] / opt_list[0] for i in range (len (opt_list))], key_to_sort='cpu')
+        #
+        #
+        # self.print_single_tikz_plot(our_alg_list, key_to_sort='cpu')
 
     def compare_algs (self):
         # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
@@ -141,6 +147,6 @@ class Res_file_parser (object):
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831.res') # ('shorter.res')
-    my_res_file_parser.compare_algs()  
-    # my_res_file_parser.plot_cost_vs_rsrcs ()        
+    my_res_file_parser.plot_cost_vs_rsrcs_normalized ()        
+    # my_res_file_parser.compare_algs()  
     

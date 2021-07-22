@@ -74,7 +74,7 @@ class SFC_mig_simulator (object):
                     len (usr.theta_times_lambda) * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
                     
     # Print a solution for the problem to the output res file #self.calc_alg_sol_cost() 
-    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}.{}.cpu{}.stts{} | cost = {:.0f} | rsrc_aug = {:.2f}\n' .format(self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.stts, sol_cost, self.rsrc_aug)) 
+    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}.{}.cpu{}.stts{} | cost = {:.0f}\n' .format(self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.stts, sol_cost)) 
 
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -379,7 +379,7 @@ class SFC_mig_simulator (object):
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.cpu_cap_at_lvl    = np.array ([30  * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
-                                 np.array ([360 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
+                                 np.array ([560 * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -460,7 +460,7 @@ class SFC_mig_simulator (object):
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
-        self.max_R                      = 4 # maximal rsrc augmenation to consider
+        self.max_R                      = 2 # maximal rsrc augmenation to consider
         random.seed (42)                    # Use a fixed pseudo-number seed 
         
         # Init output files

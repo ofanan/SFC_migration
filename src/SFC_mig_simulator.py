@@ -83,7 +83,7 @@ class SFC_mig_simulator (object):
     s_has_sufic_avail_cpu_for_usr = lambda self, s, usr : (self.G.nodes[s]['a'] >= usr.B[self.G.nodes[s]['lvl']])
     
     # returns a list of the critical usrs
-    critical_usrs = lambda self : list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) 
+    unplaced_usrs = lambda self : list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) 
 
     def set_last_time (self):
         """
@@ -735,7 +735,7 @@ class SFC_mig_simulator (object):
         Returns sccs if found a feasible placement, fail otherwise
         """
 
-        for usr in sorted (self.critical_usrs(), key = lambda usr : usr.rand_id):
+        for usr in sorted (self.unplaced_usrs(), key = lambda usr : usr.rand_id):
             if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
                 self.rst_sol()
                 return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
@@ -771,17 +771,17 @@ class SFC_mig_simulator (object):
         Run the worst-fit alg'.
         Returns sccs if found a feasible placement, fail otherwise
         """
-        critical_usrs = self.critical_usrs () 
+        unplaced_usrs = self.unplaced_usrs () 
         
         # first, handle the old, existing usrs, in an increasing order of the available cpu on the currently-hosting server
-        for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1 and usr.nxt_s==-1, critical_usrs)), 
+        for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1 and usr.nxt_s==-1, unplaced_usrs)), 
                            key = lambda usr : (self.G.nodes[usr.cur_s]['a'], usr.rand_id)): 
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()
                 return self.worst_fit_reshuffle()
                         
         # next, handle the new usrs, namely, that are not currently hosted on any server
-        for usr in sorted (list (filter (lambda usr : usr.cur_s==-1 and usr.nxt_s==-1, critical_usrs),
+        for usr in sorted (list (filter (lambda usr : usr.cur_s==-1 and usr.nxt_s==-1, unplaced_usrs),
                            key = lambda usr : usr.rand_id)): 
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()
@@ -1000,25 +1000,27 @@ class SFC_mig_simulator (object):
             # self.check_AP_id (AP_id)
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
 
-            # Add this usr to the Hs of every server to which it belongs at its new location
+            # Add this usr to the Hs of every server to which it belongs in its new location
             s       = self.ap2s[AP_id]
             usr.S_u = [s]
             for lvl in (range (len(usr.B)-1)):
                 s = self.parent_of(s)
                 usr.S_u.append (s)
     
-            # If this alg ues 'Hs', we have to update it, so that for each server, 
-            # Hs of a server includes a usr only if s is delay-feasible for this usr also after the usr moved. 
-            if (self.alg in ['our_alg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): # Can satisfy delay constraint while staying in the cur location and keeping the CPU budget
+            
+            # Check whether it's possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
+            if (self.alg in ['our_alg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
                 
+                # Yep: the delay constraint are satisfied also in the current placement. 
+                # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
                 for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
-                    self.G.nodes[s]['Hs'].remove (usr) 
+                    self.G.nodes[s]['Hs'].remove (usr) # Remove the usr from  'Hs' in all locations 
                 for s in usr.S_u:
-                    self.G.nodes[s]['Hs'].add(usr)                               
+                    self.G.nodes[s]['Hs'].add(usr)     # Add the usr only to the 'Hs' of its delay-feasible servers                          
                 continue
+            
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
-
             self.rmv_usr_rsrcs (usr) # Free the resources of this user in its current place            
             usr.lvl   = -1
             usr.nxt_s = -1
@@ -1102,6 +1104,9 @@ class SFC_mig_simulator (object):
 
 
 def run_cost_vs_rsrc_sim ():
+    """
+    Iteratively simulate for several algs and cpu capacities
+    """
     
     for cpu_cap in [(561 + 56*i) for i in range (1,11)]:
         for alg in ['our_alg', 'ffit']:
@@ -1123,7 +1128,7 @@ if __name__ == "__main__":
     # run_cost_vs_rsrc_sim ()
 
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                       cpu_cap_at_leaf       = 562
@@ -1132,8 +1137,8 @@ if __name__ == "__main__":
     print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
     exit ()
 
-    my_simulator.simulate (alg              ='our_alg', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
-                           sim_len_in_slots = 3, 
+    my_simulator.simulate (alg              ='ffit', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
+                           sim_len_in_slots = 1, 
                            initial_rsrc_aug =1
                            ) 
     

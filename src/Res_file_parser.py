@@ -9,23 +9,36 @@ cpu_idx       = 2
 stts_idx      = 3
 num_of_fields = 3
 
+opt_idx   = 0
+alg_idx   = 1
+ffit_idx  = 2
+cpvnf_idx = 3
+
 class Res_file_parser (object):  
 
     def __init__ (self):
         """
         """
-        self.add_plot_opt   = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_str1  = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_fno1  = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_fna1  = '\t\t\\addplot [color = red, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_fno2  = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_fna2  = '\t\t\\addplot [color = blue,  mark = *, mark options = {mark size = 2, fill = blue},  line width = \plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_our_alg = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_ffit    = '\t\t\\addplot [color = red, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_fna2    = '\t\t\\addplot [color = blue,  mark = *, mark options = {mark size = 2, fill = blue},  line width = \plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
         self.add_legend_str = '\n\t\t\\addlegendentry {'
-        self.add_plot_str_dict = {'Opt' : self.add_plot_opt, 'FNAA' : self.add_plot_fna2, 'FNOA' : self.add_plot_fno2}
-        self.legend_entry_dict = {'Opt' : '\\opt', 
-                                  'FNOA' : '\\pgmfno'}
+        # self.add_plot_str_vec = [self.add_plot_opt, self.add_plot_alg, self.add_plot_ffit, self.add_plot_cpvnf]
 
+        self.add_plot_str_dict = {'opt'     : self.add_plot_opt,
+                                  'our_alg' : self.add_plot_our_alg,
+                                  'ffit'    : self.add_plot_ffit,
+                                  'cpvnf'   : self.add_plot_cpvnf}
+
+        self.legend_entry_dict = {'opt'     :  '\opt', 
+                                  'our_alg' : '\ourAlg', 
+                                  'ffit'    : '\\ffit',
+                                  'cpvnf'   : '\cpvnf'}
+        
     def parse_file (self, input_file_name):
     
         self.input_file     = open ("../res/" + input_file_name,  "r")
@@ -68,13 +81,12 @@ class Res_file_parser (object):
             "cost"  : float(splitted_line[1].split(" = ")[1])
             }
 
-    def gen_filtered_list (self, list_to_filter, t = -1, alg = None, cpu = -1, stts = -1):
+    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), alg = None, cpu = -1, stts = -1):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
         """
-        if (t != -1):
-            list_to_filter = list (filter (lambda item : item['t'] == t, list_to_filter))    
+        list_to_filter = list (filter (lambda item : item['t'] >= min_t and item['t'] <= max_t, list_to_filter))    
         if (alg != None):
             list_to_filter = list (filter (lambda item : item['alg'] == alg, list_to_filter))    
         if (cpu != -1):
@@ -98,7 +110,7 @@ class Res_file_parser (object):
         if (not (addplot_str == None)):
             printf (self.output_file, addplot_str)
         for dict in sorted (list_of_dict, key = lambda i: i[key_to_sort]):
-            printf (self.output_file, '({:.0f}, {:.0f})' .format (dict[key_to_sort], dict['cost']))
+            printf (self.output_file, '({:.4f}, {:.4f})' .format (dict[key_to_sort], dict['cost']))
         printf (self.output_file, self.end_add_plot_str)
         if (not (add_legend_str == None)): # if the caller requested to print an "add legend" str          
             printf (self.output_file, '\t\t{}{}' .format (self.add_legend_str, legend_entry))    
@@ -106,21 +118,46 @@ class Res_file_parser (object):
         printf (self.output_file, '\n\n')    
 
 
-    def plot_cost_vs_rsrcs_normalized (self):
-        opt_list     = self.gen_filtered_list (self.list_of_dicts, alg='lp',      t=30601, stts=1)
-        norm_factor  = opt_list[-1]['cost']
-        our_alg_list = self.gen_filtered_list (self.list_of_dicts, alg='our_alg', t=30601, stts=1)
+    def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = True):
+        min_t, max_t = 30601, 30661
+        opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt',min_t=min_t, max_t=max_t, stts=1),
+                           key = lambda item : item['cpu'])
+        cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+        X_norm_factor = cpu_vals[0] if normalize_X else 1 # normalize X axis by the minimum cpu
         
-        # for alg in  
-        # self.print_single_tikz_plot ([opt_list[i] / opt_list[0] for i in range (len (opt_list))], key_to_sort='cpu')
-        #
-        #
-        # self.print_single_tikz_plot(our_alg_list, key_to_sort='cpu')
+        opt_avg_list = []
+        for cpu in cpu_vals:
+            opt_avg_list.append (np.average ([item['cost'] for item in 
+                                 list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
+        
+        Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
+
+        for alg in ['opt', 'our_alg', 'ffit']:
+            
+            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
+                           key = lambda item : item['cpu'])
+                       
+            if (len(alg_list)==0):
+                continue
+
+            alg_avg_list = []
+            
+            for cpu in cpu_vals:
+                alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) ) 
+                if (len(alg_vals_for_this_cpu)==0):
+                    continue
+                alg_avg_list.append ({'cpu'  : cpu / X_norm_factor,
+                                      'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu]) / Y_norm_factor })
+
+                if (len(alg_avg_list)==0):
+                    continue
+        
+            self.print_single_tikz_plot (alg_avg_list, key_to_sort='cpu', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg]) 
 
     def compare_algs (self):
-        # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
-        # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'lp', self.list_of_dicts)), key = lambda item : item['t'])
-        opt_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'lp',  self.list_of_dicts)), key = lambda item : item['t'])] )
+        # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'opt', self.list_of_dicts)), key = lambda item : item['t'])
+        # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'opt', self.list_of_dicts)), key = lambda item : item['t'])
+        opt_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'opt',  self.list_of_dicts)), key = lambda item : item['t'])] )
         alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'our_alg', self.list_of_dicts)), key = lambda item : item['t'])])
         ratio     = np.divide (alg_cost, opt_cost)
         print ('max_ratio = {}, avg ratio = {}' .format (np.max (ratio), np.average(ratio)))
@@ -147,6 +184,6 @@ class Res_file_parser (object):
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831.res') # ('shorter.res')
-    my_res_file_parser.plot_cost_vs_rsrcs_normalized ()        
+    my_res_file_parser.plot_cost_vs_rsrcs ()        
     # my_res_file_parser.compare_algs()  
     

@@ -523,7 +523,7 @@ class SFC_mig_simulator (object):
         print ('rsrc aug = {}' .format (self.rsrc_aug))
         if (self.alg in ['our_alg', 'wfit', 'ffit']):
             self.simulate_algs()
-        elif (self.alg == 'lp'):
+        elif (self.alg == 'opt'):
             self.simulate_lp ();
         else:
             print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
@@ -1096,12 +1096,15 @@ class SFC_mig_simulator (object):
             ar[idx] = min_val[idx]
         return ar 
      
+    def calc_total_cpu_rsrcs (self):
+        return sum ([self.G.nodes[s]['cpu cap'] for s in self.G.nodes])
+     
 
 
 def run_cost_vs_rsrc_sim ():
     
     for cpu_cap in [(561 + 56*i) for i in range (1,11)]:
-        for alg in ['lp']:
+        for alg in ['our_alg', 'ffit']:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
@@ -1113,12 +1116,11 @@ def run_cost_vs_rsrc_sim ():
                                    sim_len_in_slots = 61, 
                                    initial_rsrc_aug = 1
                                    )     
-     
+
 if __name__ == "__main__":
     
     ap_file_name = 'vehicles_n_speed_0830_0831.ap'
-    run_cost_vs_rsrc_sim ()
-    exit ()
+    # run_cost_vs_rsrc_sim ()
 
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
@@ -1127,10 +1129,14 @@ if __name__ == "__main__":
                                       cpu_cap_at_leaf       = 562
                                       )
 
-    my_simulator.simulate (alg              ='our_alg', # pick an algorithm from the list: ['lp', 'our_alg', 'wfit', 'ffit'] 
+    print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
+    exit ()
+
+    my_simulator.simulate (alg              ='our_alg', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
                            sim_len_in_slots = 3, 
                            initial_rsrc_aug =1
                            ) 
+    
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

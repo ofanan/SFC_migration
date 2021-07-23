@@ -45,10 +45,10 @@ class SFC_mig_simulator (object):
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_CLP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost (usr, lvl)     
+    chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_CLP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost_CLP (usr, lvl)     
     
-    # # calculate the migration cost incurred for a usr if located on a given lvl
-    calc_mig_cost = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
+    # # calculate the migration cost incurred for a usr if placed on a given lvl, assuming a CLP (co-located placement), namely, the whole chain is placed on a single server
+    calc_mig_cost_CLP = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
           
     # Calculate the number of CPU units actually used in each server
     used_cpu_in_all_srvrs = lambda self: np.array ([self.G.nodes[s]['RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
@@ -85,6 +85,12 @@ class SFC_mig_simulator (object):
     # returns a list of the critical usrs
     unplaced_usrs = lambda self : list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) 
 
+    # sort the given list of usrs in a first-fit manner
+    first_fit_sort = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : usr.rand_id)
+
+    # sort the given list of usrs in a cpvnf manner
+    cpvnf_sort = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
+
     def set_last_time (self):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
@@ -120,7 +126,7 @@ class SFC_mig_simulator (object):
         
         self.total_cpu_cost_in_slot.append  (sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs]))
         self.total_link_cost_in_slot.append (sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs]))
-        self.total_mig_cost_in_slot.append  (sum ([self.calc_mig_cost(usr, usr.lvl)               for usr in self.usrs]))
+        self.total_mig_cost_in_slot.append  (sum ([self.calc_mig_cost_CLP(usr, usr.lvl)               for usr in self.usrs]))
      
     def print_sol_to_res_and_log (self):
         """
@@ -132,7 +138,7 @@ class SFC_mig_simulator (object):
             self.calc_sol_cost_components()
 
         if (VERBOSE_LOG in self.verbose):
-            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost())
+            self.print_sol_res_line (output_file=self.log_output_file, sol_cost=self.calc_alg_sol_cost())
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
             self.print_sol_to_log()
             if (self.stts != sccs):
@@ -521,7 +527,7 @@ class SFC_mig_simulator (object):
         self.rsrc_aug = initial_rsrc_aug
         self.set_augmented_cpu_in_all_srvrs ()
         print ('rsrc aug = {}' .format (self.rsrc_aug))
-        if (self.alg in ['our_alg', 'wfit', 'ffit']):
+        if (self.alg in ['our_alg', 'wfit', 'ffit', 'cpvnf']):
             self.simulate_algs()
         elif (self.alg == 'opt'):
             self.simulate_lp ();
@@ -664,6 +670,8 @@ class SFC_mig_simulator (object):
                     self.stts = self.alg_top(self.first_fit)
                 elif (self.alg == 'wfit'):
                     self.stts = self.alg_top(self.worst_fit)
+                elif (self.alg == 'cpvnf'):
+                    self.stts = self.alg_top(self.cpvnf)
                 else:
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
@@ -718,16 +726,52 @@ class SFC_mig_simulator (object):
         plt.legend()
         plt.savefig ('../res/{}.mob.jpg' .format(self.ap_file_name.split('.')[0]))
         plt.clf()
+        
+    def cpvnf_reshuffle (self):
+        """
+        Run the cpvnf alg' when considering all existing usrs in the system (not only critical usrs).
+        Returns sccs if found a feasible placement, fail otherwise
+        """
+        
+        for usr in self.cpvnf_sort (self.usrs):
+            if ( not (self.cpvnf_place_usr (usr))): 
+                return fail
+        return sccs
+    
+    def cpvnf_place_usr (self, usr):
+        """
+        places a usr on the server minimizing the cost, among the delay-feasible available servers. 
+        If no available delay-feasible server exists, returns fail. Else, returns sccs.
+        """
+        avail_delay_feasible_srvrs = [s for s in usr.S_u if self.s_has_sufic_avail_cpu_for_usr (s, usr)]
+        
+        if (avail_delay_feasible_srvrs == []): 
+            return fail
+        
+        optional_costs = [self.chain_cost_homo (usr, self.G.nodes[s]['lvl']) for s in avail_delay_feasible_srvrs]
+        self.place_usr_u_on_srvr_s (usr, avail_delay_feasible_srvrs[optional_costs.index (min (optional_costs))])
+        return sccs
+    
+    def cpvnf (self):
+        """
+        Run the cpvnf alg'.
+        Returns sccs if found a feasible placement, fail otherwise
+        """
+        for usr in self.cpvnf_sort (self.unplaced_usrs):
+            if (self.cpvnf_place_usr (usr)!= sccs): 
+                self.rst_sol()
+                return self.cpvnf_reshuffle()
+        return sccs
     
     def first_fit_reshuffle (self):
         """
         Run the first-fit alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
-        for usr in sorted (self.usrs, key = lambda usr : usr.rand_id):
+        for usr in self.first_fit_sort (self.usrs): 
             if (self.first_fit_place_usr(usr) != sccs):
                 return fail
-        return sccs
+        return sccs    
     
     def first_fit (self):
         """
@@ -735,15 +779,12 @@ class SFC_mig_simulator (object):
         Returns sccs if found a feasible placement, fail otherwise
         """
 
-        for usr in sorted (self.unplaced_usrs(), key = lambda usr : usr.rand_id):
+        for usr in self.first_fit_sort (self.unplaced_usrs()): 
             if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
                 self.rst_sol()
                 return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
-            # if (VERBOSE_DEBUG in self.verbose and usr.id >= 2770): #$$$
-            #     list_of_usr_2770 = list (filter (lambda usr : usr.id == 2770, self.usrs))
-            #     printf (self.debug_file, 'u2770.nxt_s={}\n' .format (list_of_usr_2770[0].nxt_s))
         return sccs
-    
+
     def first_fit_place_usr (self, usr):
         """
         places a usr on the first server that fits it (that is, enough capacity for it), on the downward path of its delay-feasible servers.
@@ -752,7 +793,7 @@ class SFC_mig_simulator (object):
         
         for s in reversed(usr.S_u):
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
-                self.place_usr_on_s (usr, s)
+                self.place_usr_u_on_srvr_s (usr, s)
                 return sccs
         return fail
     
@@ -806,7 +847,7 @@ class SFC_mig_simulator (object):
         delay_feasible_servers = sorted (usr.S_u, key = lambda s : self.G.nodes[s]['a'], reverse=True) # sort the delay-feasible servers in a dec' order of available resources (worst-fit approach)
         for s in delay_feasible_servers: # for every delay-feasible server 
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
-                self.place_usr_on_s(usr, self.G.nodes[s]['id'] )
+                self.place_usr_u_on_srvr_s(usr, self.G.nodes[s]['id'] )
                 return True
         return False  
     
@@ -892,18 +933,18 @@ class SFC_mig_simulator (object):
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
             for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id)): # for each chain in Hs, in an increasing order of level ('L')
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
-                    self.place_usr_on_s (usr, s)
+                    self.place_usr_u_on_srvr_s (usr, s)
                 elif (len (usr.B)-1 == lvl):
                     return fail
         return sccs
 
-    def place_usr_on_s (self, usr, s):
+    def place_usr_u_on_srvr_s (self, u, s):
         """
         Place the given usr on the given srvr, and reduce s's available cpu accordingly.
         """
-        usr.nxt_s             = s
-        usr.lvl               = self.G.nodes[s]['lvl']
-        self.G.nodes[s]['a'] -= usr.B[self.G.nodes[s]['lvl']]
+        u.nxt_s               = s
+        u.lvl                 = self.G.nodes[s]['lvl']
+        self.G.nodes[s]['a'] -= u.B[self.G.nodes[s]['lvl']]
 
     def rd_new_usrs_line_lp (self, line):
         """
@@ -1134,10 +1175,9 @@ if __name__ == "__main__":
                                       cpu_cap_at_leaf       = 562
                                       )
 
-    print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
-    exit ()
+    # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
 
-    my_simulator.simulate (alg              ='ffit', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
+    my_simulator.simulate (alg              ='cpvnf', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
                            sim_len_in_slots = 1, 
                            initial_rsrc_aug =1
                            ) 

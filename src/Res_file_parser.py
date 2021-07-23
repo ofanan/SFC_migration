@@ -22,9 +22,8 @@ class Res_file_parser (object):
         self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_our_alg = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_ffit    = '\t\t\\addplot [color = red, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_ffit    = '\t\t\\addplot [color = blue, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_fna2    = '\t\t\\addplot [color = blue,  mark = *, mark options = {mark size = 2, fill = blue},  line width = \plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
         self.add_legend_str = '\n\t\t\\addlegendentry {'
         # self.add_plot_str_vec = [self.add_plot_opt, self.add_plot_alg, self.add_plot_ffit, self.add_plot_cpvnf]
@@ -118,7 +117,7 @@ class Res_file_parser (object):
         printf (self.output_file, '\n\n')    
 
 
-    def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = True):
+    def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False):
         min_t, max_t = 30601, 30661
         opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt',min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -132,7 +131,7 @@ class Res_file_parser (object):
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['opt', 'our_alg', 'ffit']:
+        for alg in ['opt', 'our_alg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -183,7 +182,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831.res') # ('shorter.res')
+    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831_64aps.res') # ('shorter.res')
     my_res_file_parser.plot_cost_vs_rsrcs ()        
     # my_res_file_parser.compare_algs()  
     

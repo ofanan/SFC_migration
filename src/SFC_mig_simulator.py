@@ -26,8 +26,8 @@ VERBOSE_COST_COMP = 5 # Print the cost of each component in the cost function
 CALC_RSRC_AUG     = 6
 
 # Status returned by algorithms solving the prob' 
-sccs = 1
-fail = 2
+sccs = True
+fail = False
 
 class SFC_mig_simulator (object):
     """
@@ -83,13 +83,13 @@ class SFC_mig_simulator (object):
     s_has_sufic_avail_cpu_for_usr = lambda self, s, usr : (self.G.nodes[s]['a'] >= usr.B[self.G.nodes[s]['lvl']])
     
     # returns a list of the critical usrs
-    unplaced_usrs = lambda self : list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) 
+    unplaced_usrs  = lambda self : list (filter (lambda usr : usr.nxt_s==-1, self.usrs)) 
 
     # sort the given list of usrs in a first-fit manner
     first_fit_sort = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : usr.rand_id)
 
     # sort the given list of usrs in a cpvnf manner
-    cpvnf_sort = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
+    cpvnf_sort     = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
 
     def set_last_time (self):
         """
@@ -734,8 +734,19 @@ class SFC_mig_simulator (object):
         """
         
         for usr in self.cpvnf_sort (self.usrs):
-            if ( not (self.cpvnf_place_usr (usr))): 
+            if (self.cpvnf_place_usr (usr)!= sccs): 
                 return fail
+        return sccs
+    
+    def cpvnf (self):
+        """
+        Run the cpvnf alg'.
+        Returns sccs if found a feasible placement, fail otherwise
+        """
+        for usr in self.cpvnf_sort (self.unplaced_usrs()):
+            if (self.cpvnf_place_usr (usr)!= sccs): 
+                self.rst_sol()
+                return self.cpvnf_reshuffle()
         return sccs
     
     def cpvnf_place_usr (self, usr):
@@ -750,17 +761,6 @@ class SFC_mig_simulator (object):
         
         optional_costs = [self.chain_cost_homo (usr, self.G.nodes[s]['lvl']) for s in avail_delay_feasible_srvrs]
         self.place_usr_u_on_srvr_s (usr, avail_delay_feasible_srvrs[optional_costs.index (min (optional_costs))])
-        return sccs
-    
-    def cpvnf (self):
-        """
-        Run the cpvnf alg'.
-        Returns sccs if found a feasible placement, fail otherwise
-        """
-        for usr in self.cpvnf_sort (self.unplaced_usrs):
-            if (self.cpvnf_place_usr (usr)!= sccs): 
-                self.rst_sol()
-                return self.cpvnf_reshuffle()
         return sccs
     
     def first_fit_reshuffle (self):
@@ -1149,10 +1149,10 @@ def run_cost_vs_rsrc_sim ():
     Iteratively simulate for several algs and cpu capacities
     """
     
-    for cpu_cap in [(561 + 56*i) for i in range (1,11)]:
-        for alg in ['our_alg', 'ffit']:
+    for cpu_cap in [(561 + 56*i) for i in range (0,4)]:
+        for alg in ['cpvnf']: #['our_alg', 'ffit']:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              verbose               = [VERBOSE_RES, VERBOSE_DEBUG, VERBOSE_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
                                               children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                               cpu_cap_at_leaf       = cpu_cap
@@ -1165,22 +1165,23 @@ def run_cost_vs_rsrc_sim ():
 
 if __name__ == "__main__":
     
-    ap_file_name = 'vehicles_n_speed_0830_0831.ap'
-    # run_cost_vs_rsrc_sim ()
+    ap_file_name = 'vehicles_n_speed_0830_0831_64aps.ap'
+    run_cost_vs_rsrc_sim ()
+    exit ()
 
-    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
-                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                      cpu_cap_at_leaf       = 562
-                                      )
-
-    # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
-
-    my_simulator.simulate (alg              ='cpvnf', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
-                           sim_len_in_slots = 1, 
-                           initial_rsrc_aug =1
-                           ) 
+    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                   verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
+    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                   cpu_cap_at_leaf       = 562
+    #                                   )
+    #
+    # # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
+    #
+    # my_simulator.simulate (alg              ='cpvnf', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
+    #                        sim_len_in_slots = 1, 
+    #                        initial_rsrc_aug =1
+    #                        ) 
     
                            
                            # (alg          - 'ffit', #algorithm to simulate 

@@ -450,7 +450,7 @@ class loc2ap_c (object):
         The exact behavior is by the value of self.verbose
         """
         if (VERBOSE_AP in self.verbose):
-            self.ap_file        = open ("../res/" + loc_file_names[0].split('.')[0] + ".ap", "w+")  
+            self.ap_file        = open ("../res/" + loc_file_names[0].split('.')[0] + '.' + str(self.num_of_APs) + 'aps' +".ap", "w+")  
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
             printf (self.ap_file, '//for each time slot:\n')
             printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
@@ -505,10 +505,10 @@ class loc2ap_c (object):
         
 if __name__ == '__main__': 
 
-    max_power_of_4 = 3
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_CNT])
-    my_loc2ap.time_period_str = '0830_0831'
-    my_loc2ap.parse_files (['vehicles_n_speed_0830.loc'])#(['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
+    max_power_of_4 = 4
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP, VERBOSE_DEBUG])
+    my_loc2ap.time_period_str = '0730_0830'
+    my_loc2ap.parse_files (['vehicles_n_speed_0830.loc']) #(['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

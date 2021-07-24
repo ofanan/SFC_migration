@@ -17,17 +17,17 @@ from printf import printf
 import loc2ap_c
 
 # Levels of verbose (which output is generated)
-VERBOSE_DEBUG     = 0
-VERBOSE_RES       = 1 # Write to a file the total cost and rsrc aug. upon every event
-VERBOSE_LOG       = 2 # Write to a ".log" file
-VERBOSE_ADD_LOG   = 3 # Write to a detailed ".log" file
-VERBOSE_MOB       = 4 # Write data about the mobility of usrs, and about the num of migrated chains per slot
-VERBOSE_COST_COMP = 5 # Print the cost of each component in the cost function
-CALC_RSRC_AUG     = 6
+VERBOSE_DEBUG         = 0
+VERBOSE_RES           = 1 # Write to a file the total cost and rsrc aug. upon every event
+VERBOSE_LOG           = 2 # Write to a ".log" file
+VERBOSE_ADD_LOG       = 3 # Write to a detailed ".log" file
+VERBOSE_MOB           = 4 # Write data about the mobility of usrs, and about the num of migrated chains per slot
+VERBOSE_COST_COMP     = 5 # Print the cost of each component in the cost function
+VERBOSE_CALC_RSRC_AUG = 6
 
 # Status returned by algorithms solving the prob' 
-sccs = True
-fail = False
+sccs = 1
+fail = 2
 
 class SFC_mig_simulator (object):
     """
@@ -74,7 +74,7 @@ class SFC_mig_simulator (object):
                     len (usr.theta_times_lambda) * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
                     
     # Print a solution for the problem to the output res file #self.calc_alg_sol_cost() 
-    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}.{}.cpu{}.stts{} | cost = {:.0f}\n' .format(self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.stts, sol_cost)) 
+    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cost = {:.0f}\n' .format(self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, sol_cost)) 
 
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -91,6 +91,9 @@ class SFC_mig_simulator (object):
     # sort the given list of usrs in a cpvnf manner
     cpvnf_sort     = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
 
+    # Randomize a target delay for a usr, using the distribution and values defined in self.
+    randomize_target_delay = lambda self : self.target_delay[0] if (random.random() < self.prob_of_target_delay[0]) else self.target_delay[1] 
+    
     def set_last_time (self):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
@@ -215,7 +218,7 @@ class SFC_mig_simulator (object):
             self.print_sol_res_line (output_file=self.res_output_file, sol_cost=model.objective.value())
         sol_status = plp.LpStatus[model.status] 
         if (VERBOSE_LOG in self.verbose):            
-            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self. model.objective.value())
+            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=model.objective.value())
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_lp_sol_to_log ()
@@ -463,12 +466,13 @@ class SFC_mig_simulator (object):
         self.uniform_link_cost          = 3
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
-        self.uniform_target_delay       = 20 #[ms]
+        self.target_delay               = [10, 100] # in [ms], lowest to highest
+        self.prob_of_target_delay       = [0.3]
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
         self.max_R                      = 2 # maximal rsrc augmenation to consider
-        random.seed (42)                    # Use a fixed pseudo-number seed 
+        random.seed                     (42) # Use a fixed pseudo-number seed 
         
         # Init output files
         if (VERBOSE_RES in self.verbose):
@@ -501,16 +505,13 @@ class SFC_mig_simulator (object):
         """
         Sanity check for the usr parameters' feasibility.
         """
-        usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, C_u=self.uniform_Cu)
+        usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
         self.CPUAll_single_usr (usr) 
         if (len(usr.B)==0):
             print ('Error: cannot satisfy delay constraints of usr {}, even on a leaf. theta_times_lambda={}, target_delay ={}' .format (
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()
-        if (self.link_delay_of_CLP_at_lvl[-1] > self.uniform_target_delay):
-            print ('**** Warning: the network delay at the root > target delay. Hence, no user can use the root server. ****')
-            if (self.ap_file_name not in ['shorter.ap', 'short_0.ap', 'short_1.ap']):
-                exit ()     
+        
 
     def simulate (self, alg, sim_len_in_slots=99999, initial_rsrc_aug=1):
         """
@@ -863,7 +864,7 @@ class SFC_mig_simulator (object):
             return sccs
 
         # Now we know that the run failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
-        if (CALC_RSRC_AUG not in self.verbose):
+        if (VERBOSE_CALC_RSRC_AUG not in self.verbose):
             return self.stts
 
         # Couldn't solve the problem without additional rsrc aug --> begin a binary search for the amount of rsrc aug' needed.
@@ -872,7 +873,7 @@ class SFC_mig_simulator (object):
 
         self.rst_sol() # dis-allocate all users
         self.CPUAll(self.usrs) 
-        max_R = self.max_R if CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
+        max_R = self.max_R if VERBOSE_CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
         
         # init cur RCs and a(s) to the number of available CPU in each server, assuming maximal rsrc aug' 
         for s in self.G.nodes(): 
@@ -892,7 +893,7 @@ class SFC_mig_simulator (object):
         
         while True: 
              
-            if ( np.array([ub[s] <= lb[s]+1 for s in self.G.nodes()], dtype='bool').all()): # Did the binary search converged?
+            if ( np.array([ub[-1] <= lb[-1]+1 for s in self.G.nodes()], dtype='bool').all()): # Did the binary search converged?
                 for s in self.G.nodes(): # Yep, so allocate this minimal found amount of rsrc aug to all servers
                     self.G.nodes[s]['RCs'] = math.ceil (ub[s])  
                 self.rst_sol()         # and re-solve the prob'
@@ -964,7 +965,7 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             tuple   = tuple[1].split (',')
     
-            usr = usr_lp_c (id = int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.uniform_target_delay, C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+            usr = usr_lp_c (id = int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
             self.CPUAll_single_usr (usr)
             self.usrs.append (usr)
             AP_id = int(tuple[1])
@@ -995,9 +996,11 @@ class SFC_mig_simulator (object):
             
             usr = usr_c (id                 = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
                          theta_times_lambda = self.uniform_theta_times_lambda,
-                         target_delay       = self.uniform_target_delay,
+                         target_delay       = self.randomize_target_delay(),
                          C_u                = self.uniform_Cu)
+                       
             self.CPUAll_single_usr (usr)
+            
             self.usrs.append (usr)
             AP_id = int(tuple[1])
             # self.check_AP_id (AP_id)
@@ -1149,40 +1152,41 @@ def run_cost_vs_rsrc_sim ():
     Iteratively simulate for several algs and cpu capacities
     """
     
-    for cpu_cap in [(561 + 56*i) for i in range (0,4)]:
-        for alg in ['cpvnf']: #['our_alg', 'ffit']:
-            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES, VERBOSE_DEBUG, VERBOSE_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
-                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                              cpu_cap_at_leaf       = cpu_cap
-                                              )
-        
-            my_simulator.simulate (alg              = alg,  
-                                   sim_len_in_slots = 61, 
-                                   initial_rsrc_aug = 1
-                                   )     
 
 if __name__ == "__main__":
     
-    ap_file_name = 'vehicles_n_speed_0830_0831_64aps.ap'
-    run_cost_vs_rsrc_sim ()
-    exit ()
+    ap_file_name = 'vehicles_n_speed_0830.256aps.ap'
+    # run_cost_vs_rsrc_sim ()
+    # exit ()
 
-    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                   verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 3, 
-    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                   cpu_cap_at_leaf       = 562
-    #                                   )
-    #
-    # # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
-    #
-    # my_simulator.simulate (alg              ='cpvnf', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
-    #                        sim_len_in_slots = 1, 
-    #                        initial_rsrc_aug =1
-    #                        ) 
+    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                      verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                      cpu_cap_at_leaf       = 150
+                                      )
     
+    # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
+    
+    my_simulator.simulate (alg              ='opt', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
+                           sim_len_in_slots = 61, 
+                           initial_rsrc_aug =1
+                           ) 
+    
+
+    # for cpu_cap in [(198 + 20*i) for i in range (0,11)]:
+    #     for alg in ['cpvnf', 'our_alg', 'ffit']:
+    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                           verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                           cpu_cap_at_leaf       = cpu_cap
+    #                                           )
+    #
+    #         my_simulator.simulate (alg              = alg,  
+    #                                sim_len_in_slots = 61, 
+    #                                initial_rsrc_aug = 1
+    #                                )     
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

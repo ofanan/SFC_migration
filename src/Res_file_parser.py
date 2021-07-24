@@ -66,7 +66,7 @@ class Res_file_parser (object):
          
         settings          = splitted_line[0]
         cost              = float(splitted_line[1].split("=")[1])
-        splitted_settings = settings.split (".")
+        splitted_settings = settings.split ("_")
 
         if len (splitted_settings) < num_of_fields:
             print ("encountered a format error. Splitted line is {}" .format (splitted_line))

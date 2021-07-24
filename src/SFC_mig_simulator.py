@@ -1150,21 +1150,21 @@ if __name__ == "__main__":
     
     ap_file_name = 'vehicles_n_speed_0830_0831_256aps.ap'
 
-    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                      cpu_cap_at_leaf       = 150
-                                      )
+    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                   verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                   cpu_cap_at_leaf       = 150
+    #                                   )
+    #
+    # # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
+    #
+    # my_simulator.simulate (alg              ='opt', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+    #                        sim_len_in_slots = 61, 
+    #                        initial_rsrc_aug =1
+    #                        ) 
     
-    # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
-    
-    my_simulator.simulate (alg              ='opt', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-                           sim_len_in_slots = 61, 
-                           initial_rsrc_aug =1
-                           ) 
-    
-    min_req_cap = 150
+    min_req_cap = 205
 
     for alg in ['cpvnf', 'ourAlg', 'ffit']: #['opt']:
         for cpu_cap in [int(round((min_req_cap + min_req_cap*0.1*i))) for i in range (6,21)]:

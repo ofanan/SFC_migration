@@ -1166,19 +1166,19 @@ if __name__ == "__main__":
     
     min_req_cap = 150
 
-    # for cpu_cap in [int(round((min_req_cap + min_req_cap*0.1*i))) for i in range (0,11)]:
-    #     for alg in ['cpvnf', 'ourAlg', 'ffit']: #['opt']:
-    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                           verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                           cpu_cap_at_leaf       = cpu_cap
-    #                                           )
-    #
-    #         my_simulator.simulate (alg              = alg,  
-    #                                sim_len_in_slots = 61, 
-    #                                initial_rsrc_aug = 1
-    #                                )     
+    for alg in ['cpvnf', 'ourAlg', 'ffit']: #['opt']:
+        for cpu_cap in [int(round((min_req_cap + min_req_cap*0.1*i))) for i in range (6,21)]:
+            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                              verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                              cpu_cap_at_leaf       = cpu_cap
+                                              )
+    
+            my_simulator.simulate (alg              = alg,  
+                                   sim_len_in_slots = 61, 
+                                   initial_rsrc_aug = 1
+                                   )     
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

@@ -6,8 +6,9 @@ from printf import printf
 t_idx         = 0
 alg_idx       = 1
 cpu_idx       = 2
-stts_idx      = 3
-num_of_fields = 3
+prob_idx      = 3
+stts_idx      = 4
+num_of_fields = stts_idx+1
 
 opt_idx   = 0
 alg_idx   = 1
@@ -21,7 +22,7 @@ class Res_file_parser (object):
         """
         self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_our_alg = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_ourAlg = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ffit    = '\t\t\\addplot [color = blue, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
@@ -29,12 +30,12 @@ class Res_file_parser (object):
         # self.add_plot_str_vec = [self.add_plot_opt, self.add_plot_alg, self.add_plot_ffit, self.add_plot_cpvnf]
 
         self.add_plot_str_dict = {'opt'     : self.add_plot_opt,
-                                  'our_alg' : self.add_plot_our_alg,
+                                  'ourAlg' : self.add_plot_ourAlg,
                                   'ffit'    : self.add_plot_ffit,
                                   'cpvnf'   : self.add_plot_cpvnf}
 
         self.legend_entry_dict = {'opt'     :  '\opt', 
-                                  'our_alg' : '\ourAlg', 
+                                  'ourAlg' : '\ourAlg', 
                                   'ffit'    : '\\ffit',
                                   'cpvnf'   : '\cpvnf'}
         
@@ -68,16 +69,17 @@ class Res_file_parser (object):
         cost              = float(splitted_line[1].split("=")[1])
         splitted_settings = settings.split ("_")
 
-        if len (splitted_settings) < num_of_fields:
-            print ("encountered a format error. Splitted line is {}" .format (splitted_line))
+        if len (splitted_settings) != num_of_fields:
+            print ("encountered a format error.\nSplitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
             exit ()
                
         self.dict = {
-            "t"     : int (splitted_settings [t_idx]   .split('t')[1]),
+            "t"     : int   (splitted_settings [t_idx]   .split('t')[1]),
             "alg"   : splitted_settings      [alg_idx],
-            "cpu"   : int (splitted_settings [cpu_idx] .split("cpu")[1]),  
-            "stts"  : int (splitted_settings [stts_idx].split("stts")[1]),  
-            "cost"  : float(splitted_line[1].split(" = ")[1])
+            "cpu"   : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
+            "prob"  : float (splitted_settings [prob_idx].split("p")   [1]),  
+            "stts"  : int   (splitted_settings [stts_idx].split("stts")[1]),  
+            "cost"  : float (splitted_line[1].split(" = ")[1])
             }
 
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), alg = None, cpu = -1, stts = -1):
@@ -131,7 +133,7 @@ class Res_file_parser (object):
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['opt', 'our_alg', 'ffit', 'cpvnf']:
+        for alg in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -143,7 +145,7 @@ class Res_file_parser (object):
             
             for cpu in cpu_vals:
                 alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) ) 
-                if (len(alg_vals_for_this_cpu)==0):
+                if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
                     continue
                 alg_avg_list.append ({'cpu'  : cpu / X_norm_factor,
                                       'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu]) / Y_norm_factor })
@@ -157,7 +159,7 @@ class Res_file_parser (object):
         # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'opt', self.list_of_dicts)), key = lambda item : item['t'])
         # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'opt', self.list_of_dicts)), key = lambda item : item['t'])
         opt_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'opt',  self.list_of_dicts)), key = lambda item : item['t'])] )
-        alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'our_alg', self.list_of_dicts)), key = lambda item : item['t'])])
+        alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'ourAlg', self.list_of_dicts)), key = lambda item : item['t'])])
         ratio     = np.divide (alg_cost, opt_cost)
         print ('max_ratio = {}, avg ratio = {}' .format (np.max (ratio), np.average(ratio)))
         print (ratio)
@@ -182,7 +184,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831_64aps.res') # ('shorter.res')
+    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831_256aps.res') # ('shorter.res')
     my_res_file_parser.plot_cost_vs_rsrcs ()        
     # my_res_file_parser.compare_algs()  
     

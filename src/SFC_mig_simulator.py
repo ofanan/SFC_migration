@@ -467,11 +467,11 @@ class SFC_mig_simulator (object):
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
-        self.prob_of_target_delay       = [0.3]
+        self.prob_of_target_delay       = [0.7]
         self.warned_about_too_large_ap  = False
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         self.usrs                       = []
-        self.max_R                      = 2 # maximal rsrc augmenation to consider
+        self.max_R                      = 4 # maximal rsrc augmenation to consider
         random.seed                     (42) # Use a fixed pseudo-number seed 
         
         # Init output files
@@ -528,7 +528,7 @@ class SFC_mig_simulator (object):
         self.rsrc_aug = initial_rsrc_aug
         self.set_augmented_cpu_in_all_srvrs ()
         print ('rsrc aug = {}' .format (self.rsrc_aug))
-        if (self.alg in ['our_alg', 'wfit', 'ffit', 'cpvnf']):
+        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
             self.simulate_algs()
         elif (self.alg == 'opt'):
             self.simulate_lp ();
@@ -570,7 +570,7 @@ class SFC_mig_simulator (object):
             self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        if (self.alg in ['our_alg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
+        if (self.alg in ['ourAlg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
             for usr in self.usrs:
                 usr.calc_rand_id ()
                     
@@ -629,7 +629,7 @@ class SFC_mig_simulator (object):
         # reset Hs and RCs       
         for s in self.G.nodes():
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
-            if (self.alg in ['our_alg']):
+            if (self.alg in ['ourAlg']):
                 self.G.nodes[s]['Hs']  = set() 
         
         for line in self.ap_file: 
@@ -665,7 +665,7 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
                 # solve the prob' using the requested alg'    
-                if   (self.alg == 'our_alg'):
+                if   (self.alg == 'ourAlg'):
                     self.stts = self.alg_top(self.bottom_up)
                 elif (self.alg == 'ffit'):
                     self.stts = self.alg_top(self.first_fit)
@@ -677,7 +677,7 @@ class SFC_mig_simulator (object):
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
-                if (self.stts == sccs and self.alg == 'our_alg'):  
+                if (self.stts == sccs and self.alg == 'ourAlg'):  
                     self.push_up ()
                     if (VERBOSE_LOG in self.verbose):
                         printf (self.log_output_file, 'after push-up\n')
@@ -1011,7 +1011,7 @@ class SFC_mig_simulator (object):
                 usr.S_u.append (s)
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
-            if (self.alg in ['our_alg']):
+            if (self.alg in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                       
                     
@@ -1053,7 +1053,7 @@ class SFC_mig_simulator (object):
     
             
             # Check whether it's possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
-            if (self.alg in ['our_alg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
+            if (self.alg in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
                 
                 # Yep: the delay constraint are satisfied also in the current placement. 
                 # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
@@ -1071,7 +1071,7 @@ class SFC_mig_simulator (object):
 
             # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
             # Hs is the set of relevant usrs) at each of its delay-feasible server
-            if (self.alg in ['our_alg']):
+            if (self.alg in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                               
 
@@ -1122,7 +1122,7 @@ class SFC_mig_simulator (object):
         """
         #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-        if (self.alg not in ['our_alg']):
+        if (self.alg not in ['ourAlg']):
             return 
         
         # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
@@ -1146,46 +1146,39 @@ class SFC_mig_simulator (object):
         return sum ([self.G.nodes[s]['cpu cap'] for s in self.G.nodes])
      
 
-
-def run_cost_vs_rsrc_sim ():
-    """
-    Iteratively simulate for several algs and cpu capacities
-    """
-    
-
 if __name__ == "__main__":
     
     ap_file_name = 'vehicles_n_speed_0830_0831_256aps.ap'
 
-    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                   verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                   cpu_cap_at_leaf       = 150
-    #                                   )
-    #
-    # # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
-    #
-    # my_simulator.simulate (alg              ='opt', # pick an algorithm from the list: ['opt', 'our_alg', 'wfit', 'ffit'] 
-    #                        sim_len_in_slots = 61, 
-    #                        initial_rsrc_aug =1
-    #                        ) 
+    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                      verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                      cpu_cap_at_leaf       = 150
+                                      )
     
-    min_req_cap = 205
+    # print ('total cpu={}' .format (my_simulator.calc_total_cpu_rsrcs()))
+    
+    my_simulator.simulate (alg              ='opt', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+                           sim_len_in_slots = 61, 
+                           initial_rsrc_aug =1
+                           ) 
+    
+    min_req_cap = 150
 
-    for cpu_cap in [int(round((min_req_cap + min_req_cap*0.1*i))) for i in range (0,11)]:
-        for alg in ['cpvnf', 'our_alg', 'ffit']: #['opt']:
-            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                              cpu_cap_at_leaf       = cpu_cap
-                                              )
-    
-            my_simulator.simulate (alg              = alg,  
-                                   sim_len_in_slots = 61, 
-                                   initial_rsrc_aug = 1
-                                   )     
+    # for cpu_cap in [int(round((min_req_cap + min_req_cap*0.1*i))) for i in range (0,11)]:
+    #     for alg in ['cpvnf', 'ourAlg', 'ffit']: #['opt']:
+    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                           verbose               = [VERBOSE_RES], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                           cpu_cap_at_leaf       = cpu_cap
+    #                                           )
+    #
+    #         my_simulator.simulate (alg              = alg,  
+    #                                sim_len_in_slots = 61, 
+    #                                initial_rsrc_aug = 1
+    #                                )     
                            
                            # (alg          - 'ffit', #algorithm to simulate 
                            # final_slot_to_simulate  = 27060,     # last time slot to run. Currently the first slot is 27000 (07:30).

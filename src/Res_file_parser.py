@@ -40,9 +40,9 @@ class Res_file_parser (object):
                                   'cpvnf'   : '\cpvnf'}
         
     def parse_file (self, input_file_name):
-    
+        
+        self.input_file_name = input_file_name
         self.input_file     = open ("../res/" + input_file_name,  "r")
-        self.output_file    = open ("../res/" + input_file_name.split(".")[0] + ".dat", "w")
         lines               = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines               = (line for line in lines if line)       # Discard blank lines
         self.list_of_dicts  = [] # a list of dictionaries, holding the settings and the results read from result files
@@ -82,16 +82,18 @@ class Res_file_parser (object):
             "cost"  : float (splitted_line[1].split(" = ")[1])
             }
 
-    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), alg = None, cpu = -1, stts = -1):
+    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=0, alg = None, cpu = -1, stts = -1):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
         """
         list_to_filter = list (filter (lambda item : item['t'] >= min_t and item['t'] <= max_t, list_to_filter))    
         if (alg != None):
-            list_to_filter = list (filter (lambda item : item['alg'] == alg, list_to_filter))    
+            list_to_filter = list (filter (lambda item : item['alg']  == alg, list_to_filter))    
         if (cpu != -1):
-            list_to_filter = list (filter (lambda item : item['cpu'] == cpu, list_to_filter))    
+            list_to_filter = list (filter (lambda item : item['cpu']  == cpu, list_to_filter))    
+        if (prob > 0):
+            list_to_filter = list (filter (lambda item : item['prob'] == prob, list_to_filter))    
         if (stts != -1):
             list_to_filter = list (filter (lambda item : item['stts'] == stts, list_to_filter))    
         return list_to_filter
@@ -121,7 +123,10 @@ class Res_file_parser (object):
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False):
         min_t, max_t = 30601, 30661
-        opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt',min_t=min_t, max_t=max_t, stts=1),
+        prob = 0.7
+        self.output_file_name = '../res/{}.p{}.dat' .format (self.input_file_name.split(".")[0], prob)
+        self.output_file      = open (self.output_file_name, "w")
+        opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
         cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
         X_norm_factor = cpu_vals[0] if normalize_X else 1 # normalize X axis by the minimum cpu
@@ -172,6 +177,7 @@ class Res_file_parser (object):
         for line in input_file:
             
             if (line == "\n" or line.split ("//")[0] == ""):
+            
                 continue
         
             splitted_line = line.split (" ")
@@ -184,7 +190,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('vehicles_n_speed_0830_0831_256aps.res') # ('shorter.res')
+    my_res_file_parser.parse_file ('0830_0831_256aps_p07.res') # ('shorter.res')
     my_res_file_parser.plot_cost_vs_rsrcs ()        
     # my_res_file_parser.compare_algs()  
     

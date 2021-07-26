@@ -152,7 +152,7 @@ class Res_file_parser (object):
                 alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) ) 
                 if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
                     continue
-                alg_avg_list.append ({'cpu'  : cpu / X_norm_factor,
+                alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor -1)*100,
                                       'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu]) / Y_norm_factor })
 
                 if (len(alg_avg_list)==0):

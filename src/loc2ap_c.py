@@ -149,28 +149,30 @@ class loc2ap_c (object):
                (np.average ([np.average(self.left_sim_via[ap]) for ap in range(self.num_of_APs)])))
 
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined[ap]) for ap in range(self.num_of_APs)])), 
-                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_joined.jpg')
+        
+        columns = [str(i) for i in range(2**self.max_power_of_4)]
+        file_name_suffix = '{}_{}x{}' .format (self.time_period_str, 2**self.max_power_of_4, 2**self.max_power_of_4)
+        
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined[ap])         for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        # plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_cars_joined_{}.jpg' .format (file_name_suffix))
+        return
         
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.left[ap]) for ap in range(self.num_of_APs)])), 
-                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that left cell every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_left.jpg')
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.left[ap])           for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        # plt.title ('avg num of cars that left cell every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_cars_left_{}.jpg' .format (file_name_suffix))
+        exit ()
         
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined_sim_via[ap]) for ap in range(self.num_of_APs)])), 
-                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that joined the sim every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_joined_sim_via.jpg')
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined_sim_via[ap]) for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        # plt.title ('avg num of cars that joined the sim every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_cars_joined_sim_via_{}.jpg' .format (file_name_suffix))
         
         plt.figure ()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.left_sim_via[ap]) for ap in range(self.num_of_APs)])), 
-                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars that left the sim every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_left_sim_via.jpg')
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.left_sim_via[ap])   for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        # plt.title ('avg num of cars that left the sim every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_cars_left_sim_via_{}.jpg' .format (file_name_suffix))
         
     def rd_num_of_vehs_per_ap (self, input_file_name):
         """
@@ -505,7 +507,7 @@ class loc2ap_c (object):
         
 if __name__ == '__main__': 
 
-    max_power_of_4 = 4
+    max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY])
     my_loc2ap.time_period_str = '0830_0831' #'0730_0830'
     my_loc2ap.parse_files (['0830_0831.loc']) #(['vehicles_n_speed_0730.loc', 'vehicles_n_speed_0740.loc', 'vehicles_n_speed_0750.loc', 'vehicles_n_speed_0800.loc', 'vehicles_n_speed_0810.loc', 'vehicles_n_speed_0820.loc'])

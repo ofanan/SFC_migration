@@ -23,6 +23,7 @@ class Res_file_parser (object):
         self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ourAlg = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_ourAlgShortPushUp = '\t\t\\addplot [color = red, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ffit    = '\t\t\\addplot [color = blue, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
@@ -31,10 +32,12 @@ class Res_file_parser (object):
 
         self.add_plot_str_dict = {'opt'     : self.add_plot_opt,
                                   'ourAlg' : self.add_plot_ourAlg,
+                                  'ourAlgShortPushUp' : self.add_plot_ourAlgShortPushUp,
                                   'ffit'    : self.add_plot_ffit,
                                   'cpvnf'   : self.add_plot_cpvnf}
 
         self.legend_entry_dict = {'opt'     :  '\opt', 
+                                  'ourAlgShortPushUp' : 'ourAlgShortPushUp', 
                                   'ourAlg' : '\ourAlg', 
                                   'ffit'    : '\\ffit',
                                   'cpvnf'   : '\cpvnf'}
@@ -127,19 +130,27 @@ class Res_file_parser (object):
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
         self.output_file      = open (self.output_file_name, "w")
-        opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
-                           key = lambda item : item['cpu'])
-        cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
-        X_norm_factor = cpu_vals[0] if normalize_X else 1 # normalize X axis by the minimum cpu
         
-        opt_avg_list = []
-        for cpu in cpu_vals:
-            opt_avg_list.append (np.average ([item['cost'] for item in 
-                                 list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
+        if (normalize_X):
+            opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+                               key = lambda item : item['cpu'])
+            cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+            X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
+            
+            opt_avg_list = []
+            for cpu in cpu_vals:
+                opt_avg_list.append (np.average ([item['cost'] for item in 
+                                     list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
+        else:
+            X_norm_factor = 1
+            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='cpvnf', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+                               key = lambda item : item['cpu'])
+            cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))
+            
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['ourAlg', 'cpvnf', 'opt', 'ffit', 'ourAlgShortPushUp']:
+        for alg in ['ourAlg', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -162,15 +173,6 @@ class Res_file_parser (object):
         
             self.print_single_tikz_plot (alg_avg_list, key_to_sort='cpu', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg]) 
 
-    def compare_algs (self):
-        # lp_list_of_dicts  = sorted (list (filter (lambda item : item['alg'] == 'opt', self.list_of_dicts)), key = lambda item : item['t'])
-        # alg_list_of_dicts = sorted (list (filter (lambda item : item['alg'] == 'opt', self.list_of_dicts)), key = lambda item : item['t'])
-        opt_cost  = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'opt',  self.list_of_dicts)), key = lambda item : item['t'])] )
-        alg_cost = np.array ([item['cost'] for item in sorted (list (filter (lambda item : item['alg'] == 'ourAlg', self.list_of_dicts)), key = lambda item : item['t'])])
-        ratio     = np.divide (alg_cost, opt_cost)
-        print ('max_ratio = {}, avg ratio = {}' .format (np.max (ratio), np.average(ratio)))
-        print (ratio)
-
     def plot_num_of_vehs (self):
         # Open input and output files
         input_file  = open ("../res/num_of_vehs_24_every_min_correct.pos", "r")  
@@ -192,7 +194,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('0830_0831_256aps_p0.3.res') # ('shorter.res')
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True)        
+    my_res_file_parser.parse_file ('0830_0831_256aps_critical_p0.3.res') # ('shorter.res')
+    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False)        
     # my_res_file_parser.compare_algs()  
     

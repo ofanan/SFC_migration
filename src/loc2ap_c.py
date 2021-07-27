@@ -225,19 +225,19 @@ class loc2ap_c (object):
         n = int (math.sqrt(len(avg_num_of_cars_in_cell)))
         heatmap_val = np.array ([avg_num_of_cars_in_cell[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))]).reshape ( [n, n])
 
-        self.heatmap_output_file = open ('../res/heatmap_num_vehs_{}.dat' .format (4**self.max_power_of_4), 'a')
+        self.heatmap_output_file = open ('../res/heatmap_num_vehs_{}.dat' .format (4**self.max_power_of_4), 'w')
         for i in range (2**self.max_power_of_4):
             for j in range (2**self.max_power_of_4):
-                printf (self.heatmap_output_file, '{} {} {}\n' .format (i, j, heatmap_val[i][j]))
+                printf (self.heatmap_output_file, '{} {} {}\n' .format (j, i, heatmap_val[i][j]))
             printf (self.heatmap_output_file, '\n')
 
-        
+        printf (self.heatmap_output_file, '\n\n{}' .format(self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))))
         # Make a Python heatmap
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])), 
-                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg num of cars per cell')
-        plt.savefig('../res/heatmap_num_vehs.jpg')
+        columns = [str(i) for i in range(2**self.max_power_of_4)]
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])),columns=columns), cmap="YlGnBu")
+        # plt.title ('avg num of cars per cell')
+        plt.savefig('../res/heatmap_num_vehs_{}_Python.jpg' .format (self.num_of_APs))
         
     def plot_speed_heatmap (self):
         """
@@ -425,7 +425,7 @@ class loc2ap_c (object):
         if (VERBOSE_AP in self.verbose):
             printf(self.ap_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
-            self.plot_num_of_vehs_per_ap_graph ()
+            # self.plot_num_of_vehs_per_ap_graph ()
             self.plot_num_of_vehs_heatmap()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.plot_demography_heatmap()
@@ -492,17 +492,17 @@ class loc2ap_c (object):
                 printf (output_file, '{:.0f}\t' .format (mat[x][y]))
             printf (output_file, '\n')
     
-    def print_num_of_vehs_diffs (self):
-        ap = 12
-        print ('diff 12 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
-             (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
-    
-        ap = 48
-        print ('diff 48 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
-             (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
-        ap = 51
-        print ('diff 51 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
-             (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
+    # def print_num_of_vehs_diffs (self):
+    #     ap = 12
+    #     print ('diff 12 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
+    #          (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
+    #
+    #     ap = 48
+    #     print ('diff 48 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
+    #          (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
+    #     ap = 51
+    #     print ('diff 51 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
+    #          (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
     
     def print_num_of_vehs_per_server (self, output_file_name):
         """
@@ -524,7 +524,7 @@ if __name__ == '__main__':
     max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_CNT])
     my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
-    my_loc2ap.parse_files (['0830_0831.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap.parse_files (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

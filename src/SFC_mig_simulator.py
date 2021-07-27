@@ -25,6 +25,7 @@ VERBOSE_MOB           = 4 # Write data about the mobility of usrs, and about the
 VERBOSE_COST_COMP     = 5 # Print the cost of each component in the cost function
 VERBOSE_CALC_RSRC_AUG = 6 # Use binary-search to calculate the minimal reseource augmentation required to find a sol 
 VERBOSE_MOVED_RES     = 7 # calculate the cost incurred by the usrs who moved only 
+VERBOSE_FLAVORS       = 8 # Use 2 users' flavors
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -95,6 +96,9 @@ class SFC_mig_simulator (object):
     # Randomize a target delay for a usr, using the distribution and values defined in self.
     randomize_target_delay = lambda self : self.target_delay[0] if (random.random() < self.prob_of_target_delay[0]) else self.target_delay[1] 
     
+    
+    gen_res_file_name  = lambda self, mid_str : '../res/{}_{}_p{}.res' .format (self.ap_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0])
+    
     def set_last_time (self):
         """
         If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
@@ -136,7 +140,7 @@ class SFC_mig_simulator (object):
         """
         Print to the res, log, and debug files the solution and/or additional info.
         """
-        if (VERBOSE_RES in self.verbose): #$$$ and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
+        if (VERBOSE_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
             self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
         if (VERBOSE_MOVED_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
             self.print_sol_res_line (output_file=self.moved_res_output_file, sol_cost=self.calc_alg_sol_cost(self.moved_usrs))
@@ -212,8 +216,10 @@ class SFC_mig_simulator (object):
                 decision_var = decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
                 self.d_vars.append (decision_var)
                 single_place_const += plp_var
-                obj_func           += self.chain_cost_from_non_CLP_state (usr, lvl) * plp_var # add the cost of this decision var to the objective func
                 id += 1
+                if (VERBOSE_MOVED_RES in self.verbose and not (self.is_first_t) and usr not in self.moved_usrs): 
+                    continue # In this mode, starting from the 2nd cycle, the obj' func' should consider only the users who moved 
+                obj_func += self.chain_cost_from_non_CLP_state (usr, lvl) * plp_var # add the cost of this decision var to the objective func
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
 
@@ -252,7 +258,8 @@ class SFC_mig_simulator (object):
         If a res file with the relevant name already exists - open it for appending.
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
-        self.res_file_name = '../res/{}_p{}.res' .format (self.ap_file_name.split(".")[0], self.prob_of_target_delay[0])  
+        
+        self.res_file_name = self.gen_res_file_name (mid_str = ('opt' if self.alg=='opt' else '') )
         
         if Path('../res/' + self.res_file_name).is_file(): # does this res file already exist?
             self.res_output_file =  open ('../res/' + self.res_file_name,  "a")
@@ -266,7 +273,7 @@ class SFC_mig_simulator (object):
         If a res file with the relevant name already exists - open it for appending.
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
-        self.moved_res_file_name = '../res/{}_p{}_moved.res' .format (self.ap_file_name.split(".")[0], self.prob_of_target_delay[0])  
+        self.moved_res_file_name = self.gen_res_file_name (mid_str = ('moved_opt' if self.alg=='opt' else 'moved')) 
         
         if Path('../res/' + self.moved_res_file_name).is_file(): # does this res file already exist?
             self.moved_res_output_file =  open ('../res/' + self.moved_res_file_name,  "a")
@@ -499,6 +506,7 @@ class SFC_mig_simulator (object):
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 3
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
+        self.long_chain_theta_times_lambda = [2, 10, 10, 10, 10, 10, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
         self.prob_of_target_delay       = [0.3] 
@@ -559,7 +567,7 @@ class SFC_mig_simulator (object):
         self.stts     = sccs
         self.rsrc_aug = initial_rsrc_aug
         self.set_augmented_cpu_in_all_srvrs ()
-        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
+        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgShortPushUp']):
             self.simulate_algs()
         elif (self.alg == 'opt'):
             self.simulate_lp ();
@@ -603,10 +611,12 @@ class SFC_mig_simulator (object):
             self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        if (self.alg in ['ourAlg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
+        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'ourAlgShortPushUp']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
             for usr in self.usrs:
                 usr.calc_rand_id ()
-        self.moved_usrs = [] # rst the list of usrs who moved in this time slot 
+        self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
+        self.critical_usrs = [] # rst the list of usrs who are critical in this time slot
+
                     
     def simulate_lp (self):
         """
@@ -663,7 +673,7 @@ class SFC_mig_simulator (object):
         # reset Hs and RCs       
         for s in self.G.nodes():
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
-            if (self.alg in ['ourAlg']):
+            if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
                 self.G.nodes[s]['Hs']  = set() 
         
         for line in self.ap_file: 
@@ -699,7 +709,7 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
                 # solve the prob' using the requested alg'    
-                if   (self.alg == 'ourAlg'):
+                if   (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
                     self.stts = self.alg_top(self.bottom_up)
                 elif (self.alg == 'ffit'):
                     self.stts = self.alg_top(self.first_fit)
@@ -711,7 +721,7 @@ class SFC_mig_simulator (object):
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
-                if (self.stts == sccs and self.alg == 'ourAlg'):  
+                if (self.stts == sccs and self.alg in ['ourAlg', 'ourAlgShortPushUp']):  
                     self.push_up ()
                     if (VERBOSE_LOG in self.verbose):
                         printf (self.log_output_file, 'after push-up\n')
@@ -906,6 +916,7 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'By binary search:\n')
 
         self.rst_sol() # dis-allocate all users
+        self.critical_usrs = self.usrs # We will now consider reshuffling all usrs, so all usrs are considered critical.
         self.CPUAll(self.usrs) 
         max_R = self.max_R if VERBOSE_CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
         
@@ -916,7 +927,7 @@ class SFC_mig_simulator (object):
 
         self.stts = placement_alg() 
         if (self.stts != sccs):
-            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
+            # self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
 
@@ -967,6 +978,8 @@ class SFC_mig_simulator (object):
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
             for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id)): # for each chain in Hs, in an increasing order of level ('L')
+                if (self.alg == 'ourAlgShortPushUp' and usr not in self.critical_usrs):
+                    continue
                 if (self.G.nodes[s]['a'] > usr.B[lvl]):
                     self.place_usr_u_on_srvr_s (usr, s)
                 elif (len (usr.B)-1 == lvl):
@@ -1023,18 +1036,30 @@ class SFC_mig_simulator (object):
             tuple = tuple.split("(")
             tuple = tuple[1].split (',')
             
-            usr = usr_c (id                 = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
-                         theta_times_lambda = self.uniform_theta_times_lambda,
-                         target_delay       = self.randomize_target_delay(),
-                         C_u                = self.uniform_Cu)
+            # usr = usr_c (id                 = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
+            #              theta_times_lambda = self.uniform_theta_times_lambda,
+            #              target_delay       = self.randomize_target_delay(),
+            #              C_u                = self.uniform_Cu)
+            #
+
+                       
+            if VERBOSE_FLAVORS in self.verbose:
+                if (random.random() < self.prob_of_target_delay[0]):
+                    usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
+                else:    
+                    usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.long_chain_theta_times_lambda, target_delay=self.target_delay[1], C_u=10*self.uniform_Cu)
+            else:
+                usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
                        
             self.moved_usrs.append (usr)
+            self.critical_usrs.append(usr)
+
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr)
             self.update_S_u(usr, AP_id=int(tuple[1])) # Update the list of delay-feasible servers for this usr 
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
-            if (self.alg in ['ourAlg']):
+            if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                       
                     
@@ -1079,7 +1104,7 @@ class SFC_mig_simulator (object):
             self.update_S_u(usr, AP_id=int(tuple[1])) # Add this usr to the Hs of every server to which it belongs in its new location
                         
             # Check whether it's possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
-            if (self.alg in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
+            if (self.alg in ['ourAlg', 'ourAlgShortPushUp'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
                 
                 # Yep: the delay constraint are satisfied also in the current placement. 
                 # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
@@ -1091,13 +1116,14 @@ class SFC_mig_simulator (object):
             
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
+            self.critical_usrs.append(usr)
             self.rmv_usr_rsrcs (usr) # Free the resources of this user in its current place            
             usr.lvl   = -1
             usr.nxt_s = -1
 
             # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
             # Hs is the set of relevant usrs) at each of its delay-feasible server
-            if (self.alg in ['ourAlg']):
+            if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                               
 
@@ -1141,7 +1167,7 @@ class SFC_mig_simulator (object):
         """
         #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-        if (self.alg not in ['ourAlg']):
+        if (self.alg not in ['ourAlg', 'ourAlgShortPushUp']):
             return 
         
         # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
@@ -1183,12 +1209,13 @@ if __name__ == "__main__":
     #                            ) 
     
 
-    min_req_cap = 204
+    min_req_cap = 195
+    step        = min_req_cap*0.1
     
-    for alg in ['opt']: #['cpvnf', 'ourAlg', 'ffit', 'opt']:
-        for cpu_cap in [int(round((min_req_cap + min_req_cap*0.1*i))) for i in range (21)]:
+    for alg in ['ourAlgShortPushUp']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']:
+        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (11, 21)]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_MOVED_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              verbose               = [VERBOSE_MOVED_RES, VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
                                               children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                               cpu_cap_at_leaf       = cpu_cap

@@ -521,7 +521,7 @@ class loc2ap_c (object):
         
 if __name__ == '__main__': 
 
-    max_power_of_4 = 4
+    max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_CNT])
     my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
     my_loc2ap.parse_files (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])

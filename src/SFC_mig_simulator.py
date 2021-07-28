@@ -375,21 +375,19 @@ class SFC_mig_simulator (object):
             print ('id = {}, lvl = {}, CPU = {}' .format (usr.id, usr.lvl, usr.B[usr.lvl]))
         print ('')
         
-    def push_up (self):
+    def push_up (self, usrs):
         """
         Push-up chains: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
         Do that when chains are sorted in a decreasing order of the # of CPU units they're currently using.
         """
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
         # before calling push-up ()
-        heapq._heapify_max(self.usrs)
+        heapq._heapify_max(usrs)
  
         n = 0  # num of failing push-up tries in sequence; when this number reaches the number of users, return
 
-        while n < len (self.usrs):
-            usr = self.usrs[n]
-            if (self.alg == 'ourAlgShortPushUp' and usr not in self.critical_usrs):
-                continue
+        while n < len (usrs):
+            usr = usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_homo(usr, lvl) < self.chain_cost_homo(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previosly-suggested place for this usr  
@@ -400,9 +398,9 @@ class SFC_mig_simulator (object):
                     usr.nxt_s    = usr.S_u[usr.lvl]    
                     
                     # update the moved usr's location in the heap
-                    self.usrs[n] = self.usrs[-1] # replace the usr to push-up with the last usr in the heap
-                    self.usrs.pop() # pop the last user from the heap
-                    heapq.heappush(self.usrs, usr) # push back to the heap the user we have just pushed-up
+                    usrs[n] = usrs[-1] # replace the usr to push-up with the last usr in the heap
+                    usrs.pop() # pop the last user from the heap
+                    heapq.heappush(usrs, usr) # push back to the heap the user we have just pushed-up
                     n = 0 # succeeded to push-up a user, so next time should start from the max (which may now succeed to move)
                     break
             else:
@@ -743,8 +741,11 @@ class SFC_mig_simulator (object):
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
-                if (self.stts == sccs and self.alg in ['ourAlg', 'ourAlgShortPushUp']):  
-                    self.push_up ()
+                if (self.stts == sccs and self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+                    if (self.alg == 'ourAlgShortPushUp' and not (self.reshuffled)):  
+                        self.push_up (self.critical_usrs) 
+                    else:
+                        self.push_up (self.usrs)
                     if (VERBOSE_LOG in self.verbose):
                         printf (self.log_output_file, 'after push-up\n')
                 
@@ -926,6 +927,10 @@ class SFC_mig_simulator (object):
                
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         self.stts = placement_alg()
+        
+        if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+            self.reshuffled = not self.stts # if bottom-up succeeded, we'll return without reshufffailed. If bottom-up failed, a reshuffle will happen
+        
         if (self.stts == sccs):
             return sccs
 
@@ -949,7 +954,6 @@ class SFC_mig_simulator (object):
 
         self.stts = placement_alg() 
         if (self.stts != sccs):
-            # self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
 
@@ -1234,8 +1238,8 @@ if __name__ == "__main__":
     min_req_cap = 195
     step        = min_req_cap*0.1
     
-    for alg in ['opt']: #['ourAlgShortPushUp', 'ffit']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 'ourAlgShortPushUp'
-        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (1, 21)]: 
+    for alg in ['ourAlgShortPushUp']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 'ourAlgShortPushUp'
+        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (7, 21)]: 
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 

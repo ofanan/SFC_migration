@@ -1,4 +1,5 @@
 b_*
+/src/b_*
 .project
 /.vscode/*
 /res/*

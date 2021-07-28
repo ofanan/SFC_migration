@@ -126,7 +126,7 @@ class Res_file_parser (object):
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False):
         min_t, max_t = 30600, 30660
-        prob = 0.3
+        prob = 1.0
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
         self.output_file      = open (self.output_file_name, "w")
@@ -145,12 +145,11 @@ class Res_file_parser (object):
             X_norm_factor = 1
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='cpvnf', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
-            cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))
-            
+            cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))            
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['ourAlg', 'cpvnf']:
+        for alg in ['ourAlg', 'ourAlgShortPushUp', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -194,7 +193,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('0830_0831_256aps_critical_p0.3.res') # ('shorter.res')
+    my_res_file_parser.parse_file ('0830_0831_256aps__p1.0.res') # ('shorter.res')
     my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False)        
     # my_res_file_parser.compare_algs()  
     

@@ -21,12 +21,13 @@ VERBOSE_DEBUG         = 0
 VERBOSE_RES           = 1 # Write to a file the total cost and rsrc aug. upon every event
 VERBOSE_LOG           = 2 # Write to a ".log" file
 VERBOSE_ADD_LOG       = 3 # Write to a detailed ".log" file
-VERBOSE_MOB           = 4 # Write data about the mobility of usrs, and about the num of migrated chains per slot
-VERBOSE_COST_COMP     = 5 # Print the cost of each component in the cost function
-VERBOSE_CALC_RSRC_AUG = 6 # Use binary-search to calculate the minimal reseource augmentation required to find a sol 
-VERBOSE_MOVED_RES     = 7 # calculate the cost incurred by the usrs who moved only 
-VERBOSE_CRITICAL_RES  = 8 # calculate the cost incurred by the usrs who moved only 
-VERBOSE_FLAVORS       = 9 # Use 2 users' flavors
+VERBOSE_ADD2_LOG      = 4
+VERBOSE_MOB           = 5 # Write data about the mobility of usrs, and about the num of migrated chains per slot
+VERBOSE_COST_COMP     = 6 # Print the cost of each component in the cost function
+VERBOSE_CALC_RSRC_AUG = 7 # Use binary-search to calculate the minimal reseource augmentation required to find a sol 
+VERBOSE_MOVED_RES     = 8 # calculate the cost incurred by the usrs who moved only 
+VERBOSE_CRITICAL_RES  = 9 # calculate the cost incurred by the usrs who moved only 
+VERBOSE_FLAVORS       = 10 # Use 2 users' flavors
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -150,9 +151,11 @@ class SFC_mig_simulator (object):
         elif (VERBOSE_COST_COMP in self.verbose):
             self.calc_sol_cost_components()
 
-        if (VERBOSE_LOG in self.verbose):
+        if (VERBOSE_LOG in self.verbose): # Commented-out, because this is already printed during alg_top()
+            printf (self.log_output_file, 'after push-up:\n')
             self.print_sol_res_line (output_file=self.log_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
-            printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+        if (VERBOSE_ADD_LOG in self.verbose):
+            # printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt)) #$$$$
             self.print_sol_to_log()
             if (self.stts != sccs):
                 printf (self.log_output_file, 'Note: the solution above is partial, as the alg did not find a feasible solution\n')
@@ -342,7 +345,7 @@ class SFC_mig_simulator (object):
                         self.G.nodes[s]['cpu cap'],
                         len (chains_in_s),                       
                         ))
-                if (VERBOSE_ADD_LOG in self.verbose and used_cpu_in_s > 0): 
+                if (VERBOSE_ADD2_LOG in self.verbose and used_cpu_in_s > 0): 
                     printf (self.log_output_file, ' chains {}\n' .format (chains_in_s))
                 else: 
                     printf (self.log_output_file, '\n')
@@ -447,7 +450,7 @@ class SFC_mig_simulator (object):
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
-        self.cpu_cap_at_lvl    = np.array ([30                   * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
+        self.cpu_cap_at_lvl    = np.array ([28                   * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') if self.ap_file_name == 'shorter.ap' else\
                                  np.array ([self.cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16') # Lux city center 64 APs require 360*1.95=702
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
@@ -629,7 +632,7 @@ class SFC_mig_simulator (object):
         if (self.is_first_t):
             self.first_slot     = self.t
             self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
-        if (VERBOSE_LOG in self.verbose):
+        if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
         if (self.alg in ['ourAlg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
             for usr in self.usrs:
@@ -724,7 +727,7 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):  
                 self.rd_old_usrs_line (splitted_line[1:])
-                if (VERBOSE_LOG in self.verbose):
+                if (VERBOSE_ADD_LOG in self.verbose):
                     self.set_last_time()
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
@@ -742,13 +745,11 @@ class SFC_mig_simulator (object):
                     exit ()
         
                 if (self.stts == sccs and self.alg in ['ourAlg']):
-                    self.push_up (self.usrs)
+                    self.push_up (self.critical_usrs) #If  it's after a reshuffling, critical usrs will be identical to self.usrs
                     # if (self.reshuffled):  
                     #     self.push_up (self.usrs)
                     # else:
                     #     self.push_up (self.critical_usrs) # if not reshuffled, push-up critical usrs only 
-                    if (VERBOSE_LOG in self.verbose):
-                        printf (self.log_output_file, 'after push-up\n')
                 
                 self.print_sol_to_res_and_log ()
                 if (self.stts!=sccs):
@@ -929,11 +930,26 @@ class SFC_mig_simulator (object):
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         self.stts = placement_alg()
         
-        if (self.alg in ['ourAlg']):
-            self.reshuffled = not self.stts # if bottom-up succeeded, we'll return without reshufffailed. If bottom-up failed, a reshuffle will happen
+        if (VERBOSE_LOG in self.verbose):
+            self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+        
+        # if (self.alg in ['ourAlg']): #$$$
+        #     self.reshuffled = not self.stts # if bottom-up succeeded, we'll return without reshufffailed. If bottom-up failed, a reshuffle will happen
         
         if (self.stts == sccs):
             return sccs
+        
+        # Now we know that the first run fail. For all the benchmarks, it means that they also made a reshuffle. 
+        # However, bottom-up haven't tried a reshuffle yet. So, we give it a try now.
+        if (self.alg in ['ourAlg']):
+            self.rst_sol()
+            self.stts = self.bottom_up()
+            if (VERBOSE_LOG in self.verbose):
+                printf (self.log_output_file, 'after reshuffle:\n')
+                self.print_sol_to_log()
+                self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+            if (self.stts == sccs):
+                return sccs
 
         # Now we know that the run failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
         if (VERBOSE_CALC_RSRC_AUG not in self.verbose):
@@ -941,7 +957,7 @@ class SFC_mig_simulator (object):
 
         # Couldn't solve the problem without additional rsrc aug --> begin a binary search for the amount of rsrc aug' needed.
         if (VERBOSE_LOG in self.verbose):
-            printf (self.log_output_file, 'By binary search:\n')
+            printf (self.log_output_file, 'Starting binary search:\n')
 
         self.rst_sol() # dis-allocate all users
         self.critical_usrs = self.usrs # We will now consider reshuffling all usrs, so all usrs are considered critical.
@@ -984,9 +1000,14 @@ class SFC_mig_simulator (object):
             self.rst_sol()
 
             # Solve using the given placement alg'
-            if (placement_alg() == sccs):
+
+            self.stts = placement_alg()
+            if (VERBOSE_LOG in self.verbose):
+                    self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+            
+            if (self.stts == sccs):
                 if (VERBOSE_ADD_LOG in self.verbose): 
-                    printf (self.log_output_file, 'In bottom-up IF\n')
+                    printf (self.log_output_file, 'In binary search IF\n')
                     self.print_sol_to_log()
                     if (VERBOSE_DEBUG in self.verbose):
                         self.check_cpu_usage_all_srvrs()
@@ -1067,7 +1088,6 @@ class SFC_mig_simulator (object):
             #              C_u                = self.uniform_Cu)
             #
 
-                       
             if VERBOSE_FLAVORS in self.verbose:
                 if (random.random() < self.prob_of_target_delay[0]):
                     usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
@@ -1094,6 +1114,7 @@ class SFC_mig_simulator (object):
         """
                     
         # self.check_AP_id (AP_id)
+        usr.S_u = []
         s = self.ap2s[AP_id]
         usr.S_u.append (s)
         for lvl in (range (len(usr.B)-1)):
@@ -1220,35 +1241,34 @@ class SFC_mig_simulator (object):
 
 if __name__ == "__main__":
     
-    ap_file_name = '0830_0831_256aps.ap'
+    ap_file_name = 'shorter.ap' #'0830_0831_256aps.ap'
     
-    # for alg in ['ourAlg']:# ['cpvnf', 'ourAlg', 'ffit']: 
-    #     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                       verbose               = [VERBOSE_COST_COMP], # defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                       cpu_cap_at_leaf       = 330
-    #                                       )
-    #
-    #     my_simulator.simulate (alg              = alg, # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-    #                            sim_len_in_slots = 3, 
-    #                            initial_rsrc_aug =1
-    #                            ) 
+    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                      verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                      cpu_cap_at_leaf       = 330
+                                      )
+    
+    my_simulator.simulate (alg              = 'ourAlg', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+                           sim_len_in_slots = 9999, 
+                           initial_rsrc_aug = 1
+                           ) 
     
 
-    min_req_cap = 195
-    step        = min_req_cap*0.1
-    
-    for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (8, 9)]: 
-            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                              cpu_cap_at_leaf       = cpu_cap
-                                              )
-    
-            my_simulator.simulate (alg              = alg,  
-                                   sim_len_in_slots = 61, 
-                                   initial_rsrc_aug = 1
-                                   )     
+    # min_req_cap = 195
+    # step        = min_req_cap*0.1
+    #
+    # for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+    #     for cpu_cap in [333]: #[int(round((min_req_cap + step*i))) for i in range (7, 8)]: 
+    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                           verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG, VERBOSE_LOG],# defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                           cpu_cap_at_leaf       = cpu_cap
+    #                                           )
+    #
+    #         my_simulator.simulate (alg              = alg,  
+    #                                sim_len_in_slots = 50, 
+    #                                initial_rsrc_aug = 1
+    #                                )     

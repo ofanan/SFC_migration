@@ -124,7 +124,7 @@ class Res_file_parser (object):
 
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False):
-        min_t, max_t = 30600, 30660
+        min_t, max_t = 30600, 30645
         prob = 1.0
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
@@ -149,7 +149,7 @@ class Res_file_parser (object):
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['ourAlg', 'ffit', 'cpvnf']:
+        for alg in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -164,7 +164,7 @@ class Res_file_parser (object):
                 
                 if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
                     continue
-                alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor)*100 if normalize_X else (cpu / X_norm_factor), 
+                alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
                                       'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
 
                 if (len(alg_avg_list)==0):
@@ -194,6 +194,6 @@ class Res_file_parser (object):
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     my_res_file_parser.parse_file ('0830_0831_256aps__p1.0.res') # ('shorter.res')
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False)        
+    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True)        
     # my_res_file_parser.compare_algs()  
     

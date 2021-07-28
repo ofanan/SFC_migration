@@ -38,7 +38,7 @@ class Traci_runner (object):
         for i in range (num_of_output_files):
             
             speed_str        = 'n_speed_' if (VERBOSE_SPEED in self.verbose) else ''
-            output_file_name = '../res/vehicles_' + speed_str + secs2hour(traci.simulation.getTime()) + '.loc' 
+            output_file_name = '../res/{}_{}secs.loc' .format (secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec)  
             with open(output_file_name, 'w') as loc_output_file:
                 loc_output_file.write('')                
             loc_output_file  = open (output_file_name,  "w")
@@ -110,8 +110,8 @@ class Traci_runner (object):
     #    return True 
 
 if __name__ == '__main__':
-    my_Traci_runner = Traci_runner (warmup_period           = 3600*8.5,
+    my_Traci_runner = Traci_runner (warmup_period           = 3600*8 + 60*29,
                                     sim_length              = 61, #3600*1,
-                                    len_of_time_slot_in_sec = 1,
+                                    len_of_time_slot_in_sec = 8,
                                     num_of_output_files     = 1, 
                                     verbose                 = [VERBOSE_LOC, VERBOSE_SPEED])

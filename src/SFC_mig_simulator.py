@@ -585,7 +585,7 @@ class SFC_mig_simulator (object):
         self.stts     = sccs
         self.rsrc_aug = initial_rsrc_aug
         self.set_augmented_cpu_in_all_srvrs ()
-        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgShortPushUp']):
+        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
             self.simulate_algs()
         elif (self.alg == 'opt'):
             self.simulate_lp ();
@@ -631,7 +631,7 @@ class SFC_mig_simulator (object):
             self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'ourAlgShortPushUp']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
+        if (self.alg in ['ourAlg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
             for usr in self.usrs:
                 usr.calc_rand_id ()
         self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
@@ -693,7 +693,7 @@ class SFC_mig_simulator (object):
         # reset Hs and RCs       
         for s in self.G.nodes():
             self.G.nodes[s]['RCs'] = self.G.nodes[s]['cpu cap'] # Initially, no rsrc aug --> at each server, we've exactly his non-augmented capacity. 
-            if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+            if (self.alg in ['ourAlg']):
                 self.G.nodes[s]['Hs']  = set() 
         
         for line in self.ap_file: 
@@ -729,7 +729,7 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
                 # solve the prob' using the requested alg'    
-                if   (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+                if   (self.alg in ['ourAlg']):
                     self.stts = self.alg_top(self.bottom_up)
                 elif (self.alg == 'ffit'):
                     self.stts = self.alg_top(self.first_fit)
@@ -741,11 +741,11 @@ class SFC_mig_simulator (object):
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
-                if (self.stts == sccs and self.alg in ['ourAlg', 'ourAlgShortPushUp']):
-                    if (self.alg == 'ourAlgShortPushUp' and not (self.reshuffled)):  
-                        self.push_up (self.critical_usrs) 
-                    else:
+                if (self.stts == sccs and self.alg in ['ourAlg']):
+                    if (self.reshuffled):  
                         self.push_up (self.usrs)
+                    else:
+                        self.push_up (self.critical_usrs) # if not reshuffled, push-up critical usrs only 
                     if (VERBOSE_LOG in self.verbose):
                         printf (self.log_output_file, 'after push-up\n')
                 
@@ -928,7 +928,7 @@ class SFC_mig_simulator (object):
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         self.stts = placement_alg()
         
-        if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+        if (self.alg in ['ourAlg']):
             self.reshuffled = not self.stts # if bottom-up succeeded, we'll return without reshufffailed. If bottom-up failed, a reshuffle will happen
         
         if (self.stts == sccs):
@@ -1083,7 +1083,7 @@ class SFC_mig_simulator (object):
             self.update_S_u(usr, AP_id=int(tuple[1])) # Update the list of delay-feasible servers for this usr 
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
-            if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+            if (self.alg in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                       
                     
@@ -1133,7 +1133,7 @@ class SFC_mig_simulator (object):
                 # Yep: the delay constraint are satisfied also in the current placement. 
                 # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
                 
-                if (self.alg in ['ourAlg', 'ourAlgShortPushUp'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
+                if (self.alg in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
                     for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
                         self.G.nodes[s]['Hs'].remove (usr) # Remove the usr from  'Hs' in all locations 
                     for s in usr.S_u:
@@ -1149,7 +1149,7 @@ class SFC_mig_simulator (object):
 
             # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
             # Hs is the set of relevant usrs) at each of its delay-feasible server
-            if (self.alg in ['ourAlg', 'ourAlgShortPushUp']):
+            if (self.alg in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                               
 
@@ -1193,7 +1193,7 @@ class SFC_mig_simulator (object):
         """
         #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-        if (self.alg not in ['ourAlg', 'ourAlgShortPushUp']):
+        if (self.alg not in ['ourAlg']):
             return 
         
         # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
@@ -1238,7 +1238,7 @@ if __name__ == "__main__":
     min_req_cap = 195
     step        = min_req_cap*0.1
     
-    for alg in ['ourAlgShortPushUp']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 'ourAlgShortPushUp'
+    for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
         for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (7, 21)]: 
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   

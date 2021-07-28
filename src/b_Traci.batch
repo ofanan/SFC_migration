@@ -1,7 +1,0 @@
-#!/bin/bash
-#SBATCH --partition main
-#SBATCH --job-name num_vehs_from_33600
-#SBATCH --mail-user=itamarq@post.bgu.ac.il
-#SBATCH --mail-type=END
-echo "starting"
-python Traci_runner.py

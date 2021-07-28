@@ -145,7 +145,7 @@ class Res_file_parser (object):
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
             cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))  
-            print (cpu_vals)          
+            # print (cpu_vals)          
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
@@ -153,7 +153,7 @@ class Res_file_parser (object):
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
-                       
+            
             if (len(alg_list)==0):
                 continue
 
@@ -161,7 +161,7 @@ class Res_file_parser (object):
             
             for cpu in cpu_vals:
                 alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) )
-
+                
                 if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
                     continue
                 alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor)*100 if normalize_X else (cpu / X_norm_factor), 

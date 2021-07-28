@@ -1239,9 +1239,9 @@ if __name__ == "__main__":
     step        = min_req_cap*0.1
     
     for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (7, 21)]: 
+        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (7, 10)]: 
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              verbose               = [VERBOSE_RES, VERBOSE_LOG],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
                                               children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                               cpu_cap_at_leaf       = cpu_cap

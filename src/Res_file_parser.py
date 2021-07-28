@@ -37,7 +37,6 @@ class Res_file_parser (object):
                                   'cpvnf'   : self.add_plot_cpvnf}
 
         self.legend_entry_dict = {'opt'     :  '\opt', 
-                                  'ourAlgShortPushUp' : 'ourAlgShortPushUp', 
                                   'ourAlg' : '\ourAlg', 
                                   'ffit'    : '\\ffit',
                                   'cpvnf'   : '\cpvnf'}
@@ -143,13 +142,14 @@ class Res_file_parser (object):
                                      list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
         else:
             X_norm_factor = 1
-            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='cpvnf', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
-            cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))            
+            cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))  
+            print (cpu_vals)          
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['ourAlg', 'ourAlgShortPushUp', 'ffit', 'cpvnf']:
+        for alg in ['ourAlg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])

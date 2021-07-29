@@ -525,7 +525,7 @@ if __name__ == '__main__':
     max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP])
     my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
-    my_loc2ap.parse_files (['0829_0830_4secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap.parse_files (['0730_0830_1secs_256aps.ap']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
 
     # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
     # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)

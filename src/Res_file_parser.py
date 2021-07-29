@@ -121,7 +121,7 @@ class Res_file_parser (object):
         if (not (add_legend_str == None)): # if the caller requested to print an "add legend" str          
             printf (self.output_file, '\t\t{}{}' .format (self.add_legend_str, legend_entry))    
             printf (self.output_file, '}\n')    
-        printf (self.output_file, '\n\n')    
+        printf (self.output_file, '\n')    
 
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False, slot_len_in_sec=1):
@@ -134,18 +134,17 @@ class Res_file_parser (object):
         if (normalize_X):
             opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
-            # cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+            cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
             X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
             
-            opt_avg_list = []
-            for cpu in cpu_vals:
-                opt_avg_list.append (np.average ([item['cost'] for item in 
-                                     list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
+            if (normalize_Y):
+                opt_avg_list = []
+                for cpu in cpu_vals:
+                    opt_avg_list.append (np.average ([item['cost'] for item in list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
         else:
             X_norm_factor = 1
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
-            # cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
@@ -198,8 +197,8 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res'
+    input_file_name = '0829_0830_8secs_256aps_p0.3.res'
     my_res_file_parser.parse_file (input_file_name) # ('shorter.res')
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
+    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
     # my_res_file_parser.compare_algs()  
     

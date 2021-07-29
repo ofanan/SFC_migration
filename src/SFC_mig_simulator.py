@@ -106,6 +106,14 @@ class SFC_mig_simulator (object):
     # average the upper-bound and the lower-bound of the binary search, while rounding and converting to int
     avg_up_and_lb = lambda self, ub, lb : int (math.floor(ub+lb)/2)
     
+    
+    # # calculate the total cost of1 a solution by an algorithm (not by LP), 
+    # # and collect data about the cost's components
+    # def calc_alg_sol_cost_w_details (self):
+    #     """
+    #     """
+    #     # calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_homo (usr, usr.lvl) for usr in usrs])
+    
     def set_RCs_and_a (self, aug_cpu_capacity_at_lvl):
         # given the (augmented) cpu cap' at each lvl, assigned each server its 'RCs' (augmented CPU cap vals)
         for s in self.G.nodes:
@@ -123,31 +131,48 @@ class SFC_mig_simulator (object):
         """
         prints to a file statistics about the cost of each component in the cost function (cpu, link, and migration). 
         """
-        del (self.total_cpu_cost_in_slot[0])
-        del (self.total_link_cost_in_slot[0])
-        del (self.total_mig_cost_in_slot[0])
-        total_cost = [self.total_cpu_cost_in_slot[t] + self.total_link_cost_in_slot[t] + self.total_mig_cost_in_slot[t] for t in range(len(self.total_cpu_cost_in_slot))] #Ignore the cost in the first slot, in which there're no mig        
-        printf (self.cost_comp_output_file, 'total_cost = {}\n' .format (total_cost))
-        printf (self.cost_comp_output_file, 'cpu_cost={}\nlink_cost={}\nmig_cost={}\n' .format (
-                self.total_cpu_cost_in_slot, self.total_link_cost_in_slot, self.total_mig_cost_in_slot))
+        del (self.cpu_cost_in_slot    [0])
+        del (self.link_cost_in_slot   [0])
+        del (self.num_of_migs_in_slot [0])
+        self.cost_of_migs_in_slot = self.uniform_mig_cost * len (self.uniform_theta_times_lambda) * np.array (self.num_of_migs_in_slot)  
+        
+        printf (self.detailed_cost_comp_output_file, '//t = {}\n//*******************************\n' .format (self.t))
+        printf (self.detailed_cost_comp_output_file, 'cpu_cost_in_slot={}\nlink_cost_in_slot={}\nnum_of_migs_in_slot={}\ncost_of_migs_in_slot={}' .format
+               (self.cpu_cost_in_slot, self.link_cost_in_slot, self.num_of_migs_in_slot, self.cost_of_migs_in_slot))
+        
+        total_cpu_cost    = sum(self.cpu_cost_in_slot)
+        total_link_cost   = sum(self.link_cost_in_slot)
+        total_num_of_migs = sum(self.num_of_migs_in_slot)
+        total_mig_cost    = total_num_of_migs * self.uniform_mig_cost * len (self.uniform_theta_times_lambda)
+        total_cost        = sum ([total_cpu_cost, total_link_cost, total_mig_cost])
+        # total_cost        = np.sum (np.array ([total_cpu_cost, total_link_cost, total_mig_cost]))
+        
+        printf (self.cost_comp_output_file, '\nap_file={}\t| t = {}\t|total cpu cost={}\t| total_link_cost_={}\t| num_of_migs={}\t| total_mig_cost={}\n' .format
+               (self.ap_file_name, self.t, total_cpu_cost, total_link_cost, total_num_of_migs, total_mig_cost))
 
-        cpu_cost_ratio  = [self.total_cpu_cost_in_slot[t]/total_cost[t]  for t in range(len(total_cost))]
-        link_cost_ratio = [self.total_link_cost_in_slot[t]/total_cost[t] for t in range(len(total_cost))]
-        mig_cost_ratio  = [self.total_mig_cost_in_slot[t]/total_cost[t]  for t in range(len(total_cost))]
-        printf (self.cost_comp_output_file, 'cpu_cost_ratio = {}\nlink_cost_ratio = {}\nmig_cost_ratio = {}\n'.format (
-            cpu_cost_ratio, link_cost_ratio, mig_cost_ratio))
+        if (total_cost == 0):
+            return
+        
+        total_cpu_cost_ratio  = total_cpu_cost  / total_cost 
+        total_link_cost_ratio = total_link_cost / total_cost 
+        total_mig_cost_ratio  = total_mig_cost  / total_cost 
+        
+        # cpu_cost_ratio  = [self.cpu_cost_in_slot[t]/total_cost[t]  for t in range(len(total_cost))]
+        # link_cost_ratio = [self.link_cost_in_slot[t]/total_cost[t] for t in range(len(total_cost))]
+        # mig_cost_ratio  = [self.total_mig_cost_in_slot[t]/total_cost[t]  for t in range(len(total_cost))]
+        # printf (self.cost_comp_output_file, 'cpu_cost_ratio = {}\nlink_cost_ratio = {}\nmig_cost_ratio = {}\n'.format (
+        #     cpu_cost_ratio, link_cost_ratio, mig_cost_ratio))
             
-        printf (self.cost_comp_output_file, 'avg ratio are: cpu={:.3f}, link={:.3f}, mig={:.3f}\n' .format (
-            np.average(cpu_cost_ratio), np.average(link_cost_ratio), np.average(mig_cost_ratio) ) )
+        printf (self.cost_comp_output_file, 'total_cpu_cost_ratio={:.4f} | total_link_cost_ratio={:.3f} | total_mig_cost_ratio={:.3f}\n' .format (
+                total_cpu_cost_ratio, total_link_cost_ratio, total_mig_cost_ratio))
             
     def calc_sol_cost_components (self):
         """
         Calculates and keeps the cost of each component in the cost function (cpu, link, and migration). 
         """
-        
-        self.total_cpu_cost_in_slot.append  (sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs]))
-        self.total_link_cost_in_slot.append (sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs]))
-        self.total_mig_cost_in_slot.append  (sum ([self.calc_mig_cost_CLP(usr, usr.lvl)               for usr in self.usrs]))
+        self.cpu_cost_in_slot.append  (sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs]))
+        self.link_cost_in_slot.append (sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs]))
+        self.num_of_migs_in_slot.append     (len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs))))
      
     def print_sol_to_res_and_log (self):
         """
@@ -568,13 +593,14 @@ class SFC_mig_simulator (object):
         """
         Open the output file to which we will write the cost of each component in the sim
         """
-        self.cost_comp_file_name = "../res/" + self.ap_file_name.split(".")[0] + ".cost_comp.res"  
-        self.cost_comp_output_file =  open ('../res/' + self.cost_comp_file_name,  "w") 
+        self.cost_comp_file_name            = '../res/cost_comp.res'  
+        self.detailed_comp_cost_file_name   = '../res/{}_detailed_cost_comp.res'  
+        self.cost_comp_output_file          =  open ('../res/' + self.cost_comp_file_name,           "a") 
+        self.detailed_cost_comp_output_file =  open ('../res/' + self.detailed_comp_cost_file_name,  "w") 
         
-        self.total_cpu_cost_in_slot  = []
-        self.total_link_cost_in_slot = []
-        self.total_mig_cost_in_slot  = []
-        self.total_cost_in_slot      = []
+        self.cpu_cost_in_slot    = []
+        self.link_cost_in_slot   = []
+        self.num_of_migs_in_slot = []
 
     def delay_const_sanity_check (self):
         """
@@ -1262,34 +1288,48 @@ class SFC_mig_simulator (object):
 
 if __name__ == "__main__":
     
-    ap_file_name = '0829_0830_1secs_256aps.ap' 
+    ap_file_name = '0829_0830_8secs_256aps.ap' 
     
+    # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
     # for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
     #     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                       verbose               = [VERBOSE_CALC_RSRC_AUG, VERBOSE_RES], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                       verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
     #                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
     #                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                       cpu_cap_at_leaf       = 300
+    #                                       cpu_cap_at_leaf       = 213
     #                                       )
     #
     #     my_simulator.simulate (alg              = alg, # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-    #                            sim_len_in_slots = 9999, 
+    #                            sim_len_in_slots = 61, 
     #                            ) 
     # exit ()
 
-    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
-    step        = min_req_cap*0.1
-    
-    for alg in ['opt']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (1, 21)]:
-            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                              cpu_cap_at_leaf       = cpu_cap
-                                              )
-    
-            my_simulator.simulate (alg              = alg,  
-                                   sim_len_in_slots = 61, 
-                                   )     
+    # ap_file_name = '0829_0830_8secs_256aps.ap' #'shorter.ap' #
+    # min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
+    # step        = 0.1 * min_req_cap
+    #
+    # for alg in ['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+    #     for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (0, 21)]:
+    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                           verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                           cpu_cap_at_leaf       = cpu_cap
+    #                                           )
+    #
+    #         my_simulator.simulate (alg              = alg,  
+    #                                sim_len_in_slots = 61, 
+    #                                )     
+
+    # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
+    ap_file_name = '0730_0830_2secs_256aps.ap' 
+    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                      verbose               = [VERBOSE_COST_COMP], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                      cpu_cap_at_leaf       = 208*2
+                                      )
+
+    my_simulator.simulate (alg              = 'ourAlg', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+                           sim_len_in_slots = 99999, 
+                           ) 

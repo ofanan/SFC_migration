@@ -1252,20 +1252,23 @@ class SFC_mig_simulator (object):
 
 if __name__ == "__main__":
     
-    ap_file_name = '0830_0831_256aps.ap' #'shorter.ap' #
-    
-    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                   verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG, VERBOSE_CALC_RSRC_AUG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                   cpu_cap_at_leaf       = 330
-    #                                   )
+    # ap_file_name = 'shorter.ap' #'0830_0831_256aps.ap' 
     #
-    # my_simulator.simulate (alg              = 'ourAlg', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-    #                        sim_len_in_slots = 9999, 
-    #                        initial_rsrc_aug = 1
-    #                        ) 
+    # for alg in ['ourAlg', 'ffit', 'cpvnf']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+    #     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                       verbose               = [VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                       cpu_cap_at_leaf       = 330
+    #                                       )
+    #
+    #     my_simulator.simulate (alg              = alg, # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+    #                            sim_len_in_slots = 9999, 
+    #                            initial_rsrc_aug = 1
+    #                            ) 
+    # exit ()
 
+    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     min_req_cap = 195 # for 0830:-0831 prob=0.3 it is: 195
     step        = min_req_cap*0.1
     

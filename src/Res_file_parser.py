@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 from printf import printf 
 
@@ -37,7 +38,7 @@ class Res_file_parser (object):
                                   'cpvnf'   : self.add_plot_cpvnf}
 
         self.legend_entry_dict = {'opt'     :  '\opt', 
-                                  'ourAlg' : '\ourAlg', 
+                                  'ourAlg' : '\\algtop', 
                                   'ffit'    : '\\ffit',
                                   'cpvnf'   : '\cpvnf'}
         
@@ -123,7 +124,7 @@ class Res_file_parser (object):
         printf (self.output_file, '\n\n')    
 
 
-    def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False):
+    def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False, slot_len_in_sec=1):
         min_t, max_t = 30541, 30600
         prob = 0.3
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
@@ -133,7 +134,7 @@ class Res_file_parser (object):
         if (normalize_X):
             opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
-            cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+            # cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
             X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
             
             opt_avg_list = []
@@ -144,7 +145,7 @@ class Res_file_parser (object):
             X_norm_factor = 1
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
-            cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))
+            # cpu_vals = sorted (list (set([item['cpu'] for item in alg_list])))
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
@@ -153,20 +154,21 @@ class Res_file_parser (object):
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
             
+            cpu_vals = set ([item['cpu'] for item in self.list_of_dicts if item in alg_list])
+            
             if (len(alg_list)==0):
                 continue
 
             alg_avg_list = []
             
-            # cpu_vals = set ([item['cpu'] for item in self.list_of_dicts if item in alg_list])
             for cpu in cpu_vals:
+                
                 alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) )
                 
-                if (len(alg_vals_for_this_cpu)<5):
+                if (len(alg_vals_for_this_cpu)< math.floor( (max_t - min_t)/slot_len_in_sec)):
+                    print ('Warning: there are too few samples\nalg={}, cpu={}, num of smpls={}' .format(alg, cpu, len(alg_vals_for_this_cpu)))
                     continue
-                # $$$ Should add a check that the list is long enough, even when using T > 1 sec
-                # if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
-                #     continue
+                
                 alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
                                       'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
 
@@ -196,7 +198,8 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('0829_0830_8secs_256aps_critical_p0.3.res') # ('shorter.res')
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False)        
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res'
+    my_res_file_parser.parse_file (input_file_name) # ('shorter.res')
+    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
     # my_res_file_parser.compare_algs()  
     

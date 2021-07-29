@@ -1273,7 +1273,7 @@ if __name__ == "__main__":
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     min_req_cap = 195 # for 0830:-0831 prob=0.3 it is: 195
     step        = min_req_cap*0.1
-    
+      
     for alg in ['opt']: #, 'ffit', 'cpvnf']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
         for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (21)]: 
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 

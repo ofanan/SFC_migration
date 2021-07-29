@@ -112,6 +112,6 @@ class Traci_runner (object):
 if __name__ == '__main__':
     my_Traci_runner = Traci_runner (warmup_period           = 3600*8 + 60*29,
                                     sim_length              = 61, #3600*1,
-                                    len_of_time_slot_in_sec = 8,
+                                    len_of_time_slot_in_sec = 1,
                                     num_of_output_files     = 1, 
                                     verbose                 = [VERBOSE_LOC, VERBOSE_SPEED])

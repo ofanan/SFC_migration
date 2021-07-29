@@ -124,7 +124,7 @@ class Res_file_parser (object):
 
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False):
-        min_t, max_t = 30600, 30660
+        min_t, max_t = 30541, 30600
         prob = 0.3
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
@@ -162,8 +162,11 @@ class Res_file_parser (object):
             for cpu in cpu_vals:
                 alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) )
                 
-                if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
+                if (len(alg_vals_for_this_cpu)<5):
                     continue
+                # $$$ Should add a check that the list is long enough, even when using T > 1 sec
+                # if (len(alg_vals_for_this_cpu) < max_t - min_t): # verify that we have cost of feasible sols for all the relevant slots 
+                #     continue
                 alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
                                       'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
 
@@ -193,7 +196,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('0830_0831_256aps_moved_p0.3.res') # ('shorter.res')
+    my_res_file_parser.parse_file ('0829_0830_8secs_256aps_critical_p0.3.res') # ('shorter.res')
     my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=False)        
     # my_res_file_parser.compare_algs()  
     

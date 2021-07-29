@@ -533,7 +533,7 @@ class SFC_mig_simulator (object):
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
         self.long_chain_theta_times_lambda = [2, 10, 10, 10, 10, 10, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
-        self.target_delay               = [20, 100] # in [ms], lowest to highest
+        self.target_delay               = [10, 100] # in [ms], lowest to highest
         self.prob_of_target_delay       = [0.3] 
         self.warned_about_too_large_ap  = False
         self.usrs                       = []
@@ -747,7 +747,7 @@ class SFC_mig_simulator (object):
                     exit ()
         
                 if (self.stts == sccs and self.alg in ['ourAlg']):
-                    self.push_up (self.critical_usrs) #If  it's after a reshuffling, critical usrs will be identical to self.usrs
+                    self.push_up (self.critical_usrs) 
                     # if (self.reshuffled):  
                     #     self.push_up (self.usrs)
                     # else:
@@ -953,6 +953,8 @@ class SFC_mig_simulator (object):
             self.rst_sol()
             self.stts = self.bottom_up()
             if (VERBOSE_LOG in self.verbose):
+                if (self.stts == sccs):
+                    self.push_up(self.usrs)
                 printf (self.log_output_file, 'after reshuffle:\n')
                 self.print_sol_to_log()
                 self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
@@ -1272,10 +1274,10 @@ if __name__ == "__main__":
     min_req_cap = 195 # for 0830:-0831 prob=0.3 it is: 195
     step        = min_req_cap*0.1
     
-    for alg in ['ourAlg', 'ffit', 'cpvnf']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (10, 20)]: 
+    for alg in ['opt']: #, 'ffit', 'cpvnf']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (21)]: 
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_CRITICAL_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
                                               children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
                                               cpu_cap_at_leaf       = cpu_cap

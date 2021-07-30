@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm, Normalize
+from matplotlib.ticker import MaxNLocator
 import math
 import itertools 
 import time 
@@ -225,20 +227,25 @@ class loc2ap_c (object):
         n = int (math.sqrt(len(avg_num_of_cars_in_cell)))
         heatmap_val = np.array ([avg_num_of_cars_in_cell[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))]).reshape ( [n, n])
 
-        self.heatmap_output_file = open ('../res/heatmap_num_vehs_{}.dat' .format (4**self.max_power_of_4), 'w')
-        for i in range (2**self.max_power_of_4):
-            for j in range (2**self.max_power_of_4):
-                printf (self.heatmap_output_file, '{} {} {}\n' .format (j, i, heatmap_val[i][j]))
-            printf (self.heatmap_output_file, '\n')
-
-        printf (self.heatmap_output_file, '\n\n{}' .format(self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))))
-        # Make a Python heatmap
+        # # Generate a tikz heatmap
+        # self.heatmap_output_file = open ('../res/heatmap_num_vehs_{}.dat' .format (4**self.max_power_of_4), 'w')
+        # for i in range (2**self.max_power_of_4):
+        #     for j in range (2**self.max_power_of_4):
+        #         printf (self.heatmap_output_file, '{} {} {}\n' .format (j, i, heatmap_val[i][j]))
+        #     printf (self.heatmap_output_file, '\n')
+        #
+        # printf (self.heatmap_output_file, '\n\n{}' .format(self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))))
+        
+        # Generate a Python heatmap
         plt.figure()
         columns = [str(i) for i in range(2**self.max_power_of_4)]
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])),columns=columns), cmap="YlGnBu")
-        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        # plt.title ('avg num of cars per cell')
-        plt.savefig('../res/heatmap_num_vehs_{}_Python.jpg' .format (self.num_of_APs))
+        heatmap_vals = self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))
+        # print (heatmap_vals)
+        # my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])),columns=columns), cmap="YlGnBu", norm=LogNorm())
+        # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        # # plt.title ('avg num of cars per cell')
+        # plt.savefig('../res/heatmap_num_vehs_{}_Python_log.jpg' .format (self.num_of_APs))
+        return heatmap_vals
         
     def plot_speed_heatmap (self):
         """
@@ -283,13 +290,13 @@ class loc2ap_c (object):
             for ap in range (4*plot_num, 4*(plot_num+1)):
                 if (VERBOSE_CNT in self.verbose):
                     printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
-                plt.title ('Number of vehicles in each cell')
-                plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
-                plt.ylabel ('Number of vehicles')
-                plt.xlabel ('time [minutes, starting at 07:30]')
-            plt.legend()
-            plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
-            plt.clf()
+            #     plt.title ('Number of vehicles in each cell')
+            #     plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
+            #     plt.ylabel ('Number of vehicles')
+            #     plt.xlabel ('time [minutes, starting at 07:30]')
+            # plt.legend()
+            # plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
+            # plt.clf()
             
     def plot_tot_num_of_vehs_over_t_graph (self):    
         """
@@ -426,7 +433,7 @@ class loc2ap_c (object):
         if (VERBOSE_AP in self.verbose):
             printf(self.ap_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
-            # self.plot_num_of_vehs_per_ap_graph ()
+            self.plot_num_of_vehs_per_ap_graph ()
             self.plot_num_of_vehs_heatmap()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.plot_demography_heatmap()
@@ -523,19 +530,54 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_AP])
-    my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
-    my_loc2ap.parse_files (['0730_0830_1secs_256aps.ap']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_CNT])
+    # my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
+    # my_loc2ap.parse_files (['0730_0830_16secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
 
-    # my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
-    # input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
-    # my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
+    # gamad = np.array ((4,4))
+    # gamad = [[1,2],[3,4]]
+    # nanas = [[gamad[i][j]]*2 for i in range (2) for j in range (2)]
+    # nanans.reshape ()
+    # print (nanas)
+    
+    heatmap_vals = [1]
+    for max_power_of_4 in range(1,5):     
+        my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
+        input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
+        my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
+        # my_loc2ap.plot_num_of_vehs_heatmap ()
+        heatmap_vals.append (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) )
+        # heatmap_vals.append (np.tile (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()), 2**(4-max_power_of_4)))
+    #
+    # print (heatmap_vals[1])
+    
+    # df = pd.DataFrame(np.random.random((10,10)))
+    # df = []
+    # for max_power_of_4 in range(4):
+    #     df.append (pd.DataFrame(np.random.random((10,10))))
+    # df[1] = heatmap_vals[1]
+    
+    # heatmap_vals
+    fig, axn = plt.subplots(2, 2, sharex=True, sharey=True)
+    cbar_ax = fig.add_axes([.91, .3, .03, .4])
+    
+    for i, ax in enumerate(axn.flat):
+        my_heatmap = sns.heatmap(heatmap_vals[i+1], ax=ax,
+                     cbar=i == 0,
+                     vmin=0, vmax=100,
+                     cbar_ax=None if i else cbar_ax,
+                     cmap="YlGnBu", norm=LogNorm())
+        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+    
+    fig.tight_layout(rect=[0, 0, .9, 1])
+    plt.show ()
+
+    
     # # my_loc2ap.plot_tot_num_of_vehs_over_t_graph()
     # my_loc2ap.print_num_of_vehs_diffs ()
     # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
     # my_loc2ap.plot_num_of_vehs_per_ap_graph ()
     # my_loc2ap.print_num_of_vehs_per_server (output_file_name)
-    # my_loc2ap.plot_num_of_vehs_heatmap ()
     
     # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
     # my_loc2ap.find_max_X_max_Y ()    

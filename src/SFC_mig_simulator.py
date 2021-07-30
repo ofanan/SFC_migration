@@ -594,7 +594,7 @@ class SFC_mig_simulator (object):
         Open the output file to which we will write the cost of each component in the sim
         """
         self.cost_comp_file_name            = '../res/cost_comp.res'  
-        self.detailed_comp_cost_file_name   = '../res/{}_detailed_cost_comp.res'  
+        self.detailed_comp_cost_file_name   = '../res/{}_detailed_cost_comp.res' .format (self.ap_file_name)  
         self.cost_comp_output_file          =  open ('../res/' + self.cost_comp_file_name,           "a") 
         self.detailed_cost_comp_output_file =  open ('../res/' + self.detailed_comp_cost_file_name,  "w") 
         
@@ -1322,7 +1322,7 @@ if __name__ == "__main__":
     #                                )     
 
     # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
-    ap_file_name = '0730_0830_2secs_256aps.ap' 
+    ap_file_name = '0730_0830_8secs_256aps.ap' 
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_COST_COMP], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 

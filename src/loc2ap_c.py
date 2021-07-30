@@ -64,7 +64,6 @@ class loc2ap_c (object):
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_in_ap = [[] for ap in range(self.num_of_APs)]
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.demography_file = open ('../res/vehicles_demography.txt', 'w+')
             self.joined          = [[] for ap in range(self.num_of_APs)]
             self.left            = [[] for ap in range(self.num_of_APs)]
             self.joined_sim_via  = [[] for ap in range(self.num_of_APs)]
@@ -120,12 +119,13 @@ class loc2ap_c (object):
         """
         Prints the number of vehicles that joined/left each cell during the last simulated time slot.
         """
-        for ap in range(self.num_of_APs):
-            printf (self.demography_file, 'ap_{}: joined {}\nap_{}: joined_sim_via{}\nap_{}: left {}\nap_{}: left_sim_via {}\n' .format (
-                                                ap, self.joined[ap], 
-                                                ap, self.joined_sim_via[ap], 
-                                                ap, self.left[ap], 
-                                                ap, self.left_sim_via[ap]))
+        # for ap in range(self.num_of_APs):
+        #     printf (self.demography_file, 'ap_{}: joined {}\nap_{}: joined_sim_via{}\nap_{}: left {}\nap_{}: left_sim_via {}\n' .format (
+        #                                         ap, self.joined[ap], 
+        #                                         ap, self.joined_sim_via[ap], 
+        #                                         ap, self.left[ap], 
+        #                                         ap, self.left_sim_via[ap]))
+        printf (self.demography_file, 'total num of joined cell={}, total num of left cell = ' .format (np.sum(np.array(self.joined)),np.sum(np.array(self.left))) )
         printf (self.demography_file, '\n')                                        
 
     def print_speed (self):
@@ -435,8 +435,8 @@ class loc2ap_c (object):
         if (VERBOSE_CNT in self.verbose):
             self.plot_num_of_vehs_per_ap_graph ()
             self.plot_num_of_vehs_heatmap()
-        if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.plot_demography_heatmap()
+        # if (VERBOSE_DEMOGRAPHY in self.verbose):
+        #     self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
             
             # first, fix the speed, as we assumed a first car with speed '0'.
@@ -455,7 +455,6 @@ class loc2ap_c (object):
             for ap in range (self.num_of_APs):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap]))
         if (VERBOSE_DEMOGRAPHY in self.verbose): 
-            self.demography_file   = open ('../res/vehicles_demography.txt', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
             self.print_demography()
         if (VERBOSE_SPEED in self.verbose): 
@@ -473,8 +472,11 @@ class loc2ap_c (object):
         2. output the APs of all new/left/moved users at each time slot.
         The exact behavior is by the value of self.verbose
         """
+        if (VERBOSE_DEMOGRAPHY in self.verbose):
+            self.demography_file = open ('../res/demography_{}_{}.txt' .format(loc_file_names[0].split('.')[0], 4**self.max_power_of_4), 'w+')
         if (VERBOSE_AP in self.verbose):
-            self.ap_file        = open ("../res/" + loc_file_names[0].split('.')[0] + '_' + str(self.num_of_APs) + 'aps' +".ap", "w+")  
+            self.ap_file_name = loc_file_names[0].split('.')[0] + '_' + str(self.num_of_APs) + 'aps' +".ap"
+            self.ap_file        = open ("../res/" + self.ap_file_name, "w+")  
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
             printf (self.ap_file, '//for each time slot:\n')
             printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
@@ -530,23 +532,28 @@ class loc2ap_c (object):
 if __name__ == '__main__': 
 
     max_power_of_4 = 4
-    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_CNT])
-    # my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
-    # my_loc2ap.parse_files (['0730_0830_16secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY])
+    my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
+    my_loc2ap.parse_files (['0730_0830_1secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
 
-    # gamad = np.array ((4,4))
     # gamad = [[1,2],[3,4]]
-    # nanas = [[gamad[i][j]]*2 for i in range (2) for j in range (2)]
-    # nanans.reshape ()
+    # nanas = [[0]*4 for i in range(4)]
+    # for row in range (4):
+    #     for col in range (4):
+    #         nanas[row][col] = gamad[int(row/2)][int(col/2)] 
+    #     #nanas[row] = [[gamad[i][j]]*2 for i in range (2)] # for j in range (2)]
+    #
     # print (nanas)
-    
-    heatmap_vals = [1]
-    for max_power_of_4 in range(1,5):     
-        my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
-        input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
-        my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
-        # my_loc2ap.plot_num_of_vehs_heatmap ()
-        heatmap_vals.append (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) )
+    # exit ()
+    #
+    # heatmap_vals = [1]
+    # for max_power_of_4 in range(1,5):     
+    #     my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
+    #     input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
+    #     my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
+    #     # my_loc2ap.plot_num_of_vehs_heatmap ()
+    #     np.array (my_loc2ap.plot_num_of_vehs_heatmap ())
+        # heatmap_vals.append (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) )
         # heatmap_vals.append (np.tile (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()), 2**(4-max_power_of_4)))
     #
     # print (heatmap_vals[1])
@@ -558,19 +565,19 @@ if __name__ == '__main__':
     # df[1] = heatmap_vals[1]
     
     # heatmap_vals
-    fig, axn = plt.subplots(2, 2, sharex=True, sharey=True)
-    cbar_ax = fig.add_axes([.91, .3, .03, .4])
-    
-    for i, ax in enumerate(axn.flat):
-        my_heatmap = sns.heatmap(heatmap_vals[i+1], ax=ax,
-                     cbar=i == 0,
-                     vmin=0, vmax=100,
-                     cbar_ax=None if i else cbar_ax,
-                     cmap="YlGnBu", norm=LogNorm())
-        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-    
-    fig.tight_layout(rect=[0, 0, .9, 1])
-    plt.show ()
+    # fig, axn = plt.subplots(2, 2, sharex=True, sharey=True)
+    # cbar_ax = fig.add_axes([.91, .3, .03, .4])
+    #
+    # for i, ax in enumerate(axn.flat):
+    #     my_heatmap = sns.heatmap(heatmap_vals[i+1], ax=ax,
+    #                  cbar=i == 0,
+    #                  vmin=0, vmax=100,
+    #                  cbar_ax=None if i else cbar_ax,
+    #                  cmap="YlGnBu", norm=LogNorm())
+    #     my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+    #
+    # fig.tight_layout(rect=[0, 0, .9, 1])
+    # plt.show ()
 
     
     # # my_loc2ap.plot_tot_num_of_vehs_over_t_graph()

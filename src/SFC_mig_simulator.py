@@ -131,14 +131,18 @@ class SFC_mig_simulator (object):
         """
         prints to a file statistics about the cost of each component in the cost function (cpu, link, and migration). 
         """
-        del (self.cpu_cost_in_slot    [0])
-        del (self.link_cost_in_slot   [0])
-        del (self.num_of_migs_in_slot [0])
+        del (self.cpu_cost_in_slot            [0])
+        del (self.link_cost_in_slot           [0])
+        del (self.num_of_migs_in_slot         [0])
+        del (self.num_of_critical_usrs_in_slot[0])
+        del (self.num_of_moved_usrs_in_slot   [0])
         self.cost_of_migs_in_slot = self.uniform_mig_cost * len (self.uniform_theta_times_lambda) * np.array (self.num_of_migs_in_slot)  
         
         printf (self.detailed_cost_comp_output_file, '//t = {}\n//*******************************\n' .format (self.t))
-        printf (self.detailed_cost_comp_output_file, 'cpu_cost_in_slot={}\nlink_cost_in_slot={}\nnum_of_migs_in_slot={}\ncost_of_migs_in_slot={}' .format
+        printf (self.detailed_cost_comp_output_file, 'cpu_cost_in_slot={}\nlink_cost_in_slot={}\nnum_of_migs_in_slot={}\ncost_of_migs_in_slot={}\n' .format
                (self.cpu_cost_in_slot, self.link_cost_in_slot, self.num_of_migs_in_slot, self.cost_of_migs_in_slot))
+        printf (self.detailed_cost_comp_output_file, 'num_of_moved_usrs_in_slot={}\nnum_of_critical_usrs_in_slot={}\n' .format (
+                self.num_of_moved_usrs_in_slot, num_of_critical_usrs_in_slot))
         
         total_cpu_cost    = sum(self.cpu_cost_in_slot)
         total_link_cost   = sum(self.link_cost_in_slot)
@@ -170,9 +174,11 @@ class SFC_mig_simulator (object):
         """
         Calculates and keeps the cost of each component in the cost function (cpu, link, and migration). 
         """
-        self.cpu_cost_in_slot.append  (sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs]))
-        self.link_cost_in_slot.append (sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs]))
-        self.num_of_migs_in_slot.append     (len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs))))
+        self.cpu_cost_in_slot.            append (sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs]))
+        self.link_cost_in_slot.           append (sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs]))
+        self.num_of_migs_in_slot.         append (len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs))))
+        self.num_of_critical_usrs_in_slot.append (len(self.critical_usrs))
+        self.num_of_moved_usrs_in_slot   .append (len(self.moved_usrs))
      
     def print_sol_to_res_and_log (self):
         """
@@ -478,6 +484,16 @@ class SFC_mig_simulator (object):
         """
         for usr in usrs:
             self.CPUAll_single_usr(usr)
+       
+            
+    # def adjust_costs_to_t_slot (self):
+    #     """
+    #     Adjust the link and 
+    #     """
+    #     if (self.t_slot_len == 1):
+    #         return
+        
+    
             
     def gen_parameterized_tree (self):
         """
@@ -582,8 +598,10 @@ class SFC_mig_simulator (object):
         if (VERBOSE_DEBUG in self.verbose):
             self.debug_file = open ('../res/debug.txt', 'w') 
         if (VERBOSE_MOB in self.verbose):
-            self.num_of_moves_in_slot = [] # self.num_of_moves_in_slot[t] will hold the num of usrs who moved at slot t.   
-            self.num_of_migs_in_slot  = [] # self.num_of_migs[t] will hold the num of chains that the alg' migrated in slot t.
+            self.num_of_moves_in_slot         = [] # self.num_of_moves_in_slot[t] will hold the num of usrs who moved at slot t.   
+            self.num_of_migs_in_slot          = [] # self.num_of_migs[t] will hold the num of chains that the alg' migrated in slot t.
+            self.num_of_critical_usrs_in_slot = [] 
+            self.num_of_moved_usrs_in_slot    = [] 
             self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
         self.gen_parameterized_tree  ()
@@ -1322,7 +1340,7 @@ if __name__ == "__main__":
     #                                )     
 
     # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
-    ap_file_name = '0730_0830_8secs_256aps.ap' 
+    ap_file_name = # '0730_0830_16secs_256aps.ap' 
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_COST_COMP], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
@@ -1331,5 +1349,5 @@ if __name__ == "__main__":
                                       )
 
     my_simulator.simulate (alg              = 'ourAlg', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-                           sim_len_in_slots = 99999, 
+                           sim_len_in_slots = 3601, 
                            ) 

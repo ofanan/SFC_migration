@@ -536,25 +536,33 @@ if __name__ == '__main__':
     my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
     my_loc2ap.parse_files (['0730_0830_1secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
 
-    # gamad = [[1,2],[3,4]]
-    # nanas = [[0]*4 for i in range(4)]
-    # for row in range (4):
-    #     for col in range (4):
-    #         nanas[row][col] = gamad[int(row/2)][int(col/2)] 
-    #     #nanas[row] = [[gamad[i][j]]*2 for i in range (2)] # for j in range (2)]
-    #
-    # print (nanas)
-    # exit ()
-    #
-    # heatmap_vals = [1]
-    # for max_power_of_4 in range(1,5):     
-    #     my_loc2ap       = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
-    #     input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**max_power_of_4)
-    #     my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
-    #     # my_loc2ap.plot_num_of_vehs_heatmap ()
-    #     np.array (my_loc2ap.plot_num_of_vehs_heatmap ())
-        # heatmap_vals.append (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) )
-        # heatmap_vals.append (np.tile (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()), 2**(4-max_power_of_4)))
+    gamad = [[1,2],[3,4]]
+    nanas = [[0]*4 for i in range(4)]
+    for row in range (4):
+        for col in range (4):
+            nanas[row][col] = gamad[int(row/2)][int(col/2)] 
+        #nanas[row] = [[gamad[i][j]]*2 for i in range (2)] # for j in range (2)]
+    
+    print (nanas)
+    exit ()
+    
+    heatmap_vals = [1]
+    for cur_power_of_4 in range(1,max_power_of_4+1):     
+        my_loc2ap       = loc2ap_c (cur_power_of_4 = cur_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
+        input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**cur_power_of_4)
+        my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
+        # my_loc2ap.plot_num_of_vehs_heatmap ()
+        np.array (my_loc2ap.plot_num_of_vehs_heatmap ())
+        heatmap_for_this_lvl = np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) # The original heatmap, of size 2x2, 4x4, and so on.
+        n                    = 2**max_power_of_4 # The required size of the heatmaps
+        mega_pixel_heatmap =  [[0]*(n) for i in range(n)]           # Will contain the "zoomed" heatamp, when repeating each pixel several times, for adopting it to 16x16 resolution
+        for row in range (n):
+            for col in range (n):
+                mega_pixel_heatmap[row][col] = heatmap_for_this_lvl[int(row/2)][int(row/2)] 
+                
+        
+        heatmap_vals.append (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) )
+        heatmap_vals.append (np.tile (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()), 2**(4-cur_power_of_4)))
     #
     # print (heatmap_vals[1])
     

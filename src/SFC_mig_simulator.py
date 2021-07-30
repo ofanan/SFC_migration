@@ -142,7 +142,7 @@ class SFC_mig_simulator (object):
         printf (self.detailed_cost_comp_output_file, 'cpu_cost_in_slot={}\nlink_cost_in_slot={}\nnum_of_migs_in_slot={}\ncost_of_migs_in_slot={}\n' .format
                (self.cpu_cost_in_slot, self.link_cost_in_slot, self.num_of_migs_in_slot, self.cost_of_migs_in_slot))
         printf (self.detailed_cost_comp_output_file, 'num_of_moved_usrs_in_slot={}\nnum_of_critical_usrs_in_slot={}\n' .format (
-                self.num_of_moved_usrs_in_slot, num_of_critical_usrs_in_slot))
+                self.num_of_moved_usrs_in_slot, self.num_of_critical_usrs_in_slot))
         
         total_cpu_cost    = sum(self.cpu_cost_in_slot)
         total_link_cost   = sum(self.link_cost_in_slot)
@@ -598,10 +598,9 @@ class SFC_mig_simulator (object):
         if (VERBOSE_DEBUG in self.verbose):
             self.debug_file = open ('../res/debug.txt', 'w') 
         if (VERBOSE_MOB in self.verbose):
-            self.num_of_moves_in_slot         = [] # self.num_of_moves_in_slot[t] will hold the num of usrs who moved at slot t.   
+            self.num_of_moved_usrs_in_slot         = [] # self.num_of_moved_usrs_in_slot[t] will hold the num of usrs who moved at slot t.   
             self.num_of_migs_in_slot          = [] # self.num_of_migs[t] will hold the num of chains that the alg' migrated in slot t.
             self.num_of_critical_usrs_in_slot = [] 
-            self.num_of_moved_usrs_in_slot    = [] 
             self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
         self.gen_parameterized_tree  ()
@@ -616,9 +615,11 @@ class SFC_mig_simulator (object):
         self.cost_comp_output_file          =  open ('../res/' + self.cost_comp_file_name,           "a") 
         self.detailed_cost_comp_output_file =  open ('../res/' + self.detailed_comp_cost_file_name,  "w") 
         
-        self.cpu_cost_in_slot    = []
-        self.link_cost_in_slot   = []
-        self.num_of_migs_in_slot = []
+        self.cpu_cost_in_slot             = []
+        self.link_cost_in_slot            = []
+        self.num_of_migs_in_slot          = []
+        self.num_of_critical_usrs_in_slot = []
+        self.num_of_moved_usrs_in_slot    = []
 
     def delay_const_sanity_check (self):
         """
@@ -831,20 +832,20 @@ class SFC_mig_simulator (object):
 
         sim_len = float(self.t - self.first_slot)
         del (self.num_of_migs_in_slot[0]) # remove the mig' recorded in the first slot, which is irrelevant (corner case)
-        printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moves_in_slot)) / sim_len))
+        printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moved_usrs_in_slot)) / sim_len))
         printf (self.mob_output_file, '// avg num of usrs who migrated per slot = {:.0f}\n' .format (float(sum(self.num_of_migs_in_slot)) / sim_len))
         avg_num_of_migs_to_from_per_slot = np.divide (self.mig_from_to_lvl, sim_len)
         for lvl_src in range (self.tree_height+1):
             for lvl_dst in range (self.tree_height+1):
                 printf (self.mob_output_file, '{:.0f}\t' .format (avg_num_of_migs_to_from_per_slot[lvl_src][lvl_dst]))
             printf (self.mob_output_file, '\n')
-        printf (self.mob_output_file, 'moves_in_slot = {}\n' .format (self.num_of_moves_in_slot))
+        printf (self.mob_output_file, 'moves_in_slot = {}\n' .format (self.num_of_moved_usrs_in_slot))
         printf (self.mob_output_file, 'migs_in_slot = {}\n'  .format (self.num_of_migs_in_slot))
 
         # plot the mobility
         plt.figure()
         plt.title ('Migrations and mobility at each slot')
-        plt.plot (range(int(sim_len)), self.num_of_moves_in_slot, label='Total vehicles moved to another cell [number/sec]', linestyle='None',  marker='o', markersize = 4)
+        plt.plot (range(int(sim_len)), self.num_of_moved_usrs_in_slot, label='Total vehicles moved to another cell [number/sec]', linestyle='None',  marker='o', markersize = 4)
         plt.plot (range(int(sim_len)), self.num_of_migs_in_slot, label='Total chains migrated to another server [number/sec]', linestyle='None',  marker='.', markersize = 4)
         plt.xlabel ('time [seconds, starting at 07:30]')
         plt.legend()
@@ -1197,7 +1198,7 @@ class SFC_mig_simulator (object):
         
         splitted_line = self.parse_old_usrs_line(line)
         if (VERBOSE_MOB in self.verbose and self.t > self.first_slot):
-            self.num_of_moves_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
+            self.num_of_moved_usrs_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
 
         for tuple in splitted_line:
             if (len(tuple) <= 1):
@@ -1340,7 +1341,7 @@ if __name__ == "__main__":
     #                                )     
 
     # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
-    ap_file_name = # '0730_0830_16secs_256aps.ap' 
+    ap_file_name = '0730_0830_1secs_256aps.ap' #'0829_0830_8secs_256aps.ap' # '0730_0830_16secs_256aps.ap' 
     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                       verbose               = [VERBOSE_COST_COMP], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 

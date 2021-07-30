@@ -21,34 +21,84 @@ class Res_file_parser (object):
     def __init__ (self):
         """
         """
-        self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_ourAlg = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_ourAlgShortPushUp = '\t\t\\addplot [color = red, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_ourAlg  = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ffit    = '\t\t\\addplot [color = blue, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
-        self.add_legend_str = '\n\t\t\\addlegendentry {'
+        self.add_legend_str   = '\n\t\t\\addlegendentry {'
+        
+        self.add_plot_cpu_cost               = self.add_plot_opt 
+        self.add_plot_link_cost              = self.add_plot_ourAlg
+        self.add_plot_mig_cost               = self.add_plot_ffit
+        self.add_plot_num_of_critical_chains = self.add_plot_cpvnf
         # self.add_plot_str_vec = [self.add_plot_opt, self.add_plot_alg, self.add_plot_ffit, self.add_plot_cpvnf]
 
-        self.add_plot_str_dict = {'opt'     : self.add_plot_opt,
+        self.add_plot_str_dict = {'opt'    : self.add_plot_opt,
                                   'ourAlg' : self.add_plot_ourAlg,
-                                  'ourAlgShortPushUp' : self.add_plot_ourAlgShortPushUp,
-                                  'ffit'    : self.add_plot_ffit,
-                                  'cpvnf'   : self.add_plot_cpvnf}
+                                  'ffit'   : self.add_plot_ffit,
+                                  'cpvnf'  : self.add_plot_cpvnf}
 
-        self.legend_entry_dict = {'opt'     :  '\opt', 
+        self.legend_entry_dict = {'opt'    :  '\opt', 
                                   'ourAlg' : '\\algtop', 
-                                  'ffit'    : '\\ffit',
-                                  'cpvnf'   : '\cpvnf'}
+                                  'ffit'   : '\\ffit',
+                                  'cpvnf'  : '\cpvnf'}
+        
+        
+    def parse_detailed_cost_comp_file (self, input_file_name):
+        """
+        """
+        self.input_file_name = input_file_name
+        self.input_file      = open ("../res/" + input_file_name,  "r")
+
+        lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
+        lines                = (line for line in lines if line)       # Discard blank lines
+        
+        for line in lines:
+            
+            # Discard lines with comments / verbose data
+            if (line.split ("//")[0] == ""):
+                continue
+           
+            splitted_line = line.split ("=")
+            if (splitted_line[0]=='cpu_cost_in_slot'):
+                cpu_cost_in_slot = self.parse_vec_line(splitted_line[1])
+            elif (splitted_line[0]=='link_cost_in_slot'):
+                link_cost_in_slot = self.parse_vec_line(splitted_line[1])
+            elif (splitted_line[0]=='num_of_migs_in_slot'):            
+                num_of_migs_in_slot = self.parse_vec_line(splitted_line[1])
+            elif (splitted_line[0]=='num_of_critical_usrs_in_slot'):
+                num_of_critical_usrs_in_slot = self.parse_vec_line(splitted_line[1])
+
+        # Now we have the required vecs. Gonna parse it for making the required plots.
+        self.period            = 400
+        self.time_slot_len     = int(self.input_file_name.split('secs')[0].split('_')[-1])
+        self.entries_in_period = self.period / self.time_slot_len  
+
+            
+                    
+            
+    def parse_vec_line (self, splitted_line):
+        """
+        parse a vec from an input file, where the vec's format is, e.g.: "[2, 33, 44, 34, 8]" 
+        """
+        
+        vec      = []
+        vec_line = splitted_line.split ("\n")[0]
+        vec_line = vec_line.split('[')[1].split(']')[0].split(', ')
+        for item in vec_line:
+            vec.append (float(item))
+        return vec
+
         
     def parse_file (self, input_file_name):
         
         self.input_file_name = input_file_name
-        self.input_file     = open ("../res/" + input_file_name,  "r")
-        lines               = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
-        lines               = (line for line in lines if line)       # Discard blank lines
-        self.list_of_dicts  = [] # a list of dictionaries, holding the settings and the results read from result files
+        self.input_file      = open ("../res/" + input_file_name,  "r")
+        lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
+        lines                = (line for line in lines if line)       # Discard blank lines
+        self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
         
         for line in lines:
         
@@ -197,8 +247,11 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0829_0830_8secs_256aps_p0.3.res'
-    my_res_file_parser.parse_file (input_file_name) # ('shorter.res')
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
+    input_file_name = '0730_0830_1secs_256aps.ap_detailed_cost_comp.res'
+    my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
+    
+    
+    # my_res_file_parser.parse_file (input_file_name) # ('shorter.res')
+    # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
     # my_res_file_parser.compare_algs()  
     

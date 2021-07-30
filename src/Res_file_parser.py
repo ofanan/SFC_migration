@@ -63,21 +63,49 @@ class Res_file_parser (object):
            
             splitted_line = line.split ("=")
             if (splitted_line[0]=='cpu_cost_in_slot'):
-                cpu_cost_in_slot = self.parse_vec_line(splitted_line[1])
+                cpu_cost_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
             elif (splitted_line[0]=='link_cost_in_slot'):
-                link_cost_in_slot = self.parse_vec_line(splitted_line[1])
+                link_cost_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
             elif (splitted_line[0]=='num_of_migs_in_slot'):            
-                num_of_migs_in_slot = self.parse_vec_line(splitted_line[1])
+                num_of_migs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
             elif (splitted_line[0]=='num_of_critical_usrs_in_slot'):
-                num_of_critical_usrs_in_slot = self.parse_vec_line(splitted_line[1])
-
+                num_of_critical_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
+        
         # Now we have the required vecs. Gonna parse it for making the required plots.
-        self.period            = 400
+        # gamad = [1, 1, 2, 3, 4]
+        # print (sum (gamad[0:3]))
+        # exit ()
+        
+        
+        self.sim_len           = 3600
+        self.period_len        = 400
+        self.num_of_periods    = int (self.sim_len / self.period_len)
         self.time_slot_len     = int(self.input_file_name.split('secs')[0].split('_')[-1])
-        self.entries_in_period = self.period / self.time_slot_len  
-
-            
+        self.num_of_slots_in_period = int (self.period_len / self.time_slot_len)
+        
+        cpu_cost_in_period             = self.gen_vec_for_period(cpu_cost_in_slot)
+        link_cost_in_period            = self.gen_vec_for_period(cpu_cost_in_slot)
+        num_of_migs_in_period          = self.gen_vec_for_period(num_of_migs_in_slot)
+        num_of_critical_usrs_in_period = self.gen_vec_for_period(num_of_critical_usrs_in_slot)
+        
+        # for period_num in range (self.num_of_periods-1): #x in range (0, self.num_of_periods, self.num_of_slots_in_period):
+        #     cpu_cost_in_period              .append (np.sum([cpu_cost_in_slot             [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
+        #     link_cost_in_period             .append (np.sum([link_cost_in_slot            [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
+        #     num_of_migs_in_period           .append (np.sum([num_of_migs_in_slot          [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
+        #     num_of_critical_chains_in_period.append (np.sum([num_of_critical_usrs_in_slot [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
+        #
+        # cpu_cost_in_period              .append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
+        # link_cost_in_period             .append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
+        # num_of_critical_chains_in_period.append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
+        # num_of_critical_chains_in_period.append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
+        # print (len(cpu_cost_in_period))
                     
+    def gen_vec_for_period (self, vec_for_slot):
+        vec_for_period = []
+        for period_num in range (self.num_of_periods-1): 
+            vec_for_period.append (np.sum([vec_for_slot             [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) 
+
+        vec_for_period.append (sum (vec_for_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
             
     def parse_vec_line (self, splitted_line):
         """
@@ -247,7 +275,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0730_0830_1secs_256aps.ap_detailed_cost_comp.res'
+    input_file_name =  '0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
     my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
     

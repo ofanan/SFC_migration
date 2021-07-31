@@ -70,6 +70,8 @@ class Res_file_parser (object):
                 num_of_migs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
             elif (splitted_line[0]=='num_of_critical_usrs_in_slot'):
                 num_of_critical_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
+            elif (splitted_line[0]=='num_of_usrs_in_slot'):
+                num_of_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
         
         # Now we have the required vecs. Gonna parse it for making the required plots.
         # gamad = [1, 1, 2, 3, 4]
@@ -88,7 +90,9 @@ class Res_file_parser (object):
         link_cost_in_period            = self.gen_vec_for_period(link_cost_in_slot) * self.time_slot_len
         num_of_migs_in_period          = self.gen_vec_for_period(num_of_migs_in_slot) * self.cost_of_single_chain
         num_of_critical_usrs_in_period = self.gen_vec_for_period(num_of_critical_usrs_in_slot)
+        num_of_usrs_in_period          = self.gen_vec_for_period(num_of_usrs_in_slot)
         num_of_critical_usrs_per_slot  = num_of_critical_usrs_in_period / self.num_of_slots_in_period
+        num_of_usrs_per_slot            = num_of_usrs_in_period / self.num_of_slots_in_period
         
         output_file_name = self.input_file_name + '.dat' 
         self.output_file = open ('../res/{}' .format (output_file_name), 'w')
@@ -115,6 +119,10 @@ class Res_file_parser (object):
             printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_critical_usrs_per_slot[i]))
         printf (self.output_file, '};' + self.add_legend_str + '\# of critical chains per slot}\n')
 
+        printf (self.output_file, self.add_plot_num_of_critical_chains)
+        for i in range (len(cpu_cost_in_period)):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_critical_usrs_per_slot[i]/num_of_usrs_per_slot[i]))
+        printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
                    
     def gen_vec_for_period (self, vec_for_slot):
         vec_for_period = []
@@ -220,6 +228,7 @@ class Res_file_parser (object):
 
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False, slot_len_in_sec=1):
+        
         min_t, max_t = 30541, 30600
         prob = 0.3
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
@@ -243,7 +252,7 @@ class Res_file_parser (object):
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -292,11 +301,9 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name =  '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    input_file_name = '0730_0830_16secs_256aps.ap_detailed_cost_comp.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    # my_res_file_parser.parse_file(input_file_name)
     my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
-    
-    # my_res_file_parser.parse_file (input_file_name) # ('shorter.res')
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
-    # my_res_file_parser.compare_algs()  
     

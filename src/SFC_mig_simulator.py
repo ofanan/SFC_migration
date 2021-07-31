@@ -214,14 +214,6 @@ class SFC_mig_simulator (object):
             for usr in usrs_who_migrated_at_this_slot: 
                 self.mig_from_to_lvl[self.G.nodes[usr.cur_s]['lvl']] [self.G.nodes[usr.nxt_s]['lvl']] += 1
             
-    # def update_rsrc_aug (self):
-    #     """
-    #     Calculate the (maximal) rsrc aug' used by the current solution, using a single (scalar) R
-    #     """
-    #     used_cpu_in = self.used_cpu_in_all_srvrs ()
-    #     self.rsrc_aug  = max (np.max ([(used_cpu_in[s] / self.G.nodes[s]['cpu cap']) for s in self.G.nodes()]), self.rsrc_aug) # this is the minimal rsrc aug to be used from now and on    
-    # return self.rsrc_aug
-
     def rst_sol (self):
         """
         Reset the solution, namely, Dis-place all users. This is done by: 
@@ -1323,32 +1315,32 @@ if __name__ == "__main__":
     #                            ) 
     # exit ()
 
-    # ap_file_name = '0829_0830_8secs_256aps.ap' #'shorter.ap' #
-    # min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
-    # step        = 0.1 * min_req_cap
-    #
-    # for alg in ['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-    #     for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (0, 21)]:
-    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                           verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                           cpu_cap_at_leaf       = cpu_cap
-    #                                           )
-    #
-    #         my_simulator.simulate (alg              = alg,  
-    #                                sim_len_in_slots = 61, 
-    #                                )     
+    ap_file_name = '0829_0830_1secs__256aps.ap' #'shorter.ap' #
+    min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
+    step        = 0.1 * min_req_cap
+    
+    for alg in ['opt']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (1, 11)]:
+            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                              verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+                                              cpu_cap_at_leaf       = cpu_cap
+                                              )
+    
+            my_simulator.simulate (alg              = alg,  
+                                   sim_len_in_slots = 61, 
+                                   )     
 
-    # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
-    ap_file_name = '0730_0830_1secs_256aps.ap' #'0829_0830_8secs_256aps.ap' # '0730_0830_16secs_256aps.ap' 
-    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_COST_COMP], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                      cpu_cap_at_leaf       = 208*2
-                                      )
-
-    my_simulator.simulate (alg              = 'ourAlg', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-                           sim_len_in_slots = 3601, 
-                           ) 
+    # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
+    # ap_file_name = '0730_0830_1secs_256aps.ap' #'0829_0830_8secs_256aps.ap' # '0730_0830_16secs_256aps.ap' 
+    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                   verbose               = [VERBOSE_COST_COMP], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                   cpu_cap_at_leaf       = 208*2
+    #                                   )
+    #
+    # my_simulator.simulate (alg              = 'ourAlg', # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+    #                        sim_len_in_slots = 3601, 
+    #                        ) 

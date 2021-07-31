@@ -29,10 +29,10 @@ class Res_file_parser (object):
         self.end_add_plot_str = '\n\t\t};'
         self.add_legend_str   = '\n\t\t\\addlegendentry {'
         
-        self.add_plot_cpu_cost               = self.add_plot_opt 
-        self.add_plot_link_cost              = self.add_plot_ourAlg
-        self.add_plot_mig_cost               = self.add_plot_ffit
-        self.add_plot_num_of_critical_chains = self.add_plot_cpvnf
+        self.add_plot_cpu_cost               = '\n' + self.add_plot_opt 
+        self.add_plot_link_cost              = '\n' + self.add_plot_ourAlg
+        self.add_plot_mig_cost               = '\n' + self.add_plot_ffit
+        self.add_plot_num_of_critical_chains = '\n' + self.add_plot_cpvnf
         # self.add_plot_str_vec = [self.add_plot_opt, self.add_plot_alg, self.add_plot_ffit, self.add_plot_cpvnf]
 
         self.add_plot_str_dict = {'opt'    : self.add_plot_opt,
@@ -77,35 +77,52 @@ class Res_file_parser (object):
         # exit ()
         
         
-        self.sim_len           = 3600
-        self.period_len        = 400
+        self.sim_len              = 3600
+        self.period_len           = 400
+        self.cost_of_single_chain = 600
         self.num_of_periods    = int (self.sim_len / self.period_len)
         self.time_slot_len     = int(self.input_file_name.split('secs')[0].split('_')[-1])
         self.num_of_slots_in_period = int (self.period_len / self.time_slot_len)
         
-        cpu_cost_in_period             = self.gen_vec_for_period(cpu_cost_in_slot)
-        link_cost_in_period            = self.gen_vec_for_period(cpu_cost_in_slot)
-        num_of_migs_in_period          = self.gen_vec_for_period(num_of_migs_in_slot)
+        cpu_cost_in_period             = self.gen_vec_for_period(cpu_cost_in_slot) * self.time_slot_len 
+        link_cost_in_period            = self.gen_vec_for_period(link_cost_in_slot) * self.time_slot_len
+        num_of_migs_in_period          = self.gen_vec_for_period(num_of_migs_in_slot) * self.cost_of_single_chain
         num_of_critical_usrs_in_period = self.gen_vec_for_period(num_of_critical_usrs_in_slot)
+        num_of_critical_usrs_per_slot  = num_of_critical_usrs_in_period / self.num_of_slots_in_period
         
-        # for period_num in range (self.num_of_periods-1): #x in range (0, self.num_of_periods, self.num_of_slots_in_period):
-        #     cpu_cost_in_period              .append (np.sum([cpu_cost_in_slot             [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
-        #     link_cost_in_period             .append (np.sum([link_cost_in_slot            [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
-        #     num_of_migs_in_period           .append (np.sum([num_of_migs_in_slot          [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
-        #     num_of_critical_chains_in_period.append (np.sum([num_of_critical_usrs_in_slot [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) #(sum(cpu_cost_in_slot[x:x+self.num_of_slots_in_period-1])) #  (np.sum([cpu_cost_in_slot[period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)]))
-        #
-        # cpu_cost_in_period              .append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
-        # link_cost_in_period             .append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
-        # num_of_critical_chains_in_period.append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
-        # num_of_critical_chains_in_period.append (sum (cpu_cost_in_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
-        # print (len(cpu_cost_in_period))
-                    
+        output_file_name = self.input_file_name + '.dat' 
+        self.output_file = open ('../res/{}' .format (output_file_name), 'w')
+        
+        x = [self.period_len * (i+1) for i in range (len(cpu_cost_in_period))]
+        
+        printf (self.output_file, self.add_plot_cpu_cost)
+        for i in range (len(cpu_cost_in_period)):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], cpu_cost_in_period[i]))
+        printf (self.output_file, '};' + self.add_legend_str + 'cpu}\n')
+
+        printf (self.output_file, self.add_plot_link_cost)
+        for i in range (len(cpu_cost_in_period)):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], link_cost_in_period[i]))
+        printf (self.output_file, '};' + self.add_legend_str + 'link}\n')
+
+        printf (self.output_file, self.add_plot_mig_cost)
+        for i in range (len(cpu_cost_in_period)):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_migs_in_period[i]))
+        printf (self.output_file, '};' + self.add_legend_str + 'mig.}\n')
+
+        printf (self.output_file, self.add_plot_num_of_critical_chains)
+        for i in range (len(cpu_cost_in_period)):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_critical_usrs_per_slot[i]))
+        printf (self.output_file, '};' + self.add_legend_str + '\# of critical chains per slot}\n')
+
+                   
     def gen_vec_for_period (self, vec_for_slot):
         vec_for_period = []
         for period_num in range (self.num_of_periods-1): 
             vec_for_period.append (np.sum([vec_for_slot             [period_num*self.num_of_slots_in_period + i] for i in range (self.num_of_slots_in_period)])) 
 
-        vec_for_period.append (sum (vec_for_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))        
+        vec_for_period.append (sum (vec_for_slot[self.num_of_slots_in_period*(self.num_of_periods-1):(-1)]))
+        return np.array (vec_for_period)         
             
     def parse_vec_line (self, splitted_line):
         """
@@ -117,7 +134,7 @@ class Res_file_parser (object):
         vec_line = vec_line.split('[')[1].split(']')[0].split(', ')
         for item in vec_line:
             vec.append (float(item))
-        return vec
+        return np.array(vec)
 
         
     def parse_file (self, input_file_name):
@@ -275,7 +292,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name =  '0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    input_file_name =  '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
     my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
     

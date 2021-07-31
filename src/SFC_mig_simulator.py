@@ -44,12 +44,12 @@ class SFC_mig_simulator (object):
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
     # calculate the total cost of a solution by an algorithm (not by LP)
-    calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_homo (usr, usr.lvl) for usr in usrs])
+    calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_homo (usr, usr.lvl, slot_len=self.slot_len) for usr in usrs])
    
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    chain_cost_homo = lambda self, usr, lvl: self.link_cost_of_CLP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.calc_mig_cost_CLP (usr, lvl)     
+    chain_cost_homo = lambda self, usr, lvl, slot_len=1 : slot_len * (self.link_cost_of_CLP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl]) + self.calc_mig_cost_CLP (usr, lvl)
     
     # # calculate the migration cost incurred for a usr if placed on a given lvl, assuming a CLP (co-located placement), namely, the whole chain is placed on a single server
     calc_mig_cost_CLP = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
@@ -73,12 +73,15 @@ class SFC_mig_simulator (object):
     
     # Calculates the cost of locating the whole chain of a given user on a server at a given lvl in its Su.
     # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
-    chain_cost_from_non_CLP_state = lambda self, usr, lvl: \
+    chain_cost_from_non_CLP_state = lambda self, usr, lvl, slot_len=1: \
                     sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
-                    len (usr.theta_times_lambda) * self.uniform_mig_cost + self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl]
+                    len (usr.theta_times_lambda) * self.uniform_mig_cost + slot_len *(self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl])
                     
     # Print a solution for the problem to the output res file  
-    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cost = {:.0f}\n' .format(self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, sol_cost)) 
+    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cost = {:.0f} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
+                         self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, sol_cost,
+                         self.calc_cpu_cost_in_slot(), self.calc_link_cost_in_slot(), self.calc_mig_cost_in_slot()
+                         )) 
 
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -106,7 +109,12 @@ class SFC_mig_simulator (object):
     # average the upper-bound and the lower-bound of the binary search, while rounding and converting to int
     avg_up_and_lb = lambda self, ub, lb : int (math.floor(ub+lb)/2)
     
+    calc_cpu_cost_in_slot = lambda self : sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs])
     
+    calc_link_cost_in_slot = lambda self : sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs])
+    
+    calc_mig_cost_in_slot = lambda self : self.uniform_mig_cost * len (self.uniform_theta_times_lambda) * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
+
     # # calculate the total cost of1 a solution by an algorithm (not by LP), 
     # # and collect data about the cost's components
     # def calc_alg_sol_cost_w_details (self):
@@ -478,15 +486,6 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr(usr)
        
             
-    # def adjust_costs_to_t_slot (self):
-    #     """
-    #     Adjust the link and 
-    #     """
-    #     if (self.t_slot_len == 1):
-    #         return
-        
-    
-            
     def gen_parameterized_tree (self):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
@@ -636,8 +635,14 @@ class SFC_mig_simulator (object):
              
         print ('Simulating {}. ap file = {} cpu cap at leaf={}' .format (self.alg, self.ap_file_name, self.cpu_cap_at_leaf))
         self.stts     = sccs
-        # self.rsrc_aug = 1
-        # self.set_augmented_cpu_in_all_srvrs ()
+
+        # extract the slot len from the input '.ap' file name
+        slot_len_str = self.ap_file_name.split('secs')
+        if (len (slot_len_str) > 1): # the input filename contains the string 'secs'
+            self.slot_len = int(slot_len_str[0].split('_')[-1])
+        else:
+            self.slot_len = 1 # assume that by default, slot len is 1
+        
         if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
             self.simulate_algs()
         elif (self.alg == 'opt'):
@@ -1299,20 +1304,18 @@ class SFC_mig_simulator (object):
 
 if __name__ == "__main__":
     
-    ap_file_name = '0829_0830_1secs__256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                      verbose               = [VERBOSE_RES, VERBO],# defines which sanity checks are done during the simulation, and which outputs will be written   
-                                      tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                      children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                      cpu_cap_at_leaf       = 213
-                                      )
+    # ap_file_name = '0829_0830_8secs_256aps.ap' #'shorter.ap' #
+    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                   verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                   cpu_cap_at_leaf       = 213
+    #                                   )
+    #
+    # my_simulator.simulate (alg              = 'ourAlg',  
+    #                        sim_len_in_slots = 61 
+    #                        )     
 
-    my_simulator.simulate (alg              = 'ourAlg',  
-                           sim_len_in_slots = 61, 
-                           )     
-
-    
-    
     # ap_file_name = '0829_0830_8secs_256aps.ap' 
     # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
     # for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
@@ -1328,12 +1331,12 @@ if __name__ == "__main__":
     #                            ) 
     # exit ()
 
-    ap_file_name = '0829_0830_1secs__256aps.ap' #'shorter.ap' #
+    ap_file_name = '0829_0830_8secs_256aps.ap' #'shorter.ap' #
     min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
     step        = 0.1 * min_req_cap
     
-    for alg in ['opt']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [int(round((min_req_cap + step*i))) for i in range (1, 11)]:
+    for alg in ['ourAlg']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+        for cpu_cap in [213]: #[int(round((min_req_cap + step*i))) for i in range (21)]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 

@@ -16,7 +16,9 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-class Res_file_parser (object):  
+class Res_file_parser (object):
+    
+    calc_cost_of_item = lambda self, item : item['mig_cost'] + (item['cpu_cost'] + item['link_cost']) * (7.5 if self.time_slot_len == 8 else 1)  
 
     def __init__ (self):
         """
@@ -40,8 +42,8 @@ class Res_file_parser (object):
                                   'ffit'   : self.add_plot_ffit,
                                   'cpvnf'  : self.add_plot_cpvnf}
 
-        self.legend_entry_dict = {'opt'    :  '\opt', 
-                                  'ourAlg' : '\\algtop', 
+        self.legend_entry_dict = {'opt'    :  'LBound', 
+                                  'ourAlg' : 'BUPU', 
                                   'ffit'   : '\\ffit',
                                   'cpvnf'  : '\cpvnf'}
         
@@ -72,12 +74,6 @@ class Res_file_parser (object):
                 num_of_critical_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
             elif (splitted_line[0]=='num_of_usrs_in_slot'):
                 num_of_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
-        
-        # Now we have the required vecs. Gonna parse it for making the required plots.
-        # gamad = [1, 1, 2, 3, 4]
-        # print (sum (gamad[0:3]))
-        # exit ()
-        
         
         self.sim_len              = 3600
         self.period_len           = 400
@@ -121,7 +117,7 @@ class Res_file_parser (object):
 
         printf (self.output_file, self.add_plot_num_of_critical_chains)
         for i in range (len(cpu_cost_in_period)):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_critical_usrs_per_slot[i]/num_of_usrs_per_slot[i]))
+            printf (self.output_file, '({:.4f}, {:.4f})' .format (x[i], num_of_critical_usrs_per_slot[i]/num_of_usrs_per_slot[i]))
         printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
                    
     def gen_vec_for_period (self, vec_for_slot):
@@ -180,12 +176,15 @@ class Res_file_parser (object):
             exit ()
                
         self.dict = {
-            "t"     : int   (splitted_settings [t_idx]   .split('t')[1]),
-            "alg"   : splitted_settings      [alg_idx],
-            "cpu"   : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
-            "prob"  : float (splitted_settings [prob_idx].split("p")   [1]),  
-            "stts"  : int   (splitted_settings [stts_idx].split("stts")[1]),  
-            "cost"  : float (splitted_line[1].split(" = ")[1])
+            "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
+            "alg"       : splitted_settings      [alg_idx],
+            "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
+            "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
+            "stts"      : int   (splitted_settings [stts_idx].split("stts")[1]),  
+            "cost"      : float (splitted_line[1].split(" = ")[1]),
+            "cpu_cost"  : float (splitted_line[2].split(" = ")[1]),
+            "link_cost" : float (splitted_line[3].split(" = ")[1]),
+            "mig_cost"  : float (splitted_line[4].split(" = ")[1])            
             }
 
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=0, alg = None, cpu = -1, stts = -1):
@@ -229,7 +228,9 @@ class Res_file_parser (object):
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False, slot_len_in_sec=1):
         
-        min_t, max_t = 30541, 30600
+        max_t = 30600
+        self.time_slot_len = int(self.input_file_name.split('secs')[0].split('_')[-1])
+        min_t = 30545 if (self.time_slot_len==1) else 30541
         prob = 0.3
         Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
@@ -252,7 +253,7 @@ class Res_file_parser (object):
         
         Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
 
-        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for alg in ['ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -273,7 +274,7 @@ class Res_file_parser (object):
                     continue
                 
                 alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
-                                      'cost' : np.average ([item['cost'] for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
+                                      'cost' : np.average ([self.calc_cost_of_item(item)/8 for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
 
                 if (len(alg_avg_list)==0):
                     continue
@@ -301,9 +302,9 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0730_0830_16secs_256aps.ap_detailed_cost_comp.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
-    # my_res_file_parser.parse_file(input_file_name)
-    my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
+    input_file_name = '0829_0830_8secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    my_res_file_parser.parse_file(input_file_name)
+    # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
-    # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
+    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
     

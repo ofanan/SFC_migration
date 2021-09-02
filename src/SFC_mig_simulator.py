@@ -40,10 +40,10 @@ class SFC_mig_simulator (object):
     #############################################################################
     # Inline functions
     #############################################################################
-    # Returns the parent of a given server
+    # Returns the parent of a given node (server)
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
-    # calculate the total cost of a solution by an algorithm (not by LP)
+    # calculate the total cost of a solution by a placement algorithm (not by a solution by LP)
     calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_homo (usr, usr.lvl, slot_len=self.slot_len) for usr in usrs])
    
     # calculate the total cost of placing a chain at some level. 
@@ -61,18 +61,19 @@ class SFC_mig_simulator (object):
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
     # # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
-    loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
+    # loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
 
-    # Returns the server to which a given user is currently assigned
+    # Returns the server currently assigned for a given user 
     cur_server_of = lambda self, usr: usr.S_u[usr.lvl] 
 
     # Returns the total amount of cpu used by users at a certain server
     used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
 
+    # Given a server s, returns the total CPU currently allocated to usrs assigned to server s.  
     lp_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.plp_var.value() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
     
     # Calculates the cost of locating the whole chain of a given user on a server at a given lvl in its Su.
-    # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinnct server. 
+    # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinct server. 
     chain_cost_from_non_CLP_state = lambda self, usr, lvl, slot_len=1: \
                     sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
                     len (usr.theta_times_lambda) * self.uniform_mig_cost + slot_len *(self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl])
@@ -109,21 +110,20 @@ class SFC_mig_simulator (object):
     # average the upper-bound and the lower-bound of the binary search, while rounding and converting to int
     avg_up_and_lb = lambda self, ub, lb : int (math.floor(ub+lb)/2)
     
+    # Returns the total CPU cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
     calc_cpu_cost_in_slot = lambda self : sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs])
     
+    # Returns the total link cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
     calc_link_cost_in_slot = lambda self : sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs])
     
+    # Returns the total migration cost in the current time slot. 
     calc_mig_cost_in_slot = lambda self : self.uniform_mig_cost * len (self.uniform_theta_times_lambda) * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
 
-    # # calculate the total cost of1 a solution by an algorithm (not by LP), 
-    # # and collect data about the cost's components
-    # def calc_alg_sol_cost_w_details (self):
-    #     """
-    #     """
-    #     # calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_homo (usr, usr.lvl) for usr in usrs])
-    
+        
     def set_RCs_and_a (self, aug_cpu_capacity_at_lvl):
-        # given the (augmented) cpu cap' at each lvl, assigned each server its 'RCs' (augmented CPU cap vals)
+        """"
+        given the (augmented) cpu cap' at each lvl, assign each server its 'RCs' (augmented CPU cap vals); and initialise 'a' (the amount of available CPU) to 'RCs' (the augmented CPU cap).
+        """
         for s in self.G.nodes:
             self.G.nodes[s]['RCs'] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
             self.G.nodes[s]['a'  ] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
@@ -190,7 +190,7 @@ class SFC_mig_simulator (object):
      
     def print_sol_to_res_and_log (self):
         """
-        Print to the res, log, and debug files the solution and/or additional info.
+        Print to the res, log, and debug files the solution and/or additional info, according to the verobse level, indicated by the variable self.verbose.
         """
         if (VERBOSE_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
             self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
@@ -238,7 +238,6 @@ class SFC_mig_simulator (object):
         """
         Returns the overall cost of users that moved in a LP solution 
         """
-        
         cost = 0
         for d_var in self.d_vars: 
             if d_var.plp_var.value() > 0: # the LP solution set non-zero value for this decision variable
@@ -251,19 +250,20 @@ class SFC_mig_simulator (object):
         Find an optimal fractional solution using Python's pulp LP library.
         pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
         """
-        model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize)
+        model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize) # init a "model" that will hold the problem, objective, and constraints 
+        
+        # init the decision vars
         self.d_vars  = [] # decision variables  
-
         obj_func     = [] # objective function
-        id           = 0  # cntr for the id of the decision variables 
+        d_var_id           = 0  # cntr for the id of the decision variables 
         for usr in self.usrs:
             single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
-                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (id))
-                decision_var = decision_var_c (id=id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
+                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id))
+                decision_var = decision_var_c (id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
                 self.d_vars.append (decision_var)
                 single_place_const += plp_var
-                id += 1
+                d_var_id += 1
                 if (VERBOSE_MOVED_RES in self.verbose and not (self.is_first_t) and usr not in self.moved_usrs): 
                     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who moved 
                 # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_usrs): 
@@ -280,15 +280,15 @@ class SFC_mig_simulator (object):
             if (cpu_cap_const != []):
                 model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
 
-        model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output # to solve it using another solver: solve(GLPK(msg = 0))
+        model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output; to solve it using another solver: solve(GLPK(msg = 0))
         
         self.stts = model.status
         
+        # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
             self.print_sol_res_line (output_file=self.res_output_file, sol_cost=model.objective.value())
         if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
             self.print_sol_res_line (output_file=self.moved_res_output_file, sol_cost=self.calc_cost_of_moved_usrs_plp())
-        sol_status = plp.LpStatus[model.status] 
         if (VERBOSE_LOG in self.verbose):            
             self.print_sol_res_line (output_file=self.res_output_file, sol_cost=model.objective.value())
         if (model.status == 1): # successfully solved
@@ -345,6 +345,9 @@ class SFC_mig_simulator (object):
             self.print_res_file_prefix (self.critical_res_output_file)
 
     def print_res_file_prefix (self, res_file):
+        """
+        Print several header lines, indicating the format and so, to an output res file.
+        """
         printf (res_file, '// format: t{T}.{Alg}.cpu{C}.stts{s} | cost = c, where\n// T is the slot cnt (read from the input file)\n')
         printf (res_file, '// Alg is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
         printf (res_file, '// c is the total cost of the solution\n\n') 
@@ -651,14 +654,11 @@ class SFC_mig_simulator (object):
             print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
             exit ()
 
-    # def set_augmented_cpu_in_all_srvrs (self):
-    #     """
-    #     Set the capacity in each server to its cpu capacity, time the resource augmentation. 
-    #     """
-    #     for s in self.G.nodes():
-    #         self.G.nodes[s]['RCs'] = self.rsrc_aug * self.G.nodes[s]['cpu cap'] # for now, assume no resource aug' 
-
     def init_input_and_output_files (self):
+        """
+        Initialize "self" variables for the file-handlers of input and output files.
+        Write several comments explanation files as headers to the output files. 
+        """
 
         # open input file
         self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
@@ -718,7 +718,7 @@ class SFC_mig_simulator (object):
         
             if (splitted_line[0] == "t"):
                 self.rd_t_line (splitted_line[2])
-                if (self.t >= self.final_slot_to_simulate):
+                if (self.t >= self.final_slot_to_simulate): # finished the desired simulation time
                     self.post_processing ()
                     return 
                 continue
@@ -734,13 +734,13 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
                 self.set_last_time()
-                self.stts = self.alg_top(self.solve_by_plp)
+                self.stts = self.alg_top(self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
                 self.cur_st_params = self.d_vars
                 self.is_first_t = False
                     
     def simulate_algs (self):
         """
-        Simulate the whole simulation, using an algorithm (rather than a LP solver).
+        Simulate the whole simulation, using an algorithm (NOT a LP solver).
         At each time step:
         - Read and parse from an input ".ap" file the AP cells of each user who moved. 
         - solve the problem using alg_top (our alg). 
@@ -798,7 +798,7 @@ class SFC_mig_simulator (object):
                     print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
                     exit ()
         
-                if (self.alg in ['ourAlg']): # if we run our alg' 
+                if (self.alg in ['ourAlg']): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
                     self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
                 
                 self.print_sol_to_res_and_log ()
@@ -806,7 +806,7 @@ class SFC_mig_simulator (object):
                     return # Currently, we don't try to further simulate, once alg fails to find a sol even for a single slot
                 
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
-                     usr.cur_s = usr.nxt_s
+                    usr.cur_s = usr.nxt_s
                 self.is_first_t = False
         
         self.post_processing()
@@ -854,7 +854,6 @@ class SFC_mig_simulator (object):
         Run the cpvnf alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
-        
         for usr in self.cpvnf_sort (self.usrs):
             if (self.cpvnf_place_usr (usr)!= sccs): 
                 return fail
@@ -977,14 +976,6 @@ class SFC_mig_simulator (object):
         return False  
     
     
-    # def update_RCs (self, R):
-    #     if (R < 1):
-    #         print ("Error: required rsrc aug < 1")
-    #         exit ()
-    #     cpu_cap_at_lvl0 = self.cpu_cap_at_lvl[0] * R
-    #     for s in self.G.nodes:
-    #         self.G.nodes[s]['RCs'] = self.
-    
     def alg_top (self, placement_alg):
         """
         Binary search for a feasible sol that minimizes the resource augmentation R.
@@ -1005,7 +996,7 @@ class SFC_mig_simulator (object):
         # However, bottom-up haven't tried a reshuffle yet. So, we give it a try now.
         if (self.alg in ['ourAlg']):
             self.rst_sol()
-            self.reshuffled = True # As the first run, considering only critical chains, failed, we'll now perform an additional run of bottom-up, while doing a reshuffle (namely, considering all usrs).
+            self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
             self.stts = self.bottom_up()
             if (VERBOSE_ADD_LOG in self.verbose):
                 printf (self.log_output_file, 'after reshuffle:\n')
@@ -1014,7 +1005,7 @@ class SFC_mig_simulator (object):
             if (self.stts == sccs):
                 return sccs
 
-        # Now we know that the run failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
+        # Now we know that the first run, without additional resource augmentation, failed. We will progress to a binary search for the required rsrc aug' only if we're requested by the self.verbose attribute. 
         if (VERBOSE_CALC_RSRC_AUG not in self.verbose):
             return self.stts
 
@@ -1023,15 +1014,14 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'Starting binary search:\n')
         
         self.rst_sol() # dis-allocate all users
-        # self.CPUAll(self.usrs) 
         max_R = self.max_R if VERBOSE_CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
         
-        # Init the upper bound (up) and the lower bound (lb) for the binary search.
-        # The bounds are the minimal / maximal CPU capacity at the leaves
+        # Init the the lower bound (lb) and the upper bound (up) for the binary search.
+        # lb, ub are defined the minimal, maximal CPU capacity at the leaves.
         ub = math.ceil (max_R * self.cpu_cap_at_leaf) # Maximum allowed capacity at a leaf server
-        lb = self.G.nodes[len(self.G.nodes)-1]['RCs']                  # Currently (possibly augmented) capacity at a leaf server  
+        lb = self.G.nodes[len(self.G.nodes)-1]['RCs'] # Current (possibly augmented) capacity at a leaf server  
         
-        # init cur RCs and a(s) to the number of available CPU in each server, assuming maximal rsrc aug'        
+        # init cur 'RCs' and 'a' of each server to the number of available CPU in each server, assuming maximal rsrc aug'        
         self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub)) 
         
         self.stts = placement_alg() 
@@ -1039,7 +1029,7 @@ class SFC_mig_simulator (object):
             print ('did not find a feasible sol even with maximal rsrc aug')
             exit ()
         
-        # Now we know that we found an initial feasible sol when using the upper-bound resource aug' 
+        # Now we know that there exists a feasible sol when using the upper-bound resource aug' 
         
         while True: 
         
@@ -1061,7 +1051,7 @@ class SFC_mig_simulator (object):
             # Update the augmented capacity, and the available capacity at each server according to the value of resource augmentation for this iteration
             self.rst_sol()
             cur_cpu_at_leaf = self.avg_up_and_lb (ub=ub, lb=lb)            
-            self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = cur_cpu_at_leaf))
+            self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = cur_cpu_at_leaf)) # update the (augmented) CPU cap in all servers
             
             # Solve using the given placement alg'
             self.stts = placement_alg()
@@ -1106,8 +1096,8 @@ class SFC_mig_simulator (object):
     def rd_new_usrs_line_lp (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file, when looking for a LP solution for the problem
-        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
-        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
     
         if (line ==[]):
@@ -1115,23 +1105,23 @@ class SFC_mig_simulator (object):
     
         splitted_line = line[0].split ("\n")[0].split (")")
     
-        for tuple in splitted_line:
-            if (len(tuple) <= 1):
+        for usr_entry in splitted_line:
+            if (len(usr_entry) <= 1):
                 break
-            tuple = tuple.split("(")
-            tuple   = tuple[1].split (',')
+            usr_entry = usr_entry.split("(")
+            usr_entry = usr_entry[1].split (',')
     
-            usr = usr_lp_c (id = int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+            usr = usr_lp_c (id = int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
             self.moved_usrs.append(usr)
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr)
-            self.update_S_u(usr, AP_id=int(tuple[1])) # update the list of delay-feasible servers for this usr
+            self.update_S_u(usr, AP_id=int(usr_entry[1])) # update the list of delay-feasible servers for this usr
 
     def rd_new_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
-        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
-        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
         
         if (line ==[]):
@@ -1139,13 +1129,13 @@ class SFC_mig_simulator (object):
 
         splitted_line = line[0].split ("\n")[0].split (")")
 
-        for tuple in splitted_line:
-            if (len(tuple) <= 1):
+        for usr_entry in splitted_line:
+            if (len(usr_entry) <= 1):
                 break
-            tuple = tuple.split("(")
-            tuple = tuple[1].split (',')
+            usr_entry = usr_entry.split("(")
+            usr_entry = usr_entry[1].split (',')
             
-            # usr = usr_c (id                 = int(tuple[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
+            # usr = usr_c (id                 = int(usr_entry[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
             #              theta_times_lambda = self.uniform_theta_times_lambda,
             #              target_delay       = self.randomize_target_delay(),
             #              C_u                = self.uniform_Cu)
@@ -1153,18 +1143,18 @@ class SFC_mig_simulator (object):
 
             if VERBOSE_FLAVORS in self.verbose:
                 if (random.random() < self.prob_of_target_delay[0]):
-                    usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
+                    usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
                 else:    
-                    usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.long_chain_theta_times_lambda, target_delay=self.target_delay[1], C_u=10*self.uniform_Cu)
+                    usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.long_chain_theta_times_lambda, target_delay=self.target_delay[1], C_u=10*self.uniform_Cu)
             else:
-                usr = usr_c (id=int(tuple[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+                usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
                        
             self.moved_usrs.append (usr)
             self.critical_usrs.append(usr)
 
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr)
-            self.update_S_u(usr, AP_id=int(tuple[1])) # Update the list of delay-feasible servers for this usr 
+            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
             if (self.alg in ['ourAlg']):
@@ -1187,8 +1177,8 @@ class SFC_mig_simulator (object):
     def rd_old_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
-        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
-        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the usr entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
         if (line == []): # if the list of old users that moved is empty
             return
@@ -1197,20 +1187,20 @@ class SFC_mig_simulator (object):
         if (VERBOSE_MOB in self.verbose and self.t > self.first_slot):
             self.num_of_moved_usrs_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
 
-        for tuple in splitted_line:
-            if (len(tuple) <= 1):
+        for usr_entry in splitted_line:
+            if (len(usr_entry) <= 1):
                 break
-            tuple = tuple.split("(")
-            tuple = tuple[1].split (',')
+            usr_entry = usr_entry.split("(")
+            usr_entry = usr_entry[1].split (',')
             
-            list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
+            list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
             usr = list_of_usr[0]
             self.moved_usrs.append (usr)
             usr.cur_cpu = usr.B[usr.lvl]
             
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
 
-            self.update_S_u(usr, AP_id=int(tuple[1])) # Add this usr to the Hs of every server to which it belongs in its new location
+            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
                         
             # Check whether it's possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
             if (usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
@@ -1241,28 +1231,28 @@ class SFC_mig_simulator (object):
     def rd_old_usrs_line_lp (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file, when using a LP solver for the problem.
-        The input includes a list of tuples of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
-        After reading the tuples, the function assigns each chain to its relevant list of chains, Hs.  
+        The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
         if (line == []): # if the list of old users that moved is empty
             return
         
         splitted_line = self.parse_old_usrs_line(line)
 
-        for tuple in splitted_line:
-            if (len(tuple) <= 1):
+        for usr_entry in splitted_line:
+            if (len(usr_entry) <= 1):
                 break
-            tuple = tuple.split("(")
-            tuple = tuple[1].split (',')
+            usr_entry = usr_entry.split("(")
+            usr_entry = usr_entry[1].split (',')
             
-            list_of_usr = list(filter (lambda usr : usr.id == int(tuple[0]), self.usrs))
+            list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
             if (len(list_of_usr) == 0):
-                print  ('Error at t={}: input file={}. Did not find old / reslotd usr {}' .format (self.t, self.ap_file_name, tuple[0]))
+                print  ('Error at t={}: input file={}. Did not find old / reslotd usr {}' .format (self.t, self.ap_file_name, usr_entry[0]))
                 exit ()
             usr    = list_of_usr[0]
             self.moved_usrs.append(usr)
             self.CPUAll_single_usr (usr)
-            self.update_S_u(usr, AP_id=int(tuple[1])) # Add this usr to the Hs of every server to which it belongs at its new location
+            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs at its new location
     
     def check_AP_id (self, AP_id):
         if (AP_id >= self.num_of_leaves):

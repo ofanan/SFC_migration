@@ -78,11 +78,21 @@ class SFC_mig_simulator (object):
                     sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
                     len (usr.theta_times_lambda) * self.uniform_mig_cost + slot_len *(self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl])
                     
+                    
     # Print a solution for the problem to the output res file  
-    print_sol_res_line = lambda self, output_file, sol_cost : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cost = {:.0f} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
-                         self.t, self.alg, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, sol_cost,
-                         self.calc_cpu_cost_in_slot(), self.calc_link_cost_in_slot(), self.calc_mig_cost_in_slot()
-                         )) 
+    print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
+
+    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    print_sol_res_line_alg = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
+                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
+                              self.calc_cpu_cost_in_slot(), self.calc_link_cost_in_slot(), self.calc_mig_cost_in_slot()
+                              )) 
+
+    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
+                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
+                              -1, -1, -1
+                              )) 
 
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -128,13 +138,6 @@ class SFC_mig_simulator (object):
             self.G.nodes[s]['RCs'] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
             self.G.nodes[s]['a'  ] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
         
-    def set_last_time (self):
-        """
-        If needed by the verbose level, set the variable 'self.last_rt' (last measured real time), to be read later for calculating the time taken to run code pieces
-        """
-        if (VERBOSE_LOG in self.verbose):
-            self.last_rt = time.time()
-
     def print_sol_cost_components (self):
         """
         prints to a file statistics about the cost of each component in the cost function (cpu, link, and migration). 
@@ -193,16 +196,16 @@ class SFC_mig_simulator (object):
         Print to the res, log, and debug files the solution and/or additional info, according to the verobse level, indicated by the variable self.verbose.
         """
         if (VERBOSE_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
-            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
+            self.print_sol_res_line (output_file=self.res_output_file)
         if (VERBOSE_MOVED_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
-            self.print_sol_res_line (output_file=self.moved_res_output_file,    sol_cost=self.calc_alg_sol_cost(self.moved_usrs))
+            self.print_sol_res_line (output_file=self.moved_res_output_file)
         if (VERBOSE_CRITICAL_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
-            self.print_sol_res_line (output_file=self.critical_res_output_file, sol_cost=self.calc_alg_sol_cost(self.critical_usrs))
+            self.print_sol_res_line (output_file=self.critical_res_output_file)
         elif (VERBOSE_COST_COMP in self.verbose):
             self.calc_sol_cost_components()
 
         if (VERBOSE_LOG in self.verbose): # Commented-out, because this is already printed during alg_top()
-            self.print_sol_res_line (output_file=self.log_output_file, sol_cost=self.calc_alg_sol_cost(self.usrs))
+            self.print_sol_res_line (output_file=self.log_output_file)
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt)) 
             self.print_sol_to_log()
@@ -286,11 +289,11 @@ class SFC_mig_simulator (object):
         
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
-            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=model.objective.value())
+            self.print_sol_res_line (output_file=self.res_output_file)
         if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
-            self.print_sol_res_line (output_file=self.moved_res_output_file, sol_cost=self.calc_cost_of_moved_usrs_plp())
+            self.print_sol_res_line (output_file=self.moved_res_output_file)
         if (VERBOSE_LOG in self.verbose):            
-            self.print_sol_res_line (output_file=self.res_output_file, sol_cost=model.objective.value())
+            self.print_sol_res_line (output_file=self.res_output_file)
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_lp_sol_to_log ()
@@ -308,7 +311,7 @@ class SFC_mig_simulator (object):
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
         
-        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.alg=='opt' else '') )
+        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') )
         
         if Path('../res/' + self.res_file_name).is_file(): # does this res file already exist?
             self.res_output_file =  open ('../res/' + self.res_file_name,  "a")
@@ -322,7 +325,7 @@ class SFC_mig_simulator (object):
         If a res file with the relevant name already exists - open it for appending.
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
-        self.moved_res_file_name = self.gen_res_file_name (mid_str = ('_moved_opt' if self.alg=='opt' else '_moved')) 
+        self.moved_res_file_name = self.gen_res_file_name (mid_str = ('_moved_opt' if self.mode=='opt' else '_moved')) 
         
         if Path('../res/' + self.moved_res_file_name).is_file(): # does this res file already exist?
             self.moved_res_output_file =  open ('../res/' + self.moved_res_file_name,  "a")
@@ -336,7 +339,7 @@ class SFC_mig_simulator (object):
         If a res file with the relevant name already exists - open it for appending.
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
-        self.critical_res_file_name = self.gen_res_file_name (mid_str = ('_critical_opt' if self.alg=='opt' else '_critical')) 
+        self.critical_res_file_name = self.gen_res_file_name (mid_str = ('_critical_opt' if self.mode=='opt' else '_critical')) 
         
         if Path('../res/' + self.critical_res_file_name).is_file(): # does this res file already exist?
             self.critical_res_output_file =  open ('../res/' + self.critical_res_file_name,  "a")
@@ -348,15 +351,15 @@ class SFC_mig_simulator (object):
         """
         Print several header lines, indicating the format and so, to an output res file.
         """
-        printf (res_file, '// format: t{T}.{Alg}.cpu{C}.stts{s} | cost = c, where\n// T is the slot cnt (read from the input file)\n')
-        printf (res_file, '// Alg is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
+        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cost = c, where\n// T is the slot cnt (read from the input file)\n')
+        printf (res_file, '// Mode is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
         printf (res_file, '// c is the total cost of the solution\n\n') 
 
     def init_log_file (self, overwrite = True):
         """
         Open the log file for writing and write initial comments lines on it
         """
-        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg + ('.detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
+        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.mode + ('.detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s\n' )
 
@@ -593,7 +596,7 @@ class SFC_mig_simulator (object):
             self.debug_file = open ('../res/debug.txt', 'w') 
         if (VERBOSE_MOB in self.verbose):
             self.num_of_moved_usrs_in_slot         = [] # self.num_of_moved_usrs_in_slot[t] will hold the num of usrs who moved at slot t.   
-            self.num_of_migs_in_slot          = [] # self.num_of_migs[t] will hold the num of chains that the alg' migrated in slot t.
+            self.num_of_migs_in_slot          = [] # self.num_of_migs[t] will hold the num of chains assigned to migrate in slot t.
             self.num_of_critical_usrs_in_slot = [] 
             self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
@@ -626,17 +629,17 @@ class SFC_mig_simulator (object):
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()       
 
-    def simulate (self, alg, sim_len_in_slots=99999):
+    def simulate (self, mode, sim_len_in_slots=99999):
         """
-        Simulate the whole simulation using the chosen alg: LP, or ALG_TOP (our alg).
+        Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
         """
-        self.alg              = alg
+        self.mode              = mode
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
 
         self.init_input_and_output_files()        
              
-        print ('Simulating {}. ap file = {} cpu cap at leaf={}' .format (self.alg, self.ap_file_name, self.cpu_cap_at_leaf))
+        print ('Simulating {}. ap file = {} cpu cap at leaf={}' .format (self.mode, self.ap_file_name, self.cpu_cap_at_leaf))
         self.stts     = sccs
 
         # extract the slot len from the input '.ap' file name
@@ -646,12 +649,12 @@ class SFC_mig_simulator (object):
         else:
             self.slot_len = 1 # assume that by default, slot len is 1
         
-        if (self.alg in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
+        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
             self.simulate_algs()
-        elif (self.alg == 'opt'):
+        elif (self.mode == 'opt'):
             self.simulate_lp ();
         else:
-            print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
+            print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
             exit ()
 
     def init_input_and_output_files (self):
@@ -673,10 +676,10 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
         if (VERBOSE_MOB in self.verbose):
-            self.mob_file_name   = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.alg.split("_")[1] + '.mob.log'  
+            self.mob_file_name   = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
             self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
-            printf (self.mob_output_file, '// results for running alg alg_top on input file {}\n' .format (self.ap_file_name))
-            printf (self.mob_output_file, '// results for running alg alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
+            printf (self.mob_output_file, '// results for running alg_top on input file {}\n' .format (self.ap_file_name))
+            printf (self.mob_output_file, '// results for running alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
             printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
     
     def rd_t_line (self, time_str):
@@ -686,10 +689,10 @@ class SFC_mig_simulator (object):
         self.t = int(time_str)
         if (self.is_first_t):
             self.first_slot     = self.t
-            self.final_slot_to_simulate = self.t + self.sim_len_in_slots 
+            self.final_slot_to_simulate = self.t + self.sim_len_in_slots
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        if (self.alg in ['ourAlg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
+        if (self.mode in ['ourAlg', 'wfit', 'ffit']): # once in a while, reshuffle the random ids of usrs, to mitigate unfairness due to tie-breaking by the ID, when sorting usrs 
             for usr in self.usrs:
                 usr.calc_rand_id ()
         self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
@@ -733,10 +736,18 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line_lp (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
-                self.set_last_time()
+                if (VERBOSE_LOG in self.verbose):
+                    self.last_rt = time.time ()
                 self.stts = self.alg_top(self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
                 self.cur_st_params = self.d_vars
-                self.is_first_t = False
+                self.prepare_sim_to_next_slot()
+                    
+    def prepare_sim_to_next_slot (self):
+        """
+        To be called after finished handling and solving the problem for the current slot. 
+        """
+        self.is_first_t = False  # The next slot is surely not the first slot
+        self.prev_t     = self.t # save the time of the current time slot as "previous" for the next time slot to come. 
                     
     def simulate_algs (self):
         """
@@ -750,7 +761,7 @@ class SFC_mig_simulator (object):
         
         # reset Hs     
         for s in self.G.nodes():
-            if (self.alg in ['ourAlg']):
+            if (self.mode in ['ourAlg']):
                 self.G.nodes[s]['Hs']  = set() 
         
         for line in self.ap_file: 
@@ -782,23 +793,23 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "old_usrs:"):  
                 self.rd_old_usrs_line (splitted_line[1:])
                 if (VERBOSE_ADD_LOG in self.verbose):
-                    self.set_last_time()
+                    self.last_rt = time.time ()
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
                 # solve the prob' using the requested alg'    
-                if   (self.alg in ['ourAlg']):
+                if   (self.mode in ['ourAlg']):
                     self.stts = self.alg_top(self.bottom_up)
-                elif (self.alg == 'ffit'):
+                elif (self.mode == 'ffit'):
                     self.stts = self.alg_top(self.first_fit)
-                elif (self.alg == 'wfit'):
+                elif (self.mode == 'wfit'):
                     self.stts = self.alg_top(self.worst_fit)
-                elif (self.alg == 'cpvnf'):
+                elif (self.mode == 'cpvnf'):
                     self.stts = self.alg_top(self.cpvnf)
                 else:
-                    print ('Sorry, alg {} that you selected is not supported' .format (self.alg))
+                    print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
                     exit ()
         
-                if (self.alg in ['ourAlg']): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
+                if (self.mode in ['ourAlg']): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
                     self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
                 
                 self.print_sol_to_res_and_log ()
@@ -807,7 +818,7 @@ class SFC_mig_simulator (object):
                 
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                     usr.cur_s = usr.nxt_s
-                self.is_first_t = False
+                self.prepare_sim_to_next_slot()
         
         self.post_processing()
     
@@ -956,12 +967,12 @@ class SFC_mig_simulator (object):
 
     def write_fail_to_log_n_res (self):
         """
-        Write to the log and to the res file that the alg' currently running did not succeed to place all the usrs
+        Write to the log and to the res file that the solver (either an algorithm, or an LP solver) did not succeed to place all the usrs
         """
         if (VERBOSE_RES in self.verbose):
-            printf (self.res_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.alg))
+            printf (self.res_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
         if (VERBOSE_LOG in self.verbose):
-            printf (self.log_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.alg))
+            printf (self.log_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
 
     def worst_fit_place_usr (self, usr):
         """
@@ -987,21 +998,21 @@ class SFC_mig_simulator (object):
         self.stts = placement_alg()
         
         if (VERBOSE_LOG in self.verbose):
-            self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+            self.print_sol_res_line (self.log_output_file)
         
         if (self.stts == sccs):
             return sccs
         
         # Now we know that the first run fail. For all the benchmarks, it means that they also made a reshuffle. 
         # However, bottom-up haven't tried a reshuffle yet. So, we give it a try now.
-        if (self.alg in ['ourAlg']):
+        if (self.mode in ['ourAlg']):
             self.rst_sol()
             self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
             self.stts = self.bottom_up()
             if (VERBOSE_ADD_LOG in self.verbose):
                 printf (self.log_output_file, 'after reshuffle:\n')
                 self.print_sol_to_log()
-                self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+                self.print_sol_res_line (self.log_output_file)
             if (self.stts == sccs):
                 return sccs
 
@@ -1039,7 +1050,7 @@ class SFC_mig_simulator (object):
                 self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub))         
                 if (placement_alg() == sccs):
                     if (VERBOSE_ADD_LOG in self.verbose):
-                        self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+                        self.print_sol_res_line (self.log_output_file)
                         printf (self.log_output_file, 'successfully finished binary search\n') 
                     return sccs
         
@@ -1056,7 +1067,7 @@ class SFC_mig_simulator (object):
             # Solve using the given placement alg'
             self.stts = placement_alg()
             if (VERBOSE_LOG in self.verbose):
-                    self.print_sol_res_line (self.log_output_file, self.calc_alg_sol_cost(self.usrs))
+                    self.print_sol_res_line (self.log_output_file)
         
             if (self.stts == sccs):
                 if (VERBOSE_ADD_LOG in self.verbose): 
@@ -1157,7 +1168,7 @@ class SFC_mig_simulator (object):
             self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
-            if (self.alg in ['ourAlg']):
+            if (self.mode in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                       
                     
@@ -1206,7 +1217,7 @@ class SFC_mig_simulator (object):
                 # Yep: the delay constraint are satisfied also in the current placement. 
                 # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
                 
-                if (self.alg in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
+                if (self.mode in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
                     for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
                         self.G.nodes[s]['Hs'].remove (usr) # Remove the usr from  'Hs' in all locations 
                     for s in usr.S_u:
@@ -1222,7 +1233,7 @@ class SFC_mig_simulator (object):
 
             # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
             # Hs is the set of relevant usrs) at each of its delay-feasible server
-            if (self.alg in ['ourAlg']):
+            if (self.mode in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                               
 
@@ -1266,7 +1277,7 @@ class SFC_mig_simulator (object):
         """
         #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-        if (self.alg not in ['ourAlg']):
+        if (self.mode not in ['ourAlg']):
             return 
         
         # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
@@ -1300,13 +1311,13 @@ if __name__ == "__main__":
     #                                   cpu_cap_at_leaf       = 213
     #                                   )
     #
-    # my_simulator.simulate (alg              = 'ourAlg',  
+    # my_simulator.simulate (mode             = 'ourAlg',  
     #                        sim_len_in_slots = 61 
     #                        )     
 
     # ap_file_name = '0829_0830_8secs_256aps.ap' 
-    # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given alg'
-    # for alg in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+    # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given mode
+    # for mode in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
     #     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
     #                                       verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
     #                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
@@ -1314,7 +1325,7 @@ if __name__ == "__main__":
     #                                       cpu_cap_at_leaf       = 213
     #                                       )
     #
-    #     my_simulator.simulate (alg              = alg, # pick an algorithm from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
+    #     my_simulator.simulate (mode             = mode, # pick a mode from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
     #                            sim_len_in_slots = 61, 
     #                            ) 
     # exit ()
@@ -1323,7 +1334,7 @@ if __name__ == "__main__":
     min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
     step        = 0.1 * min_req_cap
     
-    for alg in ['ourAlg']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+    for mode in ['ourAlg']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
         for cpu_cap in [213]: #[int(round((min_req_cap + step*i))) for i in range (21)]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
@@ -1332,7 +1343,7 @@ if __name__ == "__main__":
                                               cpu_cap_at_leaf       = cpu_cap
                                               )
     
-            my_simulator.simulate (alg              = alg,  
+            my_simulator.simulate (mode             = mode,  
                                    sim_len_in_slots = 61, 
                                    )     
 

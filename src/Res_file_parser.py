@@ -4,6 +4,7 @@ import math
 
 from printf import printf 
 
+# Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
 alg_idx       = 1
 cpu_idx       = 2
@@ -17,11 +18,18 @@ ffit_idx  = 2
 cpvnf_idx = 3
 
 class Res_file_parser (object):
-    
-    calc_cost_of_item = lambda self, item : item['mig_cost'] + (item['cpu_cost'] + item['link_cost']) * (7.5 if self.time_slot_len == 8 else 1)  
+    """
+    Parse "res" (result) files, and generate plots from them.
+    """
+
+    # An inline function. Calculates the total cost at a given time slot.
+    # The total cost is the sum of the migration, CPU and link costs.
+    # If the length of the slot is 8, we need to multiply the CPU and link cost by 7.5. This is because in 1 minutes (60 seconds), where we ignore the first we have only 7.5 8-seconds solots #$$$ ????        
+    calc_cost_of_item = lambda self, item : item['mig_cost'] + (item['cpu_cost'] + item['link_cost']) * (7.5 if self.time_slot_len == 8 else 1)    
 
     def __init__ (self):
         """
+        Initialize a Res_file_parser, used to parse result files, and generate plots. 
         """
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ourAlg  = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
@@ -35,7 +43,6 @@ class Res_file_parser (object):
         self.add_plot_link_cost              = '\n' + self.add_plot_ourAlg
         self.add_plot_mig_cost               = '\n' + self.add_plot_ffit
         self.add_plot_num_of_critical_chains = '\n' + self.add_plot_cpvnf
-        # self.add_plot_str_vec = [self.add_plot_opt, self.add_plot_alg, self.add_plot_ffit, self.add_plot_cpvnf]
 
         self.add_plot_str_dict = {'opt'    : self.add_plot_opt,
                                   'ourAlg' : self.add_plot_ourAlg,
@@ -50,6 +57,7 @@ class Res_file_parser (object):
         
     def parse_detailed_cost_comp_file (self, input_file_name):
         """
+        Parse a result file containing the detailed costs, with its components (link, cpu and mig' cost) for each ran algorithm. 
         """
         self.input_file_name = input_file_name
         self.input_file      = open ("../res/" + input_file_name,  "r")
@@ -132,16 +140,18 @@ class Res_file_parser (object):
         """
         parse a vec from an input file, where the vec's format is, e.g.: "[2, 33, 44, 34, 8]" 
         """
-        
         vec      = []
         vec_line = splitted_line.split ("\n")[0]
-        vec_line = vec_line.split('[')[1].split(']')[0].split(', ')
+        vec_line = vec_line.split('[')[1].split(']')[0].split(', ') # remove leading and trailing square brackets
         for item in vec_line:
             vec.append (float(item))
         return np.array(vec)
 
         
     def parse_file (self, input_file_name):
+        """
+        Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
+        """
         
         self.input_file_name = input_file_name
         self.input_file      = open ("../res/" + input_file_name,  "r")
@@ -156,7 +166,6 @@ class Res_file_parser (object):
                 continue
            
             self.parse_line(line)
-            # if (not(self.dict in self.list_of_dicts)): # verify that such an item doesn't already exist in the list. However, if using list_of_dicts, no need for this check 
             if ( not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)
                 
@@ -164,6 +173,9 @@ class Res_file_parser (object):
         self.input_file.close
 
     def parse_line (self, line):
+        """
+        Parse a line in a result file. Such a line should begin with a string having several fields, detailing the settings.
+        """
 
         splitted_line = line.split (" | ")
          

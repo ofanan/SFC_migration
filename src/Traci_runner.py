@@ -22,7 +22,7 @@ class Traci_runner (object):
     # Output: True iff this vehicle is within the simulated area.
     is_in_simulated_area  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y) else True 
     
-    def __init__ (dummy):
+    def __init__ (self, dummy):
         dummy = dummy
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
@@ -62,6 +62,7 @@ class Traci_runner (object):
                 known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys)
                        
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
+            print ('here')
         traci.close()
 
     def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
@@ -81,7 +82,6 @@ class Traci_runner (object):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
-            speed_str        = 'n_speed_' if (VERBOSE_SPEED in self.verbose) else ''
             output_file_name = '../res/{}_{}secs.loc' .format (secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec)  
             with open(output_file_name, 'w') as loc_output_file:
                 loc_output_file.write('')                
@@ -90,11 +90,11 @@ class Traci_runner (object):
             printf (loc_output_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
             printf (loc_output_file, '// format for vehicles that are new (just joined the sim), or moved:\n')
             if (VERBOSE_SPEED in self.verbose): 
-                printf (loc_output_file, '// (type,usr_id,x,y,s)   where:\n')
-                printf (loc_output_file, '// type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id. s is the speed of this user.\n')
+                printf (loc_output_file, '// (veh_type,usr_id,x,y,s)   where:\n')
+                printf (loc_output_file, '// veh_type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id. s is the speed of this user.\n')
             elif (VERBOSE_LOC in self.verbose):
-                printf (loc_output_file, '// (type,usr_id,x,y)   where:\n')
-                printf (loc_output_file, '// type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id.\n')
+                printf (loc_output_file, '// (veh_type,usr_id,x,y)   where:\n')
+                printf (loc_output_file, '// veh_type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id.\n')
             
                 
             while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
@@ -121,24 +121,24 @@ class Traci_runner (object):
                 for veh_key in cur_list_of_vehicles:
                     filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
-                        type = 'n' # will indicate that this is a new vehicle 
+                        veh_type = 'n' # will indicate that this is a new vehicle 
                         if (len (ids2recycle) > 0): # can recycle an ID of a veh that left
-                            # type = 'r' # will indicate that this is a recycled vehicle's id 
+                            # veh_type = 'r' # will indicate that this is a recycled vehicle's id 
                             veh_id     = ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
                         else:
-                            # type = 'n' # will indicate that this is a new vehicle 
+                            # veh_type = 'n' # will indicate that this is a new vehicle 
                             veh_id = len (veh_key2id) # pick a new ID
                         veh_key2id.append({'key' : veh_key, 'id' : veh_id}) # insert the new veh into the db 
                     else: # already seen this veh_key in the sim' --> extract its id from the hash
                         if (traci.vehicle.getSpeed(veh_key) == 0):  
                             continue
-                        type = 'o' # will indicate that this is a old vehicle 
+                        veh_type = 'o' # will indicate that this is a old vehicle 
                         veh_id = filtered_list[0]['id'] 
                     position = self.get_relative_position (veh_key)
                     if (VERBOSE_SPEED in self.verbose): 
-                        printf (loc_output_file, "({},{},{},{},{:.0f})" .format (type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
+                        printf (loc_output_file, "({},{},{},{},{:.0f})" .format (veh_type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
                     elif (VERBOSE_LOC in self.verbose):
-                        printf (loc_output_file, "({},{},{},{})" .format (type, veh_id, position[0], position[1]))
+                        printf (loc_output_file, "({},{},{},{})" .format (veh_type, veh_id, position[0], position[1]))
         
                 sys.stdout.flush()
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
@@ -147,7 +147,7 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner ()
+    my_Traci_runner = Traci_runner (dummy = 0)
 
     # (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
     my_Traci_runner.simulate_to_cnt_vehs_only (

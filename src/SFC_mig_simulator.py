@@ -1163,12 +1163,10 @@ class SFC_mig_simulator (object):
                     
     def update_S_u (self, usr, AP_id):
         """
-        Update the Su (list of delay-feasible servers) of a given usr, given its current AP
-        """
-                    
-        # self.check_AP_id (AP_id)
+        Update the Su (list of delay-feasible servers) of a given usr, given the id of its current AP (Access Point server)
+        """                    
         usr.S_u = []
-        s = self.ap2s[AP_id]
+        s       = self.ap2s[AP_id]
         usr.S_u.append (s)
         for lvl in (range (len(usr.B)-1)):
             s = self.parent_of(s)

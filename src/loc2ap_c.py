@@ -11,10 +11,9 @@ import time
 from usr_c import usr_c # class of the users
 from printf import printf
 
-# size of the city's area, in meters. In the simulation we may consider only a part of this large area.
-GLOBAL_MAX_X, GLOBAL_MAX_Y = int(13622), int(11457) 
-MAX_X,        MAX_Y        = GLOBAL_MAX_X//2, GLOBAL_MAX_Y//2  
-LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X//4,   GLOBAL_MAX_Y//4], dtype='int16')
+GLOBAL_MAX_X, GLOBAL_MAX_Y = int(13622), int(11457)             # size of the city's area, in meters. 
+MAX_X,        MAX_Y        = GLOBAL_MAX_X//2, GLOBAL_MAX_Y//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)  
+LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X//4,   GLOBAL_MAX_Y//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
 
 # Verbose levels, defining the outputs produced
 VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
@@ -51,6 +50,11 @@ class loc2ap_c (object):
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
+        """
+        Init a "loc2ap_c" object.
+        A loc2ap_c is used can read ".loc" files (files detailing the location of each car over time), and output ".ap" files (files detailing the AP assignment of each car), and/or statistics 
+        (e.g., number of cars entering/levaing each cell, avg # of cars in each cell, etc.).
+        """
 
         self.verbose           = verbose      # verbose level - defining which outputs will be written
         self.debug             = False 

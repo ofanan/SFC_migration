@@ -69,12 +69,25 @@ class SFC_mig_simulator (object):
     # Given a server s, returns the total CPU currently allocated to usrs assigned to server s.  
     opt_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.plp_var.value() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
     
-    # Calculates the cost of locating a given user on a server at a given lvl.
-    # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinct server. 
-    chain_cost_of_usr_at_lvl_opt = lambda self, usr, lvl, slot_len=1: \
-                    sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
-                    self.uniform_chain_mig_cost + self.cpu_cost_of_usr_at_lvl (usr, lvl) + self.link_cost_of_CLP_at_lvl[lvl]  
+    # # Calculates the cost of locating a given user on a server at a given lvl.
+    # # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinct server. 
+    # chain_cost_of_usr_at_lvl_opt = lambda self, usr, lvl, slot_len=1: \
+    #                 sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
+    #                 self.uniform_chain_mig_cost + self.cpu_cost_of_usr_at_lvl (usr, lvl) + self.link_cost_of_CLP_at_lvl[lvl]  
                     
+    # Calculates the cost of a given decision variable, if the decision var is assigned 1.
+    # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinct server. 
+    d_var_cost = lambda self, d_var: self.d_var_cpu_cost (d_var) + self.d_var_link_cost (d_var) + self.d_var_mig_cost (d_var)
+
+    # Calculates the cpu cost of a given decision variable, if the decision var is assigned 1.
+    d_var_cpu_cost  = lambda self, d_var : self.cpu_cost_of_usr_at_lvl (d_var.usr, d_var.lvl) 
+
+    # Calculates the link cost of a given decision variable, if the decision var is assigned 1.
+    d_var_link_cost = lambda self, d_var : self.link_cost_of_CLP_at_lvl (d_var.lvl)
+    
+    # Calculates the migration cost of a given decision variable, if the decision var is assigned 1.
+    d_var_mig_cost  = lambda self, d_var : 0 if (d_var.usr.is_new) else (1 - d_var.cur_st) * self.uniform_chain_mig_cost  
+
     # Print a solution for the problem to the output res file  
     print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
 
@@ -84,26 +97,15 @@ class SFC_mig_simulator (object):
                               self.calc_cpu_cost_in_slot_alg(), self.calc_link_cost_in_slot_alg(), self.calc_mig_cost_in_slot_alg()
                               )) 
 
-
     # $$$$ Carefully verfiy the 5 next lambda func's
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
     print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              self.calc_cpu_cost_in_slot_opt(), self.calc_link_cost_in_slot_opt(), self.calc_mig_cost_in_slot_opt()
+                              sum ([self.d_var_cpu_cost(d_var)  for d_var in self.d_vars]),
+                              sum ([self.d_var_link_cost(d_var) for d_var in self.d_vars]),
+                              sum ([self.d_var_mig_cost(d_var) for d_var in self.d_vars])
                               )) 
-
-    # Returns the total CPU cost in the current time slot when running opt (LP solver) 
-    calc_cpu_cost_in_slot_opt  = lambda self : sum ([d_var.plp_var.value() * self.cpu_cost_of_usr_at_lvl (d_var.usr, d_var.lvl) for d_var in self.d_vars] )
-                            
-    # Returns the total link cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
-    calc_link_cost_in_slot_opt = lambda self : sum ([d_var.plp_var.value() * self.link_cost_at_lvl[d_var.lvl] for d_var in self.d_vars] )
     
-    # Returns the total migration cost in the current time slot, when using the LP solver
-    calc_mig_cost_in_slot_opt  = lambda self : self.uniform_chain_mig_cost * sum ([abs(d_var.cur_st - d_var.plp_var.value()) for d_var in self.d_vars]) / 2 
-    
-    # # Returns the fraction of chain usr that would migrate in the current time slot due to the LP solver's solution. The returned nvalue should be between 0 and 1.  
-    # frac_of_usr_u_to_be_migrated_by_opt = lambda self, usr : sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) 
-
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
 
@@ -254,7 +256,7 @@ class SFC_mig_simulator (object):
         for d_var in self.d_vars: 
             if d_var.plp_var.value() > 0: # the LP solution set non-zero value for this decision variable
                 if d_var.usr in self.moved_usrs:
-                    cost += self.chain_cost_of_usr_at_lvl_opt (d_var.usr, d_var.lvl)
+                    cost += self.d_var_cost (d_var.usr, d_var.lvl)
         return cost
 
     def solve_by_plp (self):
@@ -280,7 +282,7 @@ class SFC_mig_simulator (object):
                     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who moved 
                 # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_usrs): 
                 #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who are critical 
-                obj_func += self.chain_cost_of_usr_at_lvl_opt (usr, lvl) * plp_var # add the cost of this decision var to the objective func
+                obj_func += self.d_var_cost (usr, lvl) * plp_var # add the cost of this decision var to the objective func
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
 
@@ -1133,6 +1135,7 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry[1].split (',')
     
             usr = usr_lp_c (id = int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+            usr.is_new = True
             self.moved_usrs.append(usr)
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr)
@@ -1269,6 +1272,7 @@ class SFC_mig_simulator (object):
                 print  ('Error at t={}: input file={}. Did not find old / reslotd usr {}' .format (self.t, self.ap_file_name, usr_entry[0]))
                 exit ()
             usr    = list_of_usr[0]
+            usr.is_new = False
             self.moved_usrs.append(usr)
             self.CPUAll_single_usr (usr)
             self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs at its new location

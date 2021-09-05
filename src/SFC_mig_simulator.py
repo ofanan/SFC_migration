@@ -83,27 +83,30 @@ class SFC_mig_simulator (object):
     d_var_cpu_cost  = lambda self, d_var : self.cpu_cost_of_usr_at_lvl (d_var.usr, d_var.lvl) 
 
     # Calculates the link cost of a given decision variable, if the decision var is assigned 1.
-    d_var_link_cost = lambda self, d_var : self.link_cost_of_CLP_at_lvl (d_var.lvl)
+    d_var_link_cost = lambda self, d_var : self.link_cost_of_CLP_at_lvl[d_var.lvl]
     
-    # Calculates the migration cost of a given decision variable, if the decision var is assigned 1.
-    d_var_mig_cost  = lambda self, d_var : 0 if (d_var.usr.is_new) else (1 - d_var.cur_st) * self.uniform_chain_mig_cost  
+    # #$$$ The imp' below seems wrong. Check it out.
+    # $$$ Check whether the new imp' is correct, and if so, whether it can be switched into a lambda func' 
+    # # Calculates the migration cost of a given decision variable, if the decision var is assigned 1.
+    # d_var_mig_cost  = lambda self, d_var : 0 if (d_var.usr.is_new) else (1 - d_var.cur_st) * self.uniform_chain_mig_cost  
 
     # Print a solution for the problem to the output res file  
     print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_alg = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
+    print_sol_res_line_alg = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f}\n' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              self.calc_cpu_cost_in_slot_alg(), self.calc_link_cost_in_slot_alg(), self.calc_mig_cost_in_slot_alg()
+                              self.calc_cpu_cost_in_slot_alg(), self.calc_link_cost_in_slot_alg(), self.calc_mig_cost_in_slot_alg(),
+                              self.calc_cpu_cost_in_slot_alg() + self.calc_link_cost_in_slot_alg() + self.calc_mig_cost_in_slot_alg()
                               )) 
 
     # $$$$ Carefully verfiy the 5 next lambda func's
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
+    print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | ' .format( #$$$
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              sum ([self.d_var_cpu_cost(d_var)  for d_var in self.d_vars]),
-                              sum ([self.d_var_link_cost(d_var) for d_var in self.d_vars]),
-                              sum ([self.d_var_mig_cost(d_var) for d_var in self.d_vars])
+                              sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]),
+                              sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]),
+                              sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
                               )) 
     
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
@@ -141,6 +144,17 @@ class SFC_mig_simulator (object):
     # Returns the total migration cost in the current time slot. 
     calc_mig_cost_in_slot_alg = lambda self : self.uniform_chain_mig_cost * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
 
+    def d_var_mig_cost (self, d_var): 
+        if (d_var.usr.is_new): # No mig' cost for a new usr
+            return 0
+        my_param_list = list (filter (lambda param : param.usr==d_var.usr and param.s==d_var.s, self.cur_st_params)) # my_param_list is the list of cur-st param' assigning this usr to this server
+        if (len(my_param_list)==0): #In the cur st, no part of this usr was assigned to this server.
+            return self.uniform_chain_mig_cost # Assigning 1 to this d_var implies migrating the whole usr to this server.                                                                                                                             
+        if (len(my_param_list)>1):
+            print ('Error. Inaal Abuck')
+            exit ()
+        return (1 - my_param_list[0].plp_var.value()) * self.uniform_chain_mig_cost  
+    
     def set_RCs_and_a (self, aug_cpu_capacity_at_lvl):
         """"
         given the (augmented) cpu cap' at each lvl, assign each server its 'RCs' (augmented CPU cap vals); and initialise 'a' (the amount of available CPU) to 'RCs' (the augmented CPU cap).
@@ -256,7 +270,7 @@ class SFC_mig_simulator (object):
         for d_var in self.d_vars: 
             if d_var.plp_var.value() > 0: # the LP solution set non-zero value for this decision variable
                 if d_var.usr in self.moved_usrs:
-                    cost += self.d_var_cost (d_var.usr, d_var.lvl)
+                    cost += self.d_var_cost (d_var)
         return cost
 
     def solve_by_plp (self):
@@ -274,15 +288,15 @@ class SFC_mig_simulator (object):
             single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
                 plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id))
-                decision_var = decision_var_c (id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
-                self.d_vars.append (decision_var)
+                d_var = decision_var_c (d_var_id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
+                self.d_vars.append (d_var)
                 single_place_const += plp_var
                 d_var_id += 1
                 if (VERBOSE_MOVED_RES in self.verbose and not (self.is_first_t) and usr not in self.moved_usrs): 
                     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who moved 
                 # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_usrs): 
                 #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who are critical 
-                obj_func += self.d_var_cost (usr, lvl) * plp_var # add the cost of this decision var to the objective func
+                obj_func += self.d_var_cost (d_var) * plp_var # add the cost of this decision var to the objective func
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
 
@@ -300,7 +314,18 @@ class SFC_mig_simulator (object):
         
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
-            self.print_sol_res_line (output_file=self.res_output_file)
+            self.print_sol_res_line_opt (output_file=self.res_output_file)
+            # printf (self.res_output_file, 'direct: tot cost={:.2f}' .format (model.objective.value()))
+            sol_cost_by_obj_func = model.objective.value()
+            sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
+                              sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
+                              sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+            printf (self.res_output_file, 'tot_cost = {:.2f}\n' .format (model.objective.value())) 
+            if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
+                print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
+                exit ()
+
+            
         if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
             self.print_sol_res_line (output_file=self.moved_res_output_file)
         if (VERBOSE_LOG in self.verbose):            
@@ -751,7 +776,7 @@ class SFC_mig_simulator (object):
                 if (VERBOSE_LOG in self.verbose):
                     self.last_rt = time.time ()
                 self.stts = self.alg_top(self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
-                self.cur_st_params = self.d_vars
+                self.cur_st_params = self.d_vars.copy () #All the decision vars will be referred as "cur st parameters" in the next time slot 
                 self.prepare_sim_to_next_slot()
                     
     def prepare_sim_to_next_slot (self):
@@ -1344,12 +1369,12 @@ if __name__ == "__main__":
     #                            ) 
     # exit ()
 
-    ap_file_name = '0829_0830_8secs_256aps.ap' #'shorter.ap' #
+    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
     step        = 0.1 * min_req_cap
     
-    for mode in ['ourAlg']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [213]: #[int(round((min_req_cap + step*i))) for i in range (21)]:
+    for mode in ['opt']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+        for cpu_cap in [208]: #[int(round((min_req_cap + step*i))) for i in range (21)]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
@@ -1358,6 +1383,6 @@ if __name__ == "__main__":
                                               )
     
             my_simulator.simulate (mode             = mode,  
-                                   sim_len_in_slots = 61, 
+                                   sim_len_in_slots = 10, 
                                    )     
 

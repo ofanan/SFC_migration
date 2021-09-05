@@ -68,7 +68,7 @@ class loc2ap_c (object):
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_in_ap = [[] for ap in range(self.num_of_APs)]
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.joined          = [[] for ap in range(self.num_of_APs)]
+            self.joined          = [[]*self.num_of_APs] #[[] for ap in range(self.num_of_APs)] #$$$$ if this works, should edit other lines accordingly.
             self.left            = [[] for ap in range(self.num_of_APs)]
             self.joined_sim_via  = [[] for ap in range(self.num_of_APs)]
             self.left_sim_via    = [[] for ap in range(self.num_of_APs)]

@@ -10,4 +10,4 @@ class decision_var_c (object):
         self.usr      = usr # this decision_var is about locating this usr on server s, whose level is lvl
         self.s        = s
         self.lvl      = lvl
-        self.cur_st   = cur_st # val of this decision_var at the current state 
+        self.cur_st   = cur_st # value of this decision_var at the current state 

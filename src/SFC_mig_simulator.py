@@ -1,11 +1,9 @@
 import networkx as nx
 import numpy as np
 import math
-import itertools 
 import time
 import heapq
 import pulp as plp
-from cmath import sqrt
 import matplotlib.pyplot as plt
 import random
 from pathlib import Path
@@ -14,7 +12,6 @@ from usr_c    import usr_c    # class of the users of alg
 from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
-import loc2ap_c
 
 # Levels of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
@@ -44,15 +41,18 @@ class SFC_mig_simulator (object):
     parent_of = lambda self, s : self.G.nodes[s]['prnt']
 
     # calculate the total cost of a solution by a placement algorithm (not by a solution by LP)
-    calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_homo (usr, usr.lvl, slot_len=self.slot_len) for usr in usrs])
+    calc_alg_sol_cost = lambda self, usrs: sum ([self.chain_cost_alg (usr, usr.lvl, slot_len=self.slot_len) for usr in usrs])
    
     # calculate the total cost of placing a chain at some level. 
     # The func' assume uniform cost of all links at a certain level; uniform mig' cost per VM; 
     # and uniform cost for all servers at the same layer.
-    chain_cost_homo = lambda self, usr, lvl, slot_len=1 : slot_len * (self.link_cost_of_CLP_at_lvl[lvl] + self.CPU_cost_at_lvl[lvl] * usr.B[lvl]) + self.calc_mig_cost_CLP (usr, lvl)
+    chain_cost_alg = lambda self, usr, lvl, slot_len=1 : slot_len * (self.link_cost_of_CLP_at_lvl[lvl] + self.cpu_cost_of_usr_at_lvl(usr, lvl)) + self.calc_mig_cost_CLP (usr, lvl)
+    
+    # Returns the CPU cost of locating a given user on a server at a given level 
+    cpu_cost_of_usr_at_lvl = lambda self, usr, lvl : self.CPU_cost_at_lvl[lvl] * usr.B[lvl]
     
     # # calculate the migration cost incurred for a usr if placed on a given lvl, assuming a CLP (co-located placement), namely, the whole chain is placed on a single server
-    calc_mig_cost_CLP = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_mig_cost * len (usr.theta_times_lambda)
+    calc_mig_cost_CLP = lambda self, usr, lvl : (usr.S_u[lvl] != usr.cur_s and usr.cur_s!=-1) * self.uniform_chain_mig_cost
           
     # Calculate the number of CPU units actually used in each server
     used_cpu_in_all_srvrs = lambda self: np.array ([self.G.nodes[s]['RCs'] - self.G.nodes[s]['a'] for s in self.G.nodes])      
@@ -60,24 +60,20 @@ class SFC_mig_simulator (object):
     # calculate the proved upper bnd on the rsrc aug that bottomUp may need to find a feasible sol, given such a sol exists for the non-augmented prob'
     calc_upr_bnd_rsrc_aug = lambda self: np.max ([usr.C_u for usr in self.usrs]) / np.min ([np.min (usr.B) for usr in self.usrs])
 
-    # # Returns the AP covering a given (x,y) location, assuming that the cells are identical fixed-size squares
-    # loc2ap_sq = lambda self, x, y: int (math.floor ((y / self.cell_Y_edge) ) * self.num_of_APs_in_row + math.floor ((x / self.cell_X_edge) )) 
-
     # Returns the server currently assigned for a given user 
     cur_server_of = lambda self, usr: usr.S_u[usr.lvl] 
 
     # Returns the total amount of cpu used by users at a certain server
-    used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
+    alg_used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
 
     # Given a server s, returns the total CPU currently allocated to usrs assigned to server s.  
-    lp_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.plp_var.value() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
+    opt_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.plp_var.value() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
     
-    # Calculates the cost of locating the whole chain of a given user on a server at a given lvl in its Su.
+    # Calculates the cost of locating a given user on a server at a given lvl.
     # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinct server. 
-    chain_cost_from_non_CLP_state = lambda self, usr, lvl, slot_len=1: \
+    chain_cost_of_usr_at_lvl_opt = lambda self, usr, lvl, slot_len=1: \
                     sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) * \
-                    len (usr.theta_times_lambda) * self.uniform_mig_cost + slot_len *(self.CPU_cost_at_lvl[lvl] * usr.B[lvl] + self.link_cost_of_CLP_at_lvl[lvl])
-                    
+                    self.uniform_chain_mig_cost + self.cpu_cost_of_usr_at_lvl (usr, lvl) + self.link_cost_of_CLP_at_lvl[lvl]  
                     
     # Print a solution for the problem to the output res file  
     print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
@@ -85,14 +81,28 @@ class SFC_mig_simulator (object):
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
     print_sol_res_line_alg = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              self.calc_cpu_cost_in_slot(), self.calc_link_cost_in_slot(), self.calc_mig_cost_in_slot()
+                              self.calc_cpu_cost_in_slot_alg(), self.calc_link_cost_in_slot_alg(), self.calc_mig_cost_in_slot_alg()
                               )) 
 
+
+    # $$$$ Carefully verfiy the 5 next lambda func's
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
     print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost = {} | link_cost = {} | mig_cost = {}\n' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              -1, -1, -1
+                              self.calc_cpu_cost_in_slot_opt(), self.calc_link_cost_in_slot_opt(), self.calc_mig_cost_in_slot_opt()
                               )) 
+
+    # Returns the total CPU cost in the current time slot when running opt (LP solver) 
+    calc_cpu_cost_in_slot_opt  = lambda self : sum ([d_var.plp_var.value() * self.cpu_cost_of_usr_at_lvl (d_var.usr, d_var.lvl) for d_var in self.d_vars] )
+                            
+    # Returns the total link cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
+    calc_link_cost_in_slot_opt = lambda self : sum ([d_var.plp_var.value() * self.link_cost_at_lvl[d_var.lvl] for d_var in self.d_vars] )
+    
+    # Returns the total migration cost in the current time slot, when using the LP solver
+    calc_mig_cost_in_slot_opt  = lambda self : self.uniform_chain_mig_cost * sum ([abs(d_var.cur_st - d_var.plp_var.value()) for d_var in self.d_vars]) / 2 
+    
+    # # Returns the fraction of chain usr that would migrate in the current time slot due to the LP solver's solution. The returned nvalue should be between 0 and 1.  
+    # frac_of_usr_u_to_be_migrated_by_opt = lambda self, usr : sum ([param.cur_st for param in list (filter (lambda param: param.usr == usr and param.s != usr.S_u[lvl], self.cur_st_params))]) 
 
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -121,15 +131,14 @@ class SFC_mig_simulator (object):
     avg_up_and_lb = lambda self, ub, lb : int (math.floor(ub+lb)/2)
     
     # Returns the total CPU cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
-    calc_cpu_cost_in_slot = lambda self : sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs])
+    calc_cpu_cost_in_slot_alg = lambda self : sum ([self.CPU_cost_at_lvl[usr.lvl] * usr.B[usr.lvl] for usr in self.usrs])
     
     # Returns the total link cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
-    calc_link_cost_in_slot = lambda self : sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs])
+    calc_link_cost_in_slot_alg = lambda self : sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs])
     
     # Returns the total migration cost in the current time slot. 
-    calc_mig_cost_in_slot = lambda self : self.uniform_mig_cost * len (self.uniform_theta_times_lambda) * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
+    calc_mig_cost_in_slot_alg = lambda self : self.uniform_chain_mig_cost * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
 
-        
     def set_RCs_and_a (self, aug_cpu_capacity_at_lvl):
         """"
         given the (augmented) cpu cap' at each lvl, assign each server its 'RCs' (augmented CPU cap vals); and initialise 'a' (the amount of available CPU) to 'RCs' (the augmented CPU cap).
@@ -147,7 +156,7 @@ class SFC_mig_simulator (object):
         del (self.num_of_migs_in_slot         [0])
         del (self.num_of_critical_usrs_in_slot[0])
         del (self.num_of_moved_usrs_in_slot   [0])
-        self.cost_of_migs_in_slot = self.uniform_mig_cost * len (self.uniform_theta_times_lambda) * np.array (self.num_of_migs_in_slot)  
+        self.cost_of_migs_in_slot = self.uniform_chain_mig_cost * np.array (self.num_of_migs_in_slot)  
         
         printf (self.detailed_cost_comp_output_file, '//t = {}\n//*******************************\n' .format (self.t))
         printf (self.detailed_cost_comp_output_file, 'cpu_cost_in_slot={}\nlink_cost_in_slot={}\nnum_of_migs_in_slot={}\ncost_of_migs_in_slot={}\n' .format
@@ -158,7 +167,7 @@ class SFC_mig_simulator (object):
         total_cpu_cost    = sum(self.cpu_cost_in_slot)
         total_link_cost   = sum(self.link_cost_in_slot)
         total_num_of_migs = sum(self.num_of_migs_in_slot)
-        total_mig_cost    = total_num_of_migs * self.uniform_mig_cost * len (self.uniform_theta_times_lambda)
+        total_mig_cost    = total_num_of_migs * self.uniform_chain_mig_cost
         total_cost        = sum ([total_cpu_cost, total_link_cost, total_mig_cost])
         # total_cost        = np.sum (np.array ([total_cpu_cost, total_link_cost, total_mig_cost]))
         
@@ -208,7 +217,7 @@ class SFC_mig_simulator (object):
             self.print_sol_res_line (output_file=self.log_output_file)
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt)) 
-            self.print_sol_to_log()
+            self.print_sol_to_log_alg()
             if (self.stts != sccs):
                 printf (self.log_output_file, 'Note: the solution above is partial, as the alg did not find a feasible solution\n')
                 return         
@@ -245,7 +254,7 @@ class SFC_mig_simulator (object):
         for d_var in self.d_vars: 
             if d_var.plp_var.value() > 0: # the LP solution set non-zero value for this decision variable
                 if d_var.usr in self.moved_usrs:
-                    cost += self.chain_cost_from_non_CLP_state (d_var.usr, d_var.lvl)
+                    cost += self.chain_cost_of_usr_at_lvl_opt (d_var.usr, d_var.lvl)
         return cost
 
     def solve_by_plp (self):
@@ -271,7 +280,7 @@ class SFC_mig_simulator (object):
                     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who moved 
                 # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_usrs): 
                 #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who are critical 
-                obj_func += self.chain_cost_from_non_CLP_state (usr, lvl) * plp_var # add the cost of this decision var to the objective func
+                obj_func += self.chain_cost_of_usr_at_lvl_opt (usr, lvl) * plp_var # add the cost of this decision var to the objective func
             model += (single_place_const == 1) # demand that each chain is placed in a single server
         model += obj_func
 
@@ -296,7 +305,7 @@ class SFC_mig_simulator (object):
             self.print_sol_res_line (output_file=self.res_output_file)
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
-                self.print_lp_sol_to_log ()
+                self.print_sol_to_log_opt ()
                 printf (self.log_output_file, '\nSuccessfully solved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         else:
             print  ('Running the LP failed. status={}' .format(plp.LpStatus[model.status]))
@@ -363,12 +372,12 @@ class SFC_mig_simulator (object):
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s\n' )
 
-    def print_lp_sol_to_log (self):
+    def print_sol_to_log_opt (self):
         """
         print a lp fractional solution to the output log file 
         """
         for s in self.G.nodes():
-            printf (self.log_output_file, 's{} RCs={} used cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.lp_used_cpu_in (s) ))
+            printf (self.log_output_file, 's{} RCs={} used cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.opt_used_cpu_in (s) ))
 
         if (VERBOSE_ADD_LOG in self.verbose): 
             for d_var in self.d_vars: 
@@ -376,12 +385,12 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
                            d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_var.value()))            
 
-    def print_sol_to_log (self):
+    def print_sol_to_log_alg (self):
         """
         print the solution found by alg' for the mig' problem to the output log file 
         """
         for s in self.G.nodes():
-            used_cpu_in_s = self.used_cpu_in (s)
+            used_cpu_in_s = self.alg_used_cpu_in (s)
             chains_in_s   = [usr.id for usr in self.usrs if usr.nxt_s==s]
             if (used_cpu_in_s > 0): 
                 printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}, num_of_chains={}' .format (
@@ -410,9 +419,9 @@ class SFC_mig_simulator (object):
         """
         Used for debug. Checks for all cells whether the allocated cpu + the available cpu = the total cpu.
         """
-        if (self.used_cpu_in(s) + self.G.nodes[s]['a'] != self.G.nodes[s]['RCs']):
+        if (self.alg_used_cpu_in(s) + self.G.nodes[s]['a'] != self.G.nodes[s]['RCs']):
             printf (self.log_output_file, 'Error in calculating the cpu utilization of s{}: used_cpu = {}, a={}, Rcs={}' .format 
-                    (s, self.used_cpu_in(s), self.G.nodes[s]['a'], self.G.nodes[s]['RCs']))
+                    (s, self.alg_used_cpu_in(s), self.G.nodes[s]['a'], self.G.nodes[s]['RCs']))
             print ('Error in using cpu utilization. Please see the log file: {}' .format (self.log_file_name))
             exit ()           
             
@@ -439,7 +448,7 @@ class SFC_mig_simulator (object):
         while n < len (usrs):
             usr = usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): #
-                if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_homo(usr, lvl) < self.chain_cost_homo(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
+                if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previosly-suggested place for this usr  
                     self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
                     
@@ -498,8 +507,8 @@ class SFC_mig_simulator (object):
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
-        self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
-        self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of using a link from level i to level i+1, or vice versa.
+        self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
+        self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
         self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)                                
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
@@ -575,11 +584,12 @@ class SFC_mig_simulator (object):
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
         self.cpu_cap_at_leaf            = 20 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
-        self.uniform_mig_cost           = 200
+        self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 3
-        self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz 
+        self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz
+        self.uniform_chain_mig_cost     = self.uniform_vm_mig_cost * len (self.uniform_theta_times_lambda)
         self.long_chain_theta_times_lambda = [2, 10, 10, 10, 10, 10, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
@@ -892,7 +902,7 @@ class SFC_mig_simulator (object):
         if (avail_delay_feasible_srvrs == []): 
             return fail
         
-        optional_costs = [self.chain_cost_homo (usr, self.G.nodes[s]['lvl']) for s in avail_delay_feasible_srvrs]
+        optional_costs = [self.chain_cost_alg (usr, self.G.nodes[s]['lvl']) for s in avail_delay_feasible_srvrs]
         self.place_usr_u_on_srvr_s (usr, avail_delay_feasible_srvrs[optional_costs.index (min (optional_costs))])
         return sccs
     
@@ -1011,7 +1021,7 @@ class SFC_mig_simulator (object):
             self.stts = self.bottom_up()
             if (VERBOSE_ADD_LOG in self.verbose):
                 printf (self.log_output_file, 'after reshuffle:\n')
-                self.print_sol_to_log()
+                self.print_sol_to_log_alg()
                 self.print_sol_res_line (self.log_output_file)
             if (self.stts == sccs):
                 return sccs
@@ -1072,7 +1082,7 @@ class SFC_mig_simulator (object):
             if (self.stts == sccs):
                 if (VERBOSE_ADD_LOG in self.verbose): 
                     printf (self.log_output_file, 'In binary search IF\n')
-                    self.print_sol_to_log()
+                    self.print_sol_to_log_alg()
                     if (VERBOSE_DEBUG in self.verbose):
                         self.check_cpu_usage_all_srvrs()
                 ub = cur_cpu_at_leaf       

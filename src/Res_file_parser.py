@@ -193,10 +193,10 @@ class Res_file_parser (object):
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
             "stts"      : int   (splitted_settings [stts_idx].split("stts")[1]),  
-            "cost"      : float (splitted_line[1].split(" = ")[1]),
-            "cpu_cost"  : float (splitted_line[2].split(" = ")[1]),
-            "link_cost" : float (splitted_line[3].split(" = ")[1]),
-            "mig_cost"  : float (splitted_line[4].split(" = ")[1])            
+            "cpu_cost"  : float (splitted_line[1].split("=")[1]),
+            "link_cost" : float (splitted_line[2].split("=")[1]),
+            "mig_cost"  : float (splitted_line[3].split("=")[1]),            
+            "cost"      : float (splitted_line[4].split("=")[1])
             }
 
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=0, alg = None, cpu = -1, stts = -1):
@@ -263,9 +263,9 @@ class Res_file_parser (object):
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
                                key = lambda item : item['cpu'])
         
-        Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # normalize Y axis by the maximum cost
+        Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # Calculate the normalization factor of the Y axis
 
-        for alg in ['ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
                            key = lambda item : item['cpu'])
@@ -286,7 +286,7 @@ class Res_file_parser (object):
                     continue
                 
                 alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
-                                      'cost' : np.average ([self.calc_cost_of_item(item)/8 for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
+                                      'cost' : np.average ([self.calc_cost_of_item(item) for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
 
                 if (len(alg_avg_list)==0):
                     continue
@@ -314,7 +314,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0829_0830_8secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    input_file_name = '0829_0830_1secs_256aps_opt_p0.3.ressCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
     my_res_file_parser.parse_file(input_file_name)
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     

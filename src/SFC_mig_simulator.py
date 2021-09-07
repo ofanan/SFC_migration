@@ -315,7 +315,6 @@ class SFC_mig_simulator (object):
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
             self.print_sol_res_line_opt (output_file=self.res_output_file)
-            # printf (self.res_output_file, 'direct: tot cost={:.2f}' .format (model.objective.value()))
             sol_cost_by_obj_func = model.objective.value()
             sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
                               sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
@@ -324,12 +323,14 @@ class SFC_mig_simulator (object):
             if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
                 print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
                 exit ()
-
+            
+        # print the solution to the output, according to the desired self.verbose level
+        if (VERBOSE_LOG in self.verbose):
+            self.print_sol_res_line_opt (output_file=self.log_output_file)
+            printf (self.log_output_file, 'tot_cost = {:.2f}\n' .format (model.objective.value())) 
             
         if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
             self.print_sol_res_line (output_file=self.moved_res_output_file)
-        if (VERBOSE_LOG in self.verbose):            
-            self.print_sol_res_line (output_file=self.res_output_file)
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_sol_to_log_opt ()
@@ -347,7 +348,7 @@ class SFC_mig_simulator (object):
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
         
-        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') )
+        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') ) + ('sCPU.res' if (self.use_sharp_cpu_cost) else '')
         
         if Path('../res/' + self.res_file_name).is_file(): # does this res file already exist?
             self.res_output_file =  open ('../res/' + self.res_file_name,  "a")
@@ -533,7 +534,8 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.CPU_cost_at_lvl   = [1 * (self.tree_height + 1 - lvl) for lvl in range (self.tree_height+1)]
+        self.use_sharp_cpu_cost = False
+        self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_sharp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
         self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)                                
@@ -610,7 +612,7 @@ class SFC_mig_simulator (object):
         # Network parameters
         self.tree_height                = tree_height
         self.children_per_node          = children_per_node # num of children of every non-leaf node
-        self.cpu_cap_at_leaf            = 20 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
+        self.cpu_cap_at_leaf            = 30 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -1342,17 +1344,18 @@ class SFC_mig_simulator (object):
 
 if __name__ == "__main__":
     
-    # ap_file_name = '0829_0830_8secs_256aps.ap' #'shorter.ap' #
+    # ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                   verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                   verbose               = [VERBOSE_RES, VERBOSE_LOG],# defines which sanity checks are done during the simulation, and which outputs will be written   
     #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
     #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                   cpu_cap_at_leaf       = 213
+    #                                   cpu_cap_at_leaf       = 416
     #                                   )
     #
-    # my_simulator.simulate (mode             = 'ourAlg',  
-    #                        sim_len_in_slots = 61 
-    #                        )     
+    # my_simulator.simulate (mode             = 'opt',  
+    #                        sim_len_in_slots = 3 
+    #                        )   
+    # exit ()  
 
     # ap_file_name = '0829_0830_8secs_256aps.ap' 
     # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given mode
@@ -1373,8 +1376,8 @@ if __name__ == "__main__":
     min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
     step        = 0.1 * min_req_cap
     
-    for mode in ['opt']: #['ourAlg', 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [208]: #[int(round((min_req_cap + step*i))) for i in range (21)]:
+    for mode in ['cpvnf']: #, 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+        for cpu_cap in [459]: #[int(round((min_req_cap + step*i))) for i in range (11, 21)]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
@@ -1383,6 +1386,6 @@ if __name__ == "__main__":
                                               )
     
             my_simulator.simulate (mode             = mode,  
-                                   sim_len_in_slots = 10, 
+                                   sim_len_in_slots = 61, 
                                    )     
 

@@ -1,0 +1,12 @@
+BootStrap: docker
+From: nvidia/cuda:9.0-cudnn7-devel-centos7
+# This is a comment
+%runscript
+echo " Hello from tensorflow container"
+whoami
+%post
+echo " Hello from inside the container"
+yum -y update && yum install -y epel-release
+yum install -y python-pip python-devel
+pip2 install matplotlib h5py pillow tensorflow-gpu keras scikit-learn
+

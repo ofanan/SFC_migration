@@ -92,22 +92,6 @@ class SFC_mig_simulator (object):
 
     # Print a solution for the problem to the output res file  
     print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
-
-    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_alg = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f}\n' .format(
-                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              self.calc_cpu_cost_in_slot_alg(), self.calc_link_cost_in_slot_alg(), self.calc_mig_cost_in_slot_alg(),
-                              self.calc_cpu_cost_in_slot_alg() + self.calc_link_cost_in_slot_alg() + self.calc_mig_cost_in_slot_alg()
-                              )) 
-
-    # $$$$ Carefully verfiy the 5 next lambda func's
-    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | ' .format( #$$$
-                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]),
-                              sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]),
-                              sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
-                              )) 
     
     # parse a line detailing the list of usrs who moved, in an input ".ap" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -144,6 +128,35 @@ class SFC_mig_simulator (object):
     # Returns the total migration cost in the current time slot. 
     calc_mig_cost_in_slot_alg = lambda self : self.uniform_chain_mig_cost * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
 
+    # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
+    settings_str = lambda self : 't{}_{}_cpu{}_p{}_stts{}' .format(
+                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts)
+
+    # Returns a string, detailing the sim' costs' components
+    def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
+        tot_cost = cpu_cost + link_cost + mig_cost 
+        return 'cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio={}\n' .format(
+                cpu_cost, link_cost, mig_cost, tot_cost, cpu_cost/tot_cost, link_cost/tot_cost, mig_cost/tot_cost)  
+
+    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    def print_sol_res_line_alg (self, output_file): 
+        
+        cpu_cost  = self.calc_cpu_cost_in_slot_alg()
+        link_cost = self.calc_link_cost_in_slot_alg()
+        mig_cost  = self.calc_mig_cost_in_slot_alg()
+        tot_cost  = cpu_cost + link_cost + mig_cost
+        printf (output_file, '{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio={}\n' .format(
+                              self.settings_str() 
+                              cpu_cost, link_cost, mig_cost, tot_cost, 
+                              )) 
+
+    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | ' .format( #$$$
+                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
+                              sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]),
+                              sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]),
+                              sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+                              )) 
     def d_var_mig_cost (self, d_var): 
         if (d_var.usr.is_new): # No mig' cost for a new usr
             return 0

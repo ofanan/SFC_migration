@@ -314,7 +314,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0829_0830_1secs_256aps_opt_p0.3.ressCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
     my_res_file_parser.parse_file(input_file_name)
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     

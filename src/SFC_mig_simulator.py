@@ -125,38 +125,57 @@ class SFC_mig_simulator (object):
     # Returns the total link cost in the current time slot ASSUMING that all usrs are already assigned (that is, for each usr, usr.lvl indicates a valid feasible level in the tree). 
     calc_link_cost_in_slot_alg = lambda self : sum ([self.link_cost_of_CLP_at_lvl[usr.lvl]          for usr in self.usrs])
     
-    # Returns the total migration cost in the current time slot. 
+    # Returns the total migration cost in the current time slot, when running an algo'
     calc_mig_cost_in_slot_alg = lambda self : self.uniform_chain_mig_cost * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
+
+
+    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+
+    # Returns the total cpu cost in the current time slot, according to the LP solution
+    calc_cpu_cost_in_slot_opt = lambda self : sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+    
+    # Returns the total link cost in the current time slot, according to the LP solution
+    calc_link_cost_in_slot_opt = lambda self : sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars])
+    
+    # Returns the total mig' cost in the current time slot, according to the LP solution
+    calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+
+    # # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    # print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | ' .format( #$$$
+    #                           self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
+    #                           sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]),
+    #                           sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]),
+    #                           sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+    #                           ))
+     
 
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
     settings_str = lambda self : 't{}_{}_cpu{}_p{}_stts{}' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts)
 
+    # # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    # print_sol_res_line_alg = lambda self, output_file : printf (output_file, '{} | cpu_cost={:.2f} | {}\n' .format(self.settings_str(), sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(), link_cost = self.calc_link_cost_in_slot_alg(),mig_cost  = self.calc_mig_cost_in_slot_alg()))
+
+    # Print a solution for the problem to the output res file when the solver is an LP solver  
+    print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
+            self.settings_str(), 
+            self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_opt(),
+                               link_cost = self.calc_link_cost_in_slot_opt()
+                               ,mig_cost  = self.calc_mig_cost_in_slot_opt())))
+
+    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
+    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
+            self.settings_str(), 
+            self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
+                               link_cost = self.calc_link_cost_in_slot_alg()
+                               ,mig_cost  = self.calc_mig_cost_in_slot_alg())))
+
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
         tot_cost = cpu_cost + link_cost + mig_cost 
-        return 'cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio={}\n' .format(
+        return 'cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio={}' .format(
                 cpu_cost, link_cost, mig_cost, tot_cost, cpu_cost/tot_cost, link_cost/tot_cost, mig_cost/tot_cost)  
 
-    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    def print_sol_res_line_alg (self, output_file): 
-        
-        cpu_cost  = self.calc_cpu_cost_in_slot_alg()
-        link_cost = self.calc_link_cost_in_slot_alg()
-        mig_cost  = self.calc_mig_cost_in_slot_alg()
-        tot_cost  = cpu_cost + link_cost + mig_cost
-        printf (output_file, '{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio={}\n' .format(
-                              self.settings_str() 
-                              cpu_cost, link_cost, mig_cost, tot_cost, 
-                              )) 
-
-    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | ' .format( #$$$
-                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-                              sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]),
-                              sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]),
-                              sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
-                              )) 
     def d_var_mig_cost (self, d_var): 
         if (d_var.usr.is_new): # No mig' cost for a new usr
             return 0

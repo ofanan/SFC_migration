@@ -141,7 +141,7 @@ class SFC_mig_simulator (object):
     calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
 
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
-    settings_str = lambda self : 't{}_{}_cpu{}_p{}_stts{}' .format(
+    settings_str = lambda self : 't{}_{}_cpu{}_p{:.2f}_stts{}' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts)
 
     # Print a solution for the problem to the output res file when the solver is an LP solver  
@@ -157,6 +157,8 @@ class SFC_mig_simulator (object):
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
                                link_cost = self.calc_link_cost_in_slot_alg()
                                ,mig_cost  = self.calc_mig_cost_in_slot_alg())))
+
+    augmented_cpu_cap_at_leaf = lambda self: self.G.nodes[len (self.G.nodes)-1]['RCs']
 
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
@@ -241,11 +243,11 @@ class SFC_mig_simulator (object):
         Print to the res, log, and debug files the solution and/or additional info, according to the verobse level, indicated by the variable self.verbose.
         """
         if (VERBOSE_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
-            self.print_sol_res_line (output_file=self.res_output_file)
+            self.print_sol_res_line (output_file=self.res_file)
         if (VERBOSE_MOVED_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
-            self.print_sol_res_line (output_file=self.moved_res_output_file)
+            self.print_sol_res_line (output_file=self.moved_res_file)
         if (VERBOSE_CRITICAL_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
-            self.print_sol_res_line (output_file=self.critical_res_output_file)
+            self.print_sol_res_line (output_file=self.critical_res_file)
         elif (VERBOSE_COST_COMP in self.verbose):
             self.calc_sol_cost_components()
 
@@ -334,7 +336,7 @@ class SFC_mig_simulator (object):
         
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
-            self.print_sol_res_line_opt (output_file=self.res_output_file)
+            self.print_sol_res_line_opt (output_file=self.res_file)
             sol_cost_by_obj_func = model.objective.value()
             sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
                               sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
@@ -349,13 +351,14 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, 'tot_cost = {:.2f}\n' .format (model.objective.value())) 
             
         if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
-            self.print_sol_res_line (output_file=self.moved_res_output_file)
+            self.print_sol_res_line (output_file=self.moved_res_file)
         if (model.status == 1): # successfully solved
             if (VERBOSE_LOG in self.verbose):            
                 self.print_sol_to_log_opt ()
                 printf (self.log_output_file, '\nSuccessfully solved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
         else:
-            print  ('Running the LP failed. status={}' .format(plp.LpStatus[model.status]))
+            if (VERBOSE_RES in self.verbose):
+                print  ('Running the LP failed. status={}' .format(plp.LpStatus[model.status]))
             if (VERBOSE_LOG in self.verbose):
                 printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
         return self.stts
@@ -369,11 +372,11 @@ class SFC_mig_simulator (object):
         
         self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') ) + ('.expCPU.res' if (self.use_exp_cpu_cost) else '') + ('.expCPU2.res' if (self.use_exp_cpu_cap) else '')
         
-        if Path('../res/' + self.res_file_name).is_file(): # does this res file already exist?
-            self.res_output_file =  open ('../res/' + self.res_file_name,  "a")
+        if Path(self.res_file_name).is_file(): # does this res file already exist?
+            self.res_file =  open (self.res_file_name,  "a")
         else:
-            self.res_output_file =  open ('../res/' + self.res_file_name,  "w")
-            self.print_res_file_prefix (self.res_output_file)
+            self.res_file =  open (self.res_file_name,  "w")
+            self.print_res_file_prefix (self.res_file)
 
     def init_moved_res_file (self):
         """
@@ -384,10 +387,10 @@ class SFC_mig_simulator (object):
         self.moved_res_file_name = self.gen_res_file_name (mid_str = ('_moved_opt' if self.mode=='opt' else '_moved')) 
         
         if Path('../res/' + self.moved_res_file_name).is_file(): # does this res file already exist?
-            self.moved_res_output_file =  open ('../res/' + self.moved_res_file_name,  "a")
+            self.moved_res_file =  open ('../res/' + self.moved_res_file_name,  "a")
         else:
-            self.moved_res_output_file =  open ('../res/' + self.moved_res_file_name,  "w")
-            self.print_res_file_prefix (self.moved_res_output_file)
+            self.moved_res_file =  open ('../res/' + self.moved_res_file_name,  "w")
+            self.print_res_file_prefix (self.moved_res_file)
 
     def init_critical_res_file (self):
         """
@@ -398,10 +401,10 @@ class SFC_mig_simulator (object):
         self.critical_res_file_name = self.gen_res_file_name (mid_str = ('_critical_opt' if self.mode=='opt' else '_critical')) 
         
         if Path('../res/' + self.critical_res_file_name).is_file(): # does this res file already exist?
-            self.critical_res_output_file =  open ('../res/' + self.critical_res_file_name,  "a")
+            self.critical_res_file =  open ('../res/' + self.critical_res_file_name,  "a")
         else:
-            self.critical_res_output_file =  open ('../res/' + self.critical_res_file_name,  "w")
-            self.print_res_file_prefix (self.critical_res_output_file)
+            self.critical_res_file =  open ('../res/' + self.critical_res_file_name,  "w")
+            self.print_res_file_prefix (self.critical_res_file)
 
     def print_res_file_prefix (self, res_file):
         """
@@ -553,14 +556,13 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.use_exp_cpu_cost = True
+        self.use_exp_cpu_cost = False
         # self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)] # This line produces super-exp cpu costs 
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
-        self.use_exp_cpu_cap = True
+        self.use_exp_cpu_cap = False
         self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
-        print (self.cpu_cap_at_lvl)
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -622,7 +624,7 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4, cpu_cap_at_leaf=561):
+    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4, cpu_cap_at_leaf=561, prob_of_target_delay=0.3):
         """
         """
         
@@ -644,10 +646,10 @@ class SFC_mig_simulator (object):
         self.long_chain_theta_times_lambda = [2, 10, 10, 10, 10, 10, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
-        self.prob_of_target_delay       = [0.3] 
+        self.prob_of_target_delay       = [prob_of_target_delay]  
         self.warned_about_too_large_ap  = False
         self.usrs                       = []
-        self.max_R                      = 1.12 # maximal rsrc augmenation to consider
+        self.max_R                      = 2.2 # maximal rsrc augmenation to consider
         random.seed                     (42) # Use a fixed pseudo-number seed 
         
         # Init output files
@@ -717,6 +719,7 @@ class SFC_mig_simulator (object):
         else:
             print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
             exit ()
+        return self.augmented_cpu_cap_at_leaf ()
 
     def init_input_and_output_files (self):
         """
@@ -730,6 +733,13 @@ class SFC_mig_simulator (object):
         # open output files, and print there initial comments
         if (VERBOSE_RES in self.verbose):
             self.init_res_file()
+        if VERBOSE_CALC_RSRC_AUG in self.verbose:
+            self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'            
+            if Path (self.rsrc_aug_file_name).is_file(): # does this res file already exist?
+                self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "a")
+            else:
+                self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "w")
+            
         if (VERBOSE_MOVED_RES in self.verbose):
             self.init_moved_res_file()
         if (VERBOSE_CRITICAL_RES in self.verbose):
@@ -802,6 +812,7 @@ class SFC_mig_simulator (object):
                 self.stts = self.alg_top(self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
                 self.cur_st_params = self.d_vars.copy () #All the decision vars will be referred as "cur st parameters" in the next time slot 
                 self.prepare_sim_to_next_slot()
+        self.post_processing ()
                     
     def prepare_sim_to_next_slot (self):
         """
@@ -838,7 +849,7 @@ class SFC_mig_simulator (object):
                 self.rd_t_line (splitted_line[2])
                 if (self.t >= self.final_slot_to_simulate):
                     self.post_processing ()
-                    return 
+                    return
                 continue
                 
             elif (splitted_line[0] == "usrs_that_left:"):
@@ -882,7 +893,7 @@ class SFC_mig_simulator (object):
                 self.prepare_sim_to_next_slot()
         
         self.post_processing()
-    
+        
     def post_processing (self):
         """
         Organize, writes and plots the simulation results, after the simulation is done
@@ -892,7 +903,8 @@ class SFC_mig_simulator (object):
         if (VERBOSE_COST_COMP in self.verbose):
             self.print_sol_cost_components ()
         if (VERBOSE_CALC_RSRC_AUG in self.verbose):
-            print ('augmenated cpu cap at leaf={}' .format (self.G.nodes[len (self.G.nodes)-1]['RCs']))
+            print ('augmented cpu cap at leaf={}' .format (self.augmented_cpu_cap_at_leaf()))
+            self.print_sol_res_line (self.rsrc_aug_file)
     
     def print_mob (self):
         """
@@ -1031,7 +1043,7 @@ class SFC_mig_simulator (object):
         Write to the log and to the res file that the solver (either an algorithm, or an LP solver) did not succeed to place all the usrs
         """
         if (VERBOSE_RES in self.verbose):
-            printf (self.res_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
+            printf (self.res_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
 
@@ -1364,20 +1376,42 @@ class SFC_mig_simulator (object):
         return sum ([self.G.nodes[s]['cpu cap'] for s in self.G.nodes])
      
 
+
+def run_prob_of_RT_sim ():
+    
+    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
+
+    # for mode in ['ffit', 'cpvnf', 'ourAlg']:
+    #     cpu_cap_at_leaf = 235 #Initial cpu cap at the leaf server
+    #     for prob_of_target_delay in [0.6, 0.7, 0.8, 0.9, 1]: #[0, 0.1, 0.2, 0.3, 0.4, 0.5]:
+    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                           verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                           cpu_cap_at_leaf       = cpu_cap_at_leaf,
+    #                                           prob_of_target_delay  = prob_of_target_delay, 
+    #                                           )
+    #
+    #         cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
+    #     print (cpu_cap_at_leaf)
+
+    for mode in ['opt']:
+        cpu_cap_at_leaf = 204 #Initial cpu cap at the leaf server
+        for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+                                              verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
+                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+                                              cpu_cap_at_leaf       = cpu_cap_at_leaf,
+                                              prob_of_target_delay  = prob_of_target_delay, 
+                                              )
+    
+            cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
+        print (cpu_cap_at_leaf)
+    
+
+
 if __name__ == "__main__":
     
-    # ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    # my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                   verbose               = [VERBOSE_RES, VERBOSE_LOG],# defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                   tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                   children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                   cpu_cap_at_leaf       = 416
-    #                                   )
-    #
-    # my_simulator.simulate (mode             = 'opt',  
-    #                        sim_len_in_slots = 3 
-    #                        )   
-    # exit ()  
+    run_prob_of_RT_sim()
 
     # ap_file_name = '0829_0830_8secs_256aps.ap' 
     # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given mode
@@ -1394,20 +1428,20 @@ if __name__ == "__main__":
     #                            ) 
     # exit ()
 
-    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195 #$$$
-    step        = 0.1 * min_req_cap
-    
-    for mode in ['opt']: #, 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [208, 416, 624]: #[int(round((min_req_cap + step*i))) for i in range (0, 11, 21)]:
-            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-                                              children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-                                              cpu_cap_at_leaf       = cpu_cap
-                                              )
-    
-            my_simulator.simulate (mode             = mode,  
-                                   sim_len_in_slots = 1, 
-                                   )     
+    # ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    # min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195 #$$$
+    # step        = 0.1 * min_req_cap
+    #
+    # for mode in ['opt']: #, 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+    #     for cpu_cap in [208, 416, 624]: #[int(round((min_req_cap + step*i))) for i in range (0, 11, 21)]:
+    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
+    #                                           verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
+    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
+    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
+    #                                           cpu_cap_at_leaf       = cpu_cap
+    #                                           )
+    #
+    #         my_simulator.simulate (mode             = mode,  
+    #                                sim_len_in_slots = 1, 
+    #                                )     
 

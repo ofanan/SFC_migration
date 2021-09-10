@@ -114,7 +114,7 @@ class SFC_mig_simulator (object):
     gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}.res' .format (self.ap_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0])
 
     # Returns a vector with the cpu capacities in each lvl of the tree, given the cpu cap at the leaf lvl
-    calc_cpu_capacities = lambda self, cpu_cap_at_leaf : np.array ([cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
+    calc_cpu_capacities = lambda self, cpu_cap_at_leaf : [2**(lvl)*cpu_cap_at_leaf for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cap else np.array ([cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
 
     # average the upper-bound and the lower-bound of the binary search, while rounding and converting to int
     avg_up_and_lb = lambda self, ub, lb : int (math.floor(ub+lb)/2)
@@ -140,21 +140,9 @@ class SFC_mig_simulator (object):
     # Returns the total mig' cost in the current time slot, according to the LP solution
     calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
 
-    # # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    # print_sol_res_line_opt = lambda self, output_file : printf (output_file, 't{}_{}_cpu{}_p{}_stts{} | cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | ' .format( #$$$
-    #                           self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts, 
-    #                           sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]),
-    #                           sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]),
-    #                           sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
-    #                           ))
-     
-
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
     settings_str = lambda self : 't{}_{}_cpu{}_p{}_stts{}' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts)
-
-    # # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    # print_sol_res_line_alg = lambda self, output_file : printf (output_file, '{} | cpu_cost={:.2f} | {}\n' .format(self.settings_str(), sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(), link_cost = self.calc_link_cost_in_slot_alg(),mig_cost  = self.calc_mig_cost_in_slot_alg()))
 
     # Print a solution for the problem to the output res file when the solver is an LP solver  
     print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
@@ -173,7 +161,7 @@ class SFC_mig_simulator (object):
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
         tot_cost = cpu_cost + link_cost + mig_cost 
-        return 'cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio={}' .format(
+        return 'cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio=[{:.2f},{:.2f},{:.2f}]' .format(
                 cpu_cost, link_cost, mig_cost, tot_cost, cpu_cost/tot_cost, link_cost/tot_cost, mig_cost/tot_cost)  
 
     def d_var_mig_cost (self, d_var): 
@@ -351,7 +339,6 @@ class SFC_mig_simulator (object):
             sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
                               sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
                               sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
-            printf (self.res_output_file, 'tot_cost = {:.2f}\n' .format (model.objective.value())) 
             if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
                 print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
                 exit ()
@@ -380,7 +367,7 @@ class SFC_mig_simulator (object):
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
         
-        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') ) + ('sCPU.res' if (self.use_sharp_cpu_cost) else '')
+        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') ) + ('.expCPU.res' if (self.use_exp_cpu_cost) else '') + ('.expCPU2.res' if (self.use_exp_cpu_cap) else '')
         
         if Path('../res/' + self.res_file_name).is_file(): # does this res file already exist?
             self.res_output_file =  open ('../res/' + self.res_file_name,  "a")
@@ -420,9 +407,9 @@ class SFC_mig_simulator (object):
         """
         Print several header lines, indicating the format and so, to an output res file.
         """
-        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cost = c, where\n// T is the slot cnt (read from the input file)\n')
+        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cpu_cost=... | link_cost=... | mig_cost=... | cost=... | ratio=[c,l,m] c, where\n// T is the slot cnt (read from the input file)\n')
         printf (res_file, '// Mode is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
-        printf (res_file, '// c is the total cost of the solution\n\n') 
+        printf (res_file, '// [c,l,m] are the ratio of the cpu, link, and mig cost out of the total cost, resp.\n\n') 
 
     def init_log_file (self, overwrite = True):
         """
@@ -566,11 +553,14 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.use_sharp_cpu_cost = False
-        self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_sharp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
+        self.use_exp_cpu_cost = True
+        # self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)] # This line produces super-exp cpu costs 
+        self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
-        self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)                                
+        self.use_exp_cpu_cap = True
+        self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+        print (self.cpu_cap_at_lvl)
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -1405,11 +1395,11 @@ if __name__ == "__main__":
     # exit ()
 
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195
+    min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195 #$$$
     step        = 0.1 * min_req_cap
     
-    for mode in ['cpvnf']: #, 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-        for cpu_cap in [459]: #[int(round((min_req_cap + step*i))) for i in range (11, 21)]:
+    for mode in ['opt']: #, 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
+        for cpu_cap in [208, 416, 624]: #[int(round((min_req_cap + step*i))) for i in range (0, 11, 21)]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
                                               tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
@@ -1418,6 +1408,6 @@ if __name__ == "__main__":
                                               )
     
             my_simulator.simulate (mode             = mode,  
-                                   sim_len_in_slots = 61, 
+                                   sim_len_in_slots = 1, 
                                    )     
 

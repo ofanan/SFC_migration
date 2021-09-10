@@ -248,22 +248,26 @@ class Res_file_parser (object):
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
         self.output_file      = open (self.output_file_name, "w")
         
-        if (normalize_X):
-            opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
-                               key = lambda item : item['cpu'])
-            cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
-            X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
-            
-            if (normalize_Y):
-                opt_avg_list = []
-                for cpu in cpu_vals:
-                    opt_avg_list.append (np.average ([item['cost'] for item in list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
-        else:
-            X_norm_factor = 1
-            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
-                               key = lambda item : item['cpu'])
+        # if (normalize_X):
+        #     opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+        #                        key = lambda item : item['cpu'])
+        #     cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+        #     X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
+        #
+        #     if (normalize_Y):
+        #         opt_avg_list = []
+        #         for cpu in cpu_vals:
+        #             opt_avg_list.append (np.average ([item['cost'] for item in list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
+        # else:
+        #     X_norm_factor = 1
+        #     alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+        #                        key = lambda item : item['cpu'])
         
-        Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # Calculate the normalization factor of the Y axis
+        # Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # Calculate the normalization factor of the Y axis
+        
+        Y_norm_factor = 1 #$$$
+        X_norm_factor = 208 #$$$$
+
 
         for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
@@ -314,7 +318,7 @@ class Res_file_parser (object):
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
     my_res_file_parser.parse_file(input_file_name)
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     

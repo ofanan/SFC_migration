@@ -561,7 +561,7 @@ class SFC_mig_simulator (object):
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
-        self.use_exp_cpu_cap = False
+        self.use_exp_cpu_cap = True
         self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
@@ -649,7 +649,7 @@ class SFC_mig_simulator (object):
         self.prob_of_target_delay       = [prob_of_target_delay]  
         self.warned_about_too_large_ap  = False
         self.usrs                       = []
-        self.max_R                      = 2.2 # maximal rsrc augmenation to consider
+        self.max_R                      = 3.5 # maximal rsrc augmenation to consider
         random.seed                     (42) # Use a fixed pseudo-number seed 
         
         # Init output files
@@ -734,7 +734,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_RES in self.verbose):
             self.init_res_file()
         if VERBOSE_CALC_RSRC_AUG in self.verbose:
-            self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'            
+            self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu.res' if self.use_exp_cpu_cap else '../res/rsrc_aug_by_RT_prob.res'             
             if Path (self.rsrc_aug_file_name).is_file(): # does this res file already exist?
                 self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "a")
             else:
@@ -1394,8 +1394,8 @@ def run_prob_of_RT_sim ():
     #         cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
     #     print (cpu_cap_at_leaf)
 
-    for mode in ['opt']:
-        cpu_cap_at_leaf = 204 #Initial cpu cap at the leaf server
+    for mode in ['ffit', 'cpvnf', 'ourAlg']:
+        cpu_cap_at_leaf = 150#Initial cpu cap at the leaf server
         for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   

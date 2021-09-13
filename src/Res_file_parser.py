@@ -237,6 +237,11 @@ class Res_file_parser (object):
 
 
     def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False, slot_len_in_sec=1):
+        """
+        Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
+        Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
+        and/or normalize the cost (the Y axis) by the costs obtained by opt.   
+        """
         
         max_t = 30600
         self.time_slot_len = int(self.input_file_name.split('secs')[0].split('_')[-1])
@@ -296,6 +301,9 @@ class Res_file_parser (object):
             self.print_single_tikz_plot (alg_avg_list, key_to_sort='cpu', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg]) 
 
     def plot_num_of_vehs (self):
+        """
+        Plot a diagram showing the average num of vehicles in a given area
+        """
         # Open input and output files
         input_file  = open ("../res/num_of_vehs_24_every_min_correct.pos", "r")  
         

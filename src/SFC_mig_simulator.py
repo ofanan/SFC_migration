@@ -556,12 +556,12 @@ class SFC_mig_simulator (object):
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.use_exp_cpu_cost = False
+        self.use_exp_cpu_cost = True
         # self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)] # This line produces super-exp cpu costs 
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
-        self.use_exp_cpu_cap = True
+        self.use_exp_cpu_cap = False
         self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
@@ -649,7 +649,6 @@ class SFC_mig_simulator (object):
         self.prob_of_target_delay       = [prob_of_target_delay]  
         self.warned_about_too_large_ap  = False
         self.usrs                       = []
-        self.max_R                      = 3.5 # maximal rsrc augmenation to consider
         random.seed                     (42) # Use a fixed pseudo-number seed 
         
         # Init output files
@@ -697,6 +696,7 @@ class SFC_mig_simulator (object):
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
         """
         self.mode              = mode
+        self.max_R = 1.3 if (self.mode == 'opt') else 3 # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it a lower value.  
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
 
@@ -734,7 +734,13 @@ class SFC_mig_simulator (object):
         if (VERBOSE_RES in self.verbose):
             self.init_res_file()
         if VERBOSE_CALC_RSRC_AUG in self.verbose:
-            self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu.res' if self.use_exp_cpu_cap else '../res/rsrc_aug_by_RT_prob.res'             
+            if (self.use_exp_cpu_cost and self.use_exp_cpu_cap): 
+                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu^2.res' 
+            elif (self.use_exp_cpu_cost):
+                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu.res'
+            else: 
+                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'
+
             if Path (self.rsrc_aug_file_name).is_file(): # does this res file already exist?
                 self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "a")
             else:
@@ -1382,8 +1388,8 @@ def run_prob_of_RT_sim ():
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
 
     # for mode in ['ffit', 'cpvnf', 'ourAlg']:
-    #     cpu_cap_at_leaf = 235 #Initial cpu cap at the leaf server
-    #     for prob_of_target_delay in [0.6, 0.7, 0.8, 0.9, 1]: #[0, 0.1, 0.2, 0.3, 0.4, 0.5]:
+    #     cpu_cap_at_leaf = 213 #Initial cpu cap at the leaf server
+    #     for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
     #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
     #                                           verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
     #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
@@ -1392,10 +1398,9 @@ def run_prob_of_RT_sim ():
     #                                           )
     #
     #         cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
-    #     print (cpu_cap_at_leaf)
 
-    for mode in ['ffit', 'cpvnf', 'ourAlg']:
-        cpu_cap_at_leaf = 150#Initial cpu cap at the leaf server
+    for mode in ['opt']: 
+        cpu_cap_at_leaf = 200 #Initial cpu cap at the leaf server; with exp' cpu, and opt, should start in 164
         for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
@@ -1405,7 +1410,6 @@ def run_prob_of_RT_sim ():
                                               )
     
             cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
-        print (cpu_cap_at_leaf)
     
 
 

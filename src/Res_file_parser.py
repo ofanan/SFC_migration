@@ -215,12 +215,10 @@ class Res_file_parser (object):
             list_to_filter = list (filter (lambda item : item['stts'] == stts, list_to_filter))    
         return list_to_filter
 
-    def print_single_tikz_plot (self, list_of_dict, key_to_sort, addplot_str = None, add_legend_str = None, legend_entry = None):
+    def print_single_tikz_plot (self, list_of_dict, key_to_sort, addplot_str = None, add_legend_str = None, legend_entry = None, y_value = 'cost'):
         """
         Prints a single plot in a tikz format.
         Inputs:
-        The "x" value is the one which the user asks to sort the inputs (e.g., "x" value may be the cache size, uInterval, etc).
-        The "y" value is the cost for this "x". 
         list_of_dicts - a list of Python dictionaries. 
         key_to_sort - the function sorts the items by this key, e.g.: cache size, uInterval, etc.
         addplot_str - the "add plot" string to be added before each list of points (defining the plot's width, color, etc.).
@@ -230,7 +228,7 @@ class Res_file_parser (object):
         if (not (addplot_str == None)):
             printf (self.output_file, addplot_str)
         for dict in sorted (list_of_dict, key = lambda i: i[key_to_sort]):
-            printf (self.output_file, '({:.4f}, {:.4f})' .format (dict[key_to_sort], dict['cost']))
+            printf (self.output_file, '({:.4f}, {:.4f})' .format (dict[key_to_sort], dict[y_value]))
         printf (self.output_file, self.end_add_plot_str)
         if (not (add_legend_str == None)): # if the caller requested to print an "add legend" str          
             printf (self.output_file, '\t\t{}{}' .format (self.add_legend_str, legend_entry))    
@@ -315,12 +313,26 @@ class Res_file_parser (object):
             
         plt.plot (np.array(t)/3600, tot_num_of_vehs)
         plt.show ()
+        
+    def plot_min_required_cpu_vs_RT_prob (self):
+        """
+        Generating a tikz-plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
+        """
+        output_file_name = self.input_file_name + '.dat' 
+        self.output_file = open ('../res/{}' .format (output_file_name), 'w')
+        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+            
+            list_of_points = self.gen_filtered_list (self.list_of_dicts, alg=alg, stts=1)
+            
+            self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg], y_value='cpu')
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    input_file_name = 'rsrc_aug_by_RT_prob_exp_cpu.res' #'0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
     my_res_file_parser.parse_file(input_file_name)
+    my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
+    
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
+    #my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
     

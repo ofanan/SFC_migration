@@ -11,9 +11,9 @@ import time
 from usr_c import usr_c # class of the users
 from printf import printf
 
-LUX_GLOBAL_MAX_X, LUX_GLOBAL_MAX_Y = int(13622), int(11457)             # size of the city's area, in meters. 
-MAX_X,        MAX_Y        = LUX_GLOBAL_MAX_X//2, LUX_GLOBAL_MAX_Y//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)  
-LOWER_LEFT_CORNER          = np.array ([LUX_GLOBAL_MAX_X//4,   LUX_GLOBAL_MAX_Y//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
+GLOBAL_MAX_X_LUX, GLOBAL_MAX_Y_LUX = int(13622), int(11457)             # size of the city's area, in meters. 
+MAX_X_LUX,        MAX_Y_LUX        = GLOBAL_MAX_X_LUX//2, GLOBAL_MAX_Y_LUX//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)  
+LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X_LUX//4,   GLOBAL_MAX_Y_LUX//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
 
 # Verbose levels, defining the outputs produced
 VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
@@ -59,7 +59,7 @@ class loc2ap_c (object):
         self.verbose           = verbose      # verbose level - defining which outputs will be written
         self.debug             = False 
         
-        self.max_x, self.max_y = MAX_X, MAX_Y # borders of the simulated area, in meters
+        self.max_x, self.max_y = MAX_X_LUX, MAX_Y_LUX # borders of the simulated area, in meters
         self.usrs              = []
         self.use_sq_cells      = use_sq_cells
         if (self.use_sq_cells):
@@ -389,7 +389,7 @@ class loc2ap_c (object):
                         usr_id = np.uint16(tuple[veh_id_idx])
                         nxt_ap = self.loc2ap (float(tuple[x_pos_idx]), float(tuple[y_pos_idx]))
                         if (VERBOSE_DEBUG in self.verbose and nxt_ap not in range(self.num_of_APs)):
-                            print ('Error: t = {} usr={}, nxt_ap={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_aps={} ' .format (self.t, usr_id, nxt_ap, tuple[x_pos_idx], tuple[y_pos_idx], MAX_X, MAX_Y, self.num_of_APs))
+                            print ('Error: t = {} usr={}, nxt_ap={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_aps={} ' .format (self.t, usr_id, nxt_ap, tuple[x_pos_idx], tuple[y_pos_idx], MAX_X_LUX, MAX_Y_LUX, self.num_of_APs))
                             print ('Calling loc2ap again for deubgging')
                             nxt_ap = self.loc2ap (float(tuple[x_pos_idx]), float(tuple[y_pos_idx]))
                             exit ()

@@ -20,9 +20,9 @@ class Traci_runner (object):
     # Checks whether the given vehicle is within the simulated area.
     # Input: key of a vehicle.
     # Output: True iff this vehicle is within the simulated area.
-    is_in_simulated_area  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y) else True
+    is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y_LUX) else True
     
-    is_in_lux_global_area = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.LUX_GLOBAL_MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.LUX_GLOBAL_MAX_YY) else True
+    is_in_global_area_Lux = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.GLOBAL_MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.GLOBAL_MAX_Y_LUX) else True
     
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
@@ -55,7 +55,7 @@ class Traci_runner (object):
                     break
                 
                 # Union known_veh_keys with the set of vehicles' keys of this cycle
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
                 printf (self.cnt_output_file, '{:.0f} ' .format (len(cur_list_of_vehicles)))
                 sys.stdout.flush()
 
@@ -106,7 +106,7 @@ class Traci_runner (object):
                     print ('Successfully finished writing to file {}' .format (output_file_name))
                     break
                 
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             
                 left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
@@ -152,8 +152,7 @@ class Traci_runner (object):
         
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         AP_id = 0
-        lon, lat = 6.120712,49.54384
-        # print ('{},{}' .format (AP_id, traci.simulation.convertGeo (lon, lat, fromGeo=True)))
+        print ('Geo loc of (0,0) is {}' .format (traci.simulation.convertGeo (0,0)))
     
         for line in antenna_loc_file: 
             splitted_line = line.split(',')
@@ -162,14 +161,14 @@ class Traci_runner (object):
 
             # lon, lat = float (splitted_line[6]), float (splitted_line[7]) 
             pos = traci.simulation.convertGeo (float (splitted_line[6]), float (splitted_line[7]), True)
-            printf (APs_loc_file, '{},{},{},{}\n' .format (AP_id, pos[0], pos[1], self.is_in_lux_global_area (pos)))
+            printf (APs_loc_file, '{},{},{},{},{}\n' .format (AP_id, pos[0], pos[1], 'G' if self.is_in_global_area_Lux (pos) else '' , 'C' if self.is_in_simulated_area_Lux(pos) else ''))
             AP_id += 1
         traci.close()
             
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
-    my_Traci_runner.parse_antenna_locs_file ('short.txt')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
+    my_Traci_runner.parse_antenna_locs_file ('Luxembourg_towers.txt')
 
     # my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     #

@@ -1412,27 +1412,14 @@ def run_prob_of_RT_sim ():
             cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
     
 
+def run_cost_by_rsrc ():
 
-if __name__ == "__main__":
+    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     
-    run_prob_of_RT_sim()
+    # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = 459)
+    # my_simulator.simulate (mode = 'cpvnf', sim_len_in_slots = 61)
+     
 
-    # ap_file_name = '0829_0830_8secs_256aps.ap' 
-    # # Binary search for finding the minimal necessary resources for successfully run the whole trace, using the given mode
-    # for mode in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-    #     my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                       verbose               = [VERBOSE_RES, VERBOSE_CALC_RSRC_AUG], #VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG], # defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                       tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                       children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
-    #                                       cpu_cap_at_leaf       = 213
-    #                                       )
-    #
-    #     my_simulator.simulate (mode             = mode, # pick a mode from the list: ['opt', 'ourAlg', 'wfit', 'ffit'] 
-    #                            sim_len_in_slots = 61, 
-    #                            ) 
-    # exit ()
-
-    # ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     # min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195 #$$$
     # step        = 0.1 * min_req_cap
     #
@@ -1448,4 +1435,31 @@ if __name__ == "__main__":
     #         my_simulator.simulate (mode             = mode,  
     #                                sim_len_in_slots = 1, 
     #                                )     
+
+    # Complementary runs, for the min' cpu rsrcs found for allowing a feasible sol' by each alg'
+    min_cpu_ourAlg = 213
+    min_cpu_ffit   = 438 
+    min_cpu_cpvnf  = 447
+
+    # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = min_cpu_ourAlg)
+    # my_simulator.simulate (mode = 'ourAlg', sim_len_in_slots = 61) 
+    # for mode in ['ffit', 'ourAlg']:
+    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = min_cpu_ffit)
+    #     my_simulator.simulate (mode = mode, sim_len_in_slots = 61) 
+    # for mode in ['ffit', 'cpvnf', 'ourAlg']:
+    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = min_cpu_cpvnf)
+    #     my_simulator.simulate (mode = mode, sim_len_in_slots = 61) 
+
+    # for cpu in [min_cpu_cpvnf]:
+    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = cpu)
+    #     my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
+
+    for cpu in [499, 520]:
+        my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = cpu)
+        my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
+
+if __name__ == "__main__":
+    
+    run_cost_by_rsrc ()
+    # run_prob_of_RT_sim()*
 

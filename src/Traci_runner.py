@@ -20,20 +20,20 @@ class Traci_runner (object):
     # Checks whether the given vehicle is within the simulated area.
     # Input: key of a vehicle.
     # Output: True iff this vehicle is within the simulated area.
-    is_in_simulated_area  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y) else True 
+    is_in_simulated_area  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y) else True
     
-    def __init__ (self, dummy):
-        dummy = dummy
+    is_in_lux_global_area = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.LUX_GLOBAL_MAX_X or position[1] <= 0 or position[1] >= loc2ap_c.LUX_GLOBAL_MAX_YY) else True
+    
+    def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
+        self.sumo_cfg_file = sumo_cfg_file
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
         Simulate a SUMO simulation using Traci, and cnt the number of active cars at each slot; and the total number of distinct cars along the sim.
-        """
-
-        
+        """       
         self.verbose            = verbose
         
-        traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
+        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         print ('Running Traci on the period from {:.0f} to {:.0f}' .format (warmup_period, warmup_period+sim_length))
         self.cnt_output_file_name = '../res/{}_{}secs_cnt.res' .format (secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec) 
         self.cnt_output_file      = open (self.cnt_output_file_name, 'w')
@@ -145,16 +145,41 @@ class Traci_runner (object):
         traci.close()
 
 
+    def parse_antenna_locs_file (self, antenna_locs_file_name):
+        
+        antenna_loc_file = open ('../res/Antennas locs/' + antenna_locs_file_name, 'r')
+        APs_loc_file     = open ('../res/Antennas locs/' + antenna_locs_file_name.split('.')[0] + 'locs_of_APs.txt', 'w')
+        
+        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
+        AP_id = 0
+        lon, lat = 6.120712,49.54384
+        # print ('{},{}' .format (AP_id, traci.simulation.convertGeo (lon, lat, fromGeo=True)))
+    
+        for line in antenna_loc_file: 
+            splitted_line = line.split(',')
+            if (splitted_line[0]=='radio'):
+                continue
+
+            # lon, lat = float (splitted_line[6]), float (splitted_line[7]) 
+            pos = traci.simulation.convertGeo (float (splitted_line[6]), float (splitted_line[7]), True)
+            printf (APs_loc_file, '{},{},{},{}\n' .format (AP_id, pos[0], pos[1], self.is_in_lux_global_area (pos)))
+            AP_id += 1
+        traci.close()
+            
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (dummy = 0)
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    my_Traci_runner.parse_antenna_locs_file ('short.txt')
 
-    # (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
-    my_Traci_runner.simulate_to_cnt_vehs_only (
-                    warmup_period           = 3600*7.5, #3600*7.5,
-                    sim_length              = 3600*1,
-                    len_of_time_slot_in_sec = 1,
-                    verbose                 = [])
+    # my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    #
+    # my_Traci_runner.convert_geo_to_loc ()
+
+    # my_Traci_runner.simulate_to_cnt_vehs_only (
+    #                 warmup_period           = 3600*7.5, #3600*7.5,
+    #                 sim_length              = 3600*1,
+    #                 len_of_time_slot_in_sec = 1,
+    #                 verbose                 = [])
 
     # my_Traci_runner.simulte (warmup_period          = 3600*7.5,
     #                         sim_length              = 3600*1,

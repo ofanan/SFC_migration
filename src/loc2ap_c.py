@@ -11,9 +11,9 @@ import time
 from usr_c import usr_c # class of the users
 from printf import printf
 
-GLOBAL_MAX_X, GLOBAL_MAX_Y = int(13622), int(11457)             # size of the city's area, in meters. 
-MAX_X,        MAX_Y        = GLOBAL_MAX_X//2, GLOBAL_MAX_Y//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)  
-LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X//4,   GLOBAL_MAX_Y//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
+LUX_GLOBAL_MAX_X, LUX_GLOBAL_MAX_Y = int(13622), int(11457)             # size of the city's area, in meters. 
+MAX_X,        MAX_Y        = LUX_GLOBAL_MAX_X//2, LUX_GLOBAL_MAX_Y//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)  
+LOWER_LEFT_CORNER          = np.array ([LUX_GLOBAL_MAX_X//4,   LUX_GLOBAL_MAX_Y//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
 
 # Verbose levels, defining the outputs produced
 VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
@@ -532,8 +532,9 @@ class loc2ap_c (object):
             self.print_as_sq_mat (output_file, self.vec_to_heatmap (avg_num_of_vehs_per_ap))
             reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
             avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
-        
-if __name__ == '__main__': 
+                   
+if __name__ == '__main__':
+    
 
     max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY])

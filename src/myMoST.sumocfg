@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo-sim.org/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="../../MoSTScenario/scenario/in/most.net.xml"/>
+        <route-files value="../../MoSTScenario/scenario/in/route/most.buses.flows.xml,
+		../../MoSTScenario/scenario/in/route/most.trains.flows.xml,
+		../../MoSTScenario/scenario/in/route/most.pedestrian.rou.xml,
+		../../MoSTScenario/scenario/in/route/most.commercial.rou.xml,
+		../../MoSTScenario/scenario/in/route/most.special.rou.xml,
+		../../MoSTScenario/scenario/in/route/most.highway.flows.xml
+		"/>
+        <additional-files value="../../MoSTScenario/scenario/in/add/most.poly.xml,
+		../../MoSTScenario/scenario/in/add/most.busstops.add.xml,
+		../../MoSTScenario/scenario/in/add/most.trainstops.add.xml,
+		../../MoSTScenario/scenario/in/add/most.parking.allvisible.add.xml,
+		../../MoSTScenario/scenario/in/add/basic.vType.xml"/>
+    </input>
+
+    <time>
+        <begin value="0"/>
+        <step-length value="1"/>
+    </time>
+
+</configuration>

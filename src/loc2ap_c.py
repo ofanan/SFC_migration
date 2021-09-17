@@ -48,6 +48,8 @@ class loc2ap_c (object):
     
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
+    
+    square_dist = lambda self, x, y, antenna : (x - antenna['x'])^2  
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
         """
@@ -80,6 +82,27 @@ class loc2ap_c (object):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
         self.tile2ap (lvl=0) # tile2ap translates the number as a "tile" (XY grid) to the ID of the covering AP.
         
+    # def loc2ap_using_antennas_loc_file (self, ):
+        
+    
+    def parse_my_antennas_loc_file (self, antennas_loc_file_name):
+        """
+        Parse a file containing the list of antennas, with their IDs and (x,y) position within the simulated area
+        """
+        antennas_loc_file = open ('../res/Antennas_locs/' + antennas_loc_file_name, 'r')
+        
+        self.list_of_APs = []
+        
+        for line in antennas_loc_file: 
+        
+            if (line == "\n" or line.split ("//")[0] == ""): # skip lines of comments and empty lines
+                continue
+            
+            splitted_line = line.split (',')
+            self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : float(splitted_line[1]), 'y' : float(splitted_line[2]) })
+
+        print ('sq dist is {}' .format (self.square_dist(0.0,0.0, self.list_of_APs[0]))) 
+
     def loc2ap_using_rect_cells (self, x, y):
         """
         Finding the AP covering the user's area, assuming that the number of APs is a power of 4, and rectangular cells.
@@ -535,9 +558,11 @@ class loc2ap_c (object):
                    
 if __name__ == '__main__':
     
-
     max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, use_sq_cells = True, verbose = [VERBOSE_DEMOGRAPHY])
+    
+    my_loc2ap.parse_my_antennas_loc_file ('Luxembourg_antennas_short.txt')
+    exit ()
     my_loc2ap.time_period_str = '0730_0830' #'0730_0830'
     my_loc2ap.parse_files (['0730_0830_1secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
 

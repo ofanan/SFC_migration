@@ -146,22 +146,34 @@ class Traci_runner (object):
 
 
     def parse_antenna_locs_file (self, antenna_locs_file_name):
+        """
+        Parse an antenna location file (downloaded from https://opencellid.org/), and extract for each antenna its X,Y position in the given SUMO configuration.
+        """
         
         antenna_loc_file = open ('../res/Antennas locs/' + antenna_locs_file_name, 'r')
-        APs_loc_file     = open ('../res/Antennas locs/' + antenna_locs_file_name.split('.')[0] + 'locs_of_APs.txt', 'w')
+        APs_loc_file     = open ('../res/Antennas locs/' + antenna_locs_file_name.split('.')[0] + '_short.txt', 'w')
         
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         AP_id = 0
-        print ('Geo loc of (0,0) is {}' .format (traci.simulation.convertGeo (0,0)))
+        
+        printf (APs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
+        printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
+        printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
     
         for line in antenna_loc_file: 
             splitted_line = line.split(',')
             if (splitted_line[0]=='radio'):
                 continue
 
-            # lon, lat = float (splitted_line[6]), float (splitted_line[7]) 
             pos = traci.simulation.convertGeo (float (splitted_line[6]), float (splitted_line[7]), True)
-            printf (APs_loc_file, '{},{},{},{},{}\n' .format (AP_id, pos[0], pos[1], 'G' if self.is_in_global_area_Lux (pos) else '' , 'C' if self.is_in_simulated_area_Lux(pos) else ''))
+            
+            if (not (self.is_in_simulated_area_Lux(pos))): # print only antennas within the simulated area
+                continue
+            
+            printf (APs_loc_file, '{},{},{}\n' .format (AP_id, pos[0], pos[1]))
+            
+            # For printing all antennas (not only those in the simulated area), uncomment the line below.
+            # printf (APs_loc_file, '{},{},{},{},{}\n' .format (AP_id, pos[0], pos[1], 'G' if self.is_in_global_area_Lux (pos) else '' , 'C' if self.is_in_simulated_area_Lux(pos) else ''))
             AP_id += 1
         traci.close()
             

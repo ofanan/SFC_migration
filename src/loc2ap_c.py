@@ -49,7 +49,16 @@ class loc2ap_c (object):
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
     
-    square_dist = lambda self, x, y, antenna : (x - antenna['x'])^2  
+    # returns the distance between a given (x,y) position, and a given antenna
+    sq_dist = lambda self, x, y, antenna : (x - antenna['x'])**2 + (y - antenna['y'])**2
+    
+    # Given a (x,y) position, returns the list of distances from it to all the APs
+    list_of_sq_dists_from_APs = lambda self, x, y : np.array([self.sq_dist(x,y, AP) for AP in self.list_of_APs])
+    
+    # returns the id of the nearest antenna to the given (x,y) position
+    nearest_ap = lambda self, x, y : np.argmin (self.list_of_sq_dists_from_APs (x,y))
+    
+    #index_min = min(range(len(values)), key=values.__getitem__)  
 
     def __init__(self, use_sq_cells = True, max_power_of_4=3, verbose = VERBOSE_AP):
         """
@@ -101,7 +110,9 @@ class loc2ap_c (object):
             splitted_line = line.split (',')
             self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : float(splitted_line[1]), 'y' : float(splitted_line[2]) })
 
-        print ('sq dist is {}' .format (self.square_dist(0.0,0.0, self.list_of_APs[0]))) 
+
+        x,y = 4932.084967132134,4245.938392699696
+        print ('nearest ap to ({},{}) is {}\n' .format (x,y, self.nearest_ap (x,y)))
 
     def loc2ap_using_rect_cells (self, x, y):
         """

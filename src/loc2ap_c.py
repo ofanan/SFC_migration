@@ -2,13 +2,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm, Normalize
-from matplotlib.ticker import MaxNLocator
 import math
-import itertools 
-import time 
+# from matplotlib.colors import LogNorm, Normalize
+#from matplotlib.ticker import MaxNLocator
+# import itertools 
+# import time 
 
-from usr_c import usr_c # class of the users
 from printf import printf
 
 GLOBAL_MAX_X_LUX, GLOBAL_MAX_Y_LUX = int(13622), int(11457)             # size of the city's area, in meters. 
@@ -42,9 +41,10 @@ class loc2ap_c (object):
     - An .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
     - A cnt of the number of vehicles in each cell
     """   
-    # inline function for the files location-to-AP mapping
-    # currently this function always maps assuming square cells.
-    loc2ap = lambda self, x, y : self.loc2ap_using_rect_cells (x, y)
+    # Map a given x,y position to the nearest AP.
+    # For using uniform-size cells, rather than finding the nearest AP, replace the function below with the commented function below it.
+    loc2ap = lambda self, x, y : self.nearest_ap (x,y)
+    #loc2ap = lambda self, x, y : self.loc2ap_using_rect_cells (x, y)
     
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
@@ -56,6 +56,7 @@ class loc2ap_c (object):
     list_of_sq_dists_from_APs = lambda self, x, y : np.array([self.sq_dist(x,y, AP) for AP in self.list_of_APs])
     
     # returns the id of the nearest antenna to the given (x,y) position
+    # the func' ASSUMES THAT THE AP ID IS IDENTICAL TO THE INDEX OF THE AP IN THE LIST OF APS
     nearest_ap = lambda self, x, y : np.argmin (self.list_of_sq_dists_from_APs (x,y))
     
     #index_min = min(range(len(values)), key=values.__getitem__)  

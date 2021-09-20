@@ -4,6 +4,7 @@ from sumolib import checkBinary
 import traci  
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 
 from printf import printf 
 from secs2hour import secs2hour
@@ -11,6 +12,18 @@ import loc2ap_c
 
 VERBOSE_LOC      = 2
 VERBOSE_SPEED    = 3
+
+# Indices of fields in input antenna loc files
+radio_idx = 0 # Radio type: GSM, LTE etc.
+mnc_idx   = 2 # Mobile Network Code
+x_pos_idx = 6 
+y_pos_idx = 7
+
+# Mobile Network Codes of various operators
+post_mnc    = '1'
+tango_mnc   = '77'
+orange_mnc  = '99'
+
 
 class Traci_runner (object):
 
@@ -150,8 +163,8 @@ class Traci_runner (object):
         Parse an antenna location file (downloaded from https://opencellid.org/), and extract for each antenna its X,Y position in the given SUMO configuration.
         """
         
-        antenna_loc_file = open ('../res/Antennas locs/' + antenna_locs_file_name, 'r')
-        APs_loc_file     = open ('../res/Antennas locs/' + antenna_locs_file_name.split('.')[0] + '_short.txt', 'w')
+        antenna_loc_file = open ('../res/Antennas_locs/' + antenna_locs_file_name, 'r')
+        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + '_center_LTE_orange.txt', 'w')
         
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         AP_id = 0
@@ -160,27 +173,55 @@ class Traci_runner (object):
         printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
         printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
     
+        self.list_of_antennas = []
+    
         for line in antenna_loc_file: 
+
+            if (line == "\n" or line.split ("//")[0] == ""): # skip lines of comments and empty lines
+                continue
+            
             splitted_line = line.split(',')
             if (splitted_line[0]=='radio'):
                 continue
 
-            pos = traci.simulation.convertGeo (float (splitted_line[6]), float (splitted_line[7]), True)
+            pos     = traci.simulation.convertGeo (float (splitted_line[x_pos_idx]), float (splitted_line[y_pos_idx]), True)
+            radio   = splitted_line[radio_idx]
+            mnc     = splitted_line[mnc_idx]
             
-            if (not (self.is_in_simulated_area_Lux(pos))): # print only antennas within the simulated area
+            if (not (self.is_in_simulated_area_Lux(pos)) or (radio!='LTE') or (mnc!=orange_mnc)): # print only antennas within the simulated area
                 continue
-            
+        
+            self.list_of_antennas.append ({'id' : AP_id, 'radio' : radio, 'mnc' : mnc, 'x' : pos[0], 'y' : pos[1]})    
             printf (APs_loc_file, '{},{},{}\n' .format (AP_id, pos[0], pos[1]))
             
-            # For printing all antennas (not only those in the simulated area), uncomment the line below.
-            # printf (APs_loc_file, '{},{},{},{},{}\n' .format (AP_id, pos[0], pos[1], 'G' if self.is_in_global_area_Lux (pos) else '' , 'C' if self.is_in_simulated_area_Lux(pos) else ''))
             AP_id += 1
+                       
         traci.close()
-            
+        
+        LTE_antennas = list (filter (lambda item : item['radio']=='LTE', self.list_of_antennas))
+        print ('tot num of antennas in the simulated area={}' .format (len(self.list_of_antennas)))
+        print ('Out of them: num of LTE antennas={}' .format (len(LTE_antennas)))
+        # post_LTE_antennas = list (filter (lambda item : item['mnc']==orange_mnc, LTE_antennas))
+        orange_LTE_antennas = list (filter (lambda item : item['mnc']==orange_mnc, LTE_antennas))
+        post_LTE_antennas   = list (filter (lambda item : item['mnc']==post_mnc, LTE_antennas))
+        tango_LTE_antennas  = list (filter (lambda item : item['mnc']==tango_mnc, LTE_antennas))
+        print ('Out of them: num of orange LTE antennas={}' .format (len(orange_LTE_antennas)))
+        print ('Out of them: num of post   LTE antennas={}' .format (len(post_LTE_antennas)))
+        print ('Out of them: num of tango  LTE antennas={}' .format (len(tango_LTE_antennas)))
+
+
+        # plt.title ('Total Number of Vehicles')
+        # plt.plot (range(len(self.num_of_vehs_in_ap[0])), tot_num_of_vehs)
+        # plt.ylabel ('Number of Vehicles')
+        # plt.xlabel ('time [seconds, starting at 07:30]')
+        # plt.savefig ('../res/z.jpg')
+        # plt.clf()
+
+        
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
-    my_Traci_runner.parse_antenna_locs_file ('Luxembourg_towers.txt')
+    my_Traci_runner.parse_antenna_locs_file ('Luxembourg_antennas.txt')
 
     # my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     #

@@ -112,9 +112,6 @@ class loc2ap_c (object):
             self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : float(splitted_line[1]), 'y' : float(splitted_line[2]) })
 
 
-        x,y = 4932.084967132134,4245.938392699696
-        print ('nearest ap to ({},{}) is {}\n' .format (x,y, self.nearest_ap (x,y)))
-
     def loc2ap_using_rect_cells (self, x, y):
         """
         Finding the AP covering the user's area, assuming that the number of APs is a power of 4, and rectangular cells.

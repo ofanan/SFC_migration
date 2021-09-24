@@ -16,16 +16,13 @@ VERBOSE_SPEED    = 3
 # Indices of fields in input antenna loc files
 radio_idx = 0 # Radio type: GSM, LTE etc.
 mnc_idx   = 2 # Mobile Network Code
-x_pos_idx = 6 
-y_pos_idx = 7
-
-# Mobile Network Codes of various operators
-post_mnc    = '1'
-tango_mnc   = '77'
-orange_mnc  = '99'
-
+lon_pos_idx = 6 
+lat_pos_idx = 7
 
 class Traci_runner (object):
+
+    # Given the x,y position, return the x,y position within the simulated area (city center) 
+    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER 
 
     # Returns the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
     get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER
@@ -39,6 +36,9 @@ class Traci_runner (object):
     
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
+
+        # Mobile Network Codes of various operators in Luxembourg
+        self.Lux_providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
@@ -54,28 +54,28 @@ class Traci_runner (object):
         if (warmup_period > 0):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
             
-            known_veh_keys = () # will hold the set of known vehicles' keys            
-                
-            while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
-                
-                cur_sim_time = traci.simulation.getTime()
-                
-                # print ('cur_sim_time={}, warmup_period={}, sim_length={}' .format (cur_sim_time, warmup_period, sim_length))
-                
-                # Finished the sim. Now, just make some post-processing. 
-                if (cur_sim_time >= warmup_period + sim_length):
-                    print ('Number of distinct cars during the simulated period={}' .format (len(known_veh_keys)))
-                    break
-                
-                # Union known_veh_keys with the set of vehicles' keys of this cycle
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
-                printf (self.cnt_output_file, '{:.0f} ' .format (len(cur_list_of_vehicles)))
-                sys.stdout.flush()
+        known_veh_keys = () # will hold the set of known vehicles' keys            
+            
+        while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
+            
+            cur_sim_time = traci.simulation.getTime()
+            
+            # print ('cur_sim_time={}, warmup_period={}, sim_length={}' .format (cur_sim_time, warmup_period, sim_length))
+            
+            # Finished the sim. Now, just make some post-processing. 
+            if (cur_sim_time >= warmup_period + sim_length):
+                print ('Number of distinct cars during the simulated period={}' .format (len(known_veh_keys)))
+                break
+            
+            # Union known_veh_keys with the set of vehicles' keys of this cycle
+            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+            printf (self.cnt_output_file, '{:.0f} ' .format (len(cur_list_of_vehicles)))
+            sys.stdout.flush()
 
-                known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys)
-                       
-                traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
-            print ('here')
+            known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys)
+                   
+            traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
+        print ('here')
         traci.close()
 
     def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
@@ -158,21 +158,23 @@ class Traci_runner (object):
         traci.close()
 
 
-    def parse_antenna_locs_file (self, antenna_locs_file_name):
+    # def get_relative_position_from_lat_lon (self, lat, lon): 
+    #     """
+    #     Given the geographical latitude and longitude, return the x,y position in meters w.r.t the south-west corner of the simulated area
+    #     """       
+    #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER
+
+
+    def parse_antenna_locs_file (self, antenna_locs_file_name, provider='orange'):
         """
         Parse an antenna location file (downloaded from https://opencellid.org/), and extract for each antenna its X,Y position in the given SUMO configuration.
+        Outputs a ".antloc" file, that details the x,y position of a all antennas within the simulated area.
         """
         
         antenna_loc_file = open ('../res/Antennas_locs/' + antenna_locs_file_name, 'r')
-        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + '_center_LTE_orange.txt', 'w')
-        
+
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
-        AP_id = 0
-        
-        printf (APs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
-        printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
-        printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
-    
+
         self.list_of_antennas = []
     
         for line in antenna_loc_file: 
@@ -184,44 +186,36 @@ class Traci_runner (object):
             if (splitted_line[0]=='radio'):
                 continue
 
-            pos     = traci.simulation.convertGeo (float (splitted_line[x_pos_idx]), float (splitted_line[y_pos_idx]), True)
+            pos     = self.pos_to_relative_pos (traci.simulation.convertGeo (float (splitted_line[lon_pos_idx]), float (splitted_line[lat_pos_idx]), True))
             radio   = splitted_line[radio_idx]
             mnc     = splitted_line[mnc_idx]
             
-            if (not (self.is_in_simulated_area_Lux(pos)) or (radio!='LTE') or (mnc!=orange_mnc)): # print only antennas within the simulated area
+            if (not (self.is_in_simulated_area_Lux(pos))):# or (not (radio=='LTE'))):  
                 continue
         
-            self.list_of_antennas.append ({'id' : AP_id, 'radio' : radio, 'mnc' : mnc, 'x' : pos[0], 'y' : pos[1]})    
-            printf (APs_loc_file, '{},{},{}\n' .format (AP_id, pos[0], pos[1]))
+            self.list_of_antennas.append ({'radio' : radio, 'mnc' : mnc, 'x' : pos[0], 'y' : pos[1]})    
             
-            AP_id += 1
-                       
         traci.close()
         
-        LTE_antennas = list (filter (lambda item : item['radio']=='LTE', self.list_of_antennas))
-        print ('tot num of antennas in the simulated area={}' .format (len(self.list_of_antennas)))
-        print ('Out of them: num of LTE antennas={}' .format (len(LTE_antennas)))
-        # post_LTE_antennas = list (filter (lambda item : item['mnc']==orange_mnc, LTE_antennas))
-        orange_LTE_antennas = list (filter (lambda item : item['mnc']==orange_mnc, LTE_antennas))
-        post_LTE_antennas   = list (filter (lambda item : item['mnc']==post_mnc, LTE_antennas))
-        tango_LTE_antennas  = list (filter (lambda item : item['mnc']==tango_mnc, LTE_antennas))
-        print ('Out of them: num of orange LTE antennas={}' .format (len(orange_LTE_antennas)))
-        print ('Out of them: num of post   LTE antennas={}' .format (len(post_LTE_antennas)))
-        print ('Out of them: num of tango  LTE antennas={}' .format (len(tango_LTE_antennas)))
-
-
-        # plt.title ('Total Number of Vehicles')
-        # plt.plot (range(len(self.num_of_vehs_in_ap[0])), tot_num_of_vehs)
-        # plt.ylabel ('Number of Vehicles')
-        # plt.xlabel ('time [seconds, starting at 07:30]')
-        # plt.savefig ('../res/z.jpg')
-        # plt.clf()
-
+        # self.list_of_antennas = list (filter (lambda item : item['radio']=='LTE', self.list_of_antennas)) # filter-out all non-LTE antennas
+        print ('Num of antennas in the simulated area={}' .format (len(self.list_of_antennas)))
         
+        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + '.center.' + provider + '.antloc', 'w')
+        printf (APs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
+        printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
+        printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
+
+        AP_id = 0
+        antennas_to_print = list (filter (lambda item : item['mnc']==self.Lux_providers_mnc[provider], self.list_of_antennas))
+        for ap in antennas_to_print:                       
+
+            printf (APs_loc_file, '{},{},{}\n' .format (AP_id, ap['x'], ap['y']))
+            AP_id += 1
+
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
-    my_Traci_runner.parse_antenna_locs_file ('Luxembourg_antennas.txt')
+    my_Traci_runner.parse_antenna_locs_file ('Lux.txt', provider='orange')
 
     # my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     #

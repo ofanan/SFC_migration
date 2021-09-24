@@ -3,10 +3,10 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import math
-# from matplotlib.colors import LogNorm, Normalize
-#from matplotlib.ticker import MaxNLocator
-# import itertools 
-# import time 
+from matplotlib.colors import LogNorm, Normalize
+from matplotlib.ticker import MaxNLocator
+import itertools 
+import time 
 
 from printf import printf
 
@@ -36,16 +36,22 @@ speed_idx  = 4
 
 class loc2ap_c (object):
     """
-    Accept as input a .loc file (a file detailing the locations of all the new users / users who moved at each slot).
+    Accept as input a .loc file (a file detailing the locations of all users.
+    Input: at each slot, all users who are either new (namely, just joined the simulated area); or "old" (users who already were in the simulated, but moved to another cell/AP).
+    Optional input: a list of antennas locations. 
     Optional outputs: 
     - An .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
     - A cnt of the number of vehicles in each cell
+    "AP" means: Access Point, with which a user is associated at each slot.
+    "cell" means: the rectangular cell, to which a user is associated at each slot.
+    When using real-world antennas locations, the user's cell is the cell of the AP with which the user is currently associated.
+    Otherwise, "AP" and "cells" are identical.  
     """   
     # Map a given x,y position to an AP.
     # If there're real AP locations, use Voronoi distance (map each client to the nearest AP).
     # Else, use uniform-size rectangular cells, rather than finding the , replace the function below with the commented function below it.
-    loc2ap = lambda self, x, y : self.loc2ap_using_rect_cells (x, y) if self.use_sq_AP_cells else self.nearest_ap (x,y) 
-    
+    loc2ap = lambda self, x, y : self.loc2cell_using_rect_cells (x, y) if self.use_rect_AP_cells else self.nearest_ap (x,y) 
+
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
     
@@ -61,8 +67,11 @@ class loc2ap_c (object):
     
     # Returns the rectangular cell to which a given AP antenna belongs. 
     # If using only rectangular cells (not real antennas locations), the "cell" is merely identical to the "ap"
-    ap2cell = lambda self, ap : ap if self.use_sq_AP_cells else self.list_of_APs[ap]['cell']  
+    ap2cell = lambda self, ap : ap if self.use_rect_AP_cells else self.list_of_APs[ap]['cell']  
 
+    # An indication, expressing whether the mapping to cell used rectangular cells, or an antenna-locations (.antloc) input file
+    cell_type_identifier = lambda self : '' if self.use_rect_AP_cells else '_ant'
+    
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_AP, antenna_loc_file_name=''):
         """
         Init a "loc2ap_c" object.
@@ -76,17 +85,18 @@ class loc2ap_c (object):
        
         self.max_x, self.max_y = MAX_X_LUX, MAX_Y_LUX # borders of the simulated area, in meters
         self.usrs              = []
-        self.use_sq_AP_cells   = True if (self.antenna_loc_file_name=='') else False  
+        self.use_rect_AP_cells   = True if (self.antenna_loc_file_name=='') else False  
 
         self.max_power_of_4    = max_power_of_4
         self.num_of_cells      = 4**max_power_of_4
+        self.list_of_APs = [] # List of the APs. Will be filled only if using antennas locations (and not synthetic rectangular cells).
         
-        if (self.use_sq_AP_cells):
-            self.num_of_APs        = self.num_of_cells if (self.use_sq_AP_cells) else self.num_of_APs
+        if (self.use_rect_AP_cells):
+            self.num_of_APs        = self.num_of_cells 
         else:
-            self.parse_my_antennas_loc_file(self.antenna_loc_file_name)
+            self.parse_antloc_file(self.antenna_loc_file_name, plot_ap_locs_heatmap=False)
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_in_ap = [[]*self.num_of_APs]
+            self.num_of_vehs_in_ap = [[] for _ in range (self.num_of_APs)]
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.joined_ap          = [[] for _ in range(self.num_of_APs)] # self.joined_ap[i][j] will count the # of clients that joined AP i at slot j
             self.joined_cell        = [[] for _ in range(self.num_of_cells)] # self.joined_cell[i][j] will count the # of clients that joined cell i at slot j
@@ -98,20 +108,16 @@ class loc2ap_c (object):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
             self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_file_name = '../res/num_of_vehs_per_ap_{}aps.txt' .format (4**self.max_power_of_4)
+            self.num_of_vehs_file_name = '../res/num_of_vehs_per_ap_{}aps{}.txt' .format (4**self.max_power_of_4, self.cell_type_identifier())
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
-        self.tile2ap (lvl=0) # tile2ap translates the number as a "tile" (XY grid) to the ID of the covering AP.
-
-        self.list_of_APs = [] # List of the APs. Will be filled only if using antennas locations (and not synthetic rectangular cells).
+        self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell.
         
-    # def loc2ap_using_antennas_loc_file (self, ):
-        
-    
-    def parse_my_antennas_loc_file (self, antennas_loc_file_name):
+    def parse_antloc_file (self, antennas_loc_file_name, plot_ap_locs_heatmap=False):
         """
-        Parse a file containing the list of antennas, with their IDs and (x,y) position within the simulated area
+        Parse an .antloc file.
+        An .antloc file is a file containing the list of antennas, with their IDs and (x,y) position within the simulated area
         """
-        antennas_loc_file = open ('../res/Antennas_locs/' + antennas_loc_file_name, 'r')
+        antennas_loc_file = open ('../res/antennas_locs/' + antennas_loc_file_name, 'r')
         
         for line in antennas_loc_file: 
         
@@ -121,11 +127,17 @@ class loc2ap_c (object):
             splitted_line = line.split (',')
             x = float(splitted_line[1])
             y = float(splitted_line[2])
-            self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : x, 'y' : y, 'cell' : self.loc2ap_using_rect_cells (x, y)}) # 'cell' is the rectangle of the simulated area in which this AP is found
+            self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : x, 'y' : y, 'cell' : self.loc2cell_using_rect_cells (x, y)}) # 'cell' is the rectangle of the simulated area in which this AP is found
             
         self.num_of_APs = len (self.list_of_APs)
+        
+        if (plot_ap_locs_heatmap):
+            plt.plot([ap['x'] for ap in self.list_of_APs], [ap['y'] for ap in self.list_of_APs], 'o', color='black');
+            plt.axis([0, MAX_X_LUX, 0, MAX_Y_LUX])
+            plt.savefig('../res/{}_ap_points.jpg' .format (self.antenna_loc_file_name))
+            plt.clf()
 
-    def loc2ap_using_rect_cells (self, x, y):
+    def loc2cell_using_rect_cells (self, x, y):
         """
         Finding the AP covering the user's area, assuming that the number of APs is a power of 4, and rectangular cells.
         Input:  (x,y) location data
@@ -159,7 +171,7 @@ class loc2ap_c (object):
                 
     def cnt_num_of_vehs_per_ap (self):
         """
-        Count the number of vehicles associated with each AP at the current parsed simulation step.
+        Count the number of vehicles associated with each AP in the current time slot.
         """
         for ap in range(self.num_of_APs): 
             self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
@@ -174,8 +186,8 @@ class loc2ap_c (object):
         #                                         ap, self.joined_ap_sim_via[ap], 
         #                                         ap, self.left_ap[ap], 
         #                                         ap, self.left_ap_sim_via[ap]))
-        printf (self.demography_file, 'total num of joined AP={}, total num of left AP = '     .format (np.sum(np.array(self.joined_ap)),np.sum(np.array(self.left_ap))) )
-        printf (self.demography_file, 'total num of joined cell={}, total num of left cell = ' .format (np.sum(np.array(self.joined_cell)),np.sum(np.array(self.left_cell))) )
+        printf (self.demography_file, 'total num of joined AP={}, total num of left AP={}'     .format (np.sum(np.array(self.joined_ap)),np.sum(np.array(self.left_ap))) )
+        printf (self.demography_file, 'total num of joined cell={}, total num of left cell={}' .format (np.sum(np.array(self.joined_cell)),np.sum(np.array(self.left_cell))) )
         printf (self.demography_file, '\n')                                        
 
     def print_speed (self):
@@ -212,47 +224,26 @@ class loc2ap_c (object):
         columns = [str(i) for i in range(2**self.max_power_of_4)]
         file_name_suffix = '{}_{}x{}' .format (self.time_period_str, 2**self.max_power_of_4, 2**self.max_power_of_4)
         
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cell)])), columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cell)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_joined_cell{}.jpg' .format (file_name_suffix))
         return
         
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.left_cell[cell])           for ap in range(self.num_of_cells)])), columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_cell[cell])           for ap in range(self.num_of_cells)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of cars that left cell every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_left_cell{}.jpg' .format (file_name_suffix))
         exit ()
         
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of cars that joined the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_joined_sim_via_{}.jpg' .format (file_name_suffix))
         
         plt.figure ()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.left_ap_sim_via[ap])   for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_ap_sim_via[ap])   for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of cars that left the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_left_sim_via_{}.jpg' .format (file_name_suffix))
-        
-    def rd_num_of_vehs_per_ap (self, input_file_name):
-        """
-        Read the number of vehicles at each cell, as written in the input files. 
-        """
-        input_file  = open ('../res/' + input_file_name, "r")  
-        
-        self.num_of_vehs_in_ap = []
-        for line in input_file:
-            
-            if (line == "\n" or line.split ("//")[0] == ""):
-                continue
-        
-            num_of_vehs_in_cur_ap = []
-            line = line.split ("\n")[0]
-            splitted_line = line.split (":")
-            splitted_line = splitted_line[1].split('[')[1].split(']')[0].split(', ')
-            for cur_num_of_vehs_in_this_ap in splitted_line:
-                num_of_vehs_in_cur_ap.append (int(cur_num_of_vehs_in_this_ap))
-            
-            self.num_of_vehs_in_ap.append (num_of_vehs_in_cur_ap)            
         
     def invert_mat_bottom_up (self, mat):
         """
@@ -264,12 +255,13 @@ class loc2ap_c (object):
             inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
         return inverted_mat        
 
-    def vec_to_heatmap (self, vec):
+    def vec2heatmap (self, vec):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
         n = int (math.sqrt(len(vec)))
-        heatmap_val = np.array ([vec[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))]).reshape ( [n, n])
+        heatmap_val = np.array ([vec[self.tile2cell[i]] for i in range (len(self.tile2cell))]).reshape ( [n, n])
+        
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         # Hence, need to swap the matrix upside-down
         return self.invert_mat_bottom_up(heatmap_val)
@@ -277,66 +269,72 @@ class loc2ap_c (object):
     def plot_num_of_vehs_heatmap (self):
         """
         Plot a heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
-        """
-        
-        # Make a tikz heatmap
-        avg_num_of_cars_in_cell =  np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])
-        n = int (math.sqrt(len(avg_num_of_cars_in_cell)))
-        heatmap_val = np.array ([avg_num_of_cars_in_cell[self.tile_to_ap[i]] for i in range (len(self.tile_to_ap))]).reshape ( [n, n])
-
-        # # Generate a tikz heatmap
-        # self.heatmap_output_file = open ('../res/heatmap_num_vehs_{}.dat' .format (4**self.max_power_of_4), 'w')
-        # for i in range (2**self.max_power_of_4):
-        #     for j in range (2**self.max_power_of_4):
-        #         printf (self.heatmap_output_file, '{} {} {}\n' .format (j, i, heatmap_val[i][j]))
-        #     printf (self.heatmap_output_file, '\n')
-        #
-        # printf (self.heatmap_output_file, '\n\n{}' .format(self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))))
-        
+        """        
         # Generate a Python heatmap
-        plt.figure()
+        plt.figure()       
+        
+        self.calc_avg_num_of_vehs_per_cell() 
+        heatmap_vals = self.vec2heatmap (self.avg_num_of_vehs_in_cell) #([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))
         columns = [str(i) for i in range(2**self.max_power_of_4)]
-        heatmap_vals = self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))
-        # print (heatmap_vals)
-        # my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)])),columns=columns), cmap="YlGnBu", norm=LogNorm())
-        # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        # # plt.title ('avg num of cars per cell')
-        # plt.savefig('../res/heatmap_num_vehs_{}_Python_log.jpg' .format (self.num_of_APs))
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.num_of_vehs_in_cell[cell]) for cell in range(self.num_of_cells)])),columns=columns), cmap="YlGnBu", norm=LogNorm())
+        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        plt.title ('avg num of cars per cell')
+        plt.savefig('../res/heatmap_num_vehs_{}cells{}.jpg' .format (self.num_of_cells, self.cell_type_identifier()))
         return heatmap_vals
+
+    def calc_avg_num_of_vehs_per_cell (self):
+        """
+        Calculate the avg number of vehicles per cell during the simulated period, given the num of vehs per AP
+        """
+        avg_num_of_vehs_in_ap   = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)], dtype='int16') # Average the num of cars in each AP along the simulated period
+
+        self.avg_num_of_vehs_in_cell = np.zeros (self.num_of_cells) 
+        for ap in range (self.num_of_APs):
+            self.avg_num_of_vehs_in_cell[self.ap2cell(ap)] += avg_num_of_vehs_in_ap[ap] # Add the avg # of cars in this AP to the (avg) number of cars in the cell to which this AP belongs    
+        
+    def calc_num_of_vehs_per_cell (self):
+        """
+        Calculate the number of vehicles per cell at each slot during the simulated period, given the num of vehs per AP:
+        self.num_of_vehs_in_cell[i][j] will hold the num of vehs in cell i in time slot j 
+        """
+        self.num_of_vehs_in_cell = np.zeros ( (self.num_of_cells, len(self.num_of_vehs_in_ap[0])), dtype='int16')  
+        for ap in range (self.num_of_APs):
+            self.num_of_vehs_in_cell[self.ap2cell(ap)] += np.array (self.num_of_vehs_in_ap[ap]) # Add the # of cars in this AP to the (avg) number of cars in the cell to which this AP belongs    
         
     def plot_speed_heatmap (self):
         """
         Plot a heatmap, showing the average speed of vehicles at each cell.
         """
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec_to_heatmap ([self.speed[ap]['speed'] for ap in range(self.num_of_APs)]), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap ([self.speed[ap]['speed'] for ap in range(self.num_of_APs)]), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('avg speed in each cell')
         plt.savefig('../res/heatmap_speed.jpg')
         
-    def tile2ap (self, lvl):
+    def calc_tile2cell (self, lvl):
         """
-        prepare a translation of the "Tile" (line-by-line regular index given to cells) to the number of AP.
+        prepare a translation of the "Tile" (line-by-line regular index given to cells) to the cell id.
         """
         if (lvl == 0):
+            # To calclate the tile, we calculate positions within each cell in the simulated area, and then call loc2cell_using_rect_cells() to calculate the cell associated with this position. 
             power = lvl
-            n = int(math.sqrt (self.num_of_APs/4**power))
-            self.tile_to_ap   = np.empty (n**2, dtype = 'uint8')
+            n = int(math.sqrt (self.num_of_cells/4**power))
+            self.tile2cell   = np.empty (n**2, dtype = 'uint8')
             offset_x          = self.max_x // (2*n)        
             offset_y          = self.max_y // (2*n)        
             ap                = 0
             for y in range (offset_x, self.max_y, self.max_y // n): 
                 for x in range (offset_y, self.max_x, self.max_x // n): 
-                    self.tile_to_ap[ap] = self.loc2ap(x, y)
+                    self.tile2cell[ap] = self.loc2cell_using_rect_cells(x, y) 
                     ap+=1 
         elif (lvl == 1):
-            self.tile_to_ap = [0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15] 
+            self.tile2cell = [0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15] 
         elif (lvl == 2):
-            self.tile_to_ap = [0,1,2,3]
+            self.tile2cell = [0,1,2,3]
         elif (lvl == 3):
-            self.tile_to_ap = [0]
+            self.tile2cell = [0]
         else:
-            print ('Sorry, the level of 4 you chose is still unsupported by tile2ap')
+            print ('Sorry, the level of 4 you chose is still unsupported by calc_tile2cell')
             exit ()
 
     def plot_num_of_vehs_per_ap_graph (self):    
@@ -344,9 +342,9 @@ class loc2ap_c (object):
         Plot for each ap the number of vehicles associated with it along the trace.
         """
         for plot_num in range (4**(self.max_power_of_4-1)):
-            for ap in range (4*plot_num, 4*(plot_num+1)):
+            for cell in range (4*plot_num, 4*(plot_num+1)):
                 if (VERBOSE_CNT in self.verbose):
-                    printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap])) 
+                    printf (self.num_of_vehs_output_file, 'num_of_vehs_in_cell{}: {}\n' .format (cell, self.num_of_vehs_in_cell[cell])) 
             #     plt.title ('Number of vehicles in each cell')
             #     plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
             #     plt.ylabel ('Number of vehicles')
@@ -359,7 +357,6 @@ class loc2ap_c (object):
         """
         Plot for each ap the number of vehicles associated with it along the trace.
         """
-        # print (self.num_of_vehs_in_ap[0])
         gamad = np.sum ([self.num_of_vehs_in_ap[ap][0] for ap in range(self.num_of_APs)])
         tot_num_of_vehs = [np.sum ([self.num_of_vehs_in_ap[ap][t] for ap in range(self.num_of_APs)]) for t in range(len(self.num_of_vehs_in_ap[0]))]
         # print (tot_num_of_vehs)
@@ -377,6 +374,9 @@ class loc2ap_c (object):
         plt.clf()
 
     # def find_max_X_max_Y (self):
+    # """
+    # Find the maximal values of (x,y) in a given '.loc' file (defining the positions of all objects - e.g., vehicles, or antennas).
+    # """
     #     max_x, max_y = 0, 0
     #     for i in range (9):
     #         usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
@@ -412,13 +412,13 @@ class loc2ap_c (object):
                 self.t = int(splitted_line[2])
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for ap in range (self.num_of_APs): 
-                        self.joined_ap        [ap]  .append(0)
-                        self.left_ap          [ap]  .append(0)
-                        self.joined_ap_sim_via[ap]  .append(0)
-                        self.left_ap_sim_via  [ap]  .append(0)
+                        self.joined_ap        [ap]  .append(np.int16(0))
+                        self.left_ap          [ap]  .append(np.int16(0))
+                        self.joined_ap_sim_via[ap]  .append(np.int16(0))
+                        self.left_ap_sim_via  [ap]  .append(np.int16(0))
                     for cell in range (self.num_of_cells): 
-                        self.joined_cell      [cell].append(0)
-                        self.left_cell        [cell].append(0)
+                        self.joined_cell      [cell].append(np.int16(0))
+                        self.left_cell        [cell].append(np.int16(0))
                 continue
 
             elif (splitted_line[0] == 'usrs_that_left:'):
@@ -499,7 +499,7 @@ class loc2ap_c (object):
         if (VERBOSE_AP in self.verbose):
             printf(self.ap_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
-            self.plot_num_of_vehs_per_ap_graph ()
+            # self.plot_num_of_vehs_per_ap_graph ()
             self.plot_num_of_vehs_heatmap()
         # if (VERBOSE_DEMOGRAPHY in self.verbose):
         #     self.plot_demography_heatmap()
@@ -520,6 +520,9 @@ class loc2ap_c (object):
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for ap in range (self.num_of_APs):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap]))
+            self.calc_num_of_vehs_per_cell()
+            for cell in range (self.num_of_cells):
+                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}: {}\n' .format (cell, self.num_of_vehs_in_cell[cell]))
         if (VERBOSE_DEMOGRAPHY in self.verbose): 
             printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
             self.print_demography()
@@ -541,8 +544,13 @@ class loc2ap_c (object):
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.demography_file = open ('../res/demography_{}_{}.txt' .format(loc_file_names[0].split('.')[0], 4**self.max_power_of_4), 'w+')
         if (VERBOSE_AP in self.verbose):
-            self.ap_file_name = loc_file_names[0].split('.')[0] + '_' + ('' if self.use_sq_AP_cells else 'ant') + str(self.num_of_APs) + 'aps' +".ap"
+            self.ap_file_name = loc_file_names[0].split('.')[0] + '_' + self.cell_type_identifier() + str(self.num_of_APs) + 'aps' +".ap"
             self.ap_file        = open ("../res/" + self.ap_file_name, "w+")  
+            if (self.use_rect_AP_cells):
+                printf (self.ap_file, '// Using rectangle cells\n')
+            else:
+                printf (self.ap_file, '// .antloc file={}\n' .format (self.antenna_loc_file_name))
+
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
             printf (self.ap_file, '//for each time slot:\n')
             printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
@@ -567,18 +575,6 @@ class loc2ap_c (object):
                 printf (output_file, '{:.0f}\t' .format (mat[x][y]))
             printf (output_file, '\n')
     
-    # def print_num_of_vehs_diffs (self):
-    #     ap = 12
-    #     print ('diff 12 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
-    #          (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
-    #
-    #     ap = 48
-    #     print ('diff 48 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
-    #          (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
-    #     ap = 51
-    #     print ('diff 51 = {}' .format (np.average([(self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i]) for i in range (len(self.num_of_vehs_in_ap[ap])-1) if 
-    #          (self.num_of_vehs_in_ap[ap][i+1] - self.num_of_vehs_in_ap[ap][i])>= 0])))
-    
     def print_num_of_vehs_per_server (self, output_file_name):
         """
         Print the number of vehicles in the sub-tree below each server, assuming that the simulated area is iteratively partitioned to rectangular cells,
@@ -589,76 +585,40 @@ class loc2ap_c (object):
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
         for lvl in range (self.max_power_of_4):
             printf (output_file, '\nlvl {}\n********************************\n' .format(lvl))
-            self.tile2ap (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
-            self.print_as_sq_mat (output_file, self.vec_to_heatmap (avg_num_of_vehs_per_ap))
+            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            self.print_as_sq_mat (output_file, self.vec2heatmap (avg_num_of_vehs_per_ap))
             reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
             avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
+  
+    def plot_num_of_aps_per_cell_heatmap (self):
+        """
+        Plots a heatmap, showing the number of APs in each cell.
+        When using rectangular AP-cells, the heatmap should show fix 1 for all cells.
+        When using an '.antloc' file, the heatmap shows the number of antennas in each cell.
+        """
+        
+        num_of_aps_in_cell = np.zeros (self.num_of_cells)
+        
+        for ap in range(self.num_of_APs):
+            num_of_aps_in_cell[self.ap2cell(ap)] += 1
+            
+        columns = [str(i) for i in range(2**self.max_power_of_4)]
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_aps_in_cell), columns=columns), cmap="YlGnBu")
+        plt.savefig('../res/{}_num_of_aps_per_cell.jpg' .format(self.antenna_loc_file_name))
+        exit () #$$$
+        
+        file_name_suffix = '{}_{}x{}' .format (self.time_period_str, 2**self.max_power_of_4, 2**self.max_power_of_4)
+        
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cells)])), columns=columns), cmap="YlGnBu")
+        # plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_cars_joined_cell{}.jpg' .format (file_name_suffix))
                    
 if __name__ == '__main__':
   
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_AP, VERBOSE_DEMOGRAPHY]) #[VERBOSE_DEMOGRAPHY]) #, antenna_loc_file_name = 'Luxembourg_antennas_short.txt')
-    
-    my_loc2ap.time_period_str = '0829_0830' #'0730_0830'
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_DEMOGRAPHY], antenna_loc_file_name = 'Lux.center.orange.antloc')
+    my_loc2ap.time_period_str = ''
+    # my_loc2ap.plot_num_of_aps_per_cell_heatmap()
+     
     my_loc2ap.parse_files (['0829_0830_8secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
-
-    # gamad = [[1,2],[3,4]]
-    # nanas = [[0]*4 for i in range(4)]
-    # for row in range (4):
-    #     for col in range (4):
-    #         nanas[row][col] = gamad[int(row/2)][int(col/2)] 
-    #     #nanas[row] = [[gamad[i][j]]*2 for i in range (2)] # for j in range (2)]
-    #
-    # print (nanas)
-    # exit ()
-    #
-    # heatmap_vals = [1]
-    # for cur_power_of_4 in range(1,max_power_of_4+1):     
-    #     my_loc2ap       = loc2ap_c (cur_power_of_4 = cur_power_of_4, use_sq_cells = True, verbose = [VERBOSE_POST_PROCESSING])
-    #     input_file_name = 'num_of_vehs_per_ap_{}aps.txt' .format (4**cur_power_of_4)
-    #     my_loc2ap.rd_num_of_vehs_per_ap (input_file_name)
-    #     # my_loc2ap.plot_num_of_vehs_heatmap ()
-    #     np.array (my_loc2ap.plot_num_of_vehs_heatmap ())
-    #     heatmap_for_this_lvl = np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) # The original heatmap, of size 2x2, 4x4, and so on.
-    #     n                    = 2**max_power_of_4 # The required size of the heatmaps
-    #     mega_pixel_heatmap =  [[0]*(n) for i in range(n)]           # Will contain the "zoomed" heatamp, when repeating each pixel several times, for adopting it to 16x16 resolution
-    #     for row in range (n):
-    #         for col in range (n):
-    #             mega_pixel_heatmap[row][col] = heatmap_for_this_lvl[int(row/2)][int(row/2)] 
-    #
-    #
-    #     heatmap_vals.append (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()) )
-    #     heatmap_vals.append (np.tile (np.array (my_loc2ap.plot_num_of_vehs_heatmap ()), 2**(4-cur_power_of_4)))
-    #
-    # print (heatmap_vals[1])
     
-    # df = pd.DataFrame(np.random.random((10,10)))
-    # df = []
-    # for max_power_of_4 in range(4):
-    #     df.append (pd.DataFrame(np.random.random((10,10))))
-    # df[1] = heatmap_vals[1]
-    
-    # heatmap_vals
-    # fig, axn = plt.subplots(2, 2, sharex=True, sharey=True)
-    # cbar_ax = fig.add_axes([.91, .3, .03, .4])
-    #
-    # for i, ax in enumerate(axn.flat):
-    #     my_heatmap = sns.heatmap(heatmap_vals[i+1], ax=ax,
-    #                  cbar=i == 0,
-    #                  vmin=0, vmax=100,
-    #                  cbar_ax=None if i else cbar_ax,
-    #                  cmap="YlGnBu", norm=LogNorm())
-    #     my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-    #
-    # fig.tight_layout(rect=[0, 0, .9, 1])
-    # plt.show ()
-
-    
-    # # my_loc2ap.plot_tot_num_of_vehs_over_t_graph()
-    # my_loc2ap.print_num_of_vehs_diffs ()
-    # output_file_name = 'num_of_vehs_per_server{}.txt' .format (4**max_power_of_4)
-    # my_loc2ap.plot_num_of_vehs_per_ap_graph ()
-    # my_loc2ap.print_num_of_vehs_per_server (output_file_name)
-    
-    # For finding the maximum positional values of x and y in the .loc file(s), uncomment the line below 
-    # my_loc2ap.find_max_X_max_Y ()    

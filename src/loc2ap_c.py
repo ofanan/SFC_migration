@@ -15,7 +15,6 @@ MAX_X_LUX,        MAX_Y_LUX        = GLOBAL_MAX_X_LUX//2, GLOBAL_MAX_Y_LUX//2   
 LOWER_LEFT_CORNER          = np.array ([GLOBAL_MAX_X_LUX//4,   GLOBAL_MAX_Y_LUX//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
 
 # Verbose levels, defining the outputs produced
-VERBOSE_POST_PROCESSING = 0 # Don't read ".loc" file. Read ".ap" or ".txt" files, and analyze them - e.g., count the number of cars in each cell. 
 VERBOSE_AP              = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
 VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
 VERBOSE_DEMOGRAPHY      = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
@@ -300,6 +299,7 @@ class loc2ap_c (object):
         self.num_of_vehs_in_cell = np.zeros ( (self.num_of_cells, len(self.num_of_vehs_in_ap[0])), dtype='int16')  
         for ap in range (self.num_of_APs):
             self.num_of_vehs_in_cell[self.ap2cell(ap)] += np.array (self.num_of_vehs_in_ap[ap]) # Add the # of cars in this AP to the (avg) number of cars in the cell to which this AP belongs    
+            #self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
         
     def plot_speed_heatmap (self):
         """
@@ -353,45 +353,7 @@ class loc2ap_c (object):
             # plt.savefig ('../res/num_of_vehs_per_cell_plot{}.jpg' .format(plot_num))
             # plt.clf()
             
-    def plot_tot_num_of_vehs_over_t_graph (self):    
-        """
-        Plot for each ap the number of vehicles associated with it along the trace.
-        """
-        gamad = np.sum ([self.num_of_vehs_in_ap[ap][0] for ap in range(self.num_of_APs)])
-        tot_num_of_vehs = [np.sum ([self.num_of_vehs_in_ap[ap][t] for ap in range(self.num_of_APs)]) for t in range(len(self.num_of_vehs_in_ap[0]))]
-        # print (tot_num_of_vehs)
-        # gamad = range(len(self.num_of_vehs_in_ap[0]))
-        # for i in range(len(self.num_of_vehs_in_ap[0])):
-        #     print (i)
-        # exit ()
-        #print (range(3))
-        # print (range(len(self.num_of_vehs_in_ap[0])))
-        plt.title ('Total Number of Vehicles')
-        plt.plot (range(len(self.num_of_vehs_in_ap[0])), tot_num_of_vehs)
-        plt.ylabel ('Number of Vehicles')
-        plt.xlabel ('time [seconds, starting at 07:30]')
-        plt.savefig ('../res/z.jpg')
-        plt.clf()
-
-    # def find_max_X_max_Y (self):
-    # """
-    # Find the maximal values of (x,y) in a given '.loc' file (defining the positions of all objects - e.g., vehicles, or antennas).
-    # """
-    #     max_x, max_y = 0, 0
-    #     for i in range (9):
-    #         usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
-    #         print ('checking file {}' .format (usrs_loc_file_name)) 
-    #         usrs_loc_file           = open ('../res/' + usrs_loc_file_name,  "r") 
-    #         for line in usrs_loc_file: 
-    #             line = line.split ('\n')[0] 
-    #             if (line.split ("//")[0] == ""):
-    #                 continue
-    #
-    #             splitted_line = line.split (" ")
-    #
-    #             Code isn't complete here. Need to be revised
-    #     print ('max_x = {}, max_y = {}' .format (max_x, max_y))
-
+ 
     def parse_file (self):
         """
         - Read and parse input ".loc" file, detailing the users locations 
@@ -519,7 +481,7 @@ class loc2ap_c (object):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for ap in range (self.num_of_APs):
-                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, self.num_of_vehs_in_ap[ap]))
+                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, np.array(self.num_of_vehs_in_ap[ap])))
             self.calc_num_of_vehs_per_cell()
             for cell in range (self.num_of_cells):
                 printf (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}: {}\n' .format (cell, self.num_of_vehs_in_cell[cell]))
@@ -605,7 +567,6 @@ class loc2ap_c (object):
         columns = [str(i) for i in range(2**self.max_power_of_4)]
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_aps_in_cell), columns=columns), cmap="YlGnBu")
         plt.savefig('../res/{}_num_of_aps_per_cell.jpg' .format(self.antenna_loc_file_name))
-        exit () #$$$
         
         file_name_suffix = '{}_{}x{}' .format (self.time_period_str, 2**self.max_power_of_4, 2**self.max_power_of_4)
         
@@ -613,12 +574,38 @@ class loc2ap_c (object):
         # plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_cars_joined_cell{}.jpg' .format (file_name_suffix))
                    
+    def rd_num_of_vehs_per_ap_n_cell (self, input_file_name):
+        """
+        Read the number of vehicles at each ap, and each cell, as written in the input files. 
+        """
+        input_file  = open ('../res/' + input_file_name, "r")  
+    
+        self.num_of_vehs_in_ap   = [] #[[] for _ in range (self.num_of_APs)]   # self.num_of_vehs_in_ap[i][j] will hold the # of vehs in ap i in time slot j 
+        self.num_of_vehs_in_cell = [] #[[] for _ in range (self.num_of_cells)] # self.num_of_vehs_in_cell[i][j] will hold the # of vehs in cell i in time slot j
+        for line in input_file:
+    
+            if (line == "\n" or line.split ("//")[0] == ""):
+                continue
+    
+            line = line.split ("\n")[0]
+            splitted_line = line.split (":")
+            vec_name = splitted_line[0].split('_') 
+            vec_data = splitted_line[1].split('[')[1].split(']')[0].split(' ')
+            num_of_vehs = []
+            for num_of_vehs_in_this_time_slot in vec_data:
+                num_of_vehs.append (int(num_of_vehs_in_this_time_slot))
+            print (num_of_vehs)
+            if (vec_name[4] == 'ap'): # the vector's name begin by "num_of_vehs_in_ap"
+                self.num_of_vehs_in_ap.append(num_of_vehs)
+            else:
+                self.num_of_vehs_in_cell.append(num_of_vehs)
+                
 if __name__ == '__main__':
   
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_DEMOGRAPHY], antenna_loc_file_name = 'Lux.center.orange.antloc')
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_DEMOGRAPHY], antenna_loc_file_name = '') #'Lux.center.orange.antloc')
     my_loc2ap.time_period_str = ''
     # my_loc2ap.plot_num_of_aps_per_cell_heatmap()
      
-    my_loc2ap.parse_files (['0829_0830_8secs.loc']) #(['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
-    
+    my_loc2ap.parse_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('short.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')

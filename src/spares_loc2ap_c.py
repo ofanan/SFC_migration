@@ -99,3 +99,45 @@
         #
         # printf (self.heatmap_output_file, '\n\n{}' .format(self.vec_to_heatmap (np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))))
         
+
+
+
+   def plot_tot_num_of_vehs_over_t_graph (self):    
+        """
+        Plot for each ap the number of vehicles associated with it along the trace.
+        """
+        gamad = np.sum ([self.num_of_vehs_in_ap[ap][0] for ap in range(self.num_of_APs)])
+        tot_num_of_vehs = [np.sum ([self.num_of_vehs_in_ap[ap][t] for ap in range(self.num_of_APs)]) for t in range(len(self.num_of_vehs_in_ap[0]))]
+        # print (tot_num_of_vehs)
+        # gamad = range(len(self.num_of_vehs_in_ap[0]))
+        # for i in range(len(self.num_of_vehs_in_ap[0])):
+        #     print (i)
+        # exit ()
+        #print (range(3))
+        # print (range(len(self.num_of_vehs_in_ap[0])))
+        plt.title ('Total Number of Vehicles')
+        plt.plot (range(len(self.num_of_vehs_in_ap[0])), tot_num_of_vehs)
+        plt.ylabel ('Number of Vehicles')
+        plt.xlabel ('time [seconds, starting at 07:30]')
+        plt.savefig ('../res/z.jpg')
+        plt.clf()
+
+    # def find_max_X_max_Y (self):
+    # """
+    # Find the maximal values of (x,y) in a given '.loc' file (defining the positions of all objects - e.g., vehicles, or antennas).
+    # """
+    #     max_x, max_y = 0, 0
+    #     for i in range (9):
+    #         usrs_loc_file_name = 'vehicles_{}.loc' .format (i)
+    #         print ('checking file {}' .format (usrs_loc_file_name)) 
+    #         usrs_loc_file           = open ('../res/' + usrs_loc_file_name,  "r") 
+    #         for line in usrs_loc_file: 
+    #             line = line.split ('\n')[0] 
+    #             if (line.split ("//")[0] == ""):
+    #                 continue
+    #
+    #             splitted_line = line.split (" ")
+    #
+    #             Code isn't complete here. Need to be revised
+    #     print ('max_x = {}, max_y = {}' .format (max_x, max_y))
+

@@ -49,7 +49,7 @@ class loc2ap_c (object):
     # Map a given x,y position to an AP.
     # If there're real AP locations, use Voronoi distance (map each client to the nearest AP).
     # Else, use uniform-size rectangular cells, rather than finding the , replace the function below with the commented function below it.
-    loc2ap = lambda self, x, y : self.loc2cell_using_rect_cells (x, y) if self.use_rect_AP_cells else self.nearest_ap (x,y) 
+    loc2ap = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_AP_cells else self.nearest_ap (x,y) 
 
     # inline function for formatted-printing the AP of a single user
     print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
@@ -126,7 +126,7 @@ class loc2ap_c (object):
             splitted_line = line.split (',')
             x = float(splitted_line[1])
             y = float(splitted_line[2])
-            self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : x, 'y' : y, 'cell' : self.loc2cell_using_rect_cells (x, y)}) # 'cell' is the rectangle of the simulated area in which this AP is found
+            self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : x, 'y' : y, 'cell' : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4)}) # 'cell' is the rectangle of the simulated area in which this AP is found
             
         self.num_of_APs = len (self.list_of_APs)
         
@@ -136,7 +136,7 @@ class loc2ap_c (object):
             plt.savefig('../res/{}_ap_points.jpg' .format (self.antenna_loc_file_name))
             plt.clf()
 
-    def loc2cell_using_rect_cells (self, x, y):
+    def loc2cell_using_rect_cells (self, x, y, max_power_of_4):
         """
         Finding the AP covering the user's area, assuming that the number of APs is a power of 4, and rectangular cells.
         Input:  (x,y) location data
@@ -145,8 +145,8 @@ class loc2ap_c (object):
         ap = np.int8(0)
         x_offset, y_offset = x, y
         x_edge, y_edge = 0.5*self.max_x, 0.5*self.max_y
-        for p in range (self.max_power_of_4):
-            ap += 4**(self.max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) #Y: 5728/2864
+        for p in range (max_power_of_4):
+            ap += 4**(max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) #Y: 5728/2864
             x_offset, y_offset = x_offset % x_edge, y_offset % y_edge   
             x_edge /= 2
             y_edge /= 2
@@ -179,15 +179,12 @@ class loc2ap_c (object):
         """
         Prints the number of vehicles that joined/left each cell during the last simulated time slot.
         """
-        # for ap in range(self.num_of_APs):
-        #     printf (self.demography_file, 'ap_{}: joined {}\nap_{}: joined_ap_sim_via{}\nap_{}: left {}\nap_{}: left_sim_via {}\n' .format (
-        #                                         ap, self.joined_ap[ap], 
-        #                                         ap, self.joined_ap_sim_via[ap], 
-        #                                         ap, self.left_ap[ap], 
-        #                                         ap, self.left_ap_sim_via[ap]))
-        printf (self.demography_file, 'total num of joined AP={}, total num of left AP={}'     .format (np.sum(np.array(self.joined_ap)),np.sum(np.array(self.left_ap))) )
-        printf (self.demography_file, 'total num of joined cell={}, total num of left cell={}' .format (np.sum(np.array(self.joined_cell)),np.sum(np.array(self.left_cell))) )
-        printf (self.demography_file, '\n')                                        
+        for ap in range(self.num_of_APs):
+            printf (self.demography_file, 'ap_{}: joined {}\nap_{}: joined_ap_sim_via{}\nap_{}: left {}\nap_{}: left_sim_via {}\n' .format (
+                                                ap, self.joined_ap[ap], 
+                                                ap, self.joined_ap_sim_via[ap], 
+                                                ap, self.left_ap[ap], 
+                                                ap, self.left_ap_sim_via[ap]))
 
     def print_speed (self):
         """
@@ -254,32 +251,46 @@ class loc2ap_c (object):
             inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
         return inverted_mat        
 
-    def vec2heatmap (self, vec):
+    def vec2heatmap (self, vec, lvl=0):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
         n = int (math.sqrt(len(vec)))
+        if (lvl>0):
+            self.calc_tile2cell(lvl)
+        print ('len tile2cell={}, n={}' .format (len(self.tile2cell), n))
         heatmap_val = np.array ([vec[self.tile2cell[i]] for i in range (len(self.tile2cell))]).reshape ( [n, n])
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         # Hence, need to swap the matrix upside-down
         return self.invert_mat_bottom_up(heatmap_val)
 
-    def plot_num_of_vehs_heatmap (self):
+    def plot_num_of_vehs_in_cell_heatmaps (self):
         """
-        Plot a heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
+        Plot heatmaps, showing at each cell the average number of vehicles found at that cell, along the simulation.
+        The heatmaps are plotted for all possible resolutions between 4 cells, and the maximal # of cells simulated.
         """        
         # Generate a Python heatmap
-        plt.figure()       
         
-        self.calc_avg_num_of_vehs_per_cell() 
-        heatmap_vals = self.vec2heatmap (self.avg_num_of_vehs_in_cell) #([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))
-        columns = [str(i) for i in range(2**self.max_power_of_4)]
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.num_of_vehs_in_cell[cell]) for cell in range(self.num_of_cells)])),columns=columns), cmap="YlGnBu", norm=LogNorm())
-        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        plt.title ('avg num of cars per cell')
-        plt.savefig('../res/heatmap_num_vehs_{}cells{}.jpg' .format (self.num_of_cells, self.cell_type_identifier()))
-        return heatmap_vals
+        
+        # self.calc_avg_num_of_vehs_per_cell() 
+        # heatmap_vals = self.vec2heatmap (self.avg_num_of_vehs_in_cell) #([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))
+
+        avg_num_of_vehs_per_cell = np.array ([np.average(self.num_of_vehs_in_cell[cell]) for cell in range(self.num_of_cells)]) 
+        print ('len avg_num_of_vehs_per_cell={}' .format (len(avg_num_of_vehs_per_cell))) #$$$
+        for lvl in range (0, self.max_power_of_4):
+            columns = [str(i) for i in range(2**(self.max_power_of_4-lvl))]
+            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            plt.figure()       
+            print ('len avg_num_of_vehs_per_cell={}' .format (len(avg_num_of_vehs_per_cell))) #$$$
+            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_cell, lvl=lvl),columns=columns), cmap="YlGnBu")#, norm=LogNorm())
+            my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+            plt.title ('avg num of cars per cell')
+            plt.savefig('../res/heatmap_num_vehs_{}cells{}.jpg' .format (int(self.num_of_cells/(4**lvl)), self.cell_type_identifier()))
+            reshaped_heatmap = avg_num_of_vehs_per_cell.reshape (int(len(avg_num_of_vehs_per_cell)/4), 4) # prepare the averaging for the next iteration
+            avg_num_of_vehs_per_cell = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
+        
+    
 
     def calc_avg_num_of_vehs_per_cell (self):
         """
@@ -315,27 +326,19 @@ class loc2ap_c (object):
         """
         prepare a translation of the "Tile" (line-by-line regular index given to cells) to the cell id.
         """
-        if (lvl == 0):
-            # To calclate the tile, we calculate positions within each cell in the simulated area, and then call loc2cell_using_rect_cells() to calculate the cell associated with this position. 
-            power = lvl
-            n = int(math.sqrt (self.num_of_cells/4**power))
-            self.tile2cell   = np.empty (n**2, dtype = 'uint8')
-            offset_x          = self.max_x // (2*n)        
-            offset_y          = self.max_y // (2*n)        
-            ap                = 0
-            for y in range (offset_x, self.max_y, self.max_y // n): 
-                for x in range (offset_y, self.max_x, self.max_x // n): 
-                    self.tile2cell[ap] = self.loc2cell_using_rect_cells(x, y) 
-                    ap+=1 
-        elif (lvl == 1):
-            self.tile2cell = [0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15] 
-        elif (lvl == 2):
-            self.tile2cell = [0,1,2,3]
-        elif (lvl == 3):
-            self.tile2cell = [0]
-        else:
-            print ('Sorry, the level of 4 you chose is still unsupported by calc_tile2cell')
-            exit ()
+        
+        # To calclate the tile, we calculate positions within each cell in the simulated area, and then call loc2cell_using_rect_cells() to calculate the cell associated with this position. 
+        max_power_of_4   = self.max_power_of_4 - lvl
+        n                = int(math.sqrt (self.num_of_cells/4**lvl))
+        self.tile2cell   = np.empty (n**2, dtype = 'uint8')
+        offset_x         = self.max_x // (2*n)        
+        offset_y         = self.max_y // (2*n)        
+        rect             = 0
+        for y in range (offset_x, self.max_y, self.max_y // n): 
+            for x in range (offset_y, self.max_x, self.max_x // n): 
+                self.tile2cell[rect] = self.loc2cell_using_rect_cells(x, y, max_power_of_4=max_power_of_4) 
+                rect+=1 
+        print ('lvl={}, n={}, len(tile2cell)={}' .format (lvl, n, len(self.tile2cell)))
 
     def plot_num_of_vehs_per_ap_graph (self):    
         """
@@ -462,7 +465,7 @@ class loc2ap_c (object):
             printf(self.ap_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
             # self.plot_num_of_vehs_per_ap_graph ()
-            self.plot_num_of_vehs_heatmap()
+            self.plot_num_of_vehs_in_cell_heatmaps()
         # if (VERBOSE_DEMOGRAPHY in self.verbose):
         #     self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
@@ -603,9 +606,9 @@ class loc2ap_c (object):
 if __name__ == '__main__':
   
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_DEMOGRAPHY], antenna_loc_file_name = '') #'Lux.center.orange.antloc')
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_DEMOGRAPHY], antenna_loc_file_name = 'Lux.center.orange.antloc') #'Lux.center.orange.antloc')
     my_loc2ap.time_period_str = ''
     # my_loc2ap.plot_num_of_aps_per_cell_heatmap()
      
-    my_loc2ap.parse_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap.parse_files (['0829_0830_8secs.loc']) #(['0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
     # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('short.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')

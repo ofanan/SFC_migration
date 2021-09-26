@@ -304,7 +304,7 @@ class loc2ap_c (object):
         
         self.set_usrs_loc_file_name(usrs_loc_file_name)
         avg_num_of_vehs_per_antenna = self.avg_num_of_vehs_per_cell() / self.calc_num_of_aps_per_cell()
-        avg_num_of_vehs_per_antenna = [(0 if np.isnan(item) else item) for item in avg_num_of_vehs_per_antenna] # if there're no APs at this cell, define the number of vehs to cell for this cell as 0
+        avg_num_of_vehs_per_antenna = np.array ([(0 if np.isnan(item) else item) for item in avg_num_of_vehs_per_antenna]) # if there're no APs at this cell, define the number of vehs to cell for this cell as 0
         for lvl in range (0, self.max_power_of_4):
             columns = [str(i) for i in range(2**(self.max_power_of_4-lvl))]
             self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
@@ -314,8 +314,6 @@ class loc2ap_c (object):
             plt.title ('avg num of cars per antenna')
             plt.savefig('../res/heatmap_num_vehs_over_num_aps_{}_{}_{}cells.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             reshaped_heatmap = avg_num_of_vehs_per_antenna.reshape (int(len(avg_num_of_vehs_per_antenna)/4), 4) # prepare the averaging for the next iteration
-            print ('avg_num_of_vehs_per_antenna={}' .format (avg_num_of_vehs_per_antenna))
-            print ('reshaped_heatmap={}' .format(reshaped_heatmap))
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_antenna for the next iteration
                 avg_num_of_vehs_per_antenna = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
     

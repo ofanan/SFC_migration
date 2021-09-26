@@ -8,7 +8,8 @@ from matplotlib.ticker import MaxNLocator
 import itertools 
 import time 
 
-from printf import printf
+from printf import printf, printar
+from ntpath import split
 
 GLOBAL_MAX_X_LUX, GLOBAL_MAX_Y_LUX = int(13622), int(11457)             # size of the city's area, in meters. 
 MAX_X_LUX,        MAX_Y_LUX        = GLOBAL_MAX_X_LUX//2, GLOBAL_MAX_Y_LUX//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)  
@@ -107,7 +108,7 @@ class loc2ap_c (object):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
             self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_file_name = '../res/num_of_vehs_per_ap_{}aps{}.txt' .format (4**self.max_power_of_4, self.cell_type_identifier())
+            self.num_of_vehs_file_name = '../res/num_of_vehs_{}_{}aps.txt' .format (self.antenna_loc_file_name, self.num_of_APs)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
         self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell.
         
@@ -251,14 +252,13 @@ class loc2ap_c (object):
             inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
         return inverted_mat        
 
-    def vec2heatmap (self, vec, lvl=0):
+    def vec2heatmap (self, vec):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
         n = int (math.sqrt(len(vec)))
-        if (lvl>0):
-            self.calc_tile2cell(lvl)
-        print ('len tile2cell={}, n={}' .format (len(self.tile2cell), n))
+        if (len(vec) != len(self.tile2cell)): # The current mapping of tile2cell doesn't fit the number of rectangles in the given vec --> calculate a tile2cell mapping fitting the required len
+            self.calc_tile2cell (lvl=self.max_power_of_4 - int(math.log2(n)))
         heatmap_val = np.array ([vec[self.tile2cell[i]] for i in range (len(self.tile2cell))]).reshape ( [n, n])
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
@@ -267,29 +267,25 @@ class loc2ap_c (object):
 
     def plot_num_of_vehs_in_cell_heatmaps (self):
         """
-        Plot heatmaps, showing at each cell the average number of vehicles found at that cell, along the simulation.
+        Generate a Python heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
         The heatmaps are plotted for all possible resolutions between 4 cells, and the maximal # of cells simulated.
         """        
-        # Generate a Python heatmap
         
-        
-        # self.calc_avg_num_of_vehs_per_cell() 
-        # heatmap_vals = self.vec2heatmap (self.avg_num_of_vehs_in_cell) #([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]))
-
         avg_num_of_vehs_per_cell = np.array ([np.average(self.num_of_vehs_in_cell[cell]) for cell in range(self.num_of_cells)]) 
-        print ('len avg_num_of_vehs_per_cell={}' .format (len(avg_num_of_vehs_per_cell))) #$$$
         for lvl in range (0, self.max_power_of_4):
             columns = [str(i) for i in range(2**(self.max_power_of_4-lvl))]
             self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
             plt.figure()       
-            print ('len avg_num_of_vehs_per_cell={}' .format (len(avg_num_of_vehs_per_cell))) #$$$
-            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_cell, lvl=lvl),columns=columns), cmap="YlGnBu")#, norm=LogNorm())
+            if (lvl==3):
+                my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_cell),columns=columns), cmap="YlGnBu", vmin=670, vmax=740)#, norm=LogNorm())
+            else:
+                my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_cell),columns=columns), cmap="YlGnBu")#, norm=LogNorm())
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
             plt.title ('avg num of cars per cell')
-            plt.savefig('../res/heatmap_num_vehs_{}cells{}.jpg' .format (int(self.num_of_cells/(4**lvl)), self.cell_type_identifier()))
+            plt.savefig('../res/heatmap_num_vehs_{}_{}_{}cells.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             reshaped_heatmap = avg_num_of_vehs_per_cell.reshape (int(len(avg_num_of_vehs_per_cell)/4), 4) # prepare the averaging for the next iteration
-            avg_num_of_vehs_per_cell = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
-        
+            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
+                avg_num_of_vehs_per_cell = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
     
 
     def calc_avg_num_of_vehs_per_cell (self):
@@ -338,7 +334,6 @@ class loc2ap_c (object):
             for x in range (offset_y, self.max_x, self.max_x // n): 
                 self.tile2cell[rect] = self.loc2cell_using_rect_cells(x, y, max_power_of_4=max_power_of_4) 
                 rect+=1 
-        print ('lvl={}, n={}, len(tile2cell)={}' .format (lvl, n, len(self.tile2cell)))
 
     def plot_num_of_vehs_per_ap_graph (self):    
         """
@@ -484,10 +479,12 @@ class loc2ap_c (object):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for ap in range (self.num_of_APs):
-                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: {}\n' .format (ap, np.array(self.num_of_vehs_in_ap[ap])))
+                printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: ' .format (ap))
+                printar (self.num_of_vehs_output_file, self.num_of_vehs_in_ap[ap])
             self.calc_num_of_vehs_per_cell()
             for cell in range (self.num_of_cells):
-                printf (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}: {}\n' .format (cell, self.num_of_vehs_in_cell[cell]))
+                printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}:' .format (cell))
+                printar (self.num_of_vehs_output_file, self.num_of_vehs_in_cell[cell])
         if (VERBOSE_DEMOGRAPHY in self.verbose): 
             printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
             self.print_demography()
@@ -573,10 +570,6 @@ class loc2ap_c (object):
         
         file_name_suffix = '{}_{}x{}' .format (self.time_period_str, 2**self.max_power_of_4, 2**self.max_power_of_4)
         
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cells)])), columns=columns), cmap="YlGnBu")
-        # plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_joined_cell{}.jpg' .format (file_name_suffix))
-                   
     def rd_num_of_vehs_per_ap_n_cell (self, input_file_name):
         """
         Read the number of vehicles at each ap, and each cell, as written in the input files. 
@@ -591,9 +584,14 @@ class loc2ap_c (object):
                 continue
     
             line = line.split ("\n")[0]
+            print ('line={}' .format(line))
             splitted_line = line.split (":")
             vec_name = splitted_line[0].split('_') 
+            print ('splitted_line={}' .format(splitted_line))
+            vec_data = splitted_line[1]
+            vec_data = splitted_line[1].split('[')[1]
             vec_data = splitted_line[1].split('[')[1].split(']')[0].split(' ')
+            print ('vec_data = {}' .format (splitted_line[1].split('[')[1].split(']')[0]))
             num_of_vehs = []
             for num_of_vehs_in_this_time_slot in vec_data:
                 num_of_vehs.append (int(num_of_vehs_in_this_time_slot))
@@ -606,9 +604,13 @@ class loc2ap_c (object):
 if __name__ == '__main__':
   
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_DEMOGRAPHY], antenna_loc_file_name = 'Lux.center.orange.antloc') #'Lux.center.orange.antloc')
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antenna_loc_file_name = 'Lux.center.post.antloc') #'Lux.center.post.antloc')
+    my_loc2ap.parse_files (['0829_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
     my_loc2ap.time_period_str = ''
-    # my_loc2ap.plot_num_of_aps_per_cell_heatmap()
+    my_loc2ap.plot_num_of_aps_per_cell_heatmap()
      
-    my_loc2ap.parse_files (['0829_0830_8secs.loc']) #(['0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
-    # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('short.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')
+    # # my_loc2ap.parse_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    # my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [], antenna_loc_file_name = 'short.antloc') #Lux.center.post.antloc') #'Lux.center.post.antloc')
+    # my_loc2ap.time_period_str = ''
+    # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('num_of_vehs_per_ap_256aps_ant.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')
+    # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps()

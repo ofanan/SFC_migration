@@ -303,9 +303,10 @@ class loc2ap_c (object):
         """        
         
         self.set_usrs_loc_file_name(usrs_loc_file_name)
-        avg_num_of_vehs_per_cell = self.calc_num_of_vehs_per_cell()
+        self.calc_num_of_vehs_per_cell()
+        avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell ()
         num_of_aps_per_cell      = self.calc_num_of_aps_per_cell()
-        avg_num_of_vehs_per_antenna = [(0 if (num_of_aps_per_cell[c]==0) else avg_num_of_vehs_per_cell[c] / num_of_aps_per_cell[c]) for c in range(self.num_of_cells) ]
+        avg_num_of_vehs_per_antenna = np.array([(0 if (num_of_aps_per_cell[c]==0) else avg_num_of_vehs_per_cell[c] / num_of_aps_per_cell[c]) for c in range(self.num_of_cells) ])
         for lvl in range (0, self.max_power_of_4):
             columns = [str(i) for i in range(2**(self.max_power_of_4-lvl))]
             self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
@@ -327,7 +328,6 @@ class loc2ap_c (object):
         self.num_of_vehs_in_cell = np.zeros ( (self.num_of_cells, len(self.num_of_vehs_in_ap[0])), dtype='int16')  
         for ap in range (self.num_of_APs):
             self.num_of_vehs_in_cell[self.ap2cell(ap)] += np.array (self.num_of_vehs_in_ap[ap]) # Add the # of cars in this AP to the (avg) number of cars in the cell to which this AP belongs    
-            #self.num_of_vehs_in_ap[ap].append (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) )))
         
     def plot_speed_heatmap (self):
         """
@@ -638,7 +638,7 @@ if __name__ == '__main__':
     # Processing
     max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antenna_loc_file_name = 'Lux.center.post.antloc') #'Lux.center.post.antloc')
-    my_loc2ap.parse_loc_files (['0829_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap.parse_loc_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
     my_loc2ap.plot_num_of_vehs_per_antenna (usrs_loc_file_name='0829_0830_8secs.loc')
     exit ()
 

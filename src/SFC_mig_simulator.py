@@ -181,10 +181,6 @@ class SFC_mig_simulator (object):
         """"
         given the (augmented) cpu cap' at each lvl, assign each server its 'RCs' (augmented CPU cap vals); and initialise 'a' (the amount of available CPU) to 'RCs' (the augmented CPU cap).
         """
-        print (aug_cpu_capacity_at_lvl)
-        # for s in self.G.nodes:
-        #     print ('self.G.nodes[{}][lvl]={}' .format (s, self.G.nodes[s]['lvl']))
-        # exit () #$$$
         for s in self.G.nodes:
             self.G.nodes[s]['RCs'] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
             self.G.nodes[s]['a'  ] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
@@ -594,7 +590,6 @@ class SFC_mig_simulator (object):
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt']   = shortest_path[s][root][1]
             self.G.nodes[s]['nChild'] = self.children_per_node # Num of children of this server (==node)
-            print ('prnt of {} is {}' .format (s, self.G.nodes[s]['prnt']))
         for cell in range (self.num_of_leaves): # for each cell 
             APs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.APs))
             if (len(APs_of_this_cell)==0): # No APs at this cell
@@ -607,7 +602,6 @@ class SFC_mig_simulator (object):
 
                 # Remove all parents that don't have any child
                 if (self.G.nodes[prnt]['nChild']==0):
-                    print ('removing prnt={}' .format(prnt))
                     self.G.remove_node(prnt) # Remove the leaf server handling this cell
                 
         # nx.draw (self.G, with_labels=True) 
@@ -647,12 +641,10 @@ class SFC_mig_simulator (object):
         # print ('self.ap2s{}' .format(self.ap2s))
         # nx.draw (self.G, with_labels=True) 
         # plt.show()
-        exit ()
 
         # Update the tree height's by the changes made, and set 
         shortest_path    = nx.shortest_path(self.G)
         self.tree_height = len (shortest_path[self.ap2s[0]][root]) - 1
-        print ('updated tree height={}' .format (self.tree_height))
         
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
@@ -665,10 +657,8 @@ class SFC_mig_simulator (object):
 
         # Levelize the updated tree
         for leaf in self.ap2s:
-            # print ('leaf={}, shortest_path={}' .format (leaf, shortest_path[leaf][root]))
             
             for lvl in range (self.tree_height):
-                print ('s={}, lvl={}' .format (shortest_path[leaf][root][lvl], lvl))
                 self.G.nodes[shortest_path[leaf][root][lvl]]['lvl']     = np.uint8(lvl) # assume here a balanced tree
                 self.G.nodes[shortest_path[leaf][root][lvl]]['cpu cap'] = self.cpu_cap_at_lvl[lvl]                
         self.G.nodes[0]['lvl'] = self.tree_height

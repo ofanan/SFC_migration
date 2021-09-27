@@ -140,8 +140,7 @@ class loc2ap_c (object):
         
         self.calc_tile2cell (lvl=0) 
         # if (plot_ap_locs_heatmap):
-            # num_of_aps_per_cell = self.calc_num_of_aps_per_cell()
-        
+            # num_of_aps_per_cell = self.calc_num_of_aps_per_cell()        
 
         # Plots a heatmap, showing the number of APs in each cell.
         # When using rectangular AP-cells, the heatmap should show fix 1 for all cells.
@@ -152,12 +151,10 @@ class loc2ap_c (object):
             my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_aps_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap="YlGnBu")#, norm=LogNorm())
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
             plt.title   ('number of APs per cell')
-            plt.savefig ('../res/heatmap_num_APs_per_cell_{}_()cells.jpg' .format (self.antenna_loc_file_name, 4**(self.max_power_of_4-lvl)))
+            plt.savefig ('../res/heatmap_num_APs_per_cell_{}_{}cells.jpg' .format (self.antenna_loc_file_name, int(self.num_of_cells/(4**lvl))))
 
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
-                reshaped_heatmap = num_of_aps_per_cell.reshape (int(len(num_of_aps_per_cell)/4), 4) # prepare the averaging for the next iteration
-                num_of_aps_per_cell = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
-
+                num_of_aps_per_cell = self.aggregate_heatmap_cells (num_of_aps_per_cell)
         
         plt.plot([ap['x'] for ap in self.list_of_APs], [ap['y'] for ap in self.list_of_APs], 'o', color='black');
         plt.axis([0, MAX_X_LUX, 0, MAX_Y_LUX])
@@ -322,8 +319,6 @@ class loc2ap_c (object):
             plt.savefig('../res/heatmap_num_vehs_{}_{}_{}cells.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
                 avg_num_of_vehs_per_cell = self.aggregate_heatmap_cells (avg_num_of_vehs_per_cell)
-                # reshaped_heatmap = avg_num_of_vehs_per_cell.reshape (int(len(avg_num_of_vehs_per_cell)/4), 4) # prepare the averaging for the next iteration
-                # avg_num_of_vehs_per_cell = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
 
     def aggregate_heatmap_cells (self, vec):
         """
@@ -353,7 +348,6 @@ class loc2ap_c (object):
             reshaped_heatmap = avg_num_of_vehs_per_AP.reshape (int(len(avg_num_of_vehs_per_AP)/4), 4) # prepare the averaging for the next iteration
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_AP for the next iteration
                 avg_num_of_vehs_per_AP = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
-    
 
     def calc_num_of_vehs_per_cell (self): 
         """

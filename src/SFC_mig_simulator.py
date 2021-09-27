@@ -551,10 +551,12 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr(usr)
        
             
-    def gen_parameterized_tree (self):
+    def gen_parameterized_tree (self, ap2cell_file_name=''):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         """
+        
+        # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of APs.
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         self.use_exp_cpu_cost = True
         # self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)] # This line produces super-exp cpu costs 
@@ -573,14 +575,14 @@ class SFC_mig_simulator (object):
         shortest_path = nx.shortest_path(self.G)
 
         # levelize the tree (assuming a balanced tree)
-        self.ap2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server.
+        self.cell2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         for s in self.G.nodes(): # for every server
             self.G.nodes[s]['id'] = s
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
-                self.ap2s.append (s) #[self.num_of_leaves] = s
+                self.cell2s.append (s) #[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
@@ -593,6 +595,55 @@ class SFC_mig_simulator (object):
                     #     if (n > i):
                     #         print (n)
 
+
+        s_of_cur_ap = self.G.number_of_nodes() # We will later add servers, with increasing IDs
+        num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
+        print (num_fo_nodes_b4_pruning)
+        if (ap2cell_file_name == ''): # Is there exists a file, detailing the cell to which each AP belongs?
+            self.ap2s = self.cell2s.copy () # No --> so "cells" are equivalent to "AP" (each AP is associated with the cell, with the same id).
+        else: 
+            self.rd_ap2cell_file(ap2cell_file_name)
+            
+            # First, remove all the servers in cells that don't contain AP
+            for cell in range (self.num_of_leaves): # for each cell 
+                APs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.APs))
+                if (len(APs_of_this_cell)==0): # No APs at this cell
+                    self.G.remove_node(self.cell2s[cell]) # Remove the leaf server handling this cell
+                    self.num_of_leaves -= 1 # We have just removed one leaf server
+
+            nx.draw (self.G, with_labels=True) 
+            plt.show()
+
+            # Garbage collection
+            server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
+            print (server_ids_to_recycle)
+            for s in range(num_fo_nodes_b4_pruning): 
+                if (len(server_ids_to_recycle)==0): # No more ids to recycle
+                    break
+                if (s in server_ids_to_recycle): # No server with this id
+                    continue
+                id_to_recycle = min (server_ids_to_recycle)
+                if (s > id_to_recycle): # Can decrement the current ID of s, by modifying it to be the current id to recycle
+                    print ('s={}, server_ids_to_recycle={}, id_to_recycle={}' .format (s, server_ids_to_recycle, id_to_recycle))
+                    self.G = nx.relabel_nodes(self.G, {s : id_to_recycle})
+                    server_ids_to_recycle.remove(id_to_recycle)
+                    server_ids_to_recycle.add (s)
+            nx.draw (self.G, with_labels=True) 
+            plt.show()
+            exit ()
+            #
+            #
+            #
+            # exit ()
+
+            # # To keep the IDs of leaves the greatest in the tree, only after we finished removing all the unncessary cells, we add new leaves for the APs below each cell
+            # for cell in range (self.num_of_leaves): # for each cell 
+            #     for ap in list (filter (lambda item : item['cell']==cell, self.APs)): # for each ap belonging to this cell
+            #         self.G.add_node (s_of_cur_ap)
+            #         s_of_cur_ap += 1
+
+        nx.draw (self.G, with_labels=True) 
+        plt.show()
         self.set_RCs_and_a (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
         # Find parents of all nodes (except of the root)
@@ -624,7 +675,7 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 3, children_per_node = 4, cpu_cap_at_leaf=561, prob_of_target_delay=0.3):
+    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf=561, prob_of_target_delay=0.3, ap2cell_file_name=''):
         """
         """
         
@@ -634,8 +685,8 @@ class SFC_mig_simulator (object):
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
         
         # Network parameters
-        self.tree_height                = tree_height
-        self.children_per_node          = children_per_node # num of children of every non-leaf node
+        self.tree_height                = 2 if (self.ap_file_name=='shorter.ap') else tree_height 
+        self.children_per_node          = 2 if (self.ap_file_name=='shorter.ap') else children_per_node
         self.cpu_cap_at_leaf            = 30 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
@@ -662,7 +713,7 @@ class SFC_mig_simulator (object):
             self.num_of_critical_usrs_in_slot = [] 
             self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
-        self.gen_parameterized_tree  ()
+        self.gen_parameterized_tree  (ap2cell_file_name)
         self.delay_const_sanity_check()
 
     def init_cost_comp (self):
@@ -1381,9 +1432,34 @@ class SFC_mig_simulator (object):
     def calc_total_cpu_rsrcs (self):
         return sum ([self.G.nodes[s]['cpu cap'] for s in self.G.nodes])
      
+    def rd_ap2cell_file (self, ap2cell_file_name):
+        """
+        Parse an ap2cell file.
+        An ap2cell file contains a list of APs, and, for each AP, the cell in which it is located.
+        """
+        
+        self.APs = []
+        input_file = open ('../res/' + ap2cell_file_name, 'r')
+        
+        for line in input_file:
+    
+            if (line == "\n" or line.split ("//")[0] == ""):
+                continue
 
+            line = line.split ("\n")[0]
+            splitted_line = line.split ()
+            self.APs.append ({'ap' : int(splitted_line[0]), 'cell' : int(splitted_line[1])})
+    
+
+#######################################################################################################################################
+# Functions that are not part of the class
+#######################################################################################################################################
 
 def run_prob_of_RT_sim ():
+    """
+    Run a simulation where the probability of a RT application varies. 
+    Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
+    """
     
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
 
@@ -1404,16 +1480,18 @@ def run_prob_of_RT_sim ():
         for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
             my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
                                               verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
                                               cpu_cap_at_leaf       = cpu_cap_at_leaf,
                                               prob_of_target_delay  = prob_of_target_delay, 
                                               )
     
             cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
-    
+          
 
 def run_cost_by_rsrc ():
-
+    """
+    Run a simulation where the amount of resources varies. 
+    Output the cost obtained at each time slot.
+    """
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     
     # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = 459)
@@ -1427,8 +1505,6 @@ def run_cost_by_rsrc ():
     #     for cpu_cap in [208, 416, 624]: #[int(round((min_req_cap + step*i))) for i in range (0, 11, 21)]:
     #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
     #                                           verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                           children_per_node     = 2 if ap_file_name=='shorter.ap' else 4,
     #                                           cpu_cap_at_leaf       = cpu_cap
     #                                           )
     #
@@ -1441,25 +1517,28 @@ def run_cost_by_rsrc ():
     min_cpu_ffit   = 438 
     min_cpu_cpvnf  = 447
 
-    # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = min_cpu_ourAlg)
+    # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = min_cpu_ourAlg)
     # my_simulator.simulate (mode = 'ourAlg', sim_len_in_slots = 61) 
     # for mode in ['ffit', 'ourAlg']:
-    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = min_cpu_ffit)
+    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = min_cpu_ffit)
     #     my_simulator.simulate (mode = mode, sim_len_in_slots = 61) 
     # for mode in ['ffit', 'cpvnf', 'ourAlg']:
-    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = min_cpu_cpvnf)
+    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = min_cpu_cpvnf)
     #     my_simulator.simulate (mode = mode, sim_len_in_slots = 61) 
 
     # for cpu in [min_cpu_cpvnf]:
-    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = cpu)
+    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = cpu)
     #     my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
 
     for cpu in [499, 520]:
-        my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = cpu)
+        my_simulator = SFC_mig_simulator ()
         my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
 
+def run_antloc_sim ():
+    my_simulator = SFC_mig_simulator (ap2cell_file_name = 'short.ap2cell') # my_simulator.rd_ap2cell_file ('Lux.center.post.antloc_256cells.ap2cell')
+    exit ()
+ 
 if __name__ == "__main__":
     
-    run_cost_by_rsrc ()
-    # run_prob_of_RT_sim()*
+    run_antloc_sim ()
 

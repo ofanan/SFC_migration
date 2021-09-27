@@ -550,10 +550,16 @@ class SFC_mig_simulator (object):
         for usr in usrs:
             self.CPUAll_single_usr(usr)
        
+       
+    # def levelize_tree (self):
+    #     """
+    #     Associate with each server i
+    #     """
             
-    def gen_parameterized_tree (self, ap2cell_file_name=''):
+    def gen_parameterized_antloc_tree (self, ap2cell_file_name=''):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
+        Add leaves for each AP, and prune sub-trees that don't have any descended APs.
         """
         
         # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of APs.
@@ -575,7 +581,7 @@ class SFC_mig_simulator (object):
         shortest_path = nx.shortest_path(self.G)
 
         # levelize the tree (assuming a balanced tree)
-        self.cell2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
+        self.cell2s           = [] # Will contain a least translating the cell number to the ID of the co-located server. 
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         for s in self.G.nodes(): # for every server
@@ -583,6 +589,121 @@ class SFC_mig_simulator (object):
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
                 self.cell2s.append (s) #[self.num_of_leaves] = s
+                self.num_of_leaves += 1
+
+        s_of_cur_ap = self.G.number_of_nodes() # We will later add servers, with increasing IDs
+        num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
+        self.rd_ap2cell_file(ap2cell_file_name)
+        
+        # First, remove all the servers in cells that don't contain AP
+        for cell in range (self.num_of_leaves): # for each cell 
+            APs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.APs))
+            if (len(APs_of_this_cell)==0): # No APs at this cell
+                self.G.remove_node(self.cell2s[cell]) # Remove the leaf server handling this cell
+                self.num_of_leaves -= 1 # We have just removed one leaf server
+                self.cell2s[cell] = -1 # Now, this cell isn't associated with any server
+
+        nx.draw (self.G, with_labels=True) 
+        plt.show()
+
+        # Garbage collection: condense all the remaining nodes (==servers), so that they'll have sequencing IDs, starting from 0
+        server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
+        print (server_ids_to_recycle)
+        for s in range(num_fo_nodes_b4_pruning): 
+            if (len(server_ids_to_recycle)==0): # No more ids to recycle
+                break
+            if (s in server_ids_to_recycle): # No server with this id
+                continue
+            id_to_recycle = min (server_ids_to_recycle)
+            if (s > id_to_recycle): # Can decrement the current ID of s, by modifying it to be the current id to recycle
+                self.G = nx.relabel_nodes(self.G, {s : id_to_recycle})
+                server_ids_to_recycle.remove(id_to_recycle)
+                server_ids_to_recycle.add (s)
+                
+                # Update self.cell2s accordingly
+                my_cell_as_list = [i for i, x in enumerate(self.cell2s) if x == s]
+                self.cell2s[my_cell_as_list[0]] = id_to_recycle
+                
+        nx.draw (self.G, with_labels=True) 
+        plt.show()
+        
+        # Add new leaves for the APs below each cell. 
+        # To keep the IDs of leaves the greatest in the tree, only after we finished removing all the useless cells.
+        self.num_of_srvrs = len(self.G.nodes())
+        # for cell in range (self.num_of_leaves): # for each cell 
+        for ap in [ap for ap in self.APs]: #(filter (lambda item : item['cell']==cell, self.APs)): # for each ap belonging to this cell
+            ap['s'] = len(self.G.nodes())   # We'll shortly add a server for this AP, so the id of this AP will be current number of servers+1.
+            self.G.add_node (len(self.G.nodes())) # Add a server co-located with this AP
+            self.G.add_edge (ap['s'], self.cell2s[ap['cell']]) # Add an edge from the newly added server, to the server handling the cell of this AP, ...
+            self.G.add_edge (self.cell2s[ap['cell']], ap['s']) # And vice versa
+
+        nx.draw (self.G, with_labels=True) 
+        plt.show()
+        print ('cell2s={}, self.APs={}' .format (self.cell2s, self.APs))
+        exit ()
+        self.set_RCs_and_a (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
+
+        # Find parents of all nodes (except of the root)
+        for s in range (1, len(self.G.nodes())):
+            self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
+
+        # # Calculate delays and costs for the fully-hetero' case, where each link may have a unique cost / delay.    
+        # for edge in self.G.edges: 
+        #     self.G[edge[0]][edge[1]]['delay'] = self.Lmax / self.uniform_link_capacity + self.uniform_Tpd
+            # paths_using_this_edge = []
+            # for src in range (self.NUM_OF_SERVERS):
+                # for dst in range (self.NUM_OF_SERVERS): 
+                    # if ((edge[0],edge[1]) in links_of_path[src][dst]): # Does link appear in the path from src to dst
+                        # paths_using_this_edge.append ((src, dst)) # Yep --> append it to the list of paths in which this link appears
+            # self.G[edge[0]][edge[1]]['paths using this edge'] = paths_using_this_edge
+
+        # self.path_delay[s][d] will hold the prop' delay of the path from server s to server d
+        # self.path_delay   = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS]) 
+        # self.path_bw_cost = np.zeros ([self.NUM_OF_SERVERS, self.NUM_OF_SERVERS])
+        # for s in range (self.NUM_OF_SERVERS):
+        #     for d in range (self.NUM_OF_SERVERS):
+        #         if (s == d):
+        #             continue
+        #         self.path_delay   [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['delay'] for hop in range (len(shortest_path[s][d])-1))
+        #         self.path_bw_cost [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['cost']  for hop in range (len(shortest_path[s][d])-1))
+                
+        # calculate the network delay from a leaf to a node in each level,  
+        # assuming that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
+        # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
+        # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
+
+    def gen_parameterized_full_tree (self):
+        """
+        Generate a parameterized full tree with specified height and children-per-non-leaf-node. 
+        """
+        
+        # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of APs.
+        self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
+        self.use_exp_cpu_cost = True
+        # self.CPU_cost_at_lvl   = [1 + (self.tree_height - lvl)**5 for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)] # This line produces super-exp cpu costs 
+        self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
+        self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
+        self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
+        self.use_exp_cpu_cap = False
+        self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+        
+        # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
+        self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
+        self.link_delay_of_CLP_at_lvl = [2 * sum([self.link_delay_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
+        
+        self.G = self.G.to_directed()
+
+        shortest_path = nx.shortest_path(self.G)
+
+        # levelize the tree (assuming a balanced tree)
+        self.ap2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
+        root                  = 0 # In networkx, the ID of the root is 0
+        self.num_of_leaves    = 0
+        for s in self.G.nodes(): # for every server
+            self.G.nodes[s]['id'] = s
+            if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
+                self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
+                self.ap2s.append (s) #[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
@@ -596,57 +717,6 @@ class SFC_mig_simulator (object):
                     #         print (n)
 
 
-        s_of_cur_ap = self.G.number_of_nodes() # We will later add servers, with increasing IDs
-        num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
-        print (num_fo_nodes_b4_pruning)
-        if (ap2cell_file_name == ''): # Is there exists a file, detailing the cell to which each AP belongs?
-            self.ap2s = self.cell2s.copy () # No --> so "cells" are equivalent to "AP" (each AP is associated with the cell, with the same id).
-        else: 
-            self.rd_ap2cell_file(ap2cell_file_name)
-            
-            # First, remove all the servers in cells that don't contain AP
-            for cell in range (self.num_of_leaves): # for each cell 
-                APs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.APs))
-                if (len(APs_of_this_cell)==0): # No APs at this cell
-                    self.G.remove_node(self.cell2s[cell]) # Remove the leaf server handling this cell
-                    self.num_of_leaves -= 1 # We have just removed one leaf server
-
-            nx.draw (self.G, with_labels=True) 
-            plt.show()
-
-            # Garbage collection
-            server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
-            print (server_ids_to_recycle)
-            for s in range(num_fo_nodes_b4_pruning): 
-                if (len(server_ids_to_recycle)==0): # No more ids to recycle
-                    break
-                if (s in server_ids_to_recycle): # No server with this id
-                    continue
-                id_to_recycle = min (server_ids_to_recycle)
-                if (s > id_to_recycle): # Can decrement the current ID of s, by modifying it to be the current id to recycle
-                    print ('s={}, server_ids_to_recycle={}, id_to_recycle={}' .format (s, server_ids_to_recycle, id_to_recycle))
-                    self.G = nx.relabel_nodes(self.G, {s : id_to_recycle})
-                    server_ids_to_recycle.remove(id_to_recycle)
-                    server_ids_to_recycle.add (s)
-            nx.draw (self.G, with_labels=True) 
-            plt.show()
-            exit ()
-            #
-            #
-            #
-            # exit ()
-
-            # # To keep the IDs of leaves the greatest in the tree, only after we finished removing all the unncessary cells, we add new leaves for the APs below each cell
-            # for cell in range (self.num_of_leaves): # for each cell 
-            #     for ap in list (filter (lambda item : item['cell']==cell, self.APs)): # for each ap belonging to this cell
-            #         self.G.add_node (s_of_cur_ap)
-            #         s_of_cur_ap += 1
-
-        nx.draw (self.G, with_labels=True) 
-        plt.show()
-        self.set_RCs_and_a (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
-
-        # Find parents of all nodes (except of the root)
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
 
@@ -713,7 +783,10 @@ class SFC_mig_simulator (object):
             self.num_of_critical_usrs_in_slot = [] 
             self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
-        self.gen_parameterized_tree  (ap2cell_file_name)
+        if (ap2cell_file_name==''):
+            self.gen_parameterized_full_tree  ()
+        else:
+            self.gen_parameterized_antloc_tree (ap2cell_file_name)
         self.delay_const_sanity_check()
 
     def init_cost_comp (self):

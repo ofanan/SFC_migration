@@ -586,8 +586,9 @@ class SFC_mig_simulator (object):
         num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
         self.rd_ap2cell_file(ap2cell_file_name)
         
-        nx.draw (self.G, with_labels=True) 
-        plt.show()
+        # nx.draw (self.G, with_labels=True) 
+        # plt.show()
+        
         # Remove all the servers in cells that don't contain AP
         shortest_path    = nx.shortest_path(self.G)
         for s in range (1, len(self.G.nodes())):
@@ -609,10 +610,8 @@ class SFC_mig_simulator (object):
                     print ('removing prnt={}' .format(prnt))
                     self.G.remove_node(prnt) # Remove the leaf server handling this cell
                 
-        nx.draw (self.G, with_labels=True) 
-        plt.show()
-                    
-
+        # nx.draw (self.G, with_labels=True) 
+        # plt.show()
 
         # Garbage collection: condense all the remaining nodes (==servers), so that they'll have sequencing IDs, starting from 0
         server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
@@ -629,7 +628,8 @@ class SFC_mig_simulator (object):
                 
                 # Update self.cell2s accordingly
                 my_cell_as_list = [i for i, x in enumerate(self.cell2s) if x == s]
-                self.cell2s[my_cell_as_list[0]] = id_to_recycle
+                if (len (my_cell_as_list)>0): # This was indeed a server of cell that removed 
+                    self.cell2s[my_cell_as_list[0]] = id_to_recycle
                        
         # Add new leaves for the APs below each cell. 
         # To keep the IDs of leaves the greatest in the tree, only after we finished removing all the useless cells.
@@ -645,8 +645,8 @@ class SFC_mig_simulator (object):
         self.ap2s             = [ap['s'] for ap in self.APs] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
         # print ('self.APs={}' .format (self.APs))
         # print ('self.ap2s{}' .format(self.ap2s))
-        nx.draw (self.G, with_labels=True) 
-        plt.show()
+        # nx.draw (self.G, with_labels=True) 
+        # plt.show()
         exit ()
 
         # Update the tree height's by the changes made, and set 

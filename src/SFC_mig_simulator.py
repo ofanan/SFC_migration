@@ -974,8 +974,8 @@ class SFC_mig_simulator (object):
         """
         
         # reset Hs     
-        for s in self.G.nodes():
-            if (self.mode in ['ourAlg']):
+        if (self.mode in ['ourAlg']):
+            for s in self.G.nodes():
                 self.G.nodes[s]['Hs']  = set() 
         
         for line in self.ap_file: 
@@ -1538,17 +1538,16 @@ def run_prob_of_RT_sim ():
     """
     
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG])
-
-    for mode in ['cpvnf', 'ourAlg']: #['ffit', 'cpvnf', 'ourAlg']:
-        cpu_cap_at_leaf = 213 #Initial cpu cap at the leaf server
-        for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
     
-            cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
+    # for mode in ['ffit', 'cpvnf', 'ourAlg']:
+    #     cpu_cap_at_leaf = 213 #Initial cpu cap at the leaf server
+    #     for prob_of_target_delay in [0.6, 0.7, 0.8, 0.9, 1]: #, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+    #
+    #         cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
 
     cpu_cap_at_leaf = 200 #Initial cpu cap at the leaf server; with exp' cpu, and opt, should start in 164
-    for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+    for prob_of_target_delay in [0, 0.1]: #, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
         cpu_cap_at_leaf = my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
           
 

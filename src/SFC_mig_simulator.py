@@ -6,6 +6,7 @@ import heapq
 import pulp as plp
 import matplotlib.pyplot as plt
 import random
+import pickle
 from pathlib import Path
 
 from usr_c    import usr_c    # class of the users of alg
@@ -85,11 +86,6 @@ class SFC_mig_simulator (object):
     # Calculates the link cost of a given decision variable, if the decision var is assigned 1.
     d_var_link_cost = lambda self, d_var : self.link_cost_of_CLP_at_lvl[d_var.lvl]
     
-    # #$$$ The imp' below seems wrong. Check it out.
-    # $$$ Check whether the new imp' is correct, and if so, whether it can be switched into a lambda func' 
-    # # Calculates the migration cost of a given decision variable, if the decision var is assigned 1.
-    # d_var_mig_cost  = lambda self, d_var : 0 if (d_var.usr.is_new) else (1 - d_var.cur_st) * self.uniform_chain_mig_cost  
-
     # Print a solution for the problem to the output res file  
     print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
     
@@ -181,10 +177,22 @@ class SFC_mig_simulator (object):
         """"
         given the (augmented) cpu cap' at each lvl, assign each server its 'RCs' (augmented CPU cap vals); and initialise 'a' (the amount of available CPU) to 'RCs' (the augmented CPU cap).
         """
+        self.print_netw()
         for s in self.G.nodes:
             self.G.nodes[s]['RCs'] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
             self.G.nodes[s]['a'  ] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
         
+    def print_netw (self):
+        """
+        Used for debugging
+        """
+        debug_file = open ('../res/debug.txt', 'w')
+        for s in self.G.nodes:
+            printf (debug_file, 's={} ' .format(s))
+            printf (debug_file, 'lvl={}\n' .format(self.G.nodes[s]['lvl']))
+
+
+    
     def print_sol_cost_components (self):
         """
         prints to a file statistics about the cost of each component in the cost function (cpu, link, and migration). 
@@ -443,12 +451,11 @@ class SFC_mig_simulator (object):
             used_cpu_in_s = self.alg_used_cpu_in (s)
             chains_in_s   = [usr.id for usr in self.usrs if usr.nxt_s==s]
             if (used_cpu_in_s > 0): 
-                printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, Cs={}, num_of_chains={}' .format (
+                printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, num_of_chains={}' .format (
                         s,
                         self.G.nodes[s]['RCs'],
                         self.G.nodes[s]['a'],
                         used_cpu_in_s,
-                        self.G.nodes[s]['cpu cap'],
                         len (chains_in_s),                       
                         ))
                 if (VERBOSE_ADD2_LOG in self.verbose and used_cpu_in_s > 0): 
@@ -551,11 +558,6 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr(usr)
        
        
-    # def levelize_tree (self):
-    #     """
-    #     Associate with each server i
-    #     """
-            
     def gen_parameterized_antloc_tree (self, ap2cell_file_name=''):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
@@ -649,7 +651,6 @@ class SFC_mig_simulator (object):
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
-        self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -660,7 +661,6 @@ class SFC_mig_simulator (object):
             
             for lvl in range (self.tree_height):
                 self.G.nodes[shortest_path[leaf][root][lvl]]['lvl']     = np.uint8(lvl) # assume here a balanced tree
-                self.G.nodes[shortest_path[leaf][root][lvl]]['cpu cap'] = self.cpu_cap_at_lvl[lvl]                
         self.G.nodes[0]['lvl'] = self.tree_height
 
         for s in self.G.nodes(): # for every server
@@ -671,7 +671,6 @@ class SFC_mig_simulator (object):
         # Find parents of each node (except of the root)
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
-        self.set_RCs_and_a (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
     def gen_parameterized_full_tree (self):
         """
@@ -683,7 +682,6 @@ class SFC_mig_simulator (object):
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
-        self.cpu_cap_at_lvl    = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
         
         # overall link cost and link capacity of a Single-Server Placement of a chain at each lvl
         self.link_cost_of_CLP_at_lvl  = [2 * sum([self.link_cost_at_lvl[i]  for i in range (lvl)]) for lvl in range (self.tree_height+1)]
@@ -705,7 +703,6 @@ class SFC_mig_simulator (object):
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
-                    self.G.nodes[shortest_path[s][root][lvl]]['cpu cap']   = self.cpu_cap_at_lvl[lvl]                
                     # # The lines below are for case one likes to vary the link and cpu costs of distinct servers on the same level. 
                     # self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
                     # self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_CLP_at_lvl[lvl]
@@ -717,8 +714,6 @@ class SFC_mig_simulator (object):
 
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
-
-        self.set_RCs_and_a (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
         # # Calculate delays and costs for the fully-hetero' case, where each link may have a unique cost / delay.    
         # for edge in self.G.edges: 
@@ -745,12 +740,11 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf=561, prob_of_target_delay=0.3, ap2cell_file_name='', 
+    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 4, children_per_node = 4, prob_of_target_delay=0.3, ap2cell_file_name='', 
                   use_exp_cpu_cost=True, use_exp_cpu_cap=False):
         """
         """
-        
-        # verbose and debug      
+
         self.verbose                    = verbose
 
         self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
@@ -760,7 +754,6 @@ class SFC_mig_simulator (object):
         # Network parameters
         self.tree_height                = 2 if (self.ap_file_name=='shorter.ap') else tree_height 
         self.children_per_node          = 2 if (self.ap_file_name=='shorter.ap') else children_per_node
-        self.cpu_cap_at_leaf            = 30 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -818,10 +811,26 @@ class SFC_mig_simulator (object):
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()       
 
-    def simulate (self, mode, sim_len_in_slots=99999):
+    def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=99999):
         """
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
         """
+        
+        random.seed                     (42) # Use a fixed pseudo-number seed 
+        self.usrs                       = []
+        self.delay_const_sanity_check()
+
+        self.cpu_cap_at_leaf = 30 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
+        self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+        self.set_RCs_and_a  (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
+
+        self.usrs                       = [] 
+        for s in self.G.nodes():  # Rst the available cap' at each server
+            self.G.nodes[s]['a'] = self.G.nodes[s]['RCs']
+
+        if (prob_of_target_delay!=None): # If the caller stated a different prob_of_target_delayk, assing it
+            self.prob_of_target_delay = [prob_of_target_delay]  
+
         self.mode              = mode
         self.max_R = 1.3 if (self.mode == 'opt') else 3 # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it a lower value.  
         self.sim_len_in_slots = sim_len_in_slots
@@ -1027,7 +1036,7 @@ class SFC_mig_simulator (object):
         
         self.post_processing()
         
-    def post_processing (self):
+    def  post_processing (self):
         """
         Organize, writes and plots the simulation results, after the simulation is done
         """
@@ -1353,12 +1362,6 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry.split("(")
             usr_entry = usr_entry[1].split (',')
             
-            # usr = usr_c (id                 = int(usr_entry[0]), # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1) 
-            #              theta_times_lambda = self.uniform_theta_times_lambda,
-            #              target_delay       = self.randomize_target_delay(),
-            #              C_u                = self.uniform_Cu)
-            #
-
             if VERBOSE_FLAVORS in self.verbose:
                 if (random.random() < self.prob_of_target_delay[0]):
                     usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
@@ -1505,9 +1508,6 @@ class SFC_mig_simulator (object):
             ar[idx] = min_val[idx]
         return ar 
      
-    def calc_total_cpu_rsrcs (self):
-        return sum ([self.G.nodes[s]['cpu cap'] for s in self.G.nodes])
-     
     def rd_ap2cell_file (self, ap2cell_file_name):
         """
         Parse an ap2cell file.
@@ -1538,29 +1538,18 @@ def run_prob_of_RT_sim ():
     """
     
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-
-    # for mode in ['ffit', 'cpvnf', 'ourAlg']:
-    #     cpu_cap_at_leaf = 213 #Initial cpu cap at the leaf server
-    #     for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
-    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                           verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                           tree_height           = 2 if ap_file_name=='shorter.ap' else 4, 
-    #                                           cpu_cap_at_leaf       = cpu_cap_at_leaf,
-    #                                           prob_of_target_delay  = prob_of_target_delay, 
-    #                                           )
-    #
-    #         cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
-
-    for mode in ['opt']: 
-        cpu_cap_at_leaf = 200 #Initial cpu cap at the leaf server; with exp' cpu, and opt, should start in 164
-        for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
-            my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-                                              verbose               = [VERBOSE_CALC_RSRC_AUG],# defines which sanity checks are done during the simulation, and which outputs will be written   
-                                              cpu_cap_at_leaf       = cpu_cap_at_leaf,
-                                              prob_of_target_delay  = prob_of_target_delay, 
-                                              )
     
-            cpu_cap_at_leaf = my_simulator.simulate (mode = mode,  sim_len_in_slots = 61)
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG])
+
+    for mode in ['cpvnf', 'ourAlg']: #['ffit', 'cpvnf', 'ourAlg']:
+        cpu_cap_at_leaf = 213 #Initial cpu cap at the leaf server
+        for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+    
+            cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
+
+    cpu_cap_at_leaf = 200 #Initial cpu cap at the leaf server; with exp' cpu, and opt, should start in 164
+    for prob_of_target_delay in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+        cpu_cap_at_leaf = my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
           
 
 def run_cost_by_rsrc ():
@@ -1611,10 +1600,24 @@ def run_cost_by_rsrc ():
         my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
 
 def run_antloc_sim ():
-    my_simulator = SFC_mig_simulator (ap2cell_file_name = 'short.ap2cell') # my_simulator.rd_ap2cell_file ('Lux.center.post.antloc_256cells.ap2cell')
-    my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 
- 
-if __name__ == "__main__":
+    ap_file_name = 'shorter.ap' #'0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, ap2cell_file_name = 'short.ap2cell') # my_simulator.rd_ap2cell_file ('Lux.center.post.antloc_256cells.ap2cell')
     
-    run_antloc_sim ()
+    pickle_file_name = '../res/try.dmp'
+    pickle.dump (my_simulator, open (pickle_file_name, 'wb'))
+    
+def run_simulator (sim_pickle_file_name):
+    """
+    loads a simulator, and runs it
+    """
+    
+    my_simulator = pickle.load (open ('../res/' + sim_pickle_file_name, 'rb'))
+    my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 
+
+if __name__ == "__main__":
+
+    run_prob_of_RT_sim ()    
+    # run_antloc_sim ()
+    # my_simulator = run_simulator (sim_pickle_file_name='try.dmp')
+    # my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 
 

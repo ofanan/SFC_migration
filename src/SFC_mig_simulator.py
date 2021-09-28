@@ -177,7 +177,7 @@ class SFC_mig_simulator (object):
         """"
         given the (augmented) cpu cap' at each lvl, assign each server its 'RCs' (augmented CPU cap vals); and initialise 'a' (the amount of available CPU) to 'RCs' (the augmented CPU cap).
         """
-        self.print_netw()
+        # self.print_netw()
         for s in self.G.nodes:
             self.G.nodes[s]['RCs'] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
             self.G.nodes[s]['a'  ] = aug_cpu_capacity_at_lvl[self.G.nodes[s]['lvl']]
@@ -779,10 +779,11 @@ class SFC_mig_simulator (object):
             self.num_of_critical_usrs_in_slot = [] 
             self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
-        if (ap2cell_file_name==''):
+        self.ap2cell_file_name = ap2cell_file_name
+        if (self.ap2cell_file_name==''):
             self.gen_parameterized_full_tree  ()
         else:
-            self.gen_parameterized_antloc_tree (ap2cell_file_name)
+            self.gen_parameterized_antloc_tree (self.ap2cell_file_name)
         self.delay_const_sanity_check()
 
     def init_cost_comp (self):
@@ -873,7 +874,7 @@ class SFC_mig_simulator (object):
             if (self.use_exp_cpu_cost and self.use_exp_cpu_cap): 
                 self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu^2.res' 
             elif (self.use_exp_cpu_cost):
-                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu.res'
+                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu_cost_{}.res' .format (self.ap2cell_file_name)
             else: 
                 self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'
 
@@ -1538,18 +1539,14 @@ def run_prob_of_RT_sim ():
     """
     
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG])
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
     
-    # for mode in ['ffit', 'cpvnf', 'ourAlg']:
-    #     cpu_cap_at_leaf = 213 #Initial cpu cap at the leaf server
-    #     for prob_of_target_delay in [0.6, 0.7, 0.8, 0.9, 1]: #, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
-    #
-    #         cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
+    for mode in ['opt']:
+        cpu_cap_at_leaf = 130 #Initial cpu cap at the leaf server
+        for prob_of_target_delay in [0.1*i for i in range (11)]: 
+    
+            cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
 
-    cpu_cap_at_leaf = 200 #Initial cpu cap at the leaf server; with exp' cpu, and opt, should start in 164
-    for prob_of_target_delay in [0, 0.1]: #, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
-        cpu_cap_at_leaf = my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
-          
 
 def run_cost_by_rsrc ():
     """
@@ -1557,47 +1554,16 @@ def run_cost_by_rsrc ():
     Output the cost obtained at each time slot.
     """
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    min_req_cpu = {'opt' : 150, 'ourAlg' : 165, 'ffit' : 391, 'cpvnf' : 357}
+
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
     
-    # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], tree_height = 4, children_per_node = 4, cpu_cap_at_leaf = 459)
-    # my_simulator.simulate (mode = 'cpvnf', sim_len_in_slots = 61)
-     
-
-    # min_req_cap = 208 # for 0830:-0831 prob=0.3 it is: 195 #$$$
-    # step        = 0.1 * min_req_cap
-    #
-    # for mode in ['opt']: #, 'ffit', 'cpvnf']: #, 'ffit', 'ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: #, 'ffit', 'opt']: 
-    #     for cpu_cap in [208, 416, 624]: #[int(round((min_req_cap + step*i))) for i in range (0, 11, 21)]:
-    #         my_simulator = SFC_mig_simulator (ap_file_name          = ap_file_name, 
-    #                                           verbose               = [VERBOSE_RES],# defines which sanity checks are done during the simulation, and which outputs will be written   
-    #                                           cpu_cap_at_leaf       = cpu_cap
-    #                                           )
-    #
-    #         my_simulator.simulate (mode             = mode,  
-    #                                sim_len_in_slots = 1, 
-    #                                )     
-
-    # Complementary runs, for the min' cpu rsrcs found for allowing a feasible sol' by each alg'
-    min_cpu_ourAlg = 213
-    min_cpu_ffit   = 438 
-    min_cpu_cpvnf  = 447
-
-    # my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = min_cpu_ourAlg)
-    # my_simulator.simulate (mode = 'ourAlg', sim_len_in_slots = 61) 
-    # for mode in ['ffit', 'ourAlg']:
-    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = min_cpu_ffit)
-    #     my_simulator.simulate (mode = mode, sim_len_in_slots = 61) 
-    # for mode in ['ffit', 'cpvnf', 'ourAlg']:
-    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = min_cpu_cpvnf)
-    #     my_simulator.simulate (mode = mode, sim_len_in_slots = 61) 
-
-    # for cpu in [min_cpu_cpvnf]:
-    #     my_simulator = SFC_mig_simulator (ap_file_name = ap_file_name, verbose = [VERBOSE_RES], cpu_cap_at_leaf = cpu)
-    #     my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
-
-    for cpu in [499, 520]:
-        my_simulator = SFC_mig_simulator ()
-        my_simulator.simulate (mode = 'opt', sim_len_in_slots = 61) 
-
+    for mode in ['ffit', 'cpvnf', 'ourAlg', 'opt']:
+        for cpu_cap_at_leaf in [min_req_cpu['opt']*(1 + 0.1*i) for i in range(16)]: # simulate for opt's min cpu * [100%, 110%, ... 250%]
+            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+        if (mode != 'opt'): # if the mode isn't opt, need additional run, for finding the cost at the min req cpu for this mode
+            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], sim_len_in_slots = 61)
+    
 def run_antloc_sim ():
     ap_file_name = 'shorter.ap' #'0829_0830_1secs_256aps.ap' #'shorter.ap' #
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, ap2cell_file_name = 'short.ap2cell') # my_simulator.rd_ap2cell_file ('Lux.center.post.antloc_256cells.ap2cell')
@@ -1615,7 +1581,8 @@ def run_simulator (sim_pickle_file_name):
 
 if __name__ == "__main__":
 
-    run_prob_of_RT_sim ()    
+    run_cost_by_rsrc ()
+    # run_prob_of_RT_sim ()    
     # run_antloc_sim ()
     # my_simulator = run_simulator (sim_pickle_file_name='try.dmp')
     # my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 

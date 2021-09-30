@@ -1575,10 +1575,15 @@ if __name__ == "__main__":
 
     
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG, VERBOSE_LOG], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
     
     for mode in ['ffit']: #, cpvnf']:
-        cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=390, prob_of_target_delay=0.3, sim_len_in_slots=29) # 61)
+        cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=190, prob_of_target_delay=0.3, sim_len_in_slots=29) # 61)
+        if (my_simulator.stts == sccs):
+            print ('sccs')
+        else:
+            print ('fail')
+        
     exit ()
 
     # run_prob_of_RT_sim()

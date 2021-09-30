@@ -1,10 +1,10 @@
-import networkx as nx
 import numpy as np
 import math
 import time
 import heapq
 import pulp as plp
 import matplotlib.pyplot as plt
+import networkx as nx
 import random
 import pickle
 from pathlib import Path
@@ -13,6 +13,7 @@ from usr_c    import usr_c    # class of the users of alg
 from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf
+# from pandas.tests.arrays.sparse.test_array import test_first_fill_value_loc
 
 # Levels of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
@@ -639,10 +640,6 @@ class SFC_mig_simulator (object):
 
         self.num_of_leaves    = len(self.APs) # Each AP is co-located with a leaf server
         self.ap2s             = [ap['s'] for ap in self.APs] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
-        # print ('self.APs={}' .format (self.APs))
-        # print ('self.ap2s{}' .format(self.ap2s))
-        # nx.draw (self.G, with_labels=True) 
-        # plt.show()
 
         # Update the tree height's by the changes made, and set 
         shortest_path    = nx.shortest_path(self.G)
@@ -826,8 +823,6 @@ class SFC_mig_simulator (object):
         self.set_RCs_and_a  (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
         self.usrs                       = [] 
-        for s in self.G.nodes():  # Rst the available cap' at each server
-            self.G.nodes[s]['a'] = self.G.nodes[s]['RCs']
 
         if (prob_of_target_delay!=None): # If the caller stated a different prob_of_target_delayk, assing it
             self.prob_of_target_delay = [prob_of_target_delay]  
@@ -1211,10 +1206,12 @@ class SFC_mig_simulator (object):
                
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
         self.reshuffled = False # As the first run, considering only critical chains, failed, we'll now perform an additional run of bottom-up, while doing a reshuffle (namely, considering all usrs).
+
         self.stts = placement_alg()
         
         if (VERBOSE_LOG in self.verbose):
             self.print_sol_res_line (self.log_output_file)
+            self.print_sol_to_log_alg()
         
         if (self.stts == sccs):
             return sccs
@@ -1240,8 +1237,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 'Starting binary search:\n')
         
-        self.rst_sol() # dis-allocate all users
-        max_R = self.max_R if VERBOSE_CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
+        max_R = self.max_R # if VERBOSE_CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
         
         # Init the the lower bound (lb) and the upper bound (up) for the binary search.
         # lb, ub are defined the minimal, maximal CPU capacity at the leaves.
@@ -1250,6 +1246,7 @@ class SFC_mig_simulator (object):
         
         # init cur 'RCs' and 'a' of each server to the number of available CPU in each server, assuming maximal rsrc aug'        
         self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub)) 
+        self.rst_sol() # dis-allocate all users
         
         self.stts = placement_alg() 
         if (self.stts != sccs):
@@ -1262,8 +1259,8 @@ class SFC_mig_simulator (object):
         
             if (ub <= lb+1): # the difference between the lb and the ub is at most 1
                 # To avoid corner-case rounding problems, make a last run of the placement alg' with this (upper bound) value 
-                self.rst_sol()         
                 self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub))         
+                self.rst_sol()         
                 if (placement_alg() == sccs):
                     if (VERBOSE_ADD_LOG in self.verbose):
                         self.print_sol_res_line (self.log_output_file)
@@ -1276,11 +1273,9 @@ class SFC_mig_simulator (object):
         
             # Now we know that the binary search haven't converged yet
             # Update the augmented capacity, and the available capacity at each server according to the value of resource augmentation for this iteration
-            self.rst_sol()
             cur_cpu_at_leaf = self.avg_up_and_lb (ub=ub, lb=lb)            
             self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = cur_cpu_at_leaf)) # update the (augmented) CPU cap in all servers
-            
-            # Solve using the given placement alg'
+            self.rst_sol()
             self.stts = placement_alg()
             if (VERBOSE_LOG in self.verbose):
                     self.print_sol_res_line (self.log_output_file)
@@ -1539,14 +1534,17 @@ def run_prob_of_RT_sim ():
     """
     
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG, VERBOSE_LOG], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
     
-    for mode in ['opt']:
-        cpu_cap_at_leaf = 130 #Initial cpu cap at the leaf server
-        for prob_of_target_delay in [0.1*i for i in range (11)]: 
-    
-            cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots = 61)
+    for mode in ['ffit']: #, cpvnf']:
+        cpu_cap_at_leaf = 390  #Initial cpu cap at the leaf server
+        for prob_of_target_delay in [0.3]: #[0.1*i for i in range (11)]: 
+            cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=29) # 61)
 
+    for mode in ['ourAlg', 'opt']:
+        cpu_cap_at_leaf = 160 #Initial cpu cap at the leaf server
+        for prob_of_target_delay in [0.1*i for i in range (11)]: 
+            cpu_cap_at_leaf = my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=61)
 
 def run_cost_by_rsrc ():
     """
@@ -1554,7 +1552,7 @@ def run_cost_by_rsrc ():
     Output the cost obtained at each time slot.
     """
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cpu = {'opt' : 150, 'ourAlg' : 165, 'ffit' : 391, 'cpvnf' : 357}
+    min_req_cpu = {'opt' : 160, 'ourAlg' : 165, 'ffit' : 391, 'cpvnf' : 357}
 
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
     
@@ -1564,12 +1562,6 @@ def run_cost_by_rsrc ():
         if (mode != 'opt'): # if the mode isn't opt, need additional run, for finding the cost at the min req cpu for this mode
             my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], sim_len_in_slots = 61)
     
-def run_antloc_sim ():
-    ap_file_name = 'shorter.ap' #'0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, ap2cell_file_name = 'short.ap2cell') # my_simulator.rd_ap2cell_file ('Lux.center.post.antloc_256cells.ap2cell')
-    
-    pickle_file_name = '../res/try.dmp'
-    pickle.dump (my_simulator, open (pickle_file_name, 'wb'))
     
 def run_simulator (sim_pickle_file_name):
     """
@@ -1581,9 +1573,15 @@ def run_simulator (sim_pickle_file_name):
 
 if __name__ == "__main__":
 
-    run_cost_by_rsrc ()
+    
+    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG, VERBOSE_LOG], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
+    
+    for mode in ['ffit']: #, cpvnf']:
+        cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=390, prob_of_target_delay=0.3, sim_len_in_slots=29) # 61)
+    exit ()
+
+    # run_prob_of_RT_sim()
+    # run_cost_by_rsrc ()
     # run_prob_of_RT_sim ()    
-    # run_antloc_sim ()
-    # my_simulator = run_simulator (sim_pickle_file_name='try.dmp')
-    # my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 
 

@@ -269,7 +269,7 @@ class Res_file_parser (object):
         # Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # Calculate the normalization factor of the Y axis
         
         Y_norm_factor = 1 #$$$
-        X_norm_factor = 208 #$$$$
+        X_norm_factor = 160 #208 #$$$$
 
 
         for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
@@ -338,12 +338,11 @@ if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     
     # input_file_name = 'rsrc_aug_by_RT_prob_exp_cpu.res' #'0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
-    my_res_file_parser.parse_file('rsrc_aug_by_RT_prob_exp_cpu_cost_Lux.center.post.antloc_256cells.ap2cell.res')
-    my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
-    exit ()
+    # my_res_file_parser.parse_file('rsrc_aug_by_RT_prob_exp_cpu_cost_Lux.center.post.antloc_256cells.ap2cell.res')
+    # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res'
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res'
     my_res_file_parser.parse_file (input_file_name)
     my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]))        
     

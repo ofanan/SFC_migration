@@ -1,7 +1,7 @@
 import random
 
 min_rand_id = 1
-max_rand_id = 100
+max_rand_id = 1 #00
 
 class usr_c (object):
 
@@ -21,6 +21,11 @@ class usr_c (object):
         self.calc_rand_id()
              
     def calc_rand_id (self):
+        """
+        Calculate a random id for the usr.
+        The randomization aims to decrease the probability of fatal cases where an algorithm fails merely due to an arbitrary wrong ordering of usrs, when handling them.
+        However, randomization hardens debugging. To throttle randomization, set max_rand_int = min_rand_int. 
+        """
         self.rand_id = random.randint (min_rand_id, max_rand_id)
   
     def __lt__ (self, other):

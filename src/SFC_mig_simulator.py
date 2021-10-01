@@ -23,10 +23,9 @@ VERBOSE_ADD_LOG       = 3 # Write to a detailed ".log" file
 VERBOSE_ADD2_LOG      = 4
 VERBOSE_MOB           = 5 # Write data about the mobility of usrs, and about the num of migrated chains per slot
 VERBOSE_COST_COMP     = 6 # Print the cost of each component in the cost function
-VERBOSE_CALC_RSRC_AUG = 7 # Use binary-search to calculate the minimal reseource augmentation required to find a sol 
+VERBOSE_CALC_RSRC_AUG = 7 # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug 
 VERBOSE_MOVED_RES     = 8 # calculate the cost incurred by the usrs who moved only 
 VERBOSE_CRITICAL_RES  = 9 # calculate the cost incurred by the usrs who moved only 
-VERBOSE_FLAVORS       = 10 # Use 2 users' flavors
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -106,7 +105,9 @@ class SFC_mig_simulator (object):
     cpvnf_sort     = lambda self, list_of_usrs: sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
 
     # Randomize a target delay for a usr, using the distribution and values defined in self.
-    randomize_target_delay = lambda self : self.target_delay[0] if (random.random() < self.prob_of_target_delay[0]) else self.target_delay[1] 
+    randomize_target_delay = lambda self : self.target_delay[0] if (random.random() < self.prob_of_target_delay[0]) else self.target_delay[1]
+    # if (usr_id < self.prob_of_target_delay[0]) else self.target_delay[1]  
+     
     
     gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}.res' .format (self.ap_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0])
 
@@ -138,7 +139,7 @@ class SFC_mig_simulator (object):
     calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
 
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
-    settings_str = lambda self : 't{}_{}_cpu{}_p{:.2f}_stts{}' .format(
+    settings_str = lambda self : 't{}_{}_cpu{}_p{:.1f}_stts{}' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.stts)
 
     # Print a solution for the problem to the output res file when the solver is an LP solver  
@@ -448,10 +449,12 @@ class SFC_mig_simulator (object):
         """
         print the solution found by alg' for the mig' problem to the output log file 
         """
+        if (self.t == 30557 and VERBOSE_LOG in self.verbose): #$$$
+            self.verbose.append (VERBOSE_ADD2_LOG)
         for s in self.G.nodes():
             used_cpu_in_s = self.alg_used_cpu_in (s)
             chains_in_s   = [usr.id for usr in self.usrs if usr.nxt_s==s]
-            if (used_cpu_in_s > 0): 
+            if (used_cpu_in_s > 0):  
                 printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, num_of_chains={}' .format (
                         s,
                         self.G.nodes[s]['RCs'],
@@ -812,6 +815,8 @@ class SFC_mig_simulator (object):
     def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=99999):
         """
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
+        Return value: if the simulation succeeded (found a feasible solution for every time slot during the sim') - return the cpu capacity used in a leaf node.
+        Else, return None. 
         """
         
         random.seed                     (42) # Use a fixed pseudo-number seed 
@@ -828,7 +833,7 @@ class SFC_mig_simulator (object):
             self.prob_of_target_delay = [prob_of_target_delay]  
 
         self.mode              = mode
-        self.max_R = 1.3 if (self.mode == 'opt') else 3 # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it a lower value.  
+        self.max_R = 1.3 if (self.mode == 'opt') else 2 # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it a lower value.  
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
 
@@ -851,7 +856,7 @@ class SFC_mig_simulator (object):
         else:
             print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
             exit ()
-        return self.augmented_cpu_cap_at_leaf ()
+        return self.augmented_cpu_cap_at_leaf () if (self.stts==sccs) else None
 
     def init_input_and_output_files (self):
         """
@@ -1123,8 +1128,14 @@ class SFC_mig_simulator (object):
         Returns sccs if found a feasible placement, fail otherwise
         """
 
+        # if (self.t == 30557): #$$$
+        #     return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
         for usr in self.first_fit_sort (self.unplaced_usrs()): 
             if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
+                # if (VERBOSE_LOG in self.verbose): #$$$
+                #     printf (self.log_output_file, '\nB4 reshuffling\n')
+                #     self.print_sol_to_log_alg()
+                #     printf (self.log_output_file, '\nAfter reshuffling\n')
                 self.rst_sol()
                 self.reshuffled = True
                 return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
@@ -1140,6 +1151,8 @@ class SFC_mig_simulator (object):
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
                 self.place_usr_u_on_srvr_s (usr, s)
                 return sccs
+        if (VERBOSE_LOG in self.verbose):
+            printf (self.log_output_file, '\nfailed to locate user {} on S_u={}\n' .format (usr.id, usr.S_u)) #$$$
         return fail
     
     def worst_fit_reshuffle (self):
@@ -1237,11 +1250,9 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             printf (self.log_output_file, 'Starting binary search:\n')
         
-        max_R = self.max_R # if VERBOSE_CALC_RSRC_AUG in self.verbose else self.calc_upr_bnd_rsrc_aug ()   
-        
         # Init the the lower bound (lb) and the upper bound (up) for the binary search.
         # lb, ub are defined the minimal, maximal CPU capacity at the leaves.
-        ub = math.ceil (max_R * self.cpu_cap_at_leaf) # Maximum allowed capacity at a leaf server
+        ub = math.ceil (self.max_R * self.cpu_cap_at_leaf) # Maximum allowed capacity at a leaf server
         lb = self.G.nodes[len(self.G.nodes)-1]['RCs'] # Current (possibly augmented) capacity at a leaf server  
         
         # init cur 'RCs' and 'a' of each server to the number of available CPU in each server, assuming maximal rsrc aug'        
@@ -1333,7 +1344,7 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry.split("(")
             usr_entry = usr_entry[1].split (',')
     
-            usr = usr_lp_c (id = int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+            usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
             usr.is_new = True
             self.moved_usrs.append(usr)
             self.usrs.append (usr)
@@ -1358,13 +1369,8 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry.split("(")
             usr_entry = usr_entry[1].split (',')
             
-            if VERBOSE_FLAVORS in self.verbose:
-                if (random.random() < self.prob_of_target_delay[0]):
-                    usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
-                else:    
-                    usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.long_chain_theta_times_lambda, target_delay=self.target_delay[1], C_u=10*self.uniform_Cu)
-            else:
-                usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+            usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+                       
                        
             self.moved_usrs.append (usr)
             self.critical_usrs.append(usr)
@@ -1490,7 +1496,7 @@ class SFC_mig_simulator (object):
         # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
         for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
             self.G.nodes[s]['Hs'].remove (usr) 
-            
+                    
     def inc_array (self, ar, min_val, max_val):
         """
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
@@ -1522,29 +1528,66 @@ class SFC_mig_simulator (object):
             splitted_line = line.split ()
             self.APs.append ({'ap' : int(splitted_line[0]), 'cell' : int(splitted_line[1])})
     
+    def binary_search_along_full_trace (self, output_file, mode, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=61):
+        """
+        Binary-search for the minimal rsrce aug' required for finding a feasible sol.
+        A run is considered "sccs" iff it successfully found solutions during the whole trace.
+        Returns the lowest cpu cap' at the leaf server which still allows finding a feasible sol. 
+        """ 
+        res = self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+        if (res != None): # found a feasible solution without a binary search 
+            print ('wo binary search, cpu_cap_at_leaf={}' .format (cpu_cap_at_leaf))
+            self.print_sol_res_line (output_file)
+            return res
 
+        lb = cpu_cap_at_leaf
+        ub = cpu_cap_at_leaf * self.max_R
+        while True:
+            if (ub <= lb+1): # the difference between the lb and the ub is at most 1
+                cpu_cap_at_leaf = ub
+                self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+                self.print_sol_res_line (output_file)
+                break
+
+            cpu_cap_at_leaf = self.avg_up_and_lb(ub, lb)
+            if (self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots) != None):
+                # self.print_sol_res_line (output_file) #$$$
+                ub = cpu_cap_at_leaf
+            else: 
+                lb = cpu_cap_at_leaf
+                # self.print_sol_res_line (output_file) #$$$
+        print ('after binary search, cpu_cap_at_leaf={}' .format (cpu_cap_at_leaf))
+        return cpu_cap_at_leaf
+    
+    def run_prob_of_RT_sim (self):
+        """
+        Run a simulation where the probability of a RT application varies. 
+        Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
+        """
+        
+        output_file      = open ('../res/RT_prob_sim_{}_{}.res' .format (ap2cell_file_name, ap_file_name), 'a')
+        mode             = 'ffit'    
+        sim_len_in_slots = 61
+        
+        for mode in ['cpvnf']:
+            cpu_cap_at_leaf = 450  #Initial cpu cap at the leaf server
+            for prob_of_target_delay in [1]: # [0.1*i for i in range (11)]:
+                # cpu_cap_at_leaf = 
+                self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+    
+        # cpu_cap_at_leaf = 160  #Initial cpu cap at the leaf server
+        # for prob_of_target_delay in [0.1*i for i in range (11)]:
+        #     cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+
+        # cpu_cap_at_leaf = 160  #Initial cpu cap at the leaf server
+        # for prob_of_target_delay in [0.1*i for i in range (11)]:
+        #     cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+    
+    
 #######################################################################################################################################
 # Functions that are not part of the class
 #######################################################################################################################################
 
-def run_prob_of_RT_sim ():
-    """
-    Run a simulation where the probability of a RT application varies. 
-    Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
-    """
-    
-    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_CALC_RSRC_AUG, VERBOSE_LOG], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
-    
-    for mode in ['ffit']: #, cpvnf']:
-        cpu_cap_at_leaf = 390  #Initial cpu cap at the leaf server
-        for prob_of_target_delay in [0.3]: #[0.1*i for i in range (11)]: 
-            cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=29) # 61)
-
-    for mode in ['ourAlg', 'opt']:
-        cpu_cap_at_leaf = 160 #Initial cpu cap at the leaf server
-        for prob_of_target_delay in [0.1*i for i in range (11)]: 
-            cpu_cap_at_leaf = my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=61)
 
 def run_cost_by_rsrc ():
     """
@@ -1552,16 +1595,19 @@ def run_cost_by_rsrc ():
     Output the cost obtained at each time slot.
     """
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cpu = {'opt' : 160, 'ourAlg' : 165, 'ffit' : 391, 'cpvnf' : 357}
+    min_req_cpu = {'opt' : 160, 'ourAlg' : 165, 'ffit' : 341, 'cpvnf' : 407}
 
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
-    
-    for mode in ['ffit', 'cpvnf', 'ourAlg', 'opt']:
-        for cpu_cap_at_leaf in [min_req_cpu['opt']*(1 + 0.1*i) for i in range(16)]: # simulate for opt's min cpu * [100%, 110%, ... 250%]
+                
+    for mode in ['ffit', 'cpvnf', 'ourAlg']: #, 'ourAlg', 'opt']:
+        for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(16, 21)]: # simulate for opt's min cpu * [100%, 110%, ... 250%]
             my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+        my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
         if (mode != 'opt'): # if the mode isn't opt, need additional run, for finding the cost at the min req cpu for this mode
             my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], sim_len_in_slots = 61)
     
+    my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
+    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
     
 def run_simulator (sim_pickle_file_name):
     """
@@ -1574,19 +1620,22 @@ def run_simulator (sim_pickle_file_name):
 if __name__ == "__main__":
 
     
-    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
+    ap_file_name      = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
+    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
+    # output_file       = open ('../res/RT_prob_sim_{}_{}.res' .format (ap2cell_file_name, ap_file_name), 'a')
+    my_simulator.run_prob_of_RT_sim()
+
+    # for prob_of_target_delay in [0.5, 0.6]:
+    #     for cpu_cap_at_leaf in [320 + i for i in range (25)]:
+    #         my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=61)
+    #         my_simulator.print_sol_res_line (output_file)
+    # my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
+    # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=363, prob_of_target_delay=0, sim_len_in_slots=22)
+    # my_simulator.print_sol_res_line (output_file)
+    # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=363, prob_of_target_delay=0.5, sim_len_in_slots=22)
+    # my_simulator.print_sol_res_line (output_file)
     
-    for mode in ['ffit']: #, cpvnf']:
-        cpu_cap_at_leaf = my_simulator.simulate (mode = mode, cpu_cap_at_leaf=190, prob_of_target_delay=0.3, sim_len_in_slots=29) # 61)
-        if (my_simulator.stts == sccs):
-            print ('sccs')
-        else:
-            print ('fail')
-        
-    exit ()
-
-    # run_prob_of_RT_sim()
     # run_cost_by_rsrc ()
-    # run_prob_of_RT_sim ()    
 
+#

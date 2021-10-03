@@ -3,6 +3,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import math
+from scipy.spatial import Voronoi, voronoi_plot_2d
 # from matplotlib.colors import LogNorm, Normalize
 # from matplotlib.ticker import MaxNLocator
 # import itertools 
@@ -138,24 +139,28 @@ class loc2ap_c (object):
         for ap in range(self.num_of_APs):
             printf (ap2cell_file, '{} {}\n' .format (ap, self.ap2cell(ap)))
         
-        self.calc_tile2cell (lvl=0) 
+        self.calc_tile2cell (lvl=0)
+        
+        return
+         
         # if (plot_ap_locs_heatmap):
             # num_of_aps_per_cell = self.calc_num_of_aps_per_cell()        
 
         # Plots a heatmap, showing the number of APs in each cell.
         # When using rectangular AP-cells, the heatmap should show fix 1 for all cells.
         # When using an '.antloc' file, the heatmap shows the number of antennas in each cell.
-        num_of_aps_per_cell = self.calc_num_of_aps_per_cell()
-        for lvl in range (self.max_power_of_4):
-            plt.figure()       
-            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_aps_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap="YlGnBu")#, norm=LogNorm())
-            my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            plt.title   ('number of APs per cell')
-            plt.savefig ('../res/heatmap_num_APs_per_cell_{}_{}cells.jpg' .format (self.antenna_loc_file_name, int(self.num_of_cells/(4**lvl))))
-
-            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
-                num_of_aps_per_cell = self.aggregate_heatmap_cells (num_of_aps_per_cell)
+        # num_of_aps_per_cell = self.calc_num_of_aps_per_cell()
+        # for lvl in range (self.max_power_of_4):
+        #     plt.figure()       
+        #     my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_aps_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap="YlGnBu")#, norm=LogNorm())
+        #     my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        #     plt.title   ('number of APs per cell')
+        #     plt.savefig ('../res/heatmap_num_APs_per_cell_{}_{}cells.jpg' .format (self.antenna_loc_file_name, int(self.num_of_cells/(4**lvl))))
+        #
+        #     if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
+        #         num_of_aps_per_cell = self.aggregate_heatmap_cells (num_of_aps_per_cell)
         
+        plt.figure()
         plt.plot([ap['x'] for ap in self.list_of_APs], [ap['y'] for ap in self.list_of_APs], 'o', color='black');
         plt.axis([0, MAX_X_LUX, 0, MAX_Y_LUX])
         plt.savefig('../res/{}_ap_points.jpg' .format (self.antenna_loc_file_name))
@@ -306,17 +311,25 @@ class loc2ap_c (object):
         self.set_usrs_loc_file_name(usrs_loc_file_name)
 
         avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell() 
+        tmp_file = open ('../res/tmp.txt', 'w')
         for lvl in range (0, self.max_power_of_4):
             columns = self.gen_columns_for_heatmap (lvl=lvl)
             self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
             plt.figure()       
+            heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
             if (lvl==3):
-                my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_cell),columns=columns), cmap="YlGnBu", vmin=670, vmax=740)#, norm=LogNorm())
+                my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals,columns=columns), cmap="YlGnBu", vmin=600, vmax=800)#, norm=LogNorm())
             else:
-                my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_cell),columns=columns), cmap="YlGnBu")#, norm=LogNorm())
+                my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals,columns=columns), cmap="YlGnBu")#, norm=LogNorm())
+            printf (tmp_file, 'lvl={}\n' .format (lvl+1))
+            for row in range(len(heatmap_vals)):
+                for col in range(len(heatmap_vals[0])):
+                    printf (tmp_file, '{:.0f} ' .format (heatmap_vals[row][col]))
+                printf (tmp_file, '\n')
+            printf (tmp_file, '\n')   
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            plt.title ('avg num of cars per cell')
-            plt.savefig('../res/heatmap_num_vehs_{}_{}_{}cells.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
+            # plt.title ('avg num of cars per cell')
+            plt.savefig('../res/heatmap_num_vehs_{}_{}_{}rects.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
                 avg_num_of_vehs_per_cell = self.aggregate_heatmap_cells (avg_num_of_vehs_per_cell)
 
@@ -641,19 +654,32 @@ class loc2ap_c (object):
                 self.num_of_vehs_in_ap.append(num_of_vehs)
             else: # Now we know that the vector's name begins by "num_of_vehs_in_cell"
                 self.num_of_vehs_in_cell.append(num_of_vehs)
+
+
+    def plot_voronoi_diagram (self):
+        """
+        Plot a Voronoi diagram of the PoAs in self.list_of_APs
+        """
+        points = np.array ([[ap['x'], ap['y']] for ap in self.list_of_APs])
+        
+        # vor = Voronoi(points)
+        fig = voronoi_plot_2d(Voronoi(points), show_vertices=False)
+        plt.xlim(0, MAX_X_LUX); plt.ylim(0, MAX_Y_LUX)
+        plt.show()
+
+        
                 
 if __name__ == '__main__':
   
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antenna_loc_file_name = 'Lux.center.post.antloc') #'Lux.center.post.antloc')
-
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antenna_loc_file_name = 'Lux.center.post.antloc') #'Lux.center.post.antloc')
+    # my_loc2ap.plot_voronoi_diagram()
+    
     # Processing
-    # my_loc2ap.parse_antloc_file('Lux.center.post.antloc', plot_ap_locs_heatmap=True)
-    # exit ()
-    # my_loc2ap.parse_loc_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
-    # my_loc2ap.plot_num_of_vehs_per_AP (usrs_loc_file_name='0829_0830_8secs.loc')
-
-    # Post=processing
-    my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('num_of_vehs_Lux.center.post.antloc_1524aps.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')
-    # my_loc2ap.plot_num_of_vehs_per_AP (usrs_loc_file_name='0730_0830_8secs.loc')
-    my_loc2ap.plot_num_of_vehs_in_cell_heatmaps (usrs_loc_file_name='0829_0830_8secs.loc')
+    my_loc2ap.parse_loc_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    # # my_loc2ap.plot_num_of_vehs_per_AP (usrs_loc_file_name='0829_0830_8secs.loc')
+    
+    # # Post=processing
+    # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('num_of_vehs_Lux.center.post.antloc_1524aps.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')
+    # # my_loc2ap.plot_num_of_vehs_per_AP (usrs_loc_file_name='0730_0830_8secs.loc')
+    # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps (usrs_loc_file_name='0829_0830_8secs.loc')

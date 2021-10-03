@@ -449,8 +449,6 @@ class SFC_mig_simulator (object):
         """
         print the solution found by alg' for the mig' problem to the output log file 
         """
-        if (self.t == 30557 and VERBOSE_LOG in self.verbose): #$$$
-            self.verbose.append (VERBOSE_ADD2_LOG)
         for s in self.G.nodes():
             used_cpu_in_s = self.alg_used_cpu_in (s)
             chains_in_s   = [usr.id for usr in self.usrs if usr.nxt_s==s]
@@ -760,7 +758,6 @@ class SFC_mig_simulator (object):
         self.uniform_link_cost          = 3
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz
         self.uniform_chain_mig_cost     = self.uniform_vm_mig_cost * len (self.uniform_theta_times_lambda)
-        self.long_chain_theta_times_lambda = [2, 10, 10, 10, 10, 10, 10, 2] # "1" here means 100MHz 
         self.uniform_Cu                 = 20 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
         self.prob_of_target_delay       = [prob_of_target_delay]  
@@ -1128,8 +1125,6 @@ class SFC_mig_simulator (object):
         Returns sccs if found a feasible placement, fail otherwise
         """
 
-        # if (self.t == 30557): #$$$
-        #     return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
         for usr in self.first_fit_sort (self.unplaced_usrs()): 
             if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
                 # if (VERBOSE_LOG in self.verbose): #$$$
@@ -1151,8 +1146,8 @@ class SFC_mig_simulator (object):
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
                 self.place_usr_u_on_srvr_s (usr, s)
                 return sccs
-        if (VERBOSE_LOG in self.verbose):
-            printf (self.log_output_file, '\nfailed to locate user {} on S_u={}\n' .format (usr.id, usr.S_u)) #$$$
+        # if (VERBOSE_LOG in self.verbose): #$$$
+        #     printf (self.log_output_file, '\nfailed to locate user {} on S_u={}\n' .format (usr.id, usr.S_u)) 
         return fail
     
     def worst_fit_reshuffle (self):
@@ -1370,7 +1365,13 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry[1].split (',')
             
             usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
-                       
+            
+            # usr0 = usr_c (id=0, theta_times_lambda=[1, 10, 1], target_delay=5, C_u=100) #$$$
+            # usr1 = usr_c (id=1, theta_times_lambda=[1, 10, 1], target_delay=100, C_u=100)
+            # self.CPUAll_single_usr (usr0)
+            # self.CPUAll_single_usr (usr1)
+            # print ('u0.B={}, u1.B={}' .format (usr0.B, usr1.B))
+            # exit ()
                        
             self.moved_usrs.append (usr)
             self.critical_usrs.append(usr)
@@ -1599,15 +1600,18 @@ def run_cost_by_rsrc ():
 
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
                 
-    for mode in ['ffit', 'cpvnf', 'ourAlg']: #, 'ourAlg', 'opt']:
-        for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(16, 21)]: # simulate for opt's min cpu * [100%, 110%, ... 250%]
-            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
-        my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
-        if (mode != 'opt'): # if the mode isn't opt, need additional run, for finding the cost at the min req cpu for this mode
-            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], sim_len_in_slots = 61)
-    
-    my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
-    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
+    for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(5, 21)]: # simulate for opt's min cpu * [100%, 110%, ...]
+        my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+
+    # for mode in ['ffit', 'cpvnf', 'ourAlg']: #, 'ourAlg', 'opt']:
+    #     for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(16, 21)]: # simulate for opt's min cpu * [100%, 110%, ... 250%]
+    #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+    #     my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
+    #     if (mode != 'opt'): # if the mode isn't opt, need additional run, for finding the cost at the min req cpu for this mode
+    #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], sim_len_in_slots = 61)
+    #
+    # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
     
 def run_simulator (sim_pickle_file_name):
     """
@@ -1624,18 +1628,14 @@ if __name__ == "__main__":
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
     my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
     # output_file       = open ('../res/RT_prob_sim_{}_{}.res' .format (ap2cell_file_name, ap_file_name), 'a')
-    my_simulator.run_prob_of_RT_sim()
+    # my_simulator.run_prob_of_RT_sim()
 
-    # for prob_of_target_delay in [0.5, 0.6]:
-    #     for cpu_cap_at_leaf in [320 + i for i in range (25)]:
-    #         my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=61)
-    #         my_simulator.print_sol_res_line (output_file)
     # my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
     # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=363, prob_of_target_delay=0, sim_len_in_slots=22)
     # my_simulator.print_sol_res_line (output_file)
     # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=363, prob_of_target_delay=0.5, sim_len_in_slots=22)
     # my_simulator.print_sol_res_line (output_file)
     
-    # run_cost_by_rsrc ()
+    run_cost_by_rsrc ()
 
 #

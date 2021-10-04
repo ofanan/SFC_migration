@@ -9,7 +9,7 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 # import itertools 
 # import time 
 
-from printf import printf, printar
+from printf import printf, printar, printmat
 # from ntpath import split
 
 GLOBAL_MAX_X_LUX, GLOBAL_MAX_Y_LUX = int(13622), int(11457)             # size of the city's area, in meters. 
@@ -80,8 +80,8 @@ class loc2ap_c (object):
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_AP, antenna_loc_file_name=''):
         """
         Init a "loc2ap_c" object.
-        A loc2ap_c is used can read ".loc" files (files detailing the location of each car over time), and output ".ap" files (files detailing the AP assignment of each car), and/or statistics 
-        (e.g., number of cars entering/levaing each cell, avg # of cars in each cell, etc.).
+        A loc2ap_c is used can read ".loc" files (files detailing the location of each veh over time), and output ".ap" files (files detailing the AP assignment of each veh), and/or statistics 
+        (e.g., number of vehs entering/levaing each cell, avg # of vehs in each cell, etc.).
         """
 
         self.verbose               = verbose      # verbose level - defining which outputs will be written
@@ -227,49 +227,62 @@ class loc2ap_c (object):
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
         """
         
-        # Trunc the data of the first entry, in which obviously no car joined/left any AP, or cell
+        # Trunc the data of the first entry, in which obviously no veh joined/left any AP, or cell
         self.joined_ap         = [self.joined_ap        [ap][1:] for ap in range (self.num_of_APs)] 
         self.joined_cell       = [self.joined_cell      [ap][1:] for ap in range (self.num_of_cells)] 
         self.joined_ap_sim_via = [self.joined_ap_sim_via[ap][1:] for ap in range (self.num_of_APs)]
 
-        print ('avg num of vehs that: joined AP={:.2f}  ' .format 
-               (np.average ([np.average(self.joined_ap[ap]) for ap in range(self.num_of_APs)])))
-        print ('avg num of vehs that: joined cell={:.2f}  ' .format 
-               (np.average ([np.average(self.joined_cell[cell]) for cell in range(self.num_of_cells)])))
-        print ('left an AP={:.2f}' .format 
-               (np.average ([np.average(self.left_ap[ap]) for ap in range(self.num_of_APs)])))
-        print ('left a cell={:.2f}' .format 
-               (np.average ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])))
-        print ('joined the simulated area from ap={:.2f}' .format 
-               (np.average ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])))
-        print ('left the simulated area from ap={:.2f}' .format 
-               (np.average ([np.average(self.left_ap_sim_via[ap]) for ap in range(self.num_of_APs)])))
-
+        # print ('avg num of vehs that: joined AP={:.2f}  ' .format 
+        #        (np.average ([np.average(self.joined_ap[ap]) for ap in range(self.num_of_APs)])))
+        # print ('avg num of vehs that: joined cell={:.2f}  ' .format 
+        #        (np.average ([np.average(self.joined_cell[cell]) for cell in range(self.num_of_cells)])))
+        # print ('left an AP={:.2f}' .format 
+        #        (np.average ([np.average(self.left_ap[ap]) for ap in range(self.num_of_APs)])))
+        # print ('left a cell={:.2f}' .format 
+        #        (np.average ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])))
+        # print ('joined the simulated area from ap={:.2f}' .format 
+        #        (np.average ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])))
+        # print ('left the simulated area from ap={:.2f}' .format 
+        #        (np.average ([np.average(self.left_ap_sim_via[ap]) for ap in range(self.num_of_APs)])))
+        #
+        # plt.figure()
+        #
+        # columns = self.gen_columns_for_heatmap()
+        file_name_suffix = '{}_{}rects' .format (self.time_period_str, self.num_of_cells)
+        #
+        # my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cell)])), columns=columns), cmap="YlGnBu")
+        # # plt.title ('avg num of vehs that joined cell every sec in {}' .format (self.time_period_str))
+        # plt.savefig('../res/heatmap_vehs_joined_cell{}.jpg' .format (file_name_suffix))
+        # return
+        
+        heatmap_txt_file = open ('../res/heatmap_vehs_left.txt', 'w') 
         plt.figure()
+        avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
+         
+        for lvl in range (0, self.max_power_of_4):
+            columns = self.gen_columns_for_heatmap (lvl=lvl)
+            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            plt.figure()       
+            heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
+            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (heatmap_vals, columns=columns), cmap="YlGnBu"))
+            printf   (heatmap_txt_file, 'lvl={}\n' .format (lvl+1))
+            printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
+            my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+            plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
+            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_vehs_left_per_rect for the next iteration
+                avg_vehs_left_per_rect = self.avg_heatmap_cells (avg_vehs_left_per_rect)
         
-        columns = self.gen_columns_for_heatmap()
-        file_name_suffix = '{}_{}x{}' .format (self.time_period_str, 2**self.max_power_of_4, 2**self.max_power_of_4)
-        
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cell)])), columns=columns), cmap="YlGnBu")
-        # plt.title ('avg num of cars that joined cell every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_joined_cell{}.jpg' .format (file_name_suffix))
-        return
-        
-        plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_cell[cell])           for ap in range(self.num_of_cells)])), columns=columns), cmap="YlGnBu")
-        # plt.title ('avg num of cars that left cell every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_left_cell{}.jpg' .format (file_name_suffix))
-        exit ()
-        
+        return ()
         plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
-        # plt.title ('avg num of cars that joined the sim every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_joined_sim_via_{}.jpg' .format (file_name_suffix))
+        # plt.title ('avg num of vehs that joined the sim every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_vehs_joined_sim_via_{}.jpg' .format (file_name_suffix))
         
         plt.figure ()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_ap_sim_via[ap])   for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
-        # plt.title ('avg num of cars that left the sim every sec in {}' .format (self.time_period_str))
-        plt.savefig('../res/heatmap_cars_left_sim_via_{}.jpg' .format (file_name_suffix))
+        # plt.title ('avg num of vehs that left the sim every sec in {}' .format (self.time_period_str))
+        plt.savefig('../res/heatmap_vehs_left_sim_via_{}.jpg' .format (file_name_suffix))
+        
         
     def invert_mat_bottom_up (self, mat):
         """
@@ -322,13 +335,9 @@ class loc2ap_c (object):
             else:
                 my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals,columns=columns), cmap="YlGnBu")#, norm=LogNorm())
             printf (tmp_file, 'lvl={}\n' .format (lvl+1))
-            for row in range(len(heatmap_vals)):
-                for col in range(len(heatmap_vals[0])):
-                    printf (tmp_file, '{:.0f} ' .format (heatmap_vals[row][col]))
-                printf (tmp_file, '\n')
-            printf (tmp_file, '\n')   
+            printmat (tmp_file, heatmap_vals, my_precision=0)
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            # plt.title ('avg num of cars per cell')
+            # plt.title ('avg num of vehs per cell')
             plt.savefig('../res/heatmap_num_vehs_{}_{}_{}rects.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
                 avg_num_of_vehs_per_cell = self.aggregate_heatmap_cells (avg_num_of_vehs_per_cell)
@@ -339,6 +348,13 @@ class loc2ap_c (object):
         """
         reshaped_heatmap = vec.reshape (int(len(vec)/4), 4) # prepare the averaging for the next iteration
         return np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
+
+    def avg_heatmap_cells (self, vec):
+        """
+        average the values within a vector in a way that allows using a heatmap with x0.25 the number of rectangles
+        """
+        reshaped_heatmap = vec.reshape (int(len(vec)/4), 4) # prepare the averaging for the next iteration
+        return np.array([np.mean(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
 
     def plot_num_of_vehs_per_AP (self, usrs_loc_file_name=''):
         """
@@ -356,7 +372,7 @@ class loc2ap_c (object):
             plt.figure()       
             my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_AP),columns=self.gen_columns_for_heatmap(lvl=lvl)), cmap="YlGnBu")#, norm=LogNorm())
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            plt.title ('avg num of cars per AP')
+            plt.title ('avg num of vehs per AP')
             plt.savefig('../res/heatmap_num_vehs_per_AP_{}_{}_{}cells.jpg' .format (self.antenna_loc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             reshaped_heatmap = avg_num_of_vehs_per_AP.reshape (int(len(avg_num_of_vehs_per_AP)/4), 4) # prepare the averaging for the next iteration
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_AP for the next iteration
@@ -369,7 +385,7 @@ class loc2ap_c (object):
         """
         self.num_of_vehs_in_cell = np.zeros ( (self.num_of_cells, len(self.num_of_vehs_in_ap[0])), dtype='int16')  
         for ap in range (self.num_of_APs):
-            self.num_of_vehs_in_cell[self.ap2cell(ap)] += np.array (self.num_of_vehs_in_ap[ap]) # Add the # of cars in this AP to the (avg) number of cars in the cell to which this AP belongs    
+            self.num_of_vehs_in_cell[self.ap2cell(ap)] += np.array (self.num_of_vehs_in_ap[ap]) # Add the # of vehs in this AP to the (avg) number of vehs in the cell to which this AP belongs    
         
     def plot_speed_heatmap (self):
         """
@@ -529,7 +545,7 @@ class loc2ap_c (object):
         #     self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
             
-            # first, fix the speed, as we assumed a first car with speed '0'.
+            # first, fix the speed, as we assumed a first veh with speed '0'.
             for ap in [ap for ap in range (self.num_of_APs) if (self.speed[ap]['num of smpls'] > 0)]:
                 self.speed[ap]['speed'] = self.speed[ap]['speed'] * (self.speed[ap]['num of smpls'] +1) / self.speed[ap]['num of smpls']
             self.print_speed()
@@ -610,7 +626,7 @@ class loc2ap_c (object):
         so that the number of cells is a power of 4. 
         """
         output_file = open ('../res/' + output_file_name, 'w')
-        printf (output_file, 'avg num of cars per server\n')
+        printf (output_file, 'avg num of vehs per server\n')
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
         for lvl in range (self.max_power_of_4):
             printf (output_file, '\nlvl {}\n********************************\n' .format(lvl))
@@ -670,13 +686,15 @@ class loc2ap_c (object):
         
                 
 if __name__ == '__main__':
-  
+
+    List = [ [1, 2], [2,5], [5,1] ]
+
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antenna_loc_file_name = 'Lux.center.post.antloc') #'Lux.center.post.antloc')
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antenna_loc_file_name = '') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['0730_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap.parse_loc_files (['0829_0830_8secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
     # # my_loc2ap.plot_num_of_vehs_per_AP (usrs_loc_file_name='0829_0830_8secs.loc')
     
     # # Post=processing

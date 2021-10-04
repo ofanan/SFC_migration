@@ -12,7 +12,7 @@ from pathlib import Path
 from usr_c    import usr_c    # class of the users of alg
 from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
-from printf import printf
+from printf import printf, printmat
 # from pandas.tests.arrays.sparse.test_array import test_first_fill_value_loc
 
 # Levels of verbose / operation modes (which output is generated)
@@ -1600,8 +1600,13 @@ def run_cost_by_rsrc ():
 
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name='Lux.center.post.antloc_256cells.ap2cell')
                 
-    for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(5, 21)]: # simulate for opt's min cpu * [100%, 110%, ...]
-        my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+    # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(5, 21)]: # simulate for opt's min cpu * [100%, 110%, ...]
+    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+        
+    # for cpu_cap_at_leaf in [165, 341, 407]: # simulate for opt's min cpu * [100%, 110%, ...]
+    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+        
+    
 
     # for mode in ['ffit', 'cpvnf', 'ourAlg']: #, 'ourAlg', 'opt']:
     #     for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(16, 21)]: # simulate for opt's min cpu * [100%, 110%, ... 250%]
@@ -1611,7 +1616,7 @@ def run_cost_by_rsrc ():
     #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], sim_len_in_slots = 61)
     #
     # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=min_req_cpu['cpvnf'], sim_len_in_slots = 61)
+    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=min_req_cpu['ffit'], sim_len_in_slots = 61)
     
 def run_simulator (sim_pickle_file_name):
     """

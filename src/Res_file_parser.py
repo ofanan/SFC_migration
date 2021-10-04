@@ -329,21 +329,24 @@ class Res_file_parser (object):
         for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             list_of_points = self.gen_filtered_list (self.list_of_dicts, alg=alg, stts=1)
+        
+            for point in list_of_points:
+                point['cpu'] /= 10
             
             self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg], y_value='cpu')
      
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     
-    # input_file_name = 'rsrc_aug_by_RT_prob_exp_cpu.res' #'0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
-    # my_res_file_parser.parse_file('rsrc_aug_by_RT_prob_exp_cpu_cost_Lux.center.post.antloc_256cells.ap2cell.res')
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res' #'rsrc_aug_by_RT_prob_exp_cpu.res' #'0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
+    my_res_file_parser.parse_file (input_file_name) #('RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res')
     # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
     
-    # X_norm_factor values: Lux post: 160. Lux rect: 208 
+    # # X_norm_factor values: Lux post: 160. Lux rect: 208 
     X_norm_factor = 160 
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
-    my_res_file_parser.parse_file (input_file_name)
-    # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
+    # input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
+    # my_res_file_parser.parse_file (input_file_name)
+    # # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
     my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
     

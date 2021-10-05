@@ -338,15 +338,14 @@ class Res_file_parser (object):
 if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res' #'rsrc_aug_by_RT_prob_exp_cpu.res' #'0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'0829_0830_1secs_256aps_p0.3.res' # '0730_0830_1secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res' #'0730_0830_16secs_256aps.ap_detailed_cost_comp.res' #'detailed_cost_comp_1secs.res'
-    my_res_file_parser.parse_file (input_file_name) #('RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res')
+    input_file_name = 'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.deter_usr_id.res' 
+    my_res_file_parser.parse_file (input_file_name) 
     # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
+    my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
     
     # # X_norm_factor values: Lux post: 160. Lux rect: 208 
-    X_norm_factor = 160 
+    # X_norm_factor = 160 
     # input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
-    # my_res_file_parser.parse_file (input_file_name)
-    # # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
-    my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
+    # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
     

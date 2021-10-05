@@ -597,7 +597,6 @@ class loc2ap_c (object):
                 printf (self.ap_file, '// .antloc file={}\n' .format (self.antenna_loc_file_name))
 
             printf (self.ap_file, '// File format:\n//for each time slot:\n')
-            printf (self.ap_file, '//for each time slot:\n')
             printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
             printf (self.ap_file, '//"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
             printf (self.ap_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')

@@ -106,8 +106,12 @@ class SFC_mig_simulator (object):
 
     # Randomize a target delay for a usr, using the distribution and values defined in self.
     randomize_target_delay = lambda self : self.target_delay[0] if (random.random() < self.prob_of_target_delay[0]) else self.target_delay[1]
-    # if (usr_id < self.prob_of_target_delay[0]) else self.target_delay[1]  
-     
+    
+    # Generate a new usr
+    gen_new_usr = lambda self, usr_id : usr_c (id=usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay(usr_id), C_u=self.uniform_Cu)
+
+    # Pseudo-randomize a target delay for a usr, based on its given usr_id
+    pseudo_random_target_delay = lambda self, usr_id : self.target_delay[0] if ( ((usr_id % 10)/10) < self.prob_of_target_delay[0]) else self.target_delay[1]
     
     gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}.res' .format (self.ap_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0])
 
@@ -563,7 +567,7 @@ class SFC_mig_simulator (object):
         """
         for usr in usrs:
             self.CPUAll_single_usr(usr)
-       
+    
        
     def gen_parameterized_antloc_tree (self, ap2cell_file_name=''):
         """
@@ -807,20 +811,25 @@ class SFC_mig_simulator (object):
         """
         Sanity check for the usr parameters' feasibility.
         """
-        usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+        usr = self.gen_new_usr (usr_id=0)
         self.CPUAll_single_usr (usr) 
         if (len(usr.B)==0):
             print ('Error: cannot satisfy delay constraints of usr {}, even on a leaf. theta_times_lambda={}, target_delay ={}' .format (
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()       
 
-    def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=99999):
+    def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=99999, slot_to_dump=float('inf')): #$$$
+        
         """
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
         Return value: if the simulation succeeded (found a feasible solution for every time slot during the sim') - return the cpu capacity used in a leaf node.
         Else, return None. 
         """
         
+        # if (slot_to_dump < float('inf')): # If the user specified a finite slot to dump, we have to run the "bypass" mode. #$$$   
+        #     self.slot_to_dump = slot_to_dump
+        #     self.mode         = 'bypass'
+
         random.seed                     (42) # Use a fixed pseudo-number seed 
         self.usrs                       = []
         self.delay_const_sanity_check()
@@ -851,7 +860,7 @@ class SFC_mig_simulator (object):
         else:
             self.slot_len = 1 # assume that by default, slot len is 1
         
-        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
+        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'bypass']):
             self.simulate_algs()
         elif (self.mode == 'opt'):
             self.simulate_lp ();
@@ -1002,7 +1011,8 @@ class SFC_mig_simulator (object):
 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
-                    self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
+                    if (self.mode != 'bypass'):
+                        self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
                     self.usrs.remove (usr)                    
                 continue
         
@@ -1022,11 +1032,7 @@ class SFC_mig_simulator (object):
                 elif (self.mode == 'wfit'):
                     self.stts = self.alg_top(self.worst_fit)
                 elif (self.mode == 'cpvnf'):
-                    self.stts = self.alg_top(self.cpvnf)
-                else:
-                    print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
-                    exit ()
-        
+                    self.stts = self.alg_top(self.cpvnf)                    
                 if (self.mode in ['ourAlg'] and self.stts==sccs): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
                     self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
                 
@@ -1350,7 +1356,7 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry.split("(")
             usr_entry = usr_entry[1].split (',')
     
-            usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+            usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay (int(usr_entry[0])), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
             usr.is_new = True
             self.moved_usrs.append(usr)
             self.usrs.append (usr)
@@ -1375,7 +1381,7 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry.split("(")
             usr_entry = usr_entry[1].split (',')
             
-            usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+            usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
             
             # usr0 = usr_c (id=0, theta_times_lambda=[1, 10, 1], target_delay=5, C_u=100) #$$$
             # usr1 = usr_c (id=1, theta_times_lambda=[1, 10, 1], target_delay=100, C_u=100)
@@ -1388,7 +1394,7 @@ class SFC_mig_simulator (object):
             self.critical_usrs.append(usr)
 
             self.usrs.append (usr)
-            self.CPUAll_single_usr (usr)
+            self.CPUAll_single_usr (usr) 
             self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
@@ -1398,7 +1404,7 @@ class SFC_mig_simulator (object):
                     
     def update_S_u (self, usr, AP_id):
         """
-        Update the Su (list of delay-feasible servers) of a given usr, given the id of its current AP (Access Point server)
+        Update the S_u (list of delay-feasible servers) of a given usr, given the id of its current AP (Access Point server)
         """                    
         usr.S_u = []
         s       = self.ap2s[AP_id]
@@ -1522,44 +1528,41 @@ class SFC_mig_simulator (object):
             ar[idx] = min_val[idx]
         return ar 
     
-    def dump_usrs_to_ap_file (self, slot_to_dump):
+    def dump_usrs_to_ap_file (self):
+
+        output_ap_file = open ('../res/Lux.t{}.ap' .format (self.t), 'w')
+        printf (output_ap_file, '// Dumping ap file={} ap2cell_file_name={}' .format (self.ap_file_name, self.ap2cell_file_name))
+        printf (output_ap_file, '// File format:\n//for each time slot:\n')
+        printf (output_ap_file, '// t = {}\n' .format(self.t))
+        printf (output_ap_file, 'new_usrs:\n' .format(self.t))
+
+        for usr in self.usrs:
+            self.CPUAll_single_usr (usr) 
+            printf (output_ap_file, '({},{})' .format (usr.id, usr.S_u[0])) # S_u is the list of delay-feasible servers for that usr. S_u[0] is the leaf server (namely, the PoA) out of them.
+    
+    def run_dump_usrs (self, slot_to_dump):
         """
         Write the current AP association of all users at a given time slot to an .ap file
         """
         random.seed                     (42) # Use a fixed pseudo-number seed 
         self.usrs                       = []
-        self.delay_const_sanity_check()
-
-        self.usrs                       = [] 
-
-        output_ap_file = open ('../res/Lux.t{}.ap' .format (self.t))
-        printf (output_ap_file, '// File format:\n//for each time slot:\n')
-        printf (output_ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
-        printf (output_ap_file, '//"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
-        printf (output_ap_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
-        printf (output_ap_file, 't = {}\nusr_that_left:\n\new_usrs:\n')
         
         self.is_first_t = True # Will indicate that this is the first simulated time slot
-
-        for line in self.ap_file: 
-
+        
+        self.input_ap_file = open ("../res/" + self.ap_file_name, "r")  
+        for line in self.input_ap_file: 
+        
             # Ignore comments lines
             if (line == "\n" or line.split ("//")[0] == ""):
                 continue
-
+        
             line = line.split ('\n')[0]
             splitted_line = line.split (" ")
-
+        
             if (splitted_line[0] == "t"):
-
                 self.t = int(splitted_line[2])
-                if (self.is_first_t):
-                    self.first_slot     = self.t
-                if (self.t > slot_to_dump):
-                    break
-                
+        
             elif (splitted_line[0] == "usrs_that_left:"):
-
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
                     self.usrs.remove (usr)                    
                 continue
@@ -1567,22 +1570,25 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "new_usrs:"):              
                 new_usrs_line = splitted_line[1:]
                 if (new_usrs_line ==[]):
-                    return # no new users
-            
+                    continue # no new users
+        
                 splitted_line = new_usrs_line[0].split ("\n")[0].split (")")
-            
+        
                 for usr_entry in splitted_line:
                     if (len(usr_entry) <= 1):
                         break
                     usr_entry = usr_entry.split("(")
                     usr_entry = usr_entry[1].split (',')
-            
-                    usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+        
+                    usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
                     usr.is_new = True
+                    self.CPUAll_single_usr (usr) 
+                    self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
                     self.usrs.append (usr)
+                    
             elif (splitted_line[0] == "old_usrs:"):  
                 old_usrs_line = splitted_line[1:]
-
+        
                 if (old_usrs_line == []): # if the list of old users that moved is empty
                     return
         
@@ -1591,17 +1597,14 @@ class SFC_mig_simulator (object):
                     if (len(usr_entry) <= 1):
                         break
                     usr_entry = usr_entry.split("(")
-                    usr_entry = usr_entry[1].split (',')
-                    
+                    usr_entry = usr_entry[1].split (',')    
                     list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
                     usr = list_of_usr[0]
-                                
+                    self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
+                    self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
 
-        for usr in self.usrs:
-            printf (output_ap_file, '({},{})' .format (usr.id, usr.S_u[0])) # S_u is the list of delay-feasible servers for that usr. S_u[0] is the leaf server (namely, the PoA) out of them.
-
-
-            
+                if (self.t == slot_to_dump):
+                    self.dump_usrs_to_ap_file() 
      
     def rd_ap2cell_file (self, ap2cell_file_name):
         """
@@ -1729,8 +1732,9 @@ if __name__ == "__main__":
     # my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
 
     
-    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
-    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=171, prob_of_target_delay=0.5, sim_len_in_slots=26)
+    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
+    my_simulator.run_dump_usrs (30563)
+    # my_simulator.simulate (mode = 'bypass', cpu_cap_at_leaf=171, prob_of_target_delay=0.5, sim_len_in_slots=26, slot_to_dump=30563) #$$$ 
         # output_file       = open ('../res/RT_prob_sim_{}_{}.res' .format (ap2cell_file_name, ap_file_name), 'a')
     # my_simulator.run_prob_of_RT_sim()
 

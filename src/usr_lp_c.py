@@ -9,4 +9,4 @@ class usr_lp_c (object):
         self.mig_cost           = mig_cost              # total mig' cost of this chain
         self.C_u                = C_u   # max # of CPU units that this usr is allowed to use
         self.S_u                = []    # List of servers that are delay-feasible for this usr.
-         
+        self.is_new             = True

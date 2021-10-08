@@ -909,7 +909,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
         self.critical_usrs = [] # rst the list of usrs who are critical in this time slot
-        # self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
+        self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
 
                     
     def simulate_lp (self):
@@ -947,7 +947,7 @@ class SFC_mig_simulator (object):
                 continue
         
             elif (splitted_line[0] == "new_usrs:"):              
-                self.rd_new_usrs_line (splitted_line[1:])
+                self.rd_new_usrs_line_lp (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
                 if (VERBOSE_LOG in self.verbose):
@@ -989,6 +989,80 @@ class SFC_mig_simulator (object):
     #     for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
     #         self.usrs.remove (usr)                    
     
+    # def simulate_algs (self):
+    #     """
+    #     Simulate the whole simulation, using an algorithm (NOT a LP solver).
+    #     At each time step:
+    #     - Read and parse from an input ".ap" file the AP cells of each user who moved. 
+    #     - solve the problem using alg_top (our alg). 
+    #     - Write outputs results and/or logs to files.
+    #     - Update self.stts according to the solution's stts.
+    #     - update cur_st = nxt_st
+    #     """
+    #
+    #     # reset Hs     
+    #     if (self.mode in ['ourAlg']):
+    #         for s in self.G.nodes():
+    #             self.G.nodes[s]['Hs']  = set() 
+    #
+    #     for line in self.ap_file: 
+    #
+    #         # Ignore comments lines
+    #         if (line == "\n" or line.split ("//")[0] == ""):
+    #             continue
+    #
+    #         line = line.split ('\n')[0]
+    #         splitted_line = line.split (" ")
+    #
+    #         if (splitted_line[0] == "t"):
+    #             self.rd_t_line (splitted_line[2])
+    #
+    #             if (self.t >= self.final_slot_to_simulate):
+    #                 self.post_processing ()
+    #                 return
+    #             continue
+    #
+    #         elif (splitted_line[0] == "usrs_that_left:"):
+    #             for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
+    #                 self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # Free the resources of this user in its current place
+    #                 if (self.mode == 'ourAlg'):
+    #                     self.rmv_usr_from_all_Hs(usr)
+    #                 self.usrs.remove (usr)                    
+    #             continue
+    #
+    #         elif (splitted_line[0] == "new_usrs:"):              
+    #             self.rd_new_usrs_line (splitted_line[1:])
+    #         elif (splitted_line[0] == "old_usrs:"):  
+    #             self.rd_old_usrs_line (splitted_line[1:])
+    #             if (VERBOSE_ADD_LOG in self.verbose):
+    #                 self.last_rt = time.time ()
+    #                 printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
+    #
+    #             # if (self.t == self.slot_to_dump): 
+    #             #     self.dump_usrs_to_ap_file()
+    #
+    #             # solve the problem using the requested alg'    
+    #             if   (self.mode in ['ourAlg']):
+    #                 self.stts = self.alg_top(self.bottom_up)
+    #             elif (self.mode == 'ffit'):
+    #                 self.stts = self.alg_top(self.first_fit)
+    #             elif (self.mode == 'wfit'):
+    #                 self.stts = self.alg_top(self.worst_fit)
+    #             elif (self.mode == 'cpvnf'):
+    #                 self.stts = self.alg_top(self.cpvnf)                    
+    #             if (self.mode in ['ourAlg'] and self.stts==sccs): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
+    #                 self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
+    #
+    #             self.print_sol_to_res_and_log ()
+    #             if (self.stts!=sccs):
+    #                 return # Once an alg' fails to find a sol even for a single slot, we don't try to further simulate, 
+    #
+    #             for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
+    #                 usr.cur_s = usr.nxt_s
+    #             self.is_first_t = False  # The next slot is surely not the first slot
+    #
+    #     self.post_processing()
+        
     def simulate_algs (self):
         """
         Simulate the whole simulation, using an algorithm (NOT a LP solver).
@@ -999,7 +1073,7 @@ class SFC_mig_simulator (object):
         - Update self.stts according to the solution's stts.
         - update cur_st = nxt_st
         """
-                
+        
         # reset Hs     
         if (self.mode in ['ourAlg']):
             for s in self.G.nodes():
@@ -1016,17 +1090,16 @@ class SFC_mig_simulator (object):
 
             if (splitted_line[0] == "t"):
                 self.rd_t_line (splitted_line[2])
-
                 if (self.t >= self.final_slot_to_simulate):
                     self.post_processing ()
                     return
                 continue
                 
             elif (splitted_line[0] == "usrs_that_left:"):
+
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
-                    self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # Free the resources of this user in its current place
-                    if (self.mode == 'ourAlg'):
-                        self.rmv_usr_from_all_Hs(usr)
+
+                    self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
                     self.usrs.remove (usr)                    
                 continue
         
@@ -1038,10 +1111,7 @@ class SFC_mig_simulator (object):
                     self.last_rt = time.time ()
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
-                # if (self.t == self.slot_to_dump): 
-                #     self.dump_usrs_to_ap_file()
-                
-                # solve the problem using the requested alg'    
+                # solve the prob' using the requested alg'    
                 if   (self.mode in ['ourAlg']):
                     self.stts = self.alg_top(self.bottom_up)
                 elif (self.mode == 'ffit'):
@@ -1049,7 +1119,11 @@ class SFC_mig_simulator (object):
                 elif (self.mode == 'wfit'):
                     self.stts = self.alg_top(self.worst_fit)
                 elif (self.mode == 'cpvnf'):
-                    self.stts = self.alg_top(self.cpvnf)                    
+                    self.stts = self.alg_top(self.cpvnf)
+                else:
+                    print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
+                    exit ()
+        
                 if (self.mode in ['ourAlg'] and self.stts==sccs): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
                     self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
                 
@@ -1059,9 +1133,9 @@ class SFC_mig_simulator (object):
                 
                 for usr in self.usrs: # The solution found at this time slot is the "cur_state" for next slot
                     usr.cur_s = usr.nxt_s
-                self.is_first_t = False  # The next slot is surely not the first slot
+                self.prepare_sim_to_next_slot()
         
-        self.post_processing()
+        self.post_processing()    
         
     def  post_processing (self):
         """
@@ -1350,7 +1424,7 @@ class SFC_mig_simulator (object):
         u.lvl                 = self.G.nodes[s]['lvl']
         self.G.nodes[s]['a'] -= u.B[self.G.nodes[s]['lvl']]
 
-    def rd_new_usrs_line (self, line):
+    def rd_new_usrs_line_lp (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
         The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
@@ -1398,6 +1472,48 @@ class SFC_mig_simulator (object):
             s = self.parent_of(s)
             usr.S_u.append (s)
     
+    # def rd_old_usrs_line (self, line):
+    #     """
+    #     Read a line detailing the new usrs just joined the system, in an ".ap" file.
+    #     The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+    #     After reading the usr entries, the function assigns each chain to its relevant list of chains, Hs.  
+    #     """
+    #     if (line == []): # if the list of old users that moved is empty
+    #         return
+    #
+    #     splitted_line = self.parse_old_usrs_line(line)
+    #     # if (VERBOSE_MOB in self.verbose and self.t > self.first_slot):
+    #     #     self.num_of_moved_usrs_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
+    #
+    #     for usr_entry in splitted_line:
+    #         if (len(usr_entry) <= 1):
+    #             break
+    #         usr    = self.parse_usr_entry (usr_entry)
+    #         # self.moved_usrs.append (usr)
+    #         usr.cur_cpu = usr.B[usr.lvl]
+    #
+    #         self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
+    #
+    #         self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
+    #
+    #         if (self.mode == 'ourAlg'):  
+    #             self.rmv_usr_from_all_Hs(usr)
+    #             for s in usr.S_u:
+    #                 self.G.nodes[s]['Hs'].add(usr)     # Add the usr only to the 'Hs' of its delay-feasible servers                          
+    #
+    #         # # Is it possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
+    #         # if (usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
+    #         #
+    #         #     # Yep: the delay constraint are satisfied also in the current placement. 
+    #         #     continue
+    #
+    #         # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
+    #         # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
+    #         self.critical_usrs.append(usr)
+    #         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # Free the resources of this user in its current place
+    #         usr.lvl   = -1
+    #         usr.nxt_s = -1
+
     def rd_old_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
@@ -1408,44 +1524,103 @@ class SFC_mig_simulator (object):
             return
         
         splitted_line = self.parse_old_usrs_line(line)
-        # if (VERBOSE_MOB in self.verbose and self.t > self.first_slot):
-        #     self.num_of_moved_usrs_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
+        if (VERBOSE_MOB in self.verbose and self.t > self.first_slot):
+            self.num_of_moved_usrs_in_slot.append (len (splitted_line)) # record the num of usrs who moved at this slot  
 
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            usr    = self.parse_usr_entry (usr_entry)
-            # self.moved_usrs.append (usr)
+            usr_entry = usr_entry.split("(")
+            usr_entry = usr_entry[1].split (',')
+            
+            list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
+            usr = list_of_usr[0]
+            self.moved_usrs.append (usr)
             usr.cur_cpu = usr.B[usr.lvl]
             
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
 
             self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
                         
-            if (self.mode == 'ourAlg'):  
-                self.rmv_usr_from_all_Hs(usr)
-                for s in usr.S_u:
-                    self.G.nodes[s]['Hs'].add(usr)     # Add the usr only to the 'Hs' of its delay-feasible servers                          
-                
-            # Is it possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
+            # Check whether it's possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
             if (usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
-            
+
                 # Yep: the delay constraint are satisfied also in the current placement. 
+                # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
+                
+                if (self.mode in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
+                    for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+                        self.G.nodes[s]['Hs'].remove (usr) # Remove the usr from  'Hs' in all locations 
+                    for s in usr.S_u:
+                        self.G.nodes[s]['Hs'].add(usr)     # Add the usr only to the 'Hs' of its delay-feasible servers                          
                 continue
             
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
             self.critical_usrs.append(usr)
-            self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # Free the resources of this user in its current place
+            self.rmv_usr_rsrcs (usr) # Free the resources of this user in its current place            
             usr.lvl   = -1
             usr.nxt_s = -1
 
-            # if the currently-run alg' uses 'Hs', update the 'Hs' w.r.t. this usr.
+            # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
             # Hs is the set of relevant usrs) at each of its delay-feasible server
-            # if (self.mode in ['ourAlg']):
-            #     for s in usr.S_u:
-            #         self.G.nodes[s]['Hs'].add(usr)               
+            if (self.mode in ['ourAlg']):
+                for s in usr.S_u:
+                    self.G.nodes[s]['Hs'].add(usr)                  
+                    
+    def rmv_usr_rsrcs (self, usr):
+        """
+        Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
+        and increase the avilable rsrcs of the srvr that currently place this usr
+        """
+        #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
+        self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+        if (self.mode not in ['ourAlg']):
+            return 
+        
+        # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
+        for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+            self.G.nodes[s]['Hs'].remove (usr) 
 
+    def rd_new_usrs_line (self, line):
+        """
+        Read a line detailing the new usrs just joined the system, in an ".ap" file.
+        The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+        After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
+        """
+        
+        if (line ==[]):
+            return # no new users
+
+        splitted_line = line[0].split ("\n")[0].split (")")
+
+        for usr_entry in splitted_line:
+            if (len(usr_entry) <= 1):
+                break
+            usr_entry = usr_entry.split("(")
+            usr_entry = usr_entry[1].split (',')
+            
+            usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+            
+            # usr0 = usr_c (id=0, theta_times_lambda=[1, 10, 1], target_delay=5, C_u=100) #$$$
+            # usr1 = usr_c (id=1, theta_times_lambda=[1, 10, 1], target_delay=100, C_u=100)
+            # self.CPUAll_single_usr (usr0)
+            # self.CPUAll_single_usr (usr1)
+            # print ('u0.B={}, u1.B={}' .format (usr0.B, usr1.B))
+            # exit ()
+                       
+            self.moved_usrs.append (usr)
+            self.critical_usrs.append(usr)
+
+            self.usrs.append (usr)
+            self.CPUAll_single_usr (usr)
+            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
+            
+            # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
+            if (self.mode in ['ourAlg']):
+                for s in usr.S_u:
+                    self.G.nodes[s]['Hs'].add(usr)                       
+                    
     def rd_old_usrs_line_lp (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file, when using a LP solver for the problem.
@@ -1600,6 +1775,14 @@ class SFC_mig_simulator (object):
                 # if (self.t == slot_to_dump): 
                 #     self.dump_usrs_to_ap_file() 
      
+    def prepare_sim_to_next_slot (self):
+        """
+        To be called after finished handling and solving the problem for the current slot. 
+        """
+        self.is_first_t = False  # The next slot is surely not the first slot
+        self.prev_t     = self.t # save the time of the current time slot as "previous" for the next time slot to come. 
+                    
+                        
     def rd_ap2cell_file (self, ap2cell_file_name):
         """
         Parse an ap2cell file.
@@ -1663,11 +1846,11 @@ class SFC_mig_simulator (object):
         #         # cpu_cap_at_leaf = 
         #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
     
-        cpu_cap_at_leaf = 143  #Initial cpu cap at the leaf server
+        cpu_cap_at_leaf = 200  #Initial cpu cap at the leaf server
         for seed in [42]: #[40 + i for i in range (11)]:
             for prob_of_target_delay in [0]: #[0.1*i for i in range (11)]:
                 self.binary_search_along_full_trace(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
-                print ('finished iteration')
+                # print ('finished iteration')
 
         # cpu_cap_at_leaf = 140  #Initial cpu cap at the leaf server
         # mode = 'opt'

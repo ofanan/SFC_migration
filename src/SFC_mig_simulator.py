@@ -1429,8 +1429,9 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            usr_entry = usr_entry.split("(")
-            usr_entry = usr_entry[1].split (',')
+            usr_entry = usr_entry.split("(")[1].split (',')
+            # usr_entry = usr_entry[1].split (',')
+
 
             if (self.mode == 'opt'):
                 usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay (int(usr_entry[0])), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
@@ -1520,12 +1521,24 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            usr    = self.parse_usr_entry (usr_entry)
-            usr_entry = usr_entry.split("(")
-            usr_entry = usr_entry[1].split (',')
+            # usr    = self.parse_usr_entry (usr_entry)
+            usr_entry = usr_entry.split("(")[1].split (',')
+            # usr_entry = usr_entry[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
             usr = list_of_usr[0]
+            
+            
+            # usr_entry = usr_entry.split("(")
+            # usr_entry = usr_entry[1].split (',')
+            #
+            # list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
+            # if (len(list_of_usr) == 0):
+            #     print  ('Error at t={}: input file={}. Did not find old / rescycled usr {}' .format (self.t, self.ap_file_name, usr_entry[0]))
+            #     exit ()
+            # return list_of_usr[0]
+
+            
             # self.moved_usrs.append (usr)
             usr.cur_cpu = usr.B[usr.lvl]
             
@@ -1580,8 +1593,8 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            usr_entry = usr_entry.split("(")
-            usr_entry = usr_entry[1].split (',')
+            usr_entry = usr_entry.split("(")[1].split (',')
+            # usr_entry = usr_entry[1].split (',')
             
             usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
             
@@ -1624,8 +1637,9 @@ class SFC_mig_simulator (object):
         This func' is for existing ('old') usrs who moved only.
         """
         
-        usr_entry = usr_entry.split("(")
-        usr_entry = usr_entry[1].split (',')
+        usr_entry = usr_entry.split("(")[1].split (',')
+        # usr_entry = usr_entry[1].split (',')
+
         
         list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
         if (len(list_of_usr) == 0):
@@ -1714,8 +1728,7 @@ class SFC_mig_simulator (object):
                 for usr_entry in splitted_line:
                     if (len(usr_entry) <= 1):
                         break
-                    usr_entry = usr_entry.split("(")
-                    usr_entry = usr_entry[1].split (',')
+                    usr_entry = usr_entry.split("(")[1].split (',')
         
                     usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
                     usr.is_new = True
@@ -1733,8 +1746,9 @@ class SFC_mig_simulator (object):
                 for usr_entry in splitted_line:
                     if (len(usr_entry) <= 1):
                         break
-                    usr_entry = usr_entry.split("(")
-                    usr_entry = usr_entry[1].split (',')    
+                    usr_entry = usr_entry.split("(")[1].split (',')
+                    # usr_entry = usr_entry[1].split (',')
+    
                     list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
                     usr = list_of_usr[0]
                     self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.

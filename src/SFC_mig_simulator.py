@@ -296,17 +296,6 @@ class SFC_mig_simulator (object):
         for s in self.G.nodes():
             self.G.nodes[s]['a'] = self.G.nodes[s]['RCs']
 
-    def calc_cost_of_moved_usrs_plp (self):
-        """
-        Returns the overall cost of users that moved in a LP solution 
-        """
-        cost = 0
-        for d_var in self.d_vars: 
-            if d_var.plp_var.value() > 0: # the LP solution set non-zero value for this decision variable
-                if d_var.usr in self.moved_usrs:
-                    cost += self.d_var_cost (d_var)
-        return cost
-
     def solve_by_plp (self):
         """
         Find an optimal fractional solution using Python's pulp LP library.
@@ -908,7 +897,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
         self.critical_usrs = [] # rst the list of usrs who are critical in this time slot
-        self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
+        # self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
 
                     
     def simulate_lp (self):
@@ -1098,7 +1087,6 @@ class SFC_mig_simulator (object):
 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
-                    # self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
                     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
                     if (self.mode in ['ourAlg']):
                         for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
@@ -1532,12 +1520,13 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
+            usr    = self.parse_usr_entry (usr_entry)
             usr_entry = usr_entry.split("(")
             usr_entry = usr_entry[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
             usr = list_of_usr[0]
-            self.moved_usrs.append (usr)
+            # self.moved_usrs.append (usr)
             usr.cur_cpu = usr.B[usr.lvl]
             
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
@@ -1575,19 +1564,6 @@ class SFC_mig_simulator (object):
             if (self.mode in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                  
-                    
-    def rmv_usr_rsrcs (self, usr):
-        """
-        Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
-        and increase the avilable rsrcs of the srvr that currently place this usr
-        """
-        self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-        if (self.mode not in ['ourAlg']):
-            return 
-        
-        # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
-        for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
-            self.G.nodes[s]['Hs'].remove (usr) 
 
     def rd_new_usrs_line (self, line):
         """
@@ -1609,14 +1585,7 @@ class SFC_mig_simulator (object):
             
             usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
             
-            # usr0 = usr_c (id=0, theta_times_lambda=[1, 10, 1], target_delay=5, C_u=100) #$$$
-            # usr1 = usr_c (id=1, theta_times_lambda=[1, 10, 1], target_delay=100, C_u=100)
-            # self.CPUAll_single_usr (usr0)
-            # self.CPUAll_single_usr (usr1)
-            # print ('u0.B={}, u1.B={}' .format (usr0.B, usr1.B))
-            # exit ()
-                       
-            self.moved_usrs.append (usr)
+            # self.moved_usrs.append (usr)
             self.critical_usrs.append(usr)
 
             self.usrs.append (usr)
@@ -1643,14 +1612,6 @@ class SFC_mig_simulator (object):
             if (len(usr_entry) <= 1):
                 break
             usr    = self.parse_usr_entry (usr_entry)
-            # usr_entry = usr_entry.split("(")
-            # usr_entry = usr_entry[1].split (',')
-            #
-            # list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
-            # if (len(list_of_usr) == 0):
-            #     print  ('Error at t={}: input file={}. Did not find old / rescycled usr {}' .format (self.t, self.ap_file_name, usr_entry[0]))
-            #     exit ()
-            # usr = list_of_usr[0]
             usr.is_new = False
             # self.moved_usrs.append(usr)
             self.CPUAll_single_usr (usr)
@@ -1842,7 +1803,7 @@ class SFC_mig_simulator (object):
         """       
 
         sim_len_in_slots = 61
-        mode             = 'ourAlg'
+        mode             = 'ourAlg' #ffit' #'ourAlg'
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
        
         # for mode in ['cpvnf']:

@@ -1098,7 +1098,11 @@ class SFC_mig_simulator (object):
 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
-                    self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
+                    # self.rmv_usr_rsrcs(usr) #Remove the rsrcs used by this usr
+                    self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+                    if (self.mode in ['ourAlg']):
+                        for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+                            self.G.nodes[s]['Hs'].remove (usr) 
                     self.usrs.remove (usr)                    
                 continue
         
@@ -1823,15 +1827,13 @@ class SFC_mig_simulator (object):
                 cpu_cap_at_leaf = ub
                 self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
                 self.print_sol_res_line (output_file)
-                break
+                return cpu_cap_at_leaf
 
             cpu_cap_at_leaf = self.avg_up_and_lb(ub, lb)
             if (self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed) != None): 
                 ub = cpu_cap_at_leaf
             else: 
                 lb = cpu_cap_at_leaf
-        print ('Did not find a solution even with cpu_cap_at_leaf={}' .format (cpu_cap_at_leaf))
-        return cpu_cap_at_leaf
     
     def run_prob_of_RT_sim (self):
         """
@@ -1840,7 +1842,7 @@ class SFC_mig_simulator (object):
         """       
 
         sim_len_in_slots = 61
-        mode             = 'ffit'
+        mode             = 'ourAlg'
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
        
         # for mode in ['cpvnf']:

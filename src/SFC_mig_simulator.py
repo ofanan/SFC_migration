@@ -857,7 +857,6 @@ class SFC_mig_simulator (object):
         else:
             print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
             exit ()
-        print ('Simulated the whole trace')
         return self.augmented_cpu_cap_at_leaf () if (self.stts==sccs) else None
 
     def init_input_and_output_files (self):
@@ -1355,47 +1354,46 @@ class SFC_mig_simulator (object):
         self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub)) 
         self.rst_sol() # dis-allocate all users
         
-        self.stts = placement_alg() 
-        if (self.stts != sccs):
-            print ('did not find a feasible sol even with maximal rsrc aug')
-            exit ()
-        
-        # Now we know that there exists a feasible sol when using the upper-bound resource aug' 
-        
-        while True: 
-        
-            if (ub <= lb+1): # the difference between the lb and the ub is at most 1
-                # To avoid corner-case rounding problems, make a last run of the placement alg' with this (upper bound) value 
-                self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub))         
-                self.rst_sol()         
-                if (placement_alg() == sccs):
-                    if (VERBOSE_ADD_LOG in self.verbose):
-                        self.print_sol_res_line (self.log_output_file)
-                        printf (self.log_output_file, 'successfully finished binary search\n') 
-                    return sccs
-        
-                # We've got a prob', Houston
-                print ('Error in the binary search: though I found a feasible sol, but actually this sol is not feasible')
-                exit ()
-        
-            # Now we know that the binary search haven't converged yet
-            # Update the augmented capacity, and the available capacity at each server according to the value of resource augmentation for this iteration
-            cur_cpu_at_leaf = self.avg_up_and_lb (ub=ub, lb=lb)            
-            self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = cur_cpu_at_leaf)) # update the (augmented) CPU cap in all servers
-            self.rst_sol()
-            self.stts = placement_alg()
-            if (VERBOSE_LOG in self.verbose):
-                    self.print_sol_res_line (self.log_output_file)
-        
-            if (self.stts == sccs):
-                if (VERBOSE_ADD_LOG in self.verbose): 
-                    printf (self.log_output_file, 'In binary search IF\n')
-                    self.print_sol_to_log_alg()
-                    if (VERBOSE_DEBUG in self.verbose):
-                        self.check_cpu_usage_all_srvrs()
-                ub = cur_cpu_at_leaf       
-            else:
-                lb = cur_cpu_at_leaf
+        # self.stts = placement_alg() 
+        # if (self.stts != sccs):
+        #     print ('did not find a feasible sol even with maximal rsrc aug in per-slot binary search')
+        #     exit ()
+        #
+        # # Now we know that there exists a feasible sol when using the upper-bound resource aug'         
+        # while True: 
+        #
+        #     if (ub <= lb+1): # the difference between the lb and the ub is at most 1
+        #         # To avoid corner-case rounding problems, make a last run of the placement alg' with this (upper bound) value 
+        #         self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = ub))         
+        #         self.rst_sol()         
+        #         if (placement_alg() == sccs):
+        #             if (VERBOSE_ADD_LOG in self.verbose):
+        #                 self.print_sol_res_line (self.log_output_file)
+        #                 printf (self.log_output_file, 'successfully finished binary search\n') 
+        #             return sccs
+        #
+        #         # We've got a prob', Houston
+        #         print ('Error in the binary search: though I found a feasible sol, but actually this sol is not feasible')
+        #         exit ()
+        #
+        #     # Now we know that the binary search haven't converged yet
+        #     # Update the augmented capacity, and the available capacity at each server according to the value of resource augmentation for this iteration
+        #     cur_cpu_at_leaf = self.avg_up_and_lb (ub=ub, lb=lb)            
+        #     self.set_RCs_and_a (self.calc_cpu_capacities (cpu_cap_at_leaf = cur_cpu_at_leaf)) # update the (augmented) CPU cap in all servers
+        #     self.rst_sol()
+        #     self.stts = placement_alg()
+        #     if (VERBOSE_LOG in self.verbose):
+        #             self.print_sol_res_line (self.log_output_file)
+        #
+        #     if (self.stts == sccs):
+        #         if (VERBOSE_ADD_LOG in self.verbose): 
+        #             printf (self.log_output_file, 'In binary search IF\n')
+        #             self.print_sol_to_log_alg()
+        #             if (VERBOSE_DEBUG in self.verbose):
+        #                 self.check_cpu_usage_all_srvrs()
+        #         ub = cur_cpu_at_leaf       
+        #     else:
+        #         lb = cur_cpu_at_leaf
     
     def bottom_up (self):
         """

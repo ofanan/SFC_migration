@@ -1430,8 +1430,6 @@ class SFC_mig_simulator (object):
             if (len(usr_entry) <= 1):
                 break
             usr_entry = usr_entry.split("(")[1].split (',')
-            # usr_entry = usr_entry[1].split (',')
-
 
             if (self.mode == 'opt'):
                 usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay (int(usr_entry[0])), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
@@ -1521,62 +1519,31 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            # usr    = self.parse_usr_entry (usr_entry)
             usr_entry = usr_entry.split("(")[1].split (',')
-            # usr_entry = usr_entry[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
             usr = list_of_usr[0]
             
-            
-            # usr_entry = usr_entry.split("(")
-            # usr_entry = usr_entry[1].split (',')
-            #
-            # list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
-            # if (len(list_of_usr) == 0):
-            #     print  ('Error at t={}: input file={}. Did not find old / rescycled usr {}' .format (self.t, self.ap_file_name, usr_entry[0]))
-            #     exit ()
-            # return list_of_usr[0]
-
-            
             # self.moved_usrs.append (usr)
             usr.cur_cpu = usr.B[usr.lvl]
-            
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
-
             self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
                         
-            # Check whether it's possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
-            if (usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
-
-                # Yep: the delay constraint are satisfied also in the current placement. 
-                # However, we have to update the 'Hs' (list of usrs in the respective subtree) of the servers in its current and next locations. 
-                
-                if (self.mode in ['ourAlg'] and usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]): 
-                    for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
-                        self.G.nodes[s]['Hs'].remove (usr) # Remove the usr from  'Hs' in all locations 
-                    for s in usr.S_u:
-                        self.G.nodes[s]['Hs'].add(usr)     # Add the usr only to the 'Hs' of its delay-feasible servers                          
-                continue
+            if (self.mode in ['ourAlg']):
+                self.rmv_usr_from_all_Hs(usr) 
+                for s in usr.S_u:
+                    self.G.nodes[s]['Hs'].add(usr)     # Add the usr only to the 'Hs' of its delay-feasible servers
+                                              
+            # Is it possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
+            if (usr.cur_s in usr.S_u and usr.cur_cpu <= usr.B[usr.lvl]):  
+                continue # Yep: the delay constraint are satisfied also in the current placement.
             
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
             self.critical_usrs.append(usr)
             self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-            if (self.mode not in ['ourAlg']):
-                return 
-            
-            # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
-            for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
-                self.G.nodes[s]['Hs'].remove (usr) 
             usr.lvl   = -1
             usr.nxt_s = -1
-
-            # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
-            # Hs is the +set of relevant usrs) at each of its delay-feasible server
-            if (self.mode in ['ourAlg']):
-                for s in usr.S_u:
-                    self.G.nodes[s]['Hs'].add(usr)                  
 
     def rd_new_usrs_line (self, line):
         """
@@ -1593,9 +1560,7 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            usr_entry = usr_entry.split("(")[1].split (',')
-            # usr_entry = usr_entry[1].split (',')
-            
+            usr_entry = usr_entry.split("(")[1].split (',')            
             usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
             
             # self.moved_usrs.append (usr)

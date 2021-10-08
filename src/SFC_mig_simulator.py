@@ -1558,12 +1558,18 @@ class SFC_mig_simulator (object):
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
             self.critical_usrs.append(usr)
-            self.rmv_usr_rsrcs (usr) # Free the resources of this user in its current place            
+            self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
+            if (self.mode not in ['ourAlg']):
+                return 
+            
+            # Now we know that the alg' that currently runs uses 'Hs'. Hence, we have to clean them.
+            for s in [s for s in self.G.nodes() if usr in self.G.nodes[s]['Hs']]:
+                self.G.nodes[s]['Hs'].remove (usr) 
             usr.lvl   = -1
             usr.nxt_s = -1
 
             # if the currently-run alg' uses 'Hs', Add the usr to the relevant 'Hs'.
-            # Hs is the set of relevant usrs) at each of its delay-feasible server
+            # Hs is the +set of relevant usrs) at each of its delay-feasible server
             if (self.mode in ['ourAlg']):
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr)                  
@@ -1573,7 +1579,6 @@ class SFC_mig_simulator (object):
         Remove a usr from the Hs (relevant usrs) of every server to which it belonged, at its previous location; 
         and increase the avilable rsrcs of the srvr that currently place this usr
         """
-        #if (usr.cur_s != -1 and usr.lvl != -1): # If the 
         self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
         if (self.mode not in ['ourAlg']):
             return 
@@ -1837,7 +1842,7 @@ class SFC_mig_simulator (object):
         """       
 
         sim_len_in_slots = 61
-        mode             = 'ourAlg'    
+        mode             = 'ffit'
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
        
         # for mode in ['cpvnf']:
@@ -1849,7 +1854,7 @@ class SFC_mig_simulator (object):
         cpu_cap_at_leaf = 200  #Initial cpu cap at the leaf server
         for seed in [42]: #[40 + i for i in range (11)]:
             for prob_of_target_delay in [0]: #[0.1*i for i in range (11)]:
-                self.binary_search_along_full_trace(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+                self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
                 # print ('finished iteration')
 
         # cpu_cap_at_leaf = 140  #Initial cpu cap at the leaf server

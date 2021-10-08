@@ -935,7 +935,7 @@ class SFC_mig_simulator (object):
                 continue
         
             elif (splitted_line[0] == "new_usrs:"):              
-                self.rd_new_usrs_line_lp (splitted_line[1:])
+                self.rd_new_usrs_line  (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"):              
                 self.rd_old_usrs_line_lp (splitted_line[1:])
                 if (VERBOSE_LOG in self.verbose):
@@ -1414,42 +1414,6 @@ class SFC_mig_simulator (object):
         u.lvl                 = self.G.nodes[s]['lvl']
         self.G.nodes[s]['a'] -= u.B[self.G.nodes[s]['lvl']]
 
-    def rd_new_usrs_line_lp (self, line):
-        """
-        Read a line detailing the new usrs just joined the system, in an ".ap" file.
-        The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
-        After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
-        """
-        
-        if (line ==[]):
-            return # no new users
-
-        splitted_line = line[0].split ("\n")[0].split (")")
-
-        for usr_entry in splitted_line:
-            if (len(usr_entry) <= 1):
-                break
-            usr_entry = usr_entry.split("(")[1].split (',')
-
-            if (self.mode == 'opt'):
-                usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay (int(usr_entry[0])), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
-            else: 
-                usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
-            
-            # self.moved_usrs.append (usr)
-            self.critical_usrs.append(usr)
-
-            self.usrs.append (usr)
-            self.CPUAll_single_usr (usr) 
-            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
-
-            if (self.mode not in ['ourAlg']):
-                continue
-            
-            # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
-            for s in usr.S_u:
-                self.G.nodes[s]['Hs'].add(usr)                       
-                    
     def update_S_u (self, usr, AP_id):
         """
         Update the S_u (list of delay-feasible servers) of a given usr, given the id of its current AP (Access Point server)
@@ -1545,6 +1509,36 @@ class SFC_mig_simulator (object):
             usr.lvl   = -1
             usr.nxt_s = -1
 
+    # def rd_new_usrs_line (self, line):
+    #     """
+    #     Read a line detailing the new usrs just joined the system, in an ".ap" file.
+    #     The input includes a list of usr_entries of the format (usr,ap), where "usr" is the user id, and "ap" is its current access point (AP).
+    #     After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
+    #     """
+    #
+    #     if (line ==[]):
+    #         return # no new users
+    #
+    #     splitted_line = line[0].split ("\n")[0].split (")")
+    #
+    #     for usr_entry in splitted_line:
+    #         if (len(usr_entry) <= 1):
+    #             break
+    #         usr_entry = usr_entry.split("(")[1].split (',')            
+    #         usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+    #
+    #         # self.moved_usrs.append (usr)
+    #         self.critical_usrs.append(usr)
+    #
+    #         self.usrs.append (usr)
+    #         self.CPUAll_single_usr (usr)
+    #         self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
+    #
+    #         # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
+    #         if (self.mode in ['ourAlg']):
+    #             for s in usr.S_u:
+    #                 self.G.nodes[s]['Hs'].add(usr)                       
+                    
     def rd_new_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".ap" file.
@@ -1559,21 +1553,27 @@ class SFC_mig_simulator (object):
 
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
-                break
-            usr_entry = usr_entry.split("(")[1].split (',')            
-            usr = usr_c (id=int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.randomize_target_delay(), C_u=self.uniform_Cu)
+                return
+            usr_entry = usr_entry.split("(")[1].split (',')
+
+            if (self.mode == 'opt'):
+                usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay (int(usr_entry[0])), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
+            else: 
+                usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
             
             # self.moved_usrs.append (usr)
             self.critical_usrs.append(usr)
 
             self.usrs.append (usr)
-            self.CPUAll_single_usr (usr)
+            self.CPUAll_single_usr (usr) 
             self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
+
+            if (self.mode not in ['ourAlg']):
+                continue
             
             # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
-            if (self.mode in ['ourAlg']):
-                for s in usr.S_u:
-                    self.G.nodes[s]['Hs'].add(usr)                       
+            for s in usr.S_u:
+                self.G.nodes[s]['Hs'].add(usr)                       
                     
     def rd_old_usrs_line_lp (self, line):
         """
@@ -1791,9 +1791,9 @@ class SFC_mig_simulator (object):
         #         # cpu_cap_at_leaf = 
         #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
     
-        cpu_cap_at_leaf = 200  #Initial cpu cap at the leaf server
-        for seed in [42]: #[40 + i for i in range (11)]:
-            for prob_of_target_delay in [0]: #[0.1*i for i in range (11)]:
+        cpu_cap_at_leaf = 143  #Initial cpu cap at the leaf server
+        for seed in [40 + i for i in range (11)]:
+            for prob_of_target_delay in [0.1*i for i in range (11)]:
                 self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
                 # print ('finished iteration')
 

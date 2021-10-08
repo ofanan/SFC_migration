@@ -1,7 +1,7 @@
 import random
 
 min_rand_id = 1
-max_rand_id = 1 #000
+max_rand_id = 1000
 
 class usr_c (object):
 

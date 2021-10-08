@@ -1,7 +1,7 @@
 import random
 
 min_rand_id = 1
-max_rand_id = 1 #00
+max_rand_id = 1 #000
 
 class usr_c (object):
 
@@ -18,16 +18,8 @@ class usr_c (object):
         self.S_u                = []    # List of servers that are delay-feasible for this usr.
         self.cur_s              = cur_s # current placement (server)
         self.nxt_s              = nxt_s # next (scheduled) server
-        self.calc_rand_id()
+        self.rand_id            = random.randint (min_rand_id, max_rand_id)
              
-    def calc_rand_id (self):
-        """
-        Calculate a random id for the usr.
-        The randomization aims to decrease the probability of fatal cases where an algorithm fails merely due to an arbitrary wrong ordering of usrs, when handling them.
-        However, randomization hardens debugging. To throttle randomization, set max_rand_int = min_rand_int. 
-        """
-        self.rand_id = random.randint (min_rand_id, max_rand_id)
-  
     def __lt__ (self, other):
         """
         Used to sort usrs, based on the number of CPU units they use

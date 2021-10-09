@@ -140,14 +140,14 @@ class SFC_mig_simulator (object):
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.seed, self.stts)
 
     # Print a solution for the problem to the output res file when the solver is an LP solver  
-    print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
+    print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {:.0f}\n' .format(
             self.settings_str(), 
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_opt(),
                                link_cost = self.calc_link_cost_in_slot_opt()
                                ,mig_cost  = self.calc_mig_cost_in_slot_opt())))
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
+    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {:.0f}\n' .format(
             self.settings_str(), 
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
                                link_cost = self.calc_link_cost_in_slot_alg()
@@ -162,7 +162,7 @@ class SFC_mig_simulator (object):
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
         tot_cost = cpu_cost + link_cost + mig_cost 
-        return 'cpu_cost={:.2f} | link_cost={:.2f} | mig_cost={:.2f} | tot_cost={:.2f} | ratio=[{:.2f},{:.2f},{:.2f}]' .format(
+        return 'cpu_cost={:.0f} | link_cost={:.0f} | mig_cost={:.0f} | tot_cost={:.0f} | ratio=[{:.2f},{:.2f},{:.2f}]' .format(
                 cpu_cost, link_cost, mig_cost, tot_cost, cpu_cost/tot_cost, link_cost/tot_cost, mig_cost/tot_cost)  
 
     def d_var_mig_cost (self, d_var): 
@@ -752,13 +752,21 @@ class SFC_mig_simulator (object):
             self.prob_of_target_delay = [prob_of_target_delay]  
 
         self.mode              = mode
-        self.max_R = 1.3 if (self.mode == 'opt') else 3 # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it a lower value.  
+        
+        # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
+        if (self.mode == 'opt'):
+            self.max_R = 1.3 
+        elif (self.mode == 'ourAlg'):   
+            self.max_R = 2 
+        else:
+            self.max_R = 4
+
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
 
         self.init_input_and_output_files()        
                      
-        print ('Simulating {}. ap_file = {} cpu_cap_at_leaf={}. prob_of_RT={}' .format (self.mode, self.ap_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0]))
+        print ('Simulating {}. ap_file = {} cpu_cap_at_leaf={}. prob_of_RT={:.0f}' .format (self.mode, self.ap_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0]))
         self.stts     = sccs
 
         # extract the slot len from the input '.ap' file name
@@ -1490,17 +1498,16 @@ class SFC_mig_simulator (object):
         mode             = 'ourAlg' #ffit' #'ourAlg'
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
        
-        # for mode in ['cpvnf']:
-        #     cpu_cap_at_leaf = 450  #Initial cpu cap at the leaf server
-        #     for prob_of_target_delay in [1]: # [0.1*i for i in range (11)]:
-        #         # cpu_cap_at_leaf = 
-        #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+        for mode in ['cpvnf', 'ffit']:
+            cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
+            for seed in [40 + i for i in range (11)]:
+                for prob_of_target_delay in [0.1*i for i in range (11)]:
+                    self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
     
-        cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
-        for seed in [40 + i for i in range (11)]:
-            for prob_of_target_delay in [0.1*i for i in range (11)]:
-                self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
-                # print ('finished iteration')
+        # cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
+        # for seed in [40 + i for i in range (11)]:
+        #     for prob_of_target_delay in [0.1*i for i in range (11)]:
+        #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
         # cpu_cap_at_leaf = 140  #Initial cpu cap at the leaf server
         # mode = 'opt'

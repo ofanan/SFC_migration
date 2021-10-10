@@ -72,6 +72,9 @@ class Res_file_parser (object):
         
         matplotlib.rcParams.update({'font.size': FONT_SIZE})
 
+
+    # Calculate the confidence interval, given the avg and the std 
+    conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
         
     def parse_detailed_cost_comp_file (self, input_file_name):
         """
@@ -353,16 +356,6 @@ class Res_file_parser (object):
             
             self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg], y_value='cpu')
      
-    def conf_interval (self, vec):
-        """
-        Input: a vector
-        Output: [y_low, y_min], that are the lower and lowest values of the 95%-confidence interval for this vec
-        """ 
-
-        avg = np.average (vec)
-        std = np.std(vec)
-        return [avg - 2*std, avg + 2*std]
-       
     def plot_RT_prob_sim_python (self):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
@@ -387,15 +380,16 @@ class Res_file_parser (object):
             y = []
             
             for x_val in x: # for each concrete value in the x vector
-                [y_lo, y_hi] = self.conf_interval ([item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)])
+                
+                samples = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
+                avg = np.average(samples)
+                
+                [y_lo, y_hi] = self.conf_interval (avg, np.std(samples))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[alg]) # Plot the confidence interval
-                y.append ((y_lo+y_hi)/2)
+                y.append (avg)
             
-            if (alg in ['ffit, cpvnf']):
-                ax.plot (x, y, color=self.color_dict[alg], linewidth=LINE_WIDTH, label=self.legend_entry_dict[alg])
-            else:
-                ax.plot (x, y, color=self.color_dict[alg], marker=self.markers_dict[alg], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[alg])
+            ax.plot (x, y, color=self.color_dict[alg], marker=self.markers_dict[alg], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[alg])
         plt.xlabel('Fraction of users with RT requirements')
         plt.ylabel('Min CPU at leaf [GHz]')
         legend = ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')

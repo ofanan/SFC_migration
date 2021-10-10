@@ -766,7 +766,7 @@ class SFC_mig_simulator (object):
 
         self.init_input_and_output_files()        
                      
-        print ('Simulating {}. ap_file = {} cpu_cap_at_leaf={}. prob_of_RT={:.0f}' .format (self.mode, self.ap_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0]))
+        print ('Simulating {}. ap_file = {} cpu_cap_at_leaf={}. prob_of_RT={:.2f}' .format (self.mode, self.ap_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0]))
         self.stts     = sccs
 
         # extract the slot len from the input '.ap' file name
@@ -1510,11 +1510,10 @@ class SFC_mig_simulator (object):
         #     for prob_of_target_delay in [0.1*i for i in range (11)]:
         #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        cpu_cap_at_leaf = 279 #Initial cpu cap at the leaf server
+        cpu_cap_at_leaf = 144 #Initial cpu cap at the leaf server
         mode = 'opt'
-        self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=1, sim_len_in_slots=sim_len_in_slots)
-        # for prob_of_target_delay in [0.1*i for i in range (6, 11)]:
-        #     cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+        for prob_of_target_delay in [(0.1*i) for i in range (6, 10)]:
+            cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
     
     
 #######################################################################################################################################
@@ -1564,9 +1563,7 @@ if __name__ == "__main__":
     ap_file_name      = '0829_0830_1secs_256aps.ap' # '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
 
-    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
-    my_simulator.simulate (mode='opt', prob_of_target_delay=1, cpu_cap_at_leaf=315, sim_len_in_slots=61)
-    exit ()
+    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
     my_simulator.run_prob_of_RT_sim ()
     
     

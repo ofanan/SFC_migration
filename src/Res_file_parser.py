@@ -56,10 +56,16 @@ class Res_file_parser (object):
                                   'cpvnf'  : '\cpvnf'}
 
         self.color_dict       = {'opt'    : 'green',
-                                'ourAlg' : 'purple',
-                                'ffit'   : 'blue',
-                                'cpvnf'  : 'black'}
+                                'ourAlg'  : 'purple',
+                                'ffit'    : 'blue',
+                                'cpvnf'   : 'black'}
         
+        self.markers_dict     = {'opt'    : '+',
+                                'ourAlg'  : 'o',
+                                'ffit'    : '^',
+                                'cpvnf'   : 's'}
+
+        self.marker_size = 5
         
     def parse_detailed_cost_comp_file (self, input_file_name):
         """
@@ -347,9 +353,9 @@ class Res_file_parser (object):
         Output: [y_low, y_min], that are the lower and lowest values of the 95%-confidence interval for this vec
         """ 
 
-        avg_vec = np.average (vec)
-        std_vec = np.std(vec)
-        return [avg_vec - 2*std_vec, avg_vec + 2*std_vec]
+        avg = np.average (vec)
+        std = np.std(vec)
+        return [avg - 2*std, avg + 2*std]
        
     def plot_RT_prob_sim_python (self):
         """
@@ -375,18 +381,11 @@ class Res_file_parser (object):
             for x_val in x: # for each concrete value in the x vector
                 [y_lo, y_hi] = self.conf_interval ([item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)])
 
-            print ('x_val={}, y_lo={}, y_hi={}' .format (x_val, y_lo, y_hi))
-            plt.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[alg])
+                plt.plot (x_val, (y_lo+y_hi)/2, color=self.color_dict[alg], marker=self.markers_dict[alg], markersize=self.marker_size)
+                plt.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[alg]) # Plot the confidence interval
             plt.show ()
-            # print ('The list of probabilities for which there is data for alg {} is {}' .format (alg, x))
             
 if __name__ == '__main__':
-    
-    # x = [0, 0.1, 0.2]
-    # y_lo  = [1,   1.2, 1.1]
-    # y_hi = [1.1, 1.3, 1.0]
-    # plt.plot ((x,x), (y_lo, y_hi))
-    # plt.show ()
     
     my_res_file_parser = Res_file_parser ()
     

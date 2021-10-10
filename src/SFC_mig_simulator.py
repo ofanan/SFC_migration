@@ -282,7 +282,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_RES in self.verbose):
             self.print_sol_res_line_opt (output_file=self.res_file)
             if (model.status != 1):
-                printf (self.res_file, '// Status={}' .format (plp.LpStatus[model.status]))
+                printf (self.res_file, '// Status={}\n' .format (plp.LpStatus[model.status]))
 
             sol_cost_by_obj_func = model.objective.value()
             
@@ -1137,7 +1137,7 @@ class SFC_mig_simulator (object):
         """
                
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
-        self.reshuffled = False # As the first run, considering only critical chains, failed, we'll now perform an additional run of bottom-up, while doing a reshuffle (namely, considering all usrs).
+        self.reshuffled = True if (self.mode=='opt') else False # In the first run of algs (not Opt), we consider only critical chains. Only if this run fails, we'll try a reshuffle.
 
         self.stts = placement_alg()
         
@@ -1308,7 +1308,10 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            usr    = self.parse_usr_entry (usr_entry)
+            usr_entry = usr_entry.split("(")[1].split (',')
+            
+            list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
+            usr = list_of_usr[0]
             usr.is_new = False
             # self.moved_usrs.append(usr)
             self.CPUAll_single_usr (usr)
@@ -1373,73 +1376,73 @@ class SFC_mig_simulator (object):
             printf (output_ap_file, '({},{})' .format (usr.id, self.s2ap(usr.S_u[0]))) # S_u is the list of delay-feasible servers for that usr. S_u[0] is the leaf server (namely, the PoA) out of them.
         printf (output_ap_file, '\nold_usrs:\n')
     
-    def run_dump_usrs (self, slot_to_dump):
-        """
-        Write the current AP association of all users at a given time slot to an .ap file
-        """
-        random.seed (42) # Use a fixed pseudo-number seed 
-        self.usrs   = []
-        self.mode   = 'bypass'
-        
-        self.is_first_t = True # Will indicate that this is the first simulated time slot
-        
-        self.input_ap_file = open ("../res/" + self.ap_file_name, "r")  
-        for line in self.input_ap_file: 
-        
-            # Ignore comments lines
-            if (line == "\n" or line.split ("//")[0] == ""):
-                continue
-        
-            line = line.split ('\n')[0]
-            splitted_line = line.split (" ")
-        
-            if (splitted_line[0] == "t"):
-                self.t = int(splitted_line[2])
-        
-            elif (splitted_line[0] == "usrs_that_left:"):
-                self.rd_usrs_that_left_line (splitted_line)
-                continue
-                    
-                continue
-        
-            elif (splitted_line[0] == "new_usrs:"):              
-                new_usrs_line = splitted_line[1:]
-                if (new_usrs_line ==[]):
-                    continue # no new users
-        
-                splitted_line = new_usrs_line[0].split ("\n")[0].split (")")
-        
-                for usr_entry in splitted_line:
-                    if (len(usr_entry) <= 1):
-                        break
-                    usr_entry = usr_entry.split("(")[1].split (',')
-        
-                    usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
-                    usr.is_new = True
-                    self.CPUAll_single_usr (usr) 
-                    self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
-                    self.usrs.append (usr)
-                    
-            elif (splitted_line[0] == "old_usrs:"):  
-                old_usrs_line = splitted_line[1:]
-        
-                if (old_usrs_line == []): # if the list of old users that moved is empty
-                    return
-        
-                splitted_line = self.parse_old_usrs_line(old_usrs_line)
-                for usr_entry in splitted_line:
-                    if (len(usr_entry) <= 1):
-                        break
-                    usr_entry = usr_entry.split("(")[1].split (',')
-                    # usr_entry = usr_entry[1].split (',')
-    
-                    list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
-                    usr = list_of_usr[0]
-                    self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
-                    self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
-
-                # if (self.t == slot_to_dump): 
-                #     self.dump_usrs_to_ap_file() 
+    # def run_dump_usrs (self, slot_to_dump):
+    #     """
+    #     Write the current AP association of all users at a given time slot to an .ap file
+    #     """
+    #     random.seed (42) # Use a fixed pseudo-number seed 
+    #     self.usrs   = []
+    #     self.mode   = 'bypass'
+    #
+    #     self.is_first_t = True # Will indicate that this is the first simulated time slot
+    #
+    #     self.input_ap_file = open ("../res/" + self.ap_file_name, "r")  
+    #     for line in self.input_ap_file: 
+    #
+    #         # Ignore comments lines
+    #         if (line == "\n" or line.split ("//")[0] == ""):
+    #             continue
+    #
+    #         line = line.split ('\n')[0]
+    #         splitted_line = line.split (" ")
+    #
+    #         if (splitted_line[0] == "t"):
+    #             self.t = int(splitted_line[2])
+    #
+    #         elif (splitted_line[0] == "usrs_that_left:"):
+    #             self.rd_usrs_that_left_line (splitted_line)
+    #             continue
+    #
+    #             continue
+    #
+    #         elif (splitted_line[0] == "new_usrs:"):              
+    #             new_usrs_line = splitted_line[1:]
+    #             if (new_usrs_line ==[]):
+    #                 continue # no new users
+    #
+    #             splitted_line = new_usrs_line[0].split ("\n")[0].split (")")
+    #
+    #             for usr_entry in splitted_line:
+    #                 if (len(usr_entry) <= 1):
+    #                     break
+    #                 usr_entry = usr_entry.split("(")[1].split (',')
+    #
+    #                 usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
+    #                 usr.is_new = True
+    #                 self.CPUAll_single_usr (usr) 
+    #                 self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
+    #                 self.usrs.append (usr)
+    #
+    #         elif (splitted_line[0] == "old_usrs:"):  
+    #             old_usrs_line = splitted_line[1:]
+    #
+    #             if (old_usrs_line == []): # if the list of old users that moved is empty
+    #                 return
+    #
+    #             splitted_line = self.parse_old_usrs_line(old_usrs_line)
+    #             for usr_entry in splitted_line:
+    #                 if (len(usr_entry) <= 1):
+    #                     break
+    #                 usr_entry = usr_entry.split("(")[1].split (',')
+    #                 # usr_entry = usr_entry[1].split (',')
+    #
+    #                 list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
+    #                 usr = list_of_usr[0]
+    #                 self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
+    #                 self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
+    #
+    #             # if (self.t == slot_to_dump): 
+    #             #     self.dump_usrs_to_ap_file() 
      
     def rd_ap2cell_file (self, ap2cell_file_name):
         """
@@ -1561,7 +1564,9 @@ if __name__ == "__main__":
     ap_file_name      = '0829_0830_1secs_256aps.ap' # '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
 
-    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
+    my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
+    my_simulator.simulate (mode='opt', prob_of_target_delay=1, cpu_cap_at_leaf=315, sim_len_in_slots=61)
+    exit ()
     my_simulator.run_prob_of_RT_sim ()
     
     

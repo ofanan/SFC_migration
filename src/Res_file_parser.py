@@ -54,6 +54,11 @@ class Res_file_parser (object):
                                   'ourAlg' : 'BUPU', 
                                   'ffit'   : '\\ffit',
                                   'cpvnf'  : '\cpvnf'}
+
+        self.color_dict       = {'opt'    : 'green',
+                                'ourAlg' : 'purple',
+                                'ffit'   : 'blue',
+                                'cpvnf'  : 'black'}
         
         
     def parse_detailed_cost_comp_file (self, input_file_name):
@@ -366,15 +371,13 @@ class Res_file_parser (object):
                 x.add (point['prob'])
             
             x = sorted (x)
-            print (x)
             
             for x_val in x: # for each concrete value in the x vector
-                vec = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
-                [y_lo, y_hi] = self.conf_interval (vec)
+                [y_lo, y_hi] = self.conf_interval ([item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)])
 
             print ('x_val={}, y_lo={}, y_hi={}' .format (x_val, y_lo, y_hi))
-            plt.plot ((x_val,x_val), (y_lo, y_hi))
-        plt.show ()
+            plt.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[alg])
+            plt.show ()
             # print ('The list of probabilities for which there is data for alg {} is {}' .format (alg, x))
             
 if __name__ == '__main__':

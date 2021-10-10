@@ -1510,7 +1510,7 @@ class SFC_mig_simulator (object):
         #     for prob_of_target_delay in [0.1*i for i in range (11)]:
         #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        cpu_cap_at_leaf = 144 #Initial cpu cap at the leaf server
+        cpu_cap_at_leaf = 177 #Initial cpu cap at the leaf server
         mode = 'opt'
         for prob_of_target_delay in [(0.1*i) for i in range (6, 10)]:
             cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)

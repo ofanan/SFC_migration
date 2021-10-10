@@ -1,3 +1,4 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import math
@@ -17,6 +18,10 @@ opt_idx   = 0
 alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
+
+MARKER_SIZE = 7
+LINE_WIDTH  = 4
+FONT_SIZE   = 20
 
 class Res_file_parser (object):
     """
@@ -64,8 +69,9 @@ class Res_file_parser (object):
                                 'ourAlg'  : 'o',
                                 'ffit'    : '^',
                                 'cpvnf'   : 's'}
+        
+        matplotlib.rcParams.update({'font.size': FONT_SIZE})
 
-        self.marker_size = 5
         
     def parse_detailed_cost_comp_file (self, input_file_name):
         """
@@ -367,6 +373,7 @@ class Res_file_parser (object):
         self.output_file = open ('../res/{}' .format (output_file_name), 'w')
 
         
+        # fig, ax = plt.subplots()
         for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, alg=alg, stts=1) 
@@ -377,13 +384,22 @@ class Res_file_parser (object):
                 x.add (point['prob'])
             
             x = sorted (x)
+            y = []
             
             for x_val in x: # for each concrete value in the x vector
                 [y_lo, y_hi] = self.conf_interval ([item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)])
 
-                plt.plot (x_val, (y_lo+y_hi)/2, color=self.color_dict[alg], marker=self.markers_dict[alg], markersize=self.marker_size)
+                # plt
                 plt.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[alg]) # Plot the confidence interval
-            plt.show ()
+                y.append ((y_lo+y_hi)/2)
+                
+            # plt.
+            plt.plot (x, y, color=self.color_dict[alg], marker=self.markers_dict[alg], markersize=MARKER_SIZE, linewidth=LINE_WIDTH)
+        plt.xlabel('Fraction of users with RT requirements')
+        plt.ylabel('Min CPU at leaf [GHz]')
+        # plt.legend(alg)
+            
+        plt.show ()
             
 if __name__ == '__main__':
     

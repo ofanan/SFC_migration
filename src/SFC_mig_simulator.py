@@ -140,14 +140,14 @@ class SFC_mig_simulator (object):
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.seed, self.stts)
 
     # Print a solution for the problem to the output res file when the solver is an LP solver  
-    print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {:.0f}\n' .format(
+    print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
             self.settings_str(), 
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_opt(),
                                link_cost = self.calc_link_cost_in_slot_opt()
                                ,mig_cost  = self.calc_mig_cost_in_slot_opt())))
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {:.0f}\n' .format(
+    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
             self.settings_str(), 
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
                                link_cost = self.calc_link_cost_in_slot_alg()
@@ -297,7 +297,7 @@ class SFC_mig_simulator (object):
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_LOG in self.verbose):
             self.print_sol_res_line_opt (output_file=self.log_output_file)
-            printf (self.log_output_file, 'tot_cost = {:.2f}\n' .format (model.objective.value())) 
+            printf (self.log_output_file, 'tot_cost = {:.0f}\n' .format (model.objective.value())) 
             self.print_sol_to_log_opt ()
             if (model.status == 1): # successfully solved
                 printf (self.log_output_file, '\nSuccessfully solved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
@@ -859,14 +859,12 @@ class SFC_mig_simulator (object):
                 if (self.t >= self.final_slot_to_simulate): # finished the desired simulation time
                     self.post_processing ()
                     return 
-                continue
         
             elif (splitted_line[0] == "usrs_that_left:"):
         
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
                     self.usrs.remove  (usr) # Remove the usr from the list of usrs
-                    self.cur_st_params = list (filter (self.cur_st_params, lambda item : item.usr != usr)) # Remove any parameter corresponding to the current state of this usr (who left)                     
-                continue
+                    self.cur_st_params = list (filter (lambda param : param.usr != usr, self.cur_st_params)) # Remove any parameter corresponding to the current state of this usr (who left)
         
             elif (splitted_line[0] == "new_usrs:"):              
                 self.rd_new_usrs_line  (splitted_line[1:])
@@ -1498,21 +1496,21 @@ class SFC_mig_simulator (object):
         mode             = 'ourAlg' #ffit' #'ourAlg'
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
        
-        for mode in ['cpvnf', 'ffit']:
-            cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
-            for seed in [40 + i for i in range (11)]:
-                for prob_of_target_delay in [0.1*i for i in range (11)]:
-                    self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+        # for mode in ['ffit', 'cpvnf']:
+        #     cpu_cap_at_leaf = 300  #Initial cpu cap at the leaf server
+        #     for seed in [50 + i for i in range (3, 11)]:
+        #         for prob_of_target_delay in [0.1*i for i in range (11)]:
+        #             self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
     
         # cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
         # for seed in [40 + i for i in range (11)]:
         #     for prob_of_target_delay in [0.1*i for i in range (11)]:
         #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        # cpu_cap_at_leaf = 140  #Initial cpu cap at the leaf server
-        # mode = 'opt'
-        # output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
-        # for prob_of_target_delay in [0.1*i for i in range (11)]:
+        cpu_cap_at_leaf = 279 #Initial cpu cap at the leaf server
+        mode = 'opt'
+        self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=1, sim_len_in_slots=sim_len_in_slots)
+        # for prob_of_target_delay in [0.1*i for i in range (6, 11)]:
         #     cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
     
     
@@ -1535,7 +1533,7 @@ def run_cost_by_rsrc ():
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
         
     # for cpu_cap_at_leaf in [165, 341, 407]: # simulate for opt's min cpu * [100%, 110%, ...]
-    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, sim_len_in_slots = 61)
+    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=160, sim_len_in_slots = 3)
         
     
 
@@ -1562,9 +1560,7 @@ if __name__ == "__main__":
 
     ap_file_name      = '0829_0830_1secs_256aps.ap' # '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
-    # my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
-    # my_simulator.simulate (mode='ourAlg', cpu_cap_at_leaf=400)
-    
+
     my_simulator      = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
     my_simulator.run_prob_of_RT_sim ()
     

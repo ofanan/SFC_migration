@@ -9,7 +9,8 @@ t_idx         = 0
 alg_idx       = 1
 cpu_idx       = 2
 prob_idx      = 3
-stts_idx      = 4
+seed_idx      = 4
+stts_idx      = 5
 num_of_fields = stts_idx+1
 
 opt_idx   = 0
@@ -192,6 +193,7 @@ class Res_file_parser (object):
             "alg"       : splitted_settings      [alg_idx],
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
+            "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
             "stts"      : int   (splitted_settings [stts_idx].split("stts")[1]),  
             "cpu_cost"  : float (splitted_line[1].split("=")[1]),
             "link_cost" : float (splitted_line[2].split("=")[1]),
@@ -199,7 +201,7 @@ class Res_file_parser (object):
             "cost"      : float (splitted_line[4].split("=")[1])
             }
 
-    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=0, alg = None, cpu = -1, stts = -1):
+    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, alg = None, cpu = None, stts = -1):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
@@ -207,12 +209,12 @@ class Res_file_parser (object):
         list_to_filter = list (filter (lambda item : item['t'] >= min_t and item['t'] <= max_t, list_to_filter))    
         if (alg != None):
             list_to_filter = list (filter (lambda item : item['alg']  == alg, list_to_filter))    
-        if (cpu != -1):
+        if (cpu != None):
             list_to_filter = list (filter (lambda item : item['cpu']  == cpu, list_to_filter))    
-        if (prob > 0):
+        if (prob != None):
             list_to_filter = list (filter (lambda item : item['prob'] == prob, list_to_filter))    
         if (stts != -1):
-            list_to_filter = list (filter (lambda item : item['stts'] == stts, list_to_filter))    
+            list_to_filter = list (filter (lambda item : item['stts'] == stts, list_to_filter))
         return list_to_filter
 
     def print_single_tikz_plot (self, list_of_dict, key_to_sort, addplot_str = None, add_legend_str = None, legend_entry = None, y_value = 'cost'):
@@ -272,8 +274,7 @@ class Res_file_parser (object):
         
         for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
-            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1),
-                           key = lambda item : item['cpu'])
+            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1), key = lambda item : item['cpu'])
             
             cpu_vals = set ([item['cpu'] for item in self.list_of_dicts if item in alg_list])
             
@@ -320,7 +321,7 @@ class Res_file_parser (object):
         plt.plot (np.array(t)/3600, tot_num_of_vehs)
         plt.show ()
         
-    def plot_min_required_cpu_vs_RT_prob (self):
+    def plot_RT_prob_sim_tikz (self):
         """
         Generating a tikz-plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         """
@@ -335,14 +336,62 @@ class Res_file_parser (object):
             
             self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg], y_value='cpu')
      
+    def conf_interval (self, vec):
+        """
+        Input: a vector
+        Output: [y_low, y_min], that are the lower and lowest values of the 95%-confidence interval for this vec
+        """ 
+
+        avg_vec = np.average (vec)
+        std_vec = np.std(vec)
+        return [avg_vec - 2*std_vec, avg_vec + 2*std_vec]
+       
+    def plot_RT_prob_sim_python (self):
+        """
+        Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
+        Show the conf' intervals.
+        """
+        
+        output_file_name = self.input_file_name + '.dat' 
+        self.output_file = open ('../res/{}' .format (output_file_name), 'w')
+
+        
+        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+            
+            list_of_points = self.gen_filtered_list(self.list_of_dicts, alg=alg, stts=1) 
+        
+            x = set () # The x value will hold all the probabilities that appear in the .res file
+            for point in list_of_points: # A cpu cap' unit represents 100 MHz --> to represent results by units of GHz, divide the cpu cap' by 10.
+                point['cpu'] /= 10
+                x.add (point['prob'])
+            
+            x = sorted (x)
+            print (x)
+            
+            for x_val in x: # for each concrete value in the x vector
+                vec = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
+                [y_lo, y_hi] = self.conf_interval (vec)
+
+            print ('x_val={}, y_lo={}, y_hi={}' .format (x_val, y_lo, y_hi))
+            plt.plot ((x_val,x_val), (y_lo, y_hi))
+        plt.show ()
+            # print ('The list of probabilities for which there is data for alg {} is {}' .format (alg, x))
+            
 if __name__ == '__main__':
+    
+    # x = [0, 0.1, 0.2]
+    # y_lo  = [1,   1.2, 1.1]
+    # y_hi = [1.1, 1.3, 1.0]
+    # plt.plot ((x,x), (y_lo, y_hi))
+    # plt.show ()
+    
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = 'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.deter_usr_id.res' 
+    input_file_name = 'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
     my_res_file_parser.parse_file (input_file_name) 
-    # my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
+    # my_res_file_parser.plot_RT_prob_sim()
     # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
-    my_res_file_parser.plot_min_required_cpu_vs_RT_prob()
+    my_res_file_parser.plot_RT_prob_sim_python()
     
     # # X_norm_factor values: Lux post: 160. Lux rect: 208 
     # X_norm_factor = 160 

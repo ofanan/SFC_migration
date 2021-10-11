@@ -422,7 +422,10 @@ class Res_file_parser (object):
             mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='ourAlg', prob=prob, min_t=min_t, max_t=max_t),key = lambda item : item['cpu'])
 
         list_of_avg_vals = []        
-        for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        
+        printf (self.output_file, 'cpu        & LBound        & BUPU        & F-Fit        & CPVNF')        
+
+        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             mode_list   = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t), key = lambda item : item['cpu']) # list of lines with data about this mode
             
@@ -437,12 +440,11 @@ class Res_file_parser (object):
                 mode_list = list (filter (lambda item : not (item['cpu']==failed_run['cpu'] and item['seed']==failed_run['seed']), mode_list))
                         
             for cpu_val in set ([item['cpu'] for item in self.list_of_dicts if item in mode_list]): # list of CPU vals for which the whole run succeeded with this mode' 
-                        # cpu_vals:
                 list_of_avg_vals.append ({'mode' : mode, 
                                           'cpu'  : cpu_val, 
                                           'cost' : np.average ([item['cost'] for item in mode_list if item['cpu']==cpu_val]) })
 
-        # list_of_avg_vals = sorted (list_of_avg_vals, key = lambda item : item['cpu'])
+        printf (self.output_file, '\n')
         cpu_vals = sorted (set ([item['cpu'] for item in list_of_avg_vals]))
         min_cpu  = min (cpu_vals)
         for cpu_val in cpu_vals:

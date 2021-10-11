@@ -215,6 +215,8 @@ class loc2ap_c (object):
                                                 ap, self.joined_ap_sim_via[ap], 
                                                 ap, self.left_ap[ap], 
                                                 ap, self.left_ap_sim_via[ap]))
+        for cell in range (self.num_of_cells):
+            printf (self.demography_file, 'cell: left {}\n' .format (self.left_cell[cell]))
 
     def print_speed (self):
         """
@@ -228,9 +230,9 @@ class loc2ap_c (object):
         """
         
         # Trunc the data of the first entry, in which obviously no veh joined/left any AP, or cell
-        self.joined_ap         = [self.joined_ap        [ap][1:] for ap in range (self.num_of_APs)] 
+        # self.joined_ap         = [self.joined_ap        [ap][1:] for ap in range (self.num_of_APs)] 
         self.joined_cell       = [self.joined_cell      [ap][1:] for ap in range (self.num_of_cells)] 
-        self.joined_ap_sim_via = [self.joined_ap_sim_via[ap][1:] for ap in range (self.num_of_APs)]
+        # self.joined_ap_sim_via = [self.joined_ap_sim_via[ap][1:] for ap in range (self.num_of_APs)]
 
         # print ('avg num of vehs that: joined AP={:.2f}  ' .format 
         #        (np.average ([np.average(self.joined_ap[ap]) for ap in range(self.num_of_APs)])))
@@ -450,11 +452,11 @@ class loc2ap_c (object):
                     printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
-                    for ap in range (self.num_of_APs): 
-                        self.joined_ap        [ap]  .append(np.int16(0))
-                        self.left_ap          [ap]  .append(np.int16(0))
-                        self.joined_ap_sim_via[ap]  .append(np.int16(0))
-                        self.left_ap_sim_via  [ap]  .append(np.int16(0))
+                    # for ap in range (self.num_of_APs): 
+                    #     self.joined_ap        [ap]  .append(np.int16(0))
+                    #     self.left_ap          [ap]  .append(np.int16(0))
+                    #     self.joined_ap_sim_via[ap]  .append(np.int16(0))
+                    #     self.left_ap_sim_via  [ap]  .append(np.int16(0))
                     for cell in range (self.num_of_cells): 
                         self.joined_cell      [cell].append(np.int16(0))
                         self.left_cell        [cell].append(np.int16(0))
@@ -464,9 +466,9 @@ class loc2ap_c (object):
                 if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '{}\n' .format (line))
                 ids_of_usrs_that_left_ap = [int(id) for id in splitted_line[1:] if id!= '']                
-                if (VERBOSE_DEMOGRAPHY in self.verbose):
-                    for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_ap, self.usrs)): 
-                        self.left_ap_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
+                # if (VERBOSE_DEMOGRAPHY in self.verbose):
+                #     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_ap, self.usrs)): 
+                #         self.left_ap_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left_ap), self.usrs))
                 continue
     
@@ -497,9 +499,9 @@ class loc2ap_c (object):
                         if (tuple[type_idx] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
                             if (VERBOSE_DEMOGRAPHY in self.verbose): 
-                                self.joined_ap        [nxt_ap][-1]   += 1 # inc the # of usrs that joined this AP at this slot
+                            #     self.joined_ap        [nxt_ap][-1]   += 1 # inc the # of usrs that joined this AP at this slot
                                 self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
-                                self.joined_ap_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
+                            #     self.joined_ap_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
                         elif (tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0):
@@ -508,9 +510,9 @@ class loc2ap_c (object):
                             list_of_usr[0]['nxt ap']   = nxt_ap
                             list_of_usr[0]['nxt cell'] = nxt_cell
                             if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
-                                self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
+                                # self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
                                 self.joined_cell[nxt_cell][-1]               += 1 # inc the # of usrs that joined this cell
-                                self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
+                                # self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
                         else:
                             print ('Wrong type of usr.')
                             exit () 
@@ -682,8 +684,6 @@ class loc2ap_c (object):
         plt.xlim(0, MAX_X_LUX); plt.ylim(0, MAX_Y_LUX)
         plt.show()
 
-        
-                
 if __name__ == '__main__':
 
     List = [ [1, 2], [2,5], [5,1] ]

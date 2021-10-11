@@ -1544,17 +1544,14 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
     # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                 
-    for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
-        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    
-    for mode in ['cpvnf', 'ffit']:
+    for mode in ['cpvnf', 'ffit', 'ourAlg']:
         for seed in [40 + i for i in range (21)]:
-            for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(28, 31)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-                my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
-            my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], seed=seed)
+            for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+                if (cpu_cap_at_leaf >= min_req_cpu[mode]):
+                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+            for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit'], min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
+                if (cpu_cap_at_leaf >= min_req_cpu[mode]):
+                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
 
 if __name__ == "__main__":
 

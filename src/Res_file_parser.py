@@ -422,7 +422,7 @@ class Res_file_parser (object):
             mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='ourAlg', prob=prob, min_t=min_t, max_t=max_t),key = lambda item : item['cpu'])
 
         list_of_avg_vals = []        
-        for mode in ['ourAlg']: #, 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             mode_list   = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t), key = lambda item : item['cpu']) # list of lines with data about this mode
             
@@ -442,11 +442,14 @@ class Res_file_parser (object):
                                           'cpu'  : cpu_val, 
                                           'cost' : np.average ([item['cost'] for item in mode_list if item['cpu']==cpu_val]) })
 
-        
-        for cpu_val in set ([item['cpu'] for item in self.list_of_dicts]): # For all CPU values
+        # list_of_avg_vals = sorted (list_of_avg_vals, key = lambda item : item['cpu'])
+        cpu_vals = sorted (set ([item['cpu'] for item in list_of_avg_vals]))
+        min_cpu  = min (cpu_vals)
+        for cpu_val in cpu_vals:
+            printf (self.output_file, '{:.02f}\t& ' .format (cpu_val / min_cpu))
             for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
                 list_of_val = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, list_of_avg_vals))
-                printf (self.output_file, '$\infty$\t&' if (len(list_of_val)==0) else list_of_val[0]['cost']) 
+                printf (self.output_file, '$\infty$\t& ' if (len(list_of_val)==0) else '{:.0f}\t& ' .format (list_of_val[0]['cost'])) 
             printf (self.output_file, '\n')
                 
 

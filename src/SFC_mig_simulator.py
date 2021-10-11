@@ -1535,29 +1535,26 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
     Output the cost obtained at each time slot.
     """
     ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cpu = {'opt' : 160, 'ourAlg' : 165, 'ffit' : 393, 'cpvnf' : 399}
+    min_req_cpu = {'opt' : 143, 'ourAlg' : 165, 'ffit' : 393, 'cpvnf' : 399}
 
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
 
-    # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(31)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
     # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                 
-    # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(31)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
-    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
+        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
     
-    # for mode in ['cpvnf', 'ffit']:
-    #     for seed in [40 + i for i in range (21)]:
-    #         for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(28, 31)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #             my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-    #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
-    #         my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], seed=seed)
-
-    for seed in [40 + i for i in range (11)]:
-        my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], seed=seed)
+    for mode in ['cpvnf', 'ffit']:
+        for seed in [40 + i for i in range (21)]:
+            for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(28, 31)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+                my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
+            my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu['cpvnf'], seed=seed)
 
 if __name__ == "__main__":
 

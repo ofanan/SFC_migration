@@ -7,7 +7,7 @@ from printf import printf
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
-alg_idx       = 1
+mode_idx       = 1
 cpu_idx       = 2
 prob_idx      = 3
 seed_idx      = 4
@@ -210,7 +210,7 @@ class Res_file_parser (object):
                
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
-            "alg"       : splitted_settings      [alg_idx],
+            "mode"       : splitted_settings      [mode_idx],
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
             "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
@@ -221,14 +221,14 @@ class Res_file_parser (object):
             "cost"      : float (splitted_line[4].split("=")[1])
             }
 
-    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, alg = None, cpu = None, stts = -1):
+    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, mode = None, cpu = None, stts = -1):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
         """
         list_to_filter = list (filter (lambda item : item['t'] >= min_t and item['t'] <= max_t, list_to_filter))    
-        if (alg != None):
-            list_to_filter = list (filter (lambda item : item['alg']  == alg, list_to_filter))    
+        if (mode != None):
+            list_to_filter = list (filter (lambda item : item['mode']  == mode, list_to_filter))    
         if (cpu != None):
             list_to_filter = list (filter (lambda item : item['cpu']  == cpu, list_to_filter))    
         if (prob != None):
@@ -274,7 +274,7 @@ class Res_file_parser (object):
         self.output_file      = open (self.output_file_name, "w")
         
         # if (normalize_X):
-        #     opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+        #     opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
         #                        key = lambda item : item['cpu'])
         #     cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
         #     X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
@@ -285,39 +285,39 @@ class Res_file_parser (object):
         #             opt_avg_list.append (np.average ([item['cost'] for item in list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
         # else:
         #     X_norm_factor = 1
-        #     alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+        #     mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
         #                        key = lambda item : item['cpu'])
         
         # Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # Calculate the normalization factor of the Y axis
         
         Y_norm_factor = 1 #$$$
         
-        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
-            alg_list = sorted (self.gen_filtered_list (self.list_of_dicts, alg=alg, min_t=min_t, max_t=max_t, stts=1), key = lambda item : item['cpu'])
+            mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t, stts=1), key = lambda item : item['cpu'])
             
-            cpu_vals = set ([item['cpu'] for item in self.list_of_dicts if item in alg_list])
+            cpu_vals = set ([item['cpu'] for item in self.list_of_dicts if item in mode_list])
             
-            if (len(alg_list)==0):
+            if (len(mode_list)==0):
                 continue
 
-            alg_avg_list = []
+            mode_avg_list = []
             
             for cpu in cpu_vals:
                 
-                alg_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, alg_list) )
+                mode_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, mode_list) )
                 
-                if (len(alg_vals_for_this_cpu)< math.floor( (max_t - min_t)/slot_len_in_sec)):
-                    print ('Warning: there are too few samples\nalg={}, cpu={}, num of smpls={}' .format(alg, cpu, len(alg_vals_for_this_cpu)))
+                if (len(mode_vals_for_this_cpu)< math.floor( (max_t - min_t)/slot_len_in_sec)):
+                    print ('Warning: there are too few samples\nmode={}, cpu={}, num of smpls={}' .format(mode, cpu, len(mode_vals_for_this_cpu)))
                     continue
                 
-                alg_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
-                                      'cost' : np.average ([self.calc_cost_of_item(item) for item in alg_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
+                mode_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
+                                      'cost' : np.average ([self.calc_cost_of_item(item) for item in mode_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
 
-                if (len(alg_avg_list)==0):
+                if (len(mode_avg_list)==0):
                     continue
         
-            self.print_single_tikz_plot (alg_avg_list, key_to_sort='cpu', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg]) 
+            self.print_single_tikz_plot (mode_avg_list, key_to_sort='cpu', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode]) 
 
     def plot_num_of_vehs (self):
         """
@@ -347,14 +347,14 @@ class Res_file_parser (object):
         """
         output_file_name = self.input_file_name + '.dat' 
         self.output_file = open ('../res/{}' .format (output_file_name), 'w')
-        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
-            list_of_points = self.gen_filtered_list (self.list_of_dicts, alg=alg, stts=1)
+            list_of_points = self.gen_filtered_list (self.list_of_dicts, mode=mode, stts=1)
         
             for point in list_of_points:
                 point['cpu'] /= 10
             
-            self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[alg], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[alg], y_value='cpu')
+            self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
     def plot_RT_prob_sim_python (self):
         """
@@ -362,14 +362,10 @@ class Res_file_parser (object):
         Show the conf' intervals.
         """
         
-        output_file_name = self.input_file_name + '.dat' 
-        self.output_file = open ('../res/{}' .format (output_file_name), 'w')
-
-        
         fig, ax = plt.subplots()
-        for alg in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
-            list_of_points = self.gen_filtered_list(self.list_of_dicts, alg=alg, stts=1) 
+            list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
         
             x = set () # The x value will hold all the probabilities that appear in the .res file
             for point in list_of_points: # A cpu cap' unit represents 100 MHz --> to represent results by units of GHz, divide the cpu cap' by 10.
@@ -386,27 +382,83 @@ class Res_file_parser (object):
                 
                 [y_lo, y_hi] = self.conf_interval (avg, np.std(samples))
 
-                ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[alg]) # Plot the confidence interval
+                ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 y.append (avg)
             
-            ax.plot (x, y, color=self.color_dict[alg], marker=self.markers_dict[alg], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[alg])
+            ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode])
         plt.xlabel('Fraction of users with RT requirements')
         plt.ylabel('Min CPU at leaf [GHz]')
-        legend = ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
+        ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
-        # plt.legend(alg)
             
-        plt.show ()
+        plt.savefig ('../res/{}.jpg' .format (input_file_name))            
+
+    def gen_cost_vs_rsrcs_tbl (self, normalize_X = True, slot_len_in_sec=1):
+        """
+        Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
+        Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
+        and/or normalize the cost (the Y axis) by the costs obtained by opt.   
+        """
+        
+        min_t = 30541
+        max_t = 30600
+        self.time_slot_len = int(self.input_file_name.split('secs')[0].split('_')[-1])
+        prob = 0.3
+        self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
+        self.output_file      = open (self.output_file_name, "w")
+        
+        if (normalize_X):
+            opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
+                               key = lambda item : item['cpu'])
+            cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+            if (len (cpu_vals)==0):
+                print ('Error: you asked to normalize by opt, but no results of opt exist. Please add first results of opt to the parsed input file.')
+                return
+            X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
+        
+        else:
+            X_norm_factor = 1
+
+            mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='ourAlg', prob=prob, min_t=min_t, max_t=max_t),key = lambda item : item['cpu'])
+
+        list_of_avg_vals = []        
+        for mode in ['ourAlg']: #, 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
+            mode_list   = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t), key = lambda item : item['cpu']) # list of lines with data about this mode
+            
+            if (len(mode_list)==0): # If no info about this mode - continue
+                continue
+        
+            # Filter-out all results of failed runs 
+            failed_runs = [] # failed_runs will include the cpu and seed values for all runs that fail: we've to filter-out these results while calculating the mean cost
+            for item in [item for item in mode_list if item['stts']!=1 ]:
+                failed_runs.append ({'cpu' : item['cpu'], 'seed' : item['seed']})
+            for failed_run in failed_runs: # Remove all results of this failed_run from the list of relevant results 
+                mode_list = list (filter (lambda item : not (item['cpu']==failed_run['cpu'] and item['seed']==failed_run['seed']), mode_list))
+                        
+            for cpu_val in set ([item['cpu'] for item in self.list_of_dicts if item in mode_list]): # list of CPU vals for which the whole run succeeded with this mode' 
+                        # cpu_vals:
+                list_of_avg_vals.append ({'mode' : mode, 
+                                          'cpu'  : cpu_val, 
+                                          'cost' : np.average ([item['cost'] for item in mode_list if item['cpu']==cpu_val]) })
+
+        
+        for cpu_val in set ([item['cpu'] for item in self.list_of_dicts]): # For all CPU values
+            for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
+                list_of_val = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, list_of_avg_vals))
+                printf (self.output_file, '$\infty$\t&' if (len(list_of_val)==0) else list_of_val[0]['cost']) 
+            printf (self.output_file, '\n')
+                
+
+
 if __name__ == '__main__':
     
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = 'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res' 
     my_res_file_parser.parse_file (input_file_name) 
-    # my_res_file_parser.plot_RT_prob_sim()
-    # my_res_file_parser.parse_detailed_cost_comp_file(input_file_name)
-    my_res_file_parser.plot_RT_prob_sim_python()
+    # my_res_file_parser.plot_RT_prob_sim_python()
+    my_res_file_parser.gen_cost_vs_rsrcs_tbl()
     
     # # X_norm_factor values: Lux post: 160. Lux rect: 208 
     # X_norm_factor = 160 

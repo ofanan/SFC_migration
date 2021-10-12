@@ -19,8 +19,8 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE = 10
-LINE_WIDTH  = 4
+MARKER_SIZE = 13
+LINE_WIDTH  = 3
 FONT_SIZE   = 20
 
 class Res_file_parser (object):

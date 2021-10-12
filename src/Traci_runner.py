@@ -22,10 +22,12 @@ lat_pos_idx = 7
 class Traci_runner (object):
 
     # Given the x,y position, return the x,y position within the simulated area (city center) 
-    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER 
+    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - self.LOWER_LEFT_CORNER 
 
     # Returns the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
-    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER
+    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - self.LOWER_LEFT_CORNER
+
+    is_in_simulated_area  = lambda self, position : True if (self.simulated_area=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y_LUX) else True)
 
     # Checks whether the given vehicle is within the simulated area.
     # Input: key of a vehicle.
@@ -37,8 +39,15 @@ class Traci_runner (object):
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
 
-        # Mobile Network Codes of various operators in Luxembourg
-        self.Lux_providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}
+        if (sumo_cfg_file=='myLuST.sumocfg'):
+            self.simulated_area = 'Lux'
+            self.providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}         # Mobile Network Codes of various operators in Luxembourg
+            self.LOWER_LEFT_CORNER = loc2ap_c.LOWER_LEFT_CORNER_LUX
+        elif (sumo_cfg_file=='myMoST.sumocfg'):
+            self.simulated_area = 'Monaco'
+            self.providers_mnc = {'Monaco Telecom' : '10'}
+            self.LOWER_LEFT_CORNER = loc2ap_c.LOWER_LEFT_CORNER_MONACO
+                        
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
@@ -68,14 +77,13 @@ class Traci_runner (object):
                 break
             
             # Union known_veh_keys with the set of vehicles' keys of this cycle
-            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] #$$$$ if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
             printf (self.cnt_output_file, '{:.0f} ' .format (len(cur_list_of_vehicles)))
             sys.stdout.flush()
 
             known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys)
                    
             traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
-        print ('here')
         traci.close()
 
     def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
@@ -165,7 +173,7 @@ class Traci_runner (object):
     #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER
 
 
-    def parse_antenna_locs_file (self, antenna_locs_file_name, provider='orange'):
+    def parse_antenna_locs_file (self, antenna_locs_file_name, provider=''):
         """
         Parse an antenna location file (downloaded from https://opencellid.org/), and extract for each antenna its X,Y position in the given SUMO configuration.
         Outputs a ".antloc" file, that details the x,y position of a all antennas within the simulated area.
@@ -190,7 +198,7 @@ class Traci_runner (object):
             radio   = splitted_line[radio_idx]
             mnc     = splitted_line[mnc_idx]
             
-            if (not (self.is_in_simulated_area_Lux(pos))):# or (not (radio=='LTE'))):  
+            if (not (self.is_in_simulated_area(pos))):# or (not (radio=='LTE'))):  
                 continue
         
             self.list_of_antennas.append ({'radio' : radio, 'mnc' : mnc, 'x' : pos[0], 'y' : pos[1]})    
@@ -206,7 +214,7 @@ class Traci_runner (object):
         printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
 
         AP_id = 0
-        antennas_to_print = list (filter (lambda item : item['mnc']==self.Lux_providers_mnc[provider], self.list_of_antennas))
+        antennas_to_print = self.list_of_antennas if (self.simulated_area=='Monaco') else list (filter (lambda item : item['mnc']==self.providers_mnc[provider], self.list_of_antennas)) # In Monaco there exists a single company, so no filtering is required
         for ap in antennas_to_print:                       
 
             printf (APs_loc_file, '{},{},{}\n' .format (AP_id, ap['x'], ap['y']))
@@ -214,18 +222,14 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
-    my_Traci_runner.parse_antenna_locs_file ('Lux.txt', provider='orange')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='')
 
-    # my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
-    #
-    # my_Traci_runner.convert_geo_to_loc ()
-
-    # my_Traci_runner.simulate_to_cnt_vehs_only (
-    #                 warmup_period           = 3600*7.5, #3600*7.5,
-    #                 sim_length              = 3600*1,
-    #                 len_of_time_slot_in_sec = 1,
-    #                 verbose                 = [])
+    my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*5)
+                    # (warmup_period           = 3600*7.5, #3600*7.5,
+                    # sim_length              = 3600*1,
+                    # len_of_time_slot_in_sec = 1,
+                    # verbose                 = [])
 
     # my_Traci_runner.simulte (warmup_period          = 3600*7.5,
     #                         sim_length              = 3600*1,

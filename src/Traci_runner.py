@@ -90,13 +90,13 @@ class Traci_runner (object):
         """
     
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
-        prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
+        # prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
         vehs_left_in_this_cycle  = []
-        prsns_left_in_this_cycle = []
+        # prsns_left_in_this_cycle = []
         self.verbose             = verbose
         
-        traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
+        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         print ('Running Traci on the period from {:.0f} to {:.0f}. Will write res to {} output files' .format (warmup_period, warmup_period+sim_length, num_of_output_files))
         
         if (warmup_period > 0):
@@ -127,7 +127,7 @@ class Traci_runner (object):
                     print ('Successfully finished writing to file {}' .format (output_file_name))
                     break
                 
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             
                 vehs_left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
@@ -227,4 +227,4 @@ if __name__ == '__main__':
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
 
-    my_Traci_runner.simulate (sim_length = 3600*1, len_of_time_slot_in_sec = 60) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (sim_length = 3600*6, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

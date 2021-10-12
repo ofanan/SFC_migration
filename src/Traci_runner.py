@@ -1,10 +1,9 @@
-import optparse
-import random
+# import optparse
 from sumolib import checkBinary  
 import traci  
 import sys
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from printf import printf 
 from secs2hour import secs2hour
@@ -24,7 +23,7 @@ class Traci_runner (object):
     # Given the x,y position, return the x,y position within the simulated area (city center) 
     pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - self.LOWER_LEFT_CORNER 
 
-    # Returns the relative location of a given vehicle (namely, its position relatively to the smaller left corner of ths simulated area),
+    # Returns the relative location of a given vehicle ID. The relative location is the position w.r.t. the lower left (south-west) corner of the simulated area.
     get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - self.LOWER_LEFT_CORNER
 
     is_in_simulated_area  = lambda self, position : True if (self.simulated_area=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y_LUX) else True)
@@ -45,7 +44,7 @@ class Traci_runner (object):
             self.LOWER_LEFT_CORNER = loc2ap_c.LOWER_LEFT_CORNER_LUX
         elif (sumo_cfg_file=='myMoST.sumocfg'):
             self.simulated_area = 'Monaco'
-            self.providers_mnc = {'Monaco Telecom' : '10'}
+            self.providers_mnc = {'Monaco_Telecom' : '10'}
             self.LOWER_LEFT_CORNER = loc2ap_c.LOWER_LEFT_CORNER_MONACO
                         
 
@@ -76,12 +75,11 @@ class Traci_runner (object):
                 print ('Number of distinct cars during the simulated period={}' .format (len(known_veh_keys)))
                 break
             
-            # Union known_veh_keys with the set of vehicles' keys of this cycle
             cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] #$$$$ if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
-            printf (self.cnt_output_file, '{:.0f} ' .format (len(cur_list_of_vehicles)))
+            printf (self.cnt_output_file, 'vehs={:.0f}, persons={}\n' .format (len(cur_list_of_vehicles), traci.person.getIDCount()))
             sys.stdout.flush()
 
-            known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys)
+            known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys) # Union known_veh_keys with the set of vehicles' keys of this cycle
                    
             traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
@@ -91,10 +89,12 @@ class Traci_runner (object):
         Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input
         """
     
-        veh_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
-        ids2recycle             = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
-        left_in_this_cycle      = []
-        self.verbose            = verbose
+        veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
+        prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
+        veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
+        vehs_left_in_this_cycle  = []
+        prsns_left_in_this_cycle = []
+        self.verbose             = verbose
         
         traci.start([checkBinary('sumo'), '-c', 'my.sumocfg', '-W', '-V', 'false', '--no-step-log', 'true'])
         print ('Running Traci on the period from {:.0f} to {:.0f}. Will write res to {} output files' .format (warmup_period, warmup_period+sim_length, num_of_output_files))
@@ -130,22 +130,22 @@ class Traci_runner (object):
                 cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area_Lux (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             
-                left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
-                                                                   veh['id']  not in (ids2recycle)), veh_key2id)) 
-                veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
+                vehs_left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
+                                                                   veh['id']  not in (veh_ids2recycle)), veh_key2id)) 
+                veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
                 printf (loc_output_file, 'usrs_that_left: ')
-                if (len (left_in_this_cycle) > 0):
-                    for veh in left_in_this_cycle:
+                if (len (vehs_left_in_this_cycle) > 0):
+                    for veh in vehs_left_in_this_cycle:
                         printf (loc_output_file, '{:.0f} ' .format(veh['id']))
-                    ids2recycle = sorted (list (set (ids2recycle) | set([item['id'] for item in left_in_this_cycle]))) # add to ids2recycle the IDs of the cars that left in this cycle
+                    veh_ids2recycle = sorted (list (set (veh_ids2recycle) | set([item['id'] for item in vehs_left_in_this_cycle]))) # add to veh_ids2recycle the IDs of the cars that left in this cycle
                 printf (loc_output_file, '\nnew_or_moved: ')
                 for veh_key in cur_list_of_vehicles:
                     filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
                         veh_type = 'n' # will indicate that this is a new vehicle 
-                        if (len (ids2recycle) > 0): # can recycle an ID of a veh that left
+                        if (len (veh_ids2recycle) > 0): # can recycle an ID of a veh that left
                             # veh_type = 'r' # will indicate that this is a recycled vehicle's id 
-                            veh_id     = ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
+                            veh_id     = veh_ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
                         else:
                             # veh_type = 'n' # will indicate that this is a new vehicle 
                             veh_id = len (veh_key2id) # pick a new ID
@@ -208,13 +208,13 @@ class Traci_runner (object):
         # self.list_of_antennas = list (filter (lambda item : item['radio']=='LTE', self.list_of_antennas)) # filter-out all non-LTE antennas
         print ('Num of antennas in the simulated area={}' .format (len(self.list_of_antennas)))
         
-        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + '.center.' + provider + '.antloc', 'w')
+        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + ('.center.' if self.simulated_area=='Lux' else '.') + provider + '.antloc', 'w')
         printf (APs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
         printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
         printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
 
         AP_id = 0
-        antennas_to_print = self.list_of_antennas if (self.simulated_area=='Monaco') else list (filter (lambda item : item['mnc']==self.providers_mnc[provider], self.list_of_antennas)) # In Monaco there exists a single company, so no filtering is required
+        antennas_to_print = list (filter (lambda item : item['mnc']==self.providers_mnc[provider], self.list_of_antennas)) 
         for ap in antennas_to_print:                       
 
             printf (APs_loc_file, '{},{},{}\n' .format (AP_id, ap['x'], ap['y']))
@@ -223,12 +223,8 @@ class Traci_runner (object):
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
-    # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='')
+    # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
 
-    my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 1)
+    # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
 
-    # my_Traci_runner.simulate (warmup_period          = 3600*7.5,
-    #                         sim_length              = 3600*1,
-    #                         len_of_time_slot_in_sec = 1,
-    #                         num_of_output_files     = 1, 
-    #                         verbose                 = [])
+    my_Traci_runner.simulate (sim_length = 3600*1, len_of_time_slot_in_sec = 60) #warmup_period = 3600*7.5

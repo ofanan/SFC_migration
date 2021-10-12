@@ -12,8 +12,9 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 from printf import printf, printar, printmat
 # from ntpath import split
 
-GLOBAL_MAX_X_LUX, GLOBAL_MAX_Y_LUX = int(13622), int(11457)             # size of the city's area, in meters. 
-MAX_X_LUX, MAX_Y_LUX               = GLOBAL_MAX_X_LUX//2, GLOBAL_MAX_Y_LUX//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
+GLOBAL_MAX_X_LUX, GLOBAL_MAX_Y_LUX = int(13622), int(11457)             # size of the city's area, in meters.
+MAX_X = {'Lux' :  GLOBAL_MAX_X_LUX//2}
+MAX_Y_LUX               = GLOBAL_MAX_X_LUX//2, GLOBAL_MAX_Y_LUX//2   # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 
 # GLOBAL_MAX_X = {'Lux' : int(13622)}  
 # GLOBAL_MAX_Y = {'Lux' : int(11457)}
@@ -21,15 +22,15 @@ MAX_X_LUX, MAX_Y_LUX               = GLOBAL_MAX_X_LUX//2, GLOBAL_MAX_Y_LUX//2   
 # MAX_X        = {'Lux' : GLOBAL_MAX_X['Lux']/2}   
 # MAX_Y        = {'Lux' : GLOBAL_MAX_Y['Lux']/2}   
 
-LOWER_LEFT_CORNER_LUX              = np.array ([GLOBAL_MAX_X_LUX//4,   GLOBAL_MAX_Y_LUX//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
-LOWER_LEFT_CORNER_MONACO              = np.array ([GLOBAL_MAX_X_LUX//4,   GLOBAL_MAX_Y_LUX//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area #$$$$$ 
+LOWER_LEFT_CORNER_LUX    = np.array ([GLOBAL_MAX_X_LUX//4,   GLOBAL_MAX_Y_LUX//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
+LOWER_LEFT_CORNER_MONACO = np.array ([0,                     0                  ], dtype='int16') # x,y indexes of the south-west corner of the simulated area #$$$$$ 
 
 # Verbose levels, defining the outputs produced
-VERBOSE_AP              = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
-VERBOSE_CNT             = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
-VERBOSE_DEMOGRAPHY      = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
-VERBOSE_SPEED           = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
-VERBOSE_DEBUG           = 11
+VERBOSE_AP               = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
+VERBOSE_CNT              = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
+VERBOSE_DEMOGRAPHY       = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
+VERBOSE_SPEED            = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
+VERBOSE_DEBUG            = 11
 
 # Indices of the various field within the input '.loc' file 
 type_idx   = 0 # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 

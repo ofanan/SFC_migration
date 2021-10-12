@@ -6,6 +6,7 @@
         <net-file value="../../MoSTScenario/scenario/in/most.net.xml"/>
         <route-files value="../../MoSTScenario/scenario/in/route/most.buses.flows.xml,
 		../../MoSTScenario/scenario/in/route/most.trains.flows.xml,
+		../../MoSTScenario/scenario/in/route/most.pedestrian.rou.xml,
 		../../MoSTScenario/scenario/in/route/most.commercial.rou.xml,
 		../../MoSTScenario/scenario/in/route/most.special.rou.xml,
 		../../MoSTScenario/scenario/in/route/most.highway.flows.xml

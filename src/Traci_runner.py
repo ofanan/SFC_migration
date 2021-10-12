@@ -57,7 +57,7 @@ class Traci_runner (object):
         
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         print ('Running Traci on the period from {:.0f} to {:.0f}' .format (warmup_period, warmup_period+sim_length))
-        self.cnt_output_file_name = '../res/{}_{}secs_cnt.res' .format (secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec) 
+        self.cnt_output_file_name = '../res/{}_{}_{}secs_cnt.res' .format (self.simulated_area, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec) 
         self.cnt_output_file      = open (self.cnt_output_file_name, 'w')
                
         if (warmup_period > 0):
@@ -225,13 +225,9 @@ if __name__ == '__main__':
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='')
 
-    my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*5)
-                    # (warmup_period           = 3600*7.5, #3600*7.5,
-                    # sim_length              = 3600*1,
-                    # len_of_time_slot_in_sec = 1,
-                    # verbose                 = [])
+    my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 1)
 
-    # my_Traci_runner.simulte (warmup_period          = 3600*7.5,
+    # my_Traci_runner.simulate (warmup_period          = 3600*7.5,
     #                         sim_length              = 3600*1,
     #                         len_of_time_slot_in_sec = 1,
     #                         num_of_output_files     = 1, 

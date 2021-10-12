@@ -876,6 +876,9 @@ class SFC_mig_simulator (object):
                 self.cur_st_params = self.d_vars.copy () #All the decision vars will be referred as "cur st parameters" in the next time slot 
                 self.is_first_t = False  # The next slot is surely not the first slot
 
+                if (self.stts!=sccs):
+                    return # Once opt fails to find a sol even for a single slot, we don't try to further simulate, 
+                
         self.post_processing ()
         
     def rmv_usr_from_all_Hs (self, usr):
@@ -1495,6 +1498,7 @@ class SFC_mig_simulator (object):
         Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
         """       
 
+        print ('Running run_prob_of_RT_sim')
         sim_len_in_slots = 61
         mode             = 'ourAlg' #ffit' #'ourAlg'
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
@@ -1510,9 +1514,9 @@ class SFC_mig_simulator (object):
         #     for prob_of_target_delay in [0.1*i for i in range (11)]:
         #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        cpu_cap_at_leaf = 181 #Initial cpu cap at the leaf server
+        cpu_cap_at_leaf = 143 #Initial cpu cap at the leaf server
         mode = 'opt'
-        for prob_of_target_delay in [(0.1*i) for i in range (6, 10)]:
+        for prob_of_target_delay in [(0.1*i) for i in range (11)]:
             cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
     
     
@@ -1534,33 +1538,44 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
     Run a simulation where the amount of resources varies. 
     Output the cost obtained at each time slot.
     """
-    ap_file_name = '0829_0830_1secs_256aps.ap' #'shorter.ap' #
-    min_req_cpu = {'opt' : 143, 'ourAlg' : 165, 'ffit' : 393, 'cpvnf' : 399}
+    
+    print ('Running run_cost_by_rsrc')
 
+    min_req_cpu = {'opt' : 160, 'ourAlg' : 165, 'ffit' : 393, 'cpvnf' : 399}
     my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
 
-    # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
-    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-                
-    for mode in ['cpvnf', 'ffit', 'ourAlg']:
-        for seed in [40 + i for i in range (21)]:
-            for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-                if (cpu_cap_at_leaf >= min_req_cpu[mode]):
-                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-            for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit'], min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
-                if (cpu_cap_at_leaf >= min_req_cpu[mode]):
-                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
+    for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(5, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+        my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
+        my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
+
+                     
+    # for mode in ['cpvnf', 'ffit']: #, 'ourAlg']:
+    #     for seed in [40 + i for i in range (15, 21)]:
+    #         for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #             if (cpu_cap_at_leaf >= min_req_cpu[mode]):
+    #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+            # for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit'], min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
+            #     if (cpu_cap_at_leaf >= min_req_cpu[mode]):
+            #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
+    
+    # for mode in ['ourAlg']: #['cpvnf', 'ffit', 'ourAlg']: # Alg needs a single seed?
+    #     for seed in [40 + i for i in range (1, 21)]:
+    #         for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #             if (cpu_cap_at_leaf >= min_req_cpu[mode]):
+    #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+    #         for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit'], min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
+    #             if (cpu_cap_at_leaf >= min_req_cpu[mode]):
+    #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
 
 if __name__ == "__main__":
 
 
-    ap_file_name      = '0829_0830_1secs_256aps.ap' # '0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    ap_file_name = '0829_0830_1secs_256aps.ap' # '0829_0830_1secs_256aps.ap' #'shorter.ap' #
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
     run_cost_by_rsrc (ap_file_name, ap2cell_file_name)
 
     # my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[], ap2cell_file_name=ap2cell_file_name)
-    # my_simulator.run_prob_of_RT_sim (ap_file_name=ap_file_name, ap2cell_file_name=ap2cell_file_name)
+    # my_simulator.run_prob_of_RT_sim ()
     
     

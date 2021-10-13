@@ -17,9 +17,9 @@ GLOBAL_MAX_X = {'Lux' : int(13622), 'Monaco' : 9976}
 GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 0.0 max_x_pos_found= 9976.0 min_y_pos_found= 143.0 max_y_pos_found= 6356.0            
 
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
-for city in ['Lux']:
-    MAX_X             = {city :  GLOBAL_MAX_X['city']//2}
-    MAX_Y             = {city :  GLOBAL_MAX_Y['city']//2}
+MAX_X = {'Lux' :  GLOBAL_MAX_X['Lux']//2, 'Monaco' : GLOBAL_MAX_X['Monaco']}
+MAX_Y = {'Lux' :  GLOBAL_MAX_Y['Lux']//2, 'Monaco' : GLOBAL_MAX_Y['Monaco']}
+for city in ['Lux', 'Monaco']:
     LOWER_LEFT_CORNER = {city : np.array ([GLOBAL_MAX_X[city]//4,   GLOBAL_MAX_Y[city]//4], dtype='int16')} # x,y indexes of the south-west corner of the simulated area
 
 # Verbose levels, defining the outputs produced
@@ -83,7 +83,7 @@ class loc2ap_c (object):
   
     gen_columns_for_heatmap = lambda self, lvl=0 : [str(i) for i in range(2**(self.max_power_of_4-lvl))]
 
-    def __init__(self, max_power_of_4=3, verbose = VERBOSE_AP, antenna_loc_file_name=''):
+    def __init__(self, max_power_of_4=3, verbose = VERBOSE_AP, antenna_loc_file_name='', city=''):
         """
         Init a "loc2ap_c" object.
         A loc2ap_c is used can read ".loc" files (files detailing the location of each veh over time), and output ".ap" files (files detailing the AP assignment of each veh), and/or statistics 
@@ -91,9 +91,9 @@ class loc2ap_c (object):
         """
 
         self.verbose               = verbose      # verbose level - defining which outputs will be written
-        self.city                  = 'Lux' 
         self.debug                 = False 
         self.antenna_loc_file_name = antenna_loc_file_name
+        self.city                  = (antenna_loc_file_name.split('.')[0] if antenna_loc_file_name!='' else city)
        
         self.max_x, self.max_y = MAX_X[self.city], MAX_Y[self.city] # borders of the simulated area, in meters
         self.usrs              = []
@@ -119,7 +119,7 @@ class loc2ap_c (object):
         if (VERBOSE_SPEED in self.verbose):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
             self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
-        # self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell. #$$$$$$
+        self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell. #$$$$$$
         
     def parse_antloc_file (self, antennas_loc_file_name, plot_ap_locs_heatmap=False):
         """
@@ -500,7 +500,7 @@ class loc2ap_c (object):
 
                     splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
                     for my_tuple in splitted_line:  
-                        if (len(my_tuple) <= 1): # no more new vehicles in this list. #$$$$$$$$$$$$ or <1?>
+                        if (len(my_tuple) <= 1): # no more new vehicles in this list. 
                             break
                         my_tuple = my_tuple.split("(")
                         my_tuple   = my_tuple[1].split (',')
@@ -510,53 +510,53 @@ class loc2ap_c (object):
                         min_y_pos_found = min (y, min_y_pos_found)
                         max_x_pos_found = max (x, max_x_pos_found)
                         max_y_pos_found = max (y, max_y_pos_found)
-                        # nxt_ap   = self.loc2ap (x,y)
-                        # nxt_cell = self.ap2cell (nxt_ap)
-                        # if (VERBOSE_DEBUG in self.verbose and nxt_ap not in range(self.num_of_APs)):
-                        #     print ('Error: t = {} usr={}, nxt_ap={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_aps={} ' .format (self.t, usr_id, nxt_ap, x, y, MAX_X['Lux'], MAX_Y['Lux'], self.num_of_APs))
-                        #     print ('Calling loc2ap again for deubgging')
-                        #     nxt_ap = self.loc2ap (float(x), float(y))
-                        #     nxt_cell = self.ap2cell (nxt_ap)
-                        #     exit ()
-                        #
-                        # if (VERBOSE_DEBUG in self.verbose and nxt_ap >= self.num_of_APs):
-                        #     print ('Error at t={}: got ap num {}. usr={}, x={:.0f},y={:.0f}' .format (self.t, nxt_ap, usr_id, x, y))
-                        #     exit ()
-                        # if (tuple[type_idx] == 'n'): # new vehicle
-                        #     self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
-                        #     if (VERBOSE_DEMOGRAPHY in self.verbose): 
-                        #     #     self.joined_ap        [nxt_ap][-1]   += 1 # inc the # of usrs that joined this AP at this slot
-                        #         self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
-                        #     #     self.joined_ap_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
-                        # elif (tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
-                        #     list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
-                        #     if (len(list_of_usr) == 0):
-                        #         print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
-                        #         exit ()
-                        #     list_of_usr[0]['nxt ap']   = nxt_ap # list_of_usr[0] is the old usr who moved.
-                        #     list_of_usr[0]['nxt cell'] = nxt_cell
-                        #     if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
-                        #         # self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
-                        #         self.joined_cell[nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
-                        #         self.left_cell[list_of_usr[0]['cur cell']] [-1] += 1 # inc the # of usrs who left this cell
-                        #         # self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
-                        # else:
-                        #     print ('Wrong type of usr.')
-                        #     exit () 
-                        # if (VERBOSE_SPEED in self.verbose):
-                        #     self.speed[nxt_ap] = {'speed' : (float(tuple[speed_idx]) + self.speed[nxt_ap]['num of smpls'] * self.speed[nxt_ap]['speed'])/(self.speed[nxt_ap]['num of smpls'] + 1), 
-                        #                           'num of smpls' : self.speed[nxt_ap]['num of smpls'] + 1}
-                            
+                        nxt_ap   = self.loc2ap (x,y)
+                        nxt_cell = self.ap2cell (nxt_ap)
+                        if (VERBOSE_DEBUG in self.verbose and nxt_ap not in range(self.num_of_APs)):
+                            print ('Error: t = {} usr={}, nxt_ap={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_aps={} ' .format (self.t, usr_id, nxt_ap, x, y, MAX_X['Lux'], MAX_Y['Lux'], self.num_of_APs))
+                            print ('Calling loc2ap again for deubgging')
+                            nxt_ap = self.loc2ap (float(x), float(y))
+                            nxt_cell = self.ap2cell (nxt_ap)
+                            exit ()
+                        
+                        if (VERBOSE_DEBUG in self.verbose and nxt_ap >= self.num_of_APs):
+                            print ('Error at t={}: got ap num {}. usr={}, x={:.0f},y={:.0f}' .format (self.t, nxt_ap, usr_id, x, y))
+                            exit ()
+                        if (my_tuple[type_idx] == 'n'): # new vehicle
+                            self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
+                            if (VERBOSE_DEMOGRAPHY in self.verbose): 
+                            #     self.joined_ap        [nxt_ap][-1]   += 1 # inc the # of usrs that joined this AP at this slot
+                                self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
+                            #     self.joined_ap_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
+                        elif (my_tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
+                            list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
+                            if (len(list_of_usr) == 0):
+                                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
+                                exit ()
+                            list_of_usr[0]['nxt ap']   = nxt_ap # list_of_usr[0] is the old usr who moved.
+                            list_of_usr[0]['nxt cell'] = nxt_cell
+                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
+                                # self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
+                                self.joined_cell[nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
+                                self.left_cell[list_of_usr[0]['cur cell']] [-1] += 1 # inc the # of usrs who left this cell
+                                # self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
+                        else:
+                            print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
+                            exit () 
+                        if (VERBOSE_SPEED in self.verbose):
+                            self.speed[nxt_ap] = {'speed' : (float(my_tuple[speed_idx]) + self.speed[nxt_ap]['num of smpls'] * self.speed[nxt_ap]['speed'])/(self.speed[nxt_ap]['num of smpls'] + 1), 
+                                                  'num of smpls' : self.speed[nxt_ap]['num of smpls'] + 1}
+                
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
-                # if (VERBOSE_AP in self.verbose):
-                #     self.print_usrs_ap() # Print the APs of the users 
-                # if (VERBOSE_CNT in self.verbose):
-                #     self.cnt_num_of_vehs_per_ap ()
-                # for usr in self.usrs: # mark all existing usrs as old
-                #     usr['new']      = False
-                #     usr['cur ap']   = usr ['nxt ap']
-                #     usr['cur cell'] = usr['nxt cell']
-        print ('min_x_pos_found=', min_x_pos_found, 'max_x_pos_found=', max_x_pos_found, 'min_y_pos_found=', min_y_pos_found, 'max_y_pos_found=', max_y_pos_found)
+                if (VERBOSE_AP in self.verbose):
+                    self.print_usrs_ap() # Print the APs of the users 
+                if (VERBOSE_CNT in self.verbose):
+                    self.cnt_num_of_vehs_per_ap ()
+                for usr in self.usrs: # mark all existing usrs as old
+                    usr['new']      = False
+                    usr['cur ap']   = usr ['nxt ap']
+                    usr['cur cell'] = usr['nxt cell']
+        # print ('min_x_pos_found=', min_x_pos_found, 'max_x_pos_found=', max_x_pos_found, 'min_y_pos_found=', min_y_pos_found, 'max_y_pos_found=', max_y_pos_found)
     
     def post_processing (self):
         """
@@ -714,11 +714,11 @@ class loc2ap_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 1
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [], antenna_loc_file_name = '') #'Lux.center.post.antloc')
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antenna_loc_file_name = 'Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['Monaco_60secs.loc']) #(['0730_0830_16secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    my_loc2ap.parse_loc_files (['Monaco_24h_60secs.loc']) #(['0730_0830_16secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
     # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps()
     
     # # Post=processing

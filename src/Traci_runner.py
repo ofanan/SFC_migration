@@ -224,4 +224,4 @@ if __name__ == '__main__':
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
 
-    my_Traci_runner.simulate (sim_length = 3600*6, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (warmup_period=3600*7, sim_length = 3600*4, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

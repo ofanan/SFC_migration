@@ -19,9 +19,9 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE = 13
-LINE_WIDTH  = 3
-FONT_SIZE   = 20
+MARKER_SIZE = 15
+LINE_WIDTH  = 4
+FONT_SIZE   = 30
 
 class Res_file_parser (object):
     """
@@ -391,7 +391,8 @@ class Res_file_parser (object):
         ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
             
-        plt.savefig ('../res/{}.jpg' .format (input_file_name))            
+        # plt.savefig ('../res/{}.jpg' .format (input_file_name))
+        plt.show ()            
 
     def gen_cost_vs_rsrcs_tbl (self, normalize_X = True, slot_len_in_sec=1):
         """
@@ -448,11 +449,11 @@ class Res_file_parser (object):
         cpu_vals = sorted (set ([item['cpu'] for item in list_of_avg_vals]))
         min_cpu  = min (cpu_vals)
         for cpu_val in cpu_vals:
-            printf (self.output_file, '{:.02f}\t& ' .format (cpu_val / min_cpu))
+            printf (self.output_file, '{:.02f}\t' .format (cpu_val / min_cpu))
             for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
                 list_of_val = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, list_of_avg_vals))
-                printf (self.output_file, '$\infty$\t& ' if (len(list_of_val)==0) else '{:.0f}\t& ' .format (list_of_val[0]['cost'])) 
-            printf (self.output_file, '\n')
+                printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['cost'])) 
+            printf (self.output_file, '\\\\ \\hline \n')
                 
 
 
@@ -460,7 +461,7 @@ if __name__ == '__main__':
     
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res' 
+    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
     my_res_file_parser.parse_file (input_file_name) 
     # my_res_file_parser.plot_RT_prob_sim_python()
     my_res_file_parser.gen_cost_vs_rsrcs_tbl()

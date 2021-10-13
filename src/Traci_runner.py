@@ -21,32 +21,29 @@ lat_pos_idx = 7
 class Traci_runner (object):
 
     # Given the x,y position, return the x,y position within the simulated area (city center) 
-    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - self.LOWER_LEFT_CORNER 
+    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER [self.city]
 
     # Returns the relative location of a given vehicle ID. The relative location is the position w.r.t. the lower left (south-west) corner of the simulated area.
-    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - self.LOWER_LEFT_CORNER
+    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER[self.city]
 
-    is_in_simulated_area  = lambda self, position : True if (self.simulated_area=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y_LUX) else True)
+    is_in_simulated_area  = lambda self, position : True if (self.city=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y[self.city]) else True)
 
     # Checks whether the given vehicle is within the simulated area.
     # Input: key of a vehicle.
     # Output: True iff this vehicle is within the simulated area.
-    is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y_LUX) else True
+    is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y[self.city]) else True
     
-    is_in_global_area_Lux = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.GLOBAL_MAX_X_LUX or position[1] <= 0 or position[1] >= loc2ap_c.GLOBAL_MAX_Y_LUX) else True
+    is_in_global_area_Lux = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.GLOBAL_MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.GLOBAL_MAX_Y[self.city]) else True
     
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
 
         if (sumo_cfg_file=='myLuST.sumocfg'):
-            self.simulated_area = 'Lux'
+            self.city = 'Lux'
             self.providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}         # Mobile Network Codes of various operators in Luxembourg
-            self.LOWER_LEFT_CORNER = loc2ap_c.LOWER_LEFT_CORNER_LUX
         elif (sumo_cfg_file=='myMoST.sumocfg'):
-            self.simulated_area = 'Monaco'
-            self.providers_mnc = {'Monaco_Telecom' : '10'}
-            self.LOWER_LEFT_CORNER = loc2ap_c.LOWER_LEFT_CORNER_MONACO
-                        
+            self.city = 'Monaco'
+            self.providers_mnc = {'Monaco_Telecom' : '10'}                        
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
@@ -56,7 +53,7 @@ class Traci_runner (object):
         
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
         print ('Running Traci on the period from {:.0f} to {:.0f}' .format (warmup_period, warmup_period+sim_length))
-        self.cnt_output_file_name = '../res/{}_{}_{}secs_cnt.res' .format (self.simulated_area, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec) 
+        self.cnt_output_file_name = '../res/{}_{}_{}secs_cnt.res' .format (self.city, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec) 
         self.cnt_output_file      = open (self.cnt_output_file_name, 'w')
                
         if (warmup_period > 0):
@@ -208,7 +205,7 @@ class Traci_runner (object):
         # self.list_of_antennas = list (filter (lambda item : item['radio']=='LTE', self.list_of_antennas)) # filter-out all non-LTE antennas
         print ('Num of antennas in the simulated area={}' .format (len(self.list_of_antennas)))
         
-        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + ('.center.' if self.simulated_area=='Lux' else '.') + provider + '.antloc', 'w')
+        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + ('.center.' if self.city=='Lux' else '.') + provider + '.antloc', 'w')
         printf (APs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
         printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
         printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))

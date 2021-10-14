@@ -85,26 +85,26 @@ class Res_file_parser (object):
         t_min, t_max = min ([item['t'] for item in self.list_of_dicts]), max ([item['t'] for item in self.list_of_dicts])
         t = range (t_min, t_max+1)
 
-        num_of_markers = 10 # number of marker points in the plot 
-        period_len     = len (t) / num_of_markers # Each point will be assigned the avg value, where averaging over period of length period_len
-        mig_cost = np.empty (num_of_markers)
-        ratio    = np.empty (num_of_markers)
+        num_of_periods     = 10 # number of marker points in the plot 
+        period_len         = len (t) / num_of_periods # Each point will be assigned the avg value, where averaging over period of length period_len
+        mig_cost           = np.empty (num_of_periods)
+        ratio_of_crit_usrs = np.empty (num_of_periods)
         
         period_begin = t_min
         for period in period_len: # for every considered period
             period_end = period_begin + period_len
             res_from_this_period = list (filter (lambda item : item['t'] >= period_begin and item['t'] <= period_end, self.list_of_dicts))
-            mig_cost[period] = np.average ([item['mig_cost'] for item in res_from_this_period])
-            ratio   [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
+            mig_cost[period]   = np.average ([item['mig_cost'] for item in res_from_this_period])
+            ratio_of_crit_usrs = [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
             
         printf (self.output_file, self.add_plot_mig_cost)
-        for i in range (len(cpu_cost_in_period)):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_migs_in_period[i]))
+        for i in range (num_of_periods):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (t[i], mig_cost[i]))
         printf (self.output_file, '};' + self.add_legend_str + 'mig.}\n')
 
         printf (self.output_file, self.add_plot_num_of_critical_chains)
-        for i in range (len(cpu_cost_in_period)):
-            printf (self.output_file, '({:.4f}, {:.4f})' .format (x[i], num_of_critical_usrs_per_slot[i]/num_of_usrs_per_slot[i]))
+        for i in range (num_of_periods):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (t[i], ratio_of_crit_usrs[i]))
         printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
                    
     def gen_vec_for_period (self, vec_for_slot):

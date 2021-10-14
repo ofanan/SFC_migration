@@ -19,8 +19,13 @@ GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 MAX_X = {'Lux' :  GLOBAL_MAX_X['Lux']//2, 'Monaco' : GLOBAL_MAX_X['Monaco']}
 MAX_Y = {'Lux' :  GLOBAL_MAX_Y['Lux']//2, 'Monaco' : GLOBAL_MAX_Y['Monaco']}
-for city in ['Lux', 'Monaco']:
-    LOWER_LEFT_CORNER = {city : np.array ([GLOBAL_MAX_X[city]//4,   GLOBAL_MAX_Y[city]//4], dtype='int16')} # x,y indexes of the south-west corner of the simulated area
+
+# x,y indexes of the south-west corner of the simulated area
+LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
+                    'Monaco' : np.zeros (2, dtype='int16')} 
+# LOWER_LEFT_CORNER['Lux'] = np.array ([GLOBAL_MAX_X[city]//4,   GLOBAL_MAX_Y[city]//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
+# for city in ['Lux', 'Monaco']:
+#     LOWER_LEFT_CORNER = {city : np.array ([GLOBAL_MAX_X[city]//4,   GLOBAL_MAX_Y[city]//4], dtype='int16')} # x,y indexes of the south-west corner of the simulated area
 
 # Verbose levels, defining the outputs produced
 VERBOSE_AP               = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
@@ -43,12 +48,15 @@ speed_idx  = 4
 
 class loc2ap_c (object):
     """
-    Accept as input a .loc file (a file detailing the locations of all users.
-    Input: at each slot, all users who are either new (namely, just joined the simulated area); or "old" (users who already were in the simulated, but moved to another cell/AP).
+    This class processes the locations of users (vehicles/pedestrians) and of antennas; calculates and plots statistics (e.g., about usrs' mobility); and calculates / plots the assignment of usrs to antennas, and of antennas to rectangular cells.
+    Inputs: 
+    Typical input is a .loc file (a file detailing the locations of all users.
+    at each slot, all users who are either new (namely, just joined the simulated area); or "old" (users who already were in the simulated, but moved to another cell/AP).
     Optional input: a list of antennas locations. 
     Optional outputs: 
     - An .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
     - A cnt of the number of vehicles in each cell
+    - various plots (e.g., heatmaps of the number of vehs within each rectangles, or the number of vehs joining/levaving each rec).
     "AP" means: Access Point, with which a user is associated at each slot.
     "cell" means: the rectangular cell, to which a user is associated at each slot.
     When using real-world antennas locations, the user's cell is the cell of the AP with which the user is currently associated.
@@ -486,7 +494,7 @@ class loc2ap_c (object):
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '{}\n' .format (line))
-                ids_of_usrs_that_left_ap = [int(id) for id in splitted_line[1:] if id!= '']                
+                ids_of_usrs_that_left_ap = [int(usr_id) for usr_id in splitted_line[1:] if usr_id!= '']                
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_ap, self.usrs)): # for each usr that left
                         # self.left_ap_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
@@ -713,13 +721,13 @@ class loc2ap_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 1
+    max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antenna_loc_file_name = 'Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['Monaco_24h_60secs.loc']) #(['0730_0830_16secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
-    # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps()
+    my_loc2ap.parse_loc_files (['Monaco_0730_0830_60secs.loc']) #(['0730_0830_16secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])
+    # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post=processing
     # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('num_of_vehs_Lux.center.post.antloc_1524aps.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')

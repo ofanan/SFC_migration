@@ -33,11 +33,15 @@ class Traci_runner (object):
     # Output: True iff this vehicle is within the simulated area.
     is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y[self.city]) else True
     
-    is_in_global_area_Lux = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.GLOBAL_MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.GLOBAL_MAX_Y[self.city]) else True
+    # Checks whether the given (x,y) position is within the simulated area.
+    # Input: (x,y) position
+    # Output: True iff this position is within the simulated area.
+    is_in_global_area = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.GLOBAL_MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.GLOBAL_MAX_Y[self.city]) else True
     
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
 
+        # Find out which city we're actually simulating
         if (sumo_cfg_file=='myLuST.sumocfg'):
             self.city = 'Lux'
             self.providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}         # Mobile Network Codes of various operators in Luxembourg
@@ -47,7 +51,7 @@ class Traci_runner (object):
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
-        Simulate a SUMO simulation using Traci, and cnt the number of active cars at each slot; and the total number of distinct cars along the sim.
+        Simulate a fast Traci SUMO simulation, to cnt the number of active vehicles/pedestrians at each slot; and the total number of distinct cars along the sim.
         """       
         self.verbose            = verbose
         
@@ -64,8 +68,6 @@ class Traci_runner (object):
         while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
             
             cur_sim_time = traci.simulation.getTime()
-            
-            # print ('cur_sim_time={}, warmup_period={}, sim_length={}' .format (cur_sim_time, warmup_period, sim_length))
             
             # Finished the sim. Now, just make some post-processing. 
             if (cur_sim_time >= warmup_period + sim_length):
@@ -100,10 +102,10 @@ class Traci_runner (object):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
-            output_file_name = '../res/{}_{}secs.loc' .format (secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec)  
-            with open(output_file_name, 'w') as loc_output_file:
+            loc_output_file_name = '../res/loc_files/{}_{}_{}secs.loc' .format (self.city, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec)  
+            with open(loc_output_file_name, 'w') as loc_output_file:
                 loc_output_file.write('')                
-            loc_output_file  = open (output_file_name,  "w")
+            loc_output_file  = open (loc_output_file_name,  "w")
             printf (loc_output_file, '// locations of vehicles. Format:\n')
             printf (loc_output_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
             printf (loc_output_file, '// format for vehicles that are new (just joined the sim), or moved:\n')
@@ -121,7 +123,7 @@ class Traci_runner (object):
                 
                 # Finished the sim. Now, just make some post-processing. 
                 if (cur_sim_time >= warmup_period + sim_length*(i+1) / num_of_output_files):
-                    print ('Successfully finished writing to file {}' .format (output_file_name))
+                    print ('Successfully finished writing to file {}' .format (loc_output_file_name))
                     break
                 
                 cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
@@ -162,12 +164,11 @@ class Traci_runner (object):
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
 
-
     # def get_relative_position_from_lat_lon (self, lat, lon): 
     #     """
     #     Given the geographical latitude and longitude, return the x,y position in meters w.r.t the south-west corner of the simulated area
     #     """       
-    #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER
+    #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER[self.city]
 
 
     def parse_antenna_locs_file (self, antenna_locs_file_name, provider=''):
@@ -222,6 +223,6 @@ if __name__ == '__main__':
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
 
-    # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
+    my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
 
-    my_Traci_runner.simulate (warmup_period=3600*7, sim_length = 3600*4, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    # my_Traci_runner.simulate (warmup_period=3600*7.5, sim_length = 3600*1, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

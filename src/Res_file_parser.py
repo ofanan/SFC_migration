@@ -454,20 +454,74 @@ class Res_file_parser (object):
                 list_of_val = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, list_of_avg_vals))
                 printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['cost'])) 
             printf (self.output_file, '\\\\ \\hline \n')
-                
 
+
+    def gen_cost_vs_rsrcs_plot (self, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1):
+        """
+        Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
+        Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
+        and/or normalize the cost (the Y axis) by the costs obtained by opt.   
+        """
+        
+        fig, ax = plt.subplots()
+        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
+            
+            mode_list   = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t), key = lambda item : item['cpu']) # list of lines with data about this mode
+            
+            if (len(mode_list)==0): # If no info about this mode - continue
+                continue
+        
+            # Filter-out all results of failed runs 
+            failed_runs = [] # failed_runs will include the cpu and seed values for all runs that fail: we've to filter-out these results while calculating the mean cost
+            for item in [item for item in mode_list if item['stts']!=1 ]:
+                failed_runs.append ({'cpu' : item['cpu'], 'seed' : item['seed']})
+            for failed_run in failed_runs: # Remove all results of this failed_run from the list of relevant results 
+                mode_list = list (filter (lambda item : not (item['cpu']==failed_run['cpu'] and item['seed']==failed_run['seed']), mode_list))
+            
+            cpu_vals = sorted (set ([item['cpu'] for item in mode_list]))
+            
+            if (mode=='opt'):
+                min_cpu = cpu_vals[0]
+            x_norm_factor = min_cpu if (normalize_X) else 1 
+                    
+            x = []
+            y = []
+            for cpu_val in cpu_vals: 
+
+                mode_cpu_list = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # list of results of runs for this mode, and cpu value
+                x_val = cpu_val/x_norm_factor # x value for this plotted point / conf' interval
+                x.append (x_val)               # append the x value of this point to the list of x values of points
+                avg_cost_of_each_seed = [] # will hold the avg cost of each successful run with a given mode, cpu value, and seed (averaging the cost over all the slots in the trace)
+                for seed in set ([item['seed'] for item in mode_cpu_list]): # list of seeds for which the whole run succeeded with this mode (algorithm), and this cpu val
+                    avg_cost_of_each_seed.append (np.average ([item['cost'] for item in mode_cpu_list if item['seed']==seed]))                    
+                
+                # print ('mode={}, cpu_val={}, avg_cost_of_each_seed={}' .format (mode, cpu_val, avg_cost_of_each_seed))
+                avg_cost_of_all_seeds = np.average (avg_cost_of_each_seed) 
+                [y_lo, y_hi]          = self.conf_interval (avg_cost_of_all_seeds, np.std (avg_cost_of_each_seed)) # low, high y values for this plotted conf' interval    
+
+                ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval for this mode and cpu_val
+                y.append (avg_cost_of_all_seeds)
+            
+            ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode])                
+
+        
+
+        plt.xlabel('C_{cpu}')
+        plt.ylabel('Norm Avg. Cost')
+        plt.xlim (1,3)
+        
+        plt.savefig ('../res/cost_by_rsrc_{}.dat' .format (self.input_file_name))
+        plt.show ()            
 
 if __name__ == '__main__':
     
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
+    input_file_name = 'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
     my_res_file_parser.parse_file (input_file_name) 
     # my_res_file_parser.plot_RT_prob_sim_python()
-    my_res_file_parser.gen_cost_vs_rsrcs_tbl()
+    my_res_file_parser.gen_cost_vs_rsrcs_plot()
     
-    # # X_norm_factor values: Lux post: 160. Lux rect: 208 
-    # X_norm_factor = 160 
     # input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
     

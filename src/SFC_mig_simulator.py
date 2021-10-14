@@ -842,6 +842,7 @@ class SFC_mig_simulator (object):
         - solve the problem using a LP, using Python's Pulp LP solver. 
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
+        - If the alg' failed to find a feasible sol', even at a single slot, return with self.stts=fail
         """
         self.cur_st_params = []
         
@@ -873,12 +874,28 @@ class SFC_mig_simulator (object):
                 if (VERBOSE_LOG in self.verbose):
                     self.last_rt = time.time ()
                 self.stts = self.alg_top(self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
+
+                if (self.stts!=sccs and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
+
+                    [self.lb, self.ub] = [self.cpu_cap_at_leaf, self.cpu_cap_at_leaf * self.max_R]
+                    while True:
+                        if (self.ub <= self.lb+1): # the difference between the lb and the ub is at most 1
+                            self.cpu_cap_at_leaf = self.ub
+                            self.stts = self.alg_top(self.solve_by_plp)
+                            if (VERBOSE_RES in self.verbose):
+                                self.print_sol_res_line (self.res_file)
+                            break # found a feasible sol for this slot
+            
+                        self.cpu_cap_at_leaf = self.avg_up_and_lb(self.ub, self.lb)
+                        self.stts = self.alg_top(self.solve_by_plp)
+                        if (self.stts==sccs): 
+                            self.ub = self.cpu_cap_at_leaf
+                        else: 
+                            self.lb = self.cpu_cap_at_leaf
+                            
                 self.cur_st_params = self.d_vars.copy () #All the decision vars will be referred as "cur st parameters" in the next time slot 
                 self.is_first_t = False  # The next slot is surely not the first slot
 
-                if (self.stts!=sccs):
-                    return # Once opt fails to find a sol even for a single slot, we don't try to further simulate, 
-                
         self.post_processing ()
         
     def rmv_usr_from_all_Hs (self, usr):
@@ -893,13 +910,14 @@ class SFC_mig_simulator (object):
         
     def simulate_algs (self):
         """
-        Simulate the whole simulation, using an algorithm (NOT a LP solver).
+        Simulate using an algorithm (NOT a LP solver).
         At each time step:
         - Read and parse from an input ".ap" file the AP cells of each user who moved. 
         - solve the problem using alg_top (our alg). 
         - Write outputs results and/or logs to files.
         - Update self.stts according to the solution's stts.
         - update cur_st = nxt_st
+        - If the alg' failed to find a feasible sol', even at a single slot, return with self.stts=fail
         """
         
         # reset Hs     
@@ -944,6 +962,8 @@ class SFC_mig_simulator (object):
                 # solve the prob' using the requested alg'    
                 if   (self.mode in ['ourAlg']):
                     self.stts = self.alg_top(self.bottom_up)
+                    if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
+                        self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
                 elif (self.mode == 'ffit'):
                     self.stts = self.alg_top(self.first_fit)
                 elif (self.mode == 'wfit'):
@@ -954,9 +974,6 @@ class SFC_mig_simulator (object):
                     print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
                     exit ()
         
-                if (self.mode in ['ourAlg'] and self.stts==sccs): # if we ran our alg' (bottom-up), perform now the final step, of push-up 
-                    self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
-                
                 self.print_sol_to_res_and_log ()
                 if (self.stts!=sccs):
                     return # Once an alg' fails to find a sol even for a single slot, we don't try to further simulate, 
@@ -1465,10 +1482,21 @@ class SFC_mig_simulator (object):
             splitted_line = line.split ()
             self.APs.append ({'ap' : int(splitted_line[0]), 'cell' : int(splitted_line[1])})
     
-    def binary_search_along_full_trace (self, output_file, mode, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=61, seed=42):
+    def binary_search_opt (self, output_file, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=61, seed=42):
         """
-        Binary-search for the minimal rsrce aug' required for finding a feasible sol.
-        A run is considered "sccs" iff it successfully found solutions during the whole trace.
+        Binary-search for the minimal rsrce aug' required by an algorithm (not opt) to find a feasible sol.
+        As the results of opt are consistent (namely, If a run succeeds with cpu cap X, then in would succeed also with cpu cap X+1), 
+        each time opt fails at a single slot, it performs a binary search, until it finds the minimal cpu value required for finding a feasible sol' at that slot.     
+        Returns the lowest cpu cap' at the leaf server which still allows finding a feasible sol. 
+        """
+        self.verbose.add (VERBOSE_CALC_RSRC_AUG) 
+        self.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+
+    def binary_search_algs (self, output_file, mode, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=61, seed=42):
+        """
+        Binary-search for the minimal rsrce aug' required by an algorithm (not opt) to find a feasible sol.
+        As the results for algs' aren't necessarily consistent (namely, a run may succeed with cpu cap X, but fail with cpu cap X+1), 
+        for each suggested cpu values, we run the whole trace; a run is considered "sccs" iff it successfully found solutions during the whole trace.    
         Returns the lowest cpu cap' at the leaf server which still allows finding a feasible sol. 
         """ 
         res = self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
@@ -1507,17 +1535,17 @@ class SFC_mig_simulator (object):
         #     cpu_cap_at_leaf = 300  #Initial cpu cap at the leaf server
         #     for seed in [50 + i for i in range (3, 11)]:
         #         for prob_of_target_delay in [0.1*i for i in range (11)]:
-        #             self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
     
         # cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
         # for seed in [40 + i for i in range (11)]:
         #     for prob_of_target_delay in [0.1*i for i in range (11)]:
-        #         self.binary_search_along_full_trace(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+        #         self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
         cpu_cap_at_leaf = 143 #Initial cpu cap at the leaf server
         mode = 'opt'
         for prob_of_target_delay in [(0.1*i) for i in range (11)]:
-            cpu_cap_at_leaf = self.binary_search_along_full_trace(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+            cpu_cap_at_leaf = self.binary_search_algs(output_file=output_file, mode='opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
     
     
 #######################################################################################################################################
@@ -1554,9 +1582,9 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
             for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
                 if (cpu_cap_at_leaf >= min_req_cpu[mode]):
                     my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-            for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit'], min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
+            for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit']]: #, min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
                 if (cpu_cap_at_leaf >= min_req_cpu[mode]):
-                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[mode], seed=seed)
+                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
 if __name__ == "__main__":

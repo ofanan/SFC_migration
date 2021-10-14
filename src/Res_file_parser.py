@@ -19,9 +19,9 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE = 15
-LINE_WIDTH  = 4
-FONT_SIZE   = 30
+MARKER_SIZE = 1 #15
+LINE_WIDTH  = 3 #4
+FONT_SIZE   = 15 #30
 
 class Res_file_parser (object):
     """
@@ -495,9 +495,9 @@ class Res_file_parser (object):
                 for seed in set ([item['seed'] for item in mode_cpu_list]): # list of seeds for which the whole run succeeded with this mode (algorithm), and this cpu val
                     avg_cost_of_each_seed.append (np.average ([item['cost'] for item in mode_cpu_list if item['seed']==seed]))                    
                 
-                # print ('mode={}, cpu_val={}, avg_cost_of_each_seed={}' .format (mode, cpu_val, avg_cost_of_each_seed))
                 avg_cost_of_all_seeds = np.average (avg_cost_of_each_seed) 
                 [y_lo, y_hi]          = self.conf_interval (avg_cost_of_all_seeds, np.std (avg_cost_of_each_seed)) # low, high y values for this plotted conf' interval    
+                print ('mode={}, cpu_val={}, avg_cost_of_each_seed={}, y_lo={:.0f}, y_hi={:.0f}' .format (mode, cpu_val, avg_cost_of_each_seed, y_lo, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval for this mode and cpu_val
                 y.append (avg_cost_of_all_seeds)
@@ -506,18 +506,25 @@ class Res_file_parser (object):
 
         
 
-        plt.xlabel('C_{cpu}')
+        plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
         plt.ylabel('Norm Avg. Cost')
         plt.xlim (1,3)
+        # plt.yscale ('log')
+        plt.legend ()
         
-        plt.savefig ('../res/cost_by_rsrc_{}.dat' .format (self.input_file_name))
-        plt.show ()            
+        plt.tight_layout()
+        plt.savefig ('../res/cost_by_rsrc_{}.jpg' .format (self.input_file_name), dpi=100)
+
+        plt.ylim (390000,450000)
+        plt.xlim (2.4,3)
+        plt.savefig ('../res/cost_by_rsrc_{}_zoomed.jpg' .format (self.input_file_name), dpi=99)
+
 
 if __name__ == '__main__':
-    
+
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = 'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
+    input_file_name = 'tmp.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
     my_res_file_parser.parse_file (input_file_name) 
     # my_res_file_parser.plot_RT_prob_sim_python()
     my_res_file_parser.gen_cost_vs_rsrcs_plot()

@@ -1,9 +1,9 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import math
 
 from printf import printf 
+from pandas._libs.tslibs import period
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
@@ -76,73 +76,31 @@ class Res_file_parser (object):
     # Calculate the confidence interval, given the avg and the std 
     conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
         
-    def parse_detailed_cost_comp_file (self, input_file_name):
+    def plot_mig_cost_n_ratio_crit_usrs_tikz (self):
         """
-        Parse a result file containing the detailed costs, with its components (link, cpu and mig' cost) for each ran algorithm. 
+        Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.   
         """
-        self.input_file_name = input_file_name
-        self.input_file      = open ("../res/" + input_file_name,  "r")
 
-        lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
-        lines                = (line for line in lines if line)       # Discard blank lines
+        # Generate a vector for the x axis (the t line).
+        t_min, t_max = min ([item['t'] for item in self.list_of_dicts]), max ([item['t'] for item in self.list_of_dicts])
+        t = range (t_min, t_max+1)
+
+        num_of_markers = 10 # number of marker points in the plot 
+        period_len     = len (t) / num_of_markers # Each point will be assigned the avg value, where averaging over period of length period_len
+        mig_cost = np.empty (num_of_markers)
+        ratio    = np.empty (num_of_markers)
         
-        for line in lines:
+        period_begin = t_min
+        for period in period_len: # for every considered period
+            period_end = period_begin + period_len
+            res_from_this_period = list (filter (lambda item : item['t'] >= period_begin and item['t'] <= period_end, self.list_of_dicts))
+            mig_cost[period] = np.average ([item['mig_cost'] for item in res_from_this_period])
+            ratio   [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
             
-            # Discard lines with comments / verbose data
-            if (line.split ("//")[0] == ""):
-                continue
-           
-            splitted_line = line.split ("=")
-            if (splitted_line[0]=='cpu_cost_in_slot'):
-                cpu_cost_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
-            elif (splitted_line[0]=='link_cost_in_slot'):
-                link_cost_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
-            elif (splitted_line[0]=='num_of_migs_in_slot'):            
-                num_of_migs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
-            elif (splitted_line[0]=='num_of_critical_usrs_in_slot'):
-                num_of_critical_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
-            elif (splitted_line[0]=='num_of_usrs_in_slot'):
-                num_of_usrs_in_slot = np.array (self.parse_vec_line(splitted_line[1]))
-        
-        self.sim_len              = 3600
-        self.period_len           = 400
-        self.cost_of_single_chain = 600
-        self.num_of_periods    = int (self.sim_len / self.period_len)
-        self.time_slot_len     = int(self.input_file_name.split('secs')[0].split('_')[-1])
-        self.num_of_slots_in_period = int (self.period_len / self.time_slot_len)
-        
-        cpu_cost_in_period             = self.gen_vec_for_period(cpu_cost_in_slot) * self.time_slot_len 
-        link_cost_in_period            = self.gen_vec_for_period(link_cost_in_slot) * self.time_slot_len
-        num_of_migs_in_period          = self.gen_vec_for_period(num_of_migs_in_slot) * self.cost_of_single_chain
-        num_of_critical_usrs_in_period = self.gen_vec_for_period(num_of_critical_usrs_in_slot)
-        num_of_usrs_in_period          = self.gen_vec_for_period(num_of_usrs_in_slot)
-        num_of_critical_usrs_per_slot  = num_of_critical_usrs_in_period / self.num_of_slots_in_period
-        num_of_usrs_per_slot            = num_of_usrs_in_period / self.num_of_slots_in_period
-        
-        output_file_name = self.input_file_name + '.dat' 
-        self.output_file = open ('../res/{}' .format (output_file_name), 'w')
-        
-        x = [self.period_len * (i+1) for i in range (len(cpu_cost_in_period))]
-        
-        printf (self.output_file, self.add_plot_cpu_cost)
-        for i in range (len(cpu_cost_in_period)):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], cpu_cost_in_period[i]))
-        printf (self.output_file, '};' + self.add_legend_str + 'cpu}\n')
-
-        printf (self.output_file, self.add_plot_link_cost)
-        for i in range (len(cpu_cost_in_period)):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], link_cost_in_period[i]))
-        printf (self.output_file, '};' + self.add_legend_str + 'link}\n')
-
         printf (self.output_file, self.add_plot_mig_cost)
         for i in range (len(cpu_cost_in_period)):
             printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_migs_in_period[i]))
         printf (self.output_file, '};' + self.add_legend_str + 'mig.}\n')
-
-        printf (self.output_file, self.add_plot_num_of_critical_chains)
-        for i in range (len(cpu_cost_in_period)):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (x[i], num_of_critical_usrs_per_slot[i]))
-        printf (self.output_file, '};' + self.add_legend_str + '\# of critical chains per slot}\n')
 
         printf (self.output_file, self.add_plot_num_of_critical_chains)
         for i in range (len(cpu_cost_in_period)):
@@ -220,6 +178,9 @@ class Res_file_parser (object):
             "mig_cost"  : float (splitted_line[3].split("=")[1]),            
             "cost"      : float (splitted_line[4].split("=")[1])
             }
+        if (splitted_line > 5): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
+            self.dict['num_usrs']      = int (splitted_line[5].split("=")[1])
+            self.dict['num_crit_usrs'] = int (splitted_line[6].split("=")[1])
 
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, mode = None, cpu = None, stts = -1):
         """
@@ -257,67 +218,6 @@ class Res_file_parser (object):
             printf (self.output_file, '}\n')    
         printf (self.output_file, '\n')    
 
-
-    def plot_cost_vs_rsrcs (self, normalize_X = True, normalize_Y = False, slot_len_in_sec=1, X_norm_factor=1):
-        """
-        Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
-        Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
-        and/or normalize the cost (the Y axis) by the costs obtained by opt.   
-        """
-        
-        max_t = 30600
-        self.time_slot_len = int(self.input_file_name.split('secs')[0].split('_')[-1])
-        min_t = 30545 if (self.time_slot_len==1) else 30541
-        prob = 0.3
-        Y_units_factor = 1 # a factor added for showing the cost, e.g., in units of K (thousands)
-        self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
-        self.output_file      = open (self.output_file_name, "w")
-        
-        # if (normalize_X):
-        #     opt_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='opt', prob=prob, min_t=min_t, max_t=max_t, stts=1),
-        #                        key = lambda item : item['cpu'])
-        #     cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
-        #     X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
-        #
-        #     if (normalize_Y):
-        #         opt_avg_list = []
-        #         for cpu in cpu_vals:
-        #             opt_avg_list.append (np.average ([item['cost'] for item in list (filter (lambda item : item['cpu']==cpu, opt_list) )]))
-        # else:
-        #     X_norm_factor = 1
-        #     mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode='ourAlg', prob=prob, min_t=min_t, max_t=max_t, stts=1),
-        #                        key = lambda item : item['cpu'])
-        
-        # Y_norm_factor = opt_avg_list[-1] if normalize_Y else 1 # Calculate the normalization factor of the Y axis
-        
-        Y_norm_factor = 1 #$$$
-        
-        for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
-            
-            mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t, stts=1), key = lambda item : item['cpu'])
-            
-            cpu_vals = set ([item['cpu'] for item in self.list_of_dicts if item in mode_list])
-            
-            if (len(mode_list)==0):
-                continue
-
-            mode_avg_list = []
-            
-            for cpu in cpu_vals:
-                
-                mode_vals_for_this_cpu = list (filter (lambda item : item['cpu']==cpu, mode_list) )
-                
-                if (len(mode_vals_for_this_cpu)< math.floor( (max_t - min_t)/slot_len_in_sec)):
-                    print ('Warning: there are too few samples\nmode={}, cpu={}, num of smpls={}' .format(mode, cpu, len(mode_vals_for_this_cpu)))
-                    continue
-                
-                mode_avg_list.append ({'cpu'  : (cpu / X_norm_factor) if normalize_X else (cpu / X_norm_factor), 
-                                      'cost' : np.average ([self.calc_cost_of_item(item) for item in mode_vals_for_this_cpu])* Y_units_factor / Y_norm_factor })
-
-                if (len(mode_avg_list)==0):
-                    continue
-        
-            self.print_single_tikz_plot (mode_avg_list, key_to_sort='cpu', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode]) 
 
     def plot_num_of_vehs (self):
         """
@@ -456,7 +356,7 @@ class Res_file_parser (object):
             printf (self.output_file, '\\\\ \\hline \n')
 
 
-    def gen_cost_vs_rsrcs_plot (self, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1):
+    def plot_cost_vs_rsrcs (self, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1):
         """
         Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
@@ -516,7 +416,7 @@ class Res_file_parser (object):
         plt.savefig ('../res/cost_by_rsrc_{}.jpg' .format (self.input_file_name), dpi=100)
 
         plt.ylim (390000,450000)
-        plt.xlim (2.4,3)
+        plt.xlim (2.4,3.1)
         plt.savefig ('../res/cost_by_rsrc_{}_zoomed.jpg' .format (self.input_file_name), dpi=99)
 
 
@@ -527,7 +427,7 @@ if __name__ == '__main__':
     input_file_name = 'tmp.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
     my_res_file_parser.parse_file (input_file_name) 
     # my_res_file_parser.plot_RT_prob_sim_python()
-    my_res_file_parser.gen_cost_vs_rsrcs_plot()
+    my_res_file_parser.plot_cost_vs_rsrcs()
     
     # input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        

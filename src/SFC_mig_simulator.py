@@ -713,9 +713,24 @@ class SFC_mig_simulator (object):
         #     self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
         self.ap2cell_file_name = ap2cell_file_name
-        if (self.ap2cell_file_name=='' or self.ap_file_name=='shorter.ap'):
+        
+        # ap_file_used_antloc will be True iff the ap file was generated using real antennas' location data.
+        ap_file_used_antloc = True if (self.ap_file_name.split('.ap')[0].split('_')[-1] in ['all', 'orange', 'post', 'Telecom_Monaco', 'short']) else False
+        # ap_file_used_antloc = True if (self.ap_file_name.split('.ap')[0].split('_')) else False 
+        
+        ap2cell_file_name if (ap2cell_file_name != '') else False  
+        if (self.ap_file_name=='shorter.ap'):
+            self.gen_parameterized_full_tree  ()
+        
+        elif (self.ap2cell_file_name==''):
+            if (ap_file_used_antloc):
+                print ('Error: you specified no ap2cell file name, but the .ap file was generated using an antloc file.')
+                exit ()
             self.gen_parameterized_full_tree  ()
         else:
+            if (not (ap_file_used_antloc)):
+                print ('Error: you specified ap2cell_file_name={}, but the .ap file was not generated using an antloc file.' .format (self.ap2cell_file_name))                
+                exit ()
             self.gen_parameterized_antloc_tree (self.ap2cell_file_name)
         self.delay_const_sanity_check()
 
@@ -750,7 +765,7 @@ class SFC_mig_simulator (object):
 
         self.usrs                       = [] 
 
-        if (prob_of_target_delay!=None): # If the caller stated a different prob_of_target_delayk, assing it
+        if (prob_of_target_delay!=None): # If the caller stated a different prob_of_target_delay, assingg it
             self.prob_of_target_delay = [prob_of_target_delay]  
 
         self.mode              = mode
@@ -791,7 +806,7 @@ class SFC_mig_simulator (object):
         """
 
         # open input file
-        self.ap_file  = open ("../res/" + self.ap_file_name, "r")  
+        self.ap_file  = open ("../res/ap_files/" + self.ap_file_name, "r")  
 
         # open output files, and print there initial comments
         if (VERBOSE_RES in self.verbose):
@@ -1584,10 +1599,13 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
 if __name__ == "__main__":
 
 
-    ap_file_name = 'Lux_0829_0830_1secs_256aps.ap' #'shorter.ap' #
+    ap_file_name      = 'Lux_0730_0830_16secs_256aps.ap' #'shorter.ap' #
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
-    run_cost_by_rsrc (ap_file_name, ap2cell_file_name)
-
-    # my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
+    # run_cost_by_rsrc (ap_file_name, ap2cell_file_name)
+    cpu_cap_at_leaf = 250
+    my_simulator    = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
+    for seed in [40 + i for i in range (21)]:
+        my_simulator.simulate (mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        
     # my_simulator.run_prob_of_RT_sim ()
     

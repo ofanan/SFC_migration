@@ -1599,7 +1599,7 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
 if __name__ == "__main__":
 
 
-    ap_file_name      = 'Lux_0730_0830_16secs_256aps.ap' #'shorter.ap' #
+    ap_file_name      = 'Lux_0730_0830_16secs_post.ap' #'shorter.ap' #
     ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
     # run_cost_by_rsrc (ap_file_name, ap2cell_file_name)
     cpu_cap_at_leaf = 250

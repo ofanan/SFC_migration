@@ -62,6 +62,16 @@ class loc2ap_c (object):
     When using real-world antennas locations, the user's cell is the cell of the AP with which the user is currently associated.
     Otherwise, "AP" and "cells" are identical.  
     """   
+
+    # Given a length of a vec, return the square root of its length
+    sqrt_len = lambda self, vec : int (math.sqrt(len(vec)))
+
+    # Given n and index, returns the position of the index in a nXn mat.
+    vec2mat_idx = lambda  self, n, idx : [idx//n, idx%n]
+    
+    # reshape a vector of length n^2 as a n X n mat   
+    vec2sq_mat = lambda self, vec : vec.reshape ( [self.sqrt_len(vec), self.sqrt_len(vec)])
+    
     # Map a given x,y position to an AP.
     # If there're real AP locations, use Voronoi distance (map each client to the nearest AP).
     # Else, use uniform-size rectangular cells, rather than finding the , replace the function below with the commented function below it.
@@ -130,6 +140,50 @@ class loc2ap_c (object):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
             self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
         self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell. #$$$$$$
+        self.tmp_file = open ('../res/tmp.txt', 'w')        
+        self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
+        self.calc_neighbor_rects ()
+        # i = 81
+        # print ('vec2mat{} = {}' .format (i, self.vec2mat_idx(16, i)))
+        # print (self.gen_vec2mat_idx(self.tile2cell))
+        # self.vec2mat_idx([i for i in range (256)])
+        exit ()
+        
+    # def gen_vec2mat_idx (self, vec):
+    #     """
+    #     given a n**2 vector, return an vector that maps the indices in the vector into pairs of indices in the corresponding n X n mat.  
+    #     """
+    #     n = int (math.sqrt(len(vec)))
+    #     vec2mat_map = np.empty ([len(vec), 2], dtype='int16')
+    #     i = 0
+    #     for idx in np.ndindex (n, n):
+    #         vec2mat_map[i] = idx
+    #         i += 1
+    #     return vec2mat_map
+        
+    def calc_neighbor_rects (self):
+        """
+        Find the 4 (north, south, east, west) neighbours of each cell (rect). If it's an edge cell, the tile number of the neighbor will be -1.  
+        """
+        self.ngbrs_of_cell = [None] * self.num_of_cells
+        # tile2cell_as_mat = self.vec2sq_mat (self.tile2cell)
+        # mat2vec_idx = np.empty (self.num_of_cells, dtype='int8')
+
+        n = self.sqrt_len (self.tile2cell)
+        for cell in range(self.num_of_cells):
+            self.ngbrs_of_cell[cell] = {'w' : -1 if (cell%n==0)    else self.tile2cell [cell-1], # west neighbor 
+                                        'e' : -1 if (cell%n==n-1)  else self.tile2cell [cell+1], # east neighbor
+                                        'n' : -1 if (cell//n==0)   else self.tile2cell [cell-n], # east neighbor
+                                        's' : -1 if (cell//n==n-1) else self.tile2cell [cell+n] # east neighbor
+                                        }
+            
+        printf (self.tmp_file, '\n')
+        for cell in range(self.num_of_cells):
+            printf (self.tmp_file, '{}\t' .format (self.ngbrs_of_cell[cell]['s']))
+            if (cell % n == n-1):
+                printf (self.tmp_file, '\n') 
+            
+        
         
     def parse_antloc_file (self, antennas_loc_file_name, plot_ap_locs_heatmap=False):
         """
@@ -329,7 +383,7 @@ class loc2ap_c (object):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
-        n = int (math.sqrt(len(vec)))
+        n = self.sqrt_len(vec)
         if (len(vec) != len(self.tile2cell)): # The current mapping of tile2cell doesn't fit the number of rectangles in the given vec --> calculate a tile2cell mapping fitting the required len
             self.calc_tile2cell (lvl=self.max_power_of_4 - int(math.log2(n)))
         heatmap_val = np.array ([vec[self.tile2cell[i]] for i in range (len(self.tile2cell))]).reshape ( [n, n])
@@ -724,7 +778,7 @@ class loc2ap_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 4
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_AP], antloc_file_name = 'Lux.post.antloc', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing

@@ -558,8 +558,8 @@ class loc2ap_c (object):
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_ap, self.usrs)): # for each usr that left
                         # self.left_ap_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
-                        self.left_cell[usr['cur cell']][-1] += 1 # increase the cntr of the usrs that left from the cur cell of that usr at this cycle
-                        self.left_cell_to [cell]['out'] += 1 # inc the cntr of the # of veh left this cell to outside the sim (counting along the whole sim, not per cycle)
+                        self.left_cell    [usr['cur cell']][-1]    += 1 # increase the cntr of the usrs that left from the cur cell of that usr at this cycle
+                        self.left_cell_to [usr['cur cell']]['out'] += 1 # inc the cntr of the # of veh left this cell to outside the sim (counting along the whole sim, not per cycle)
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left_ap), self.usrs))
                 continue
     
@@ -631,25 +631,45 @@ class loc2ap_c (object):
                 self.is_first_slot = False
         # print ('min_x_pos_found=', min_x_pos_found, 'max_x_pos_found=', max_x_pos_found, 'min_y_pos_found=', min_y_pos_found, 'max_y_pos_found=', max_y_pos_found)
     
-    def print_demog_diagram (self):
+    def print_demography_diagram (self):
         """
         print a detailed demographic diagram, detailing the number of vehs left from each cell to each direction.
         The directions to which a veh can move are 'n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se', and 'out'.
         'out' indicates that a car left the simulated area.
         """
-        printf (self.demography_file, '\n\n\\ Demography diagrams\n')
+        printf (self.demography_file, '\\\ Demography diagrams\n')
+        printf (self.demography_file, '\\\ Showing for each rectangle the average number of cars left to each direction, at each slot\n')
+        printf (self.demography_file, '\\\ The number in the middle show the average number of cars left the simulated area from this rectangle\n\n\n')
+        
         
         diagram_val = np.array ([self.left_cell_to[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [self.sqrt_num_of_cells, self.sqrt_num_of_cells])
         
-        for row in reversed (range(len(diagram_val))):
+        for row in reversed(range(len(diagram_val))): # use reversed order, as we'd like to begin with the rectangle corresponding to the northest areas, which have the largest row indices.
+            for col in range(len(diagram_val[0])):
+                printf (self.demography_file, '  (row,col)=({},{})\t\t\t\t' .format (row, col))
+            printf (self.demography_file, '\n')
+            for col in range(len(diagram_val[0])):
+                printf (self.demography_file, '{:.2f}\t{:.2f}\t{:.2f}\t\t\t' .format (
+                        diagram_val[row][col]['sw'] / self.sim_len,
+                        diagram_val[row][col]['s']  / self.sim_len,
+                        diagram_val[row][col]['se'] / self.sim_len))
+            printf (self.demography_file, '\n')
+            for col in range(len(diagram_val[0])):
+                printf (self.demography_file, '{:.2f}\t{:.2f}\t{:.2f}\t\t\t' .format (
+                        diagram_val[row][col]['w']   / self.sim_len,
+                        diagram_val[row][col]['out'] / self.sim_len,
+                        diagram_val[row][col]['e']   / self.sim_len))
+            printf (self.demography_file, '\n')
             for col in range(len(diagram_val[0])):
                 printf (self.demography_file, '{:.2f}\t{:.2f}\t{:.2f}\t\t\t' .format (
                         diagram_val[row][col]['nw'] / self.sim_len,
                         diagram_val[row][col]['n']  / self.sim_len,
                         diagram_val[row][col]['ne'] / self.sim_len))
             printf (self.demography_file, '\n')
-        exit ()
-        # print ('{:.2f}\t{:.2f}\t{:.2f}\n' .format (self.left_cell_to[cell]['nw'] / self.sim_len))
+            for col in range(len(diagram_val[0])):
+                printf (self.demography_file, '  total\t{:.2f}\t\t\t\t\t' .format (
+                        sum ([diagram_val[row][col][direction] for direction in directions]) / self.sim_len)),
+            printf (self.demography_file, '\n\n')
     
     
     def post_processing (self):
@@ -667,7 +687,7 @@ class loc2ap_c (object):
             self.plot_num_of_vehs_in_cell_heatmaps()
             self.plot_num_of_vehs_per_AP()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            # self.print_demog_diagram ()
+            self.print_demography_diagram ()
             self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
             
@@ -810,17 +830,12 @@ class loc2ap_c (object):
 
 if __name__ == '__main__':
 
-    # n = 5
-    # ar = np.empty ([n, 3], dtype='int16')
-    # print (ar)
-    # exit () 
-
-    max_power_of_4 = 3
+    max_power_of_4 = 4
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #
+    my_loc2ap.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post=processing

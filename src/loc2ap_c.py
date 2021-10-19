@@ -129,6 +129,7 @@ class loc2ap_c (object):
 
         self.max_power_of_4    = max_power_of_4
         self.num_of_cells      = 4**max_power_of_4
+        self.num_of_tiles      = self.num_of_cells
         self.sqrt_num_of_cells = int (math.sqrt (self.num_of_cells))
         self.list_of_APs = [] # List of the APs. Will be filled only if using antennas locations (and not synthetic rectangular cells).
         
@@ -141,20 +142,23 @@ class loc2ap_c (object):
         if (VERBOSE_SPEED in self.verbose):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
             self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
-        self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell. #$$$$$$
+        self.calc_cell2tile (lvl=0) # calc_cell2tile translates the number as a "cell" to the ID in a vector, covering the same area as a tile
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.joined_ap          = [[] for _ in range(self.num_of_APs)] # self.joined_ap[i][j] will count the # of clients that joined AP i at slot j
             self.joined_cell        = [[] for _ in range(self.num_of_cells)] # self.joined_cell[i][j] will count the # of clients that joined cell i at slot j
             self.left_ap            = [[] for _ in range(self.num_of_APs)] # self.left_ap[i][j] will count the # of clients that left AP i at slot j
             self.left_cell          = [[] for _ in range(self.num_of_cells)] # self.left_cell[i][j] will count the # of clients that left cell i at slot j
             self.joined_ap_sim_via  = [[] for _ in range(self.num_of_APs)] # self.joined_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last AP in the sim was AP i
-            self.left_ap_sim_via    = [[] for _ in range(self.num_of_APs)] # self.left_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last cell in the sim was cell i 
-            self.left_cell_to       = [{'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0}]* self.num_of_cells
+            self.left_ap_sim_via    = [[] for _ in range(self.num_of_APs)] # self.left_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last cell in the sim was cell i
+            
+            self.left_cell_to = []
+            for _ in range(self.num_of_cells):
+                self.left_cell_to.append ({'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0})
         # self.tmp_file = open ('../res/tmp.txt', 'w')
-        # printf (self.tmp_file, 'tile2cell=\n')        
-        # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
-        # printf (self.tmp_file, '\ncell2tile=\n')
+        # printf (self.tmp_file, 'cell2tile=\n')        
         # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.cell2tile))
+        # printf (self.tmp_file, '\ntile2cell=\n')
+        # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
         
         self.calc_ngbr_rects ()
         # src, dst = 254, 252
@@ -170,14 +174,14 @@ class loc2ap_c (object):
     
         n = self.sqrt_num_of_cells
         for cell in range(self.num_of_cells):
-            self.ngbrs_of_cell[self.tile2cell[cell]] = {'w'  : -1 if (cell%n==0)    else self.tile2cell [cell-1], # west neighbor 
-                                        'e'  : -1 if (cell%n==n-1)  else self.tile2cell [cell+1], # east neighbor
-                                        'n'  : -1 if (cell//n==0)   else self.tile2cell [cell-n], # north neighbor
-                                        's'  : -1 if (cell//n==n-1) else self.tile2cell [cell+n],  # south neighbor
-                                        'nw' : -1 if (cell%n==0   or cell//n==0)   else self.tile2cell [cell-n-1], # north-west neighbor
-                                        'ne' : -1 if (cell%n==n-1 or cell//n==0)   else self.tile2cell [cell-n+1], # north-west neighbor
-                                        'sw' : -1 if (cell%n==0   or cell//n==n-1) else self.tile2cell [cell+n-1], # north-west neighbor
-                                        'se' : -1 if (cell%n==n-1 or cell//n==n-1) else self.tile2cell [cell+n+1] # north-west neighbor
+            self.ngbrs_of_cell[self.cell2tile[cell]] = {'w'  : -1 if (cell%n==0)    else self.cell2tile [cell-1], # west neighbor 
+                                        'e'  : -1 if (cell%n==n-1)  else self.cell2tile [cell+1], # east neighbor
+                                        'n'  : -1 if (cell//n==0)   else self.cell2tile [cell-n], # north neighbor
+                                        's'  : -1 if (cell//n==n-1) else self.cell2tile [cell+n],  # south neighbor
+                                        'nw' : -1 if (cell%n==0   or cell//n==0)   else self.cell2tile [cell-n-1], # north-west neighbor
+                                        'ne' : -1 if (cell%n==n-1 or cell//n==0)   else self.cell2tile [cell-n+1], # north-west neighbor
+                                        'sw' : -1 if (cell%n==0   or cell//n==n-1) else self.cell2tile [cell+n-1], # north-west neighbor
+                                        'se' : -1 if (cell%n==n-1 or cell//n==n-1) else self.cell2tile [cell+n+1] # north-west neighbor
                                         }
     
         # printf (self.tmp_file, '\nneighbours from west=\n')
@@ -197,21 +201,21 @@ class loc2ap_c (object):
         exit ()
         
         
-        # if (dst == self.tile2cell[self.cell2tile[src]-1]):
+        # if (dst == self.cell2tile[self.tile2cell[src]-1]):
         #     return 'w'
-        # elif (dst==self.tile2cell[self.cell2tile[src]+1]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]+1]):
         #     return 'e'
-        # elif (dst==self.tile2cell[self.cell2tile[src]-self.sqrt_num_of_cells]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]-self.sqrt_num_of_cells]):
         #     return 'n'
-        # elif (dst==self.tile2cell[self.cell2tile[src]+self.sqrt_num_of_cells]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]+self.sqrt_num_of_cells]):
         #     return 's'
-        # elif (dst==self.tile2cell[self.cell2tile[src]-self.sqrt_num_of_cells-1]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]-self.sqrt_num_of_cells-1]):
         #     return 'nw'
-        # elif (dst==self.tile2cell[self.cell2tile[src]-self.sqrt_num_of_cells+1]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]-self.sqrt_num_of_cells+1]):
         #     return 'ne'
-        # elif (dst==self.tile2cell[self.cell2tile[src]+self.sqrt_num_of_cells-1]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]+self.sqrt_num_of_cells-1]):
         #     return 'sw'
-        # elif (dst==self.tile2cell[self.cell2tile[src]+self.sqrt_num_of_cells+1]):
+        # elif (dst==self.cell2tile[self.tile2cell[src]+self.sqrt_num_of_cells+1]):
         #     return 'se'
         # else:
         #     print ('cells {} and {} are not neighbors' .format (src, dst))
@@ -243,7 +247,7 @@ class loc2ap_c (object):
         for ap in range(self.num_of_APs):
             printf (ap2cell_file, '{} {}\n' .format (ap, self.ap2cell(ap)))
         
-        self.calc_tile2cell (lvl=0)
+        self.calc_cell2tile (lvl=0)
         
         return
          
@@ -280,7 +284,7 @@ class loc2ap_c (object):
         x_offset, y_offset = x, y
         x_edge, y_edge = 0.5*self.max_x, 0.5*self.max_y
         for p in range (max_power_of_4):
-            ap += 4**(max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) #Y: 5728/2864
+            ap += 4**(max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) 
             x_offset, y_offset = x_offset % x_edge, y_offset % y_edge   
             x_edge /= 2
             y_edge /= 2
@@ -367,7 +371,7 @@ class loc2ap_c (object):
          
         lvl=0
         columns = self.gen_columns_for_heatmap ()
-        self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+        self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
         my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals, columns=columns), cmap="YlGnBu")
@@ -375,20 +379,16 @@ class loc2ap_c (object):
         printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
         plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
-        return 
 
-        for lvl in range (0, self.max_power_of_4):
-            columns = self.gen_columns_for_heatmap (lvl=lvl)
-            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
-            plt.figure()       
-            heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (heatmap_vals), columns=columns, cmap="YlGnBu"))
-            printf   (heatmap_txt_file, 'lvl={}\n' .format (lvl+1))
-            printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
-            my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
-            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_vehs_left_per_rect for the next iteration
-                avg_vehs_left_per_rect = self.avg_heatmap_cells (avg_vehs_left_per_rect)
+        columns = self.gen_columns_for_heatmap (lvl=0)
+        self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering AP.
+        plt.figure()       
+        heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (heatmap_vals), columns=columns, cmap="YlGnBu"))
+        printf   (heatmap_txt_file, 'max power of 4={}\n' .format (self.max_power_of_4))
+        printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
+        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
         
         return 
         plt.figure()
@@ -417,9 +417,9 @@ class loc2ap_c (object):
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
         n = self.sqrt_len(vec)
-        if (len(vec) != len(self.tile2cell)): # The current mapping of tile2cell doesn't fit the number of rectangles in the given vec --> calculate a tile2cell mapping fitting the required len
-            self.calc_tile2cell (lvl=self.max_power_of_4 - int(math.log2(n)))
-        heatmap_val = np.array ([vec[self.tile2cell[i]] for i in range (len(self.tile2cell))]).reshape ( [n, n])
+        if (len(vec) != len(self.cell2tile)): # The current mapping of cell2tile doesn't fit the number of rectangles in the given vec --> calculate a cell2tile mapping fitting the required len
+            self.calc_cell2tile (lvl=self.max_power_of_4 - int(math.log2(n)))
+        heatmap_val = np.array ([vec[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [n, n])
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         # Hence, need to swap the matrix upside-down
@@ -445,7 +445,7 @@ class loc2ap_c (object):
         tmp_file = open ('../res/tmp.txt', 'w')
         for lvl in range (0, self.max_power_of_4):
             columns = self.gen_columns_for_heatmap (lvl=lvl)
-            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
             plt.figure()       
             heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
             if (lvl==3):
@@ -486,7 +486,7 @@ class loc2ap_c (object):
         num_of_aps_per_cell      = self.calc_num_of_aps_per_cell()
         avg_num_of_vehs_per_AP = np.array([(0 if (num_of_aps_per_cell[c]==0) else avg_num_of_vehs_per_cell[c] / num_of_aps_per_cell[c]) for c in range(self.num_of_cells) ])
         for lvl in range (0, self.max_power_of_4):
-            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
             plt.figure()       
             my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_AP),columns=self.gen_columns_for_heatmap(lvl=lvl)), cmap="YlGnBu")#, norm=LogNorm())
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
@@ -515,7 +515,7 @@ class loc2ap_c (object):
         plt.title ('avg speed in each cell')
         plt.savefig('../res/heatmap_speed.jpg')
         
-    def calc_tile2cell (self, lvl):
+    def calc_cell2tile (self, lvl):
         """
         prepare a translation of the "Tile" (line-by-line regular index given to cells) to the cell id.
         """
@@ -523,20 +523,18 @@ class loc2ap_c (object):
         # To calclate the tile, we calculate positions within each cell in the simulated area, and then call loc2cell_using_rect_cells() to calculate the cell associated with this position. 
         max_power_of_4   = self.max_power_of_4 - lvl
         n                = int(math.sqrt (self.num_of_cells/4**lvl))
-        self.tile2cell   = np.empty (n**2, dtype = 'uint8')
-        offset_x         = self.max_x // (2*n)        
-        offset_y         = self.max_y // (2*n)        
+        self.cell2tile   = np.empty (n**2, dtype = 'uint8')
         rect             = 0
-        for y in range (offset_x, self.max_y, self.max_y // n): 
-            for x in range (offset_y, self.max_x, self.max_x // n): 
-                self.tile2cell[rect] = self.loc2cell_using_rect_cells(x, y, max_power_of_4=max_power_of_4) 
+        for y in range (self.max_y // (2*n), self.max_y, self.max_y // n): 
+            for x in range (self.max_x // (2*n), self.max_x, self.max_x // n): 
+                self.cell2tile[rect] = self.loc2cell_using_rect_cells(x, y, max_power_of_4=max_power_of_4) 
                 rect+=1 
         
         # for demography verbose, we need also the other direction, which maps a given cell to its physical location in the tile. 
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.cell2tile = np.empty (n**2, dtype = 'uint8')
+            self.tile2cell = np.empty (n**2, dtype = 'uint8')
             for cell in range (self.num_of_cells):
-                self.cell2tile[self.tile2cell[cell]] = cell
+                self.tile2cell[self.cell2tile[cell]] = cell
 
     def plot_num_of_vehs_per_ap_graph (self):    
         """
@@ -641,11 +639,13 @@ class loc2ap_c (object):
                                 exit ()
                             list_of_usr[0]['nxt ap']   = nxt_ap # list_of_usr[0] is the old usr who moved.
                             list_of_usr[0]['nxt cell'] = nxt_cell
-                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= list_of_usr[0]['cur ap']): #this user moved to another cell  
+                            cur_cell = list_of_usr[0]['cur cell']
+                            # print ('cur cell = {}' .format (cur_cell))
+                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= cur_cell): #this user moved to another cell  
                                 # self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
-                                self.joined_cell[nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
-                                self.left_cell [list_of_usr[0]['cur cell']] [-1] += 1 # inc the # of usrs who left this cell at this cycle
-                                self.left_cell_to [cell][self.direction_of_mv (usr_id, list_of_usr[0]['cur cell'], nxt_cell)] += 1 # increase the cntr of usrs who left this cell to the relevant direction 
+                                self.joined_cell  [nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
+                                self.left_cell    [cur_cell] [-1] += 1 # inc the # of usrs who left this cell at this cycle
+                                self.left_cell_to [cur_cell][self.direction_of_mv (usr_id, cur_cell, nxt_cell)] += 1 # increase the cntr of usrs who left this cell to the relevant direction
                                 # self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
                         else:
                             print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
@@ -672,8 +672,21 @@ class loc2ap_c (object):
         The directions to which a veh can move are 'n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se', and 'out'.
         'out' indicates that a car left the simulated area.
         """
-        cell=0
-        printf (self.demography_file, '{:.2f}\t\n' .format (self.left_cell_to[cell]['nw'] / self.sim_len))
+        printf (self.demography_file, '\n\n\\ Demography diagrams\n')
+        
+        print (self.left_cell_to[0])
+        print (self.left_cell_to[1])
+        print (self.left_cell_to[2])
+        exit()
+        diagram_val = np.array ([self.left_cell_to[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [self.sqrt_num_of_cells, self.sqrt_num_of_cells])
+        
+        for row in reversed (range(len(diagram_val))):
+            for col in range(len(diagram_val[0])):
+                printf (self.demography_file, '{:.2f}\t{:.2f}\t{:.2f}\t\t\t' .format (
+                        diagram_val[row][col]['nw'] / self.sim_len,
+                        diagram_val[row][col]['n']  / self.sim_len,
+                        diagram_val[row][col]['ne'] / self.sim_len))
+            printf (self.demography_file, '\n')
         exit ()
         # print ('{:.2f}\t{:.2f}\t{:.2f}\n' .format (self.left_cell_to[cell]['nw'] / self.sim_len))
     
@@ -717,9 +730,9 @@ class loc2ap_c (object):
             for cell in range (self.num_of_cells):
                 printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}:' .format (cell))
                 printar (self.num_of_vehs_output_file, self.num_of_vehs_in_cell[cell])
-        if (VERBOSE_DEMOGRAPHY in self.verbose): 
-            printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))
-            self.print_demography()                
+        # if (VERBOSE_DEMOGRAPHY in self.verbose): 
+        #     printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))
+        #     self.print_demography()                
         if (VERBOSE_SPEED in self.verbose): 
             self.speed_file   = open ('../res/vehicles_speed.txt', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.speed_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
@@ -782,7 +795,7 @@ class loc2ap_c (object):
         avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
         for lvl in range (self.max_power_of_4):
             printf (output_file, '\nlvl {}\n********************************\n' .format(lvl))
-            self.calc_tile2cell (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
             self.print_as_sq_mat (output_file, self.vec2heatmap (avg_num_of_vehs_per_ap))
             reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
             avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
@@ -841,7 +854,7 @@ if __name__ == '__main__':
     # print (ar)
     # exit () 
 
-    max_power_of_4 = 4
+    max_power_of_4 = 1
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     

@@ -46,6 +46,8 @@ speed_idx  = 4
 # old      = 1 # a vehicle that already exists in the sim
 # recycled = 2 # a recycled id, namely, a new vehicle using an id of an old vehicle, who left.  
 
+directions = ['s', 'n', 'e', 'w', 'se', 'sw', 'ne', 'nw', 'out']
+
 class loc2ap_c (object):
     """
     This class processes the locations of users (vehicles/pedestrians) and of antennas; calculates and plots statistics (e.g., about usrs' mobility); and calculates / plots the assignment of usrs to antennas, and of antennas to rectangular cells.
@@ -148,15 +150,16 @@ class loc2ap_c (object):
             self.joined_ap_sim_via  = [[] for _ in range(self.num_of_APs)] # self.joined_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last AP in the sim was AP i
             self.left_ap_sim_via    = [[] for _ in range(self.num_of_APs)] # self.left_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last cell in the sim was cell i 
             self.left_cell_to       = [{'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0}]* self.num_of_cells
-        self.tmp_file = open ('../res/tmp.txt', 'w')
-        printf (self.tmp_file, 'tile2cell=\n')        
-        self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
-        printf (self.tmp_file, '\ncell2tile=\n')
-        self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.cell2tile))
+        # self.tmp_file = open ('../res/tmp.txt', 'w')
+        # printf (self.tmp_file, 'tile2cell=\n')        
+        # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
+        # printf (self.tmp_file, '\ncell2tile=\n')
+        # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.cell2tile))
+        
         self.calc_ngbr_rects ()
-        src, dst = 1, 4
-        print ('the direction from {} to {} is {}' .format (src, dst, self.direction_of_mv(0, src, dst)))
-        exit ()
+        # src, dst = 254, 252
+        # print ('the direction from {} to {} is {}' .format (src, dst, self.direction_of_mv(0, src, dst)))
+        # exit ()
     
     def calc_ngbr_rects (self):
         """
@@ -177,11 +180,11 @@ class loc2ap_c (object):
                                         'se' : -1 if (cell%n==n-1 or cell//n==n-1) else self.tile2cell [cell+n+1] # north-west neighbor
                                         }
     
-        printf (self.tmp_file, '\nneighbours from west=\n')
-        for cell in range(self.num_of_cells):
-            printf (self.tmp_file, '{}\t' .format (self.ngbrs_of_cell[cell]['w']))
-            if (cell % n == n-1):
-                printf (self.tmp_file, '\n') 
+        # printf (self.tmp_file, '\nneighbours from west=\n')
+        # for cell in range(self.num_of_cells):
+        #     printf (self.tmp_file, '{}\t' .format (self.ngbrs_of_cell[cell]['w']))
+        #     if (cell % n == n-1):
+        #         printf (self.tmp_file, '\n') 
                         
     def direction_of_mv (self, usr_id, src, dst):
         """

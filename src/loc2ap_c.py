@@ -161,9 +161,6 @@ class loc2ap_c (object):
         # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
         
         self.calc_ngbr_rects ()
-        # src, dst = 254, 252
-        # print ('the direction from {} to {} is {}' .format (src, dst, self.direction_of_mv(0, src, dst)))
-        # exit ()
     
     def calc_ngbr_rects (self):
         """
@@ -201,27 +198,6 @@ class loc2ap_c (object):
         exit ()
         
         
-        # if (dst == self.cell2tile[self.tile2cell[src]-1]):
-        #     return 'w'
-        # elif (dst==self.cell2tile[self.tile2cell[src]+1]):
-        #     return 'e'
-        # elif (dst==self.cell2tile[self.tile2cell[src]-self.sqrt_num_of_cells]):
-        #     return 'n'
-        # elif (dst==self.cell2tile[self.tile2cell[src]+self.sqrt_num_of_cells]):
-        #     return 's'
-        # elif (dst==self.cell2tile[self.tile2cell[src]-self.sqrt_num_of_cells-1]):
-        #     return 'nw'
-        # elif (dst==self.cell2tile[self.tile2cell[src]-self.sqrt_num_of_cells+1]):
-        #     return 'ne'
-        # elif (dst==self.cell2tile[self.tile2cell[src]+self.sqrt_num_of_cells-1]):
-        #     return 'sw'
-        # elif (dst==self.cell2tile[self.tile2cell[src]+self.sqrt_num_of_cells+1]):
-        #     return 'se'
-        # else:
-        #     print ('cells {} and {} are not neighbors' .format (src, dst))
-        #     # print ('t={}. Error: direction_of_mv was called with usr_id={}, src={}, dst={}' .format (self.t, usr_id, src, dst))
-        #     exit () 
-    
     def parse_antloc_file (self, antennas_loc_file_name, plot_ap_locs_heatmap=False):
         """
         Parse an .antloc file.
@@ -369,27 +345,16 @@ class loc2ap_c (object):
         plt.figure()
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
          
-        lvl=0
-        columns = self.gen_columns_for_heatmap ()
-        self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
-        plt.figure()       
-        heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals, columns=columns), cmap="YlGnBu")
-        printf   (heatmap_txt_file, 'lvl={}\n' .format (lvl+1))
-        printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
-        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
-
         columns = self.gen_columns_for_heatmap (lvl=0)
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering AP.
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (heatmap_vals), columns=columns, cmap="YlGnBu"))
-        printf   (heatmap_txt_file, 'max power of 4={}\n' .format (self.max_power_of_4))
+        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals, columns=columns), cmap="YlGnBu")
+        printf   (heatmap_txt_file, 'num of rects = {}\n' .format ( self.num_of_cells))
         printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
-        
+        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells)))
+
         return 
         plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
@@ -532,7 +497,7 @@ class loc2ap_c (object):
         
         # for demography verbose, we need also the other direction, which maps a given cell to its physical location in the tile. 
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.tile2cell = np.empty (n**2, dtype = 'uint8')
+            self.tile2cell = np.empty (self.num_of_tiles, dtype = 'uint8')
             for cell in range (self.num_of_cells):
                 self.tile2cell[self.cell2tile[cell]] = cell
 
@@ -674,10 +639,6 @@ class loc2ap_c (object):
         """
         printf (self.demography_file, '\n\n\\ Demography diagrams\n')
         
-        print (self.left_cell_to[0])
-        print (self.left_cell_to[1])
-        print (self.left_cell_to[2])
-        exit()
         diagram_val = np.array ([self.left_cell_to[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [self.sqrt_num_of_cells, self.sqrt_num_of_cells])
         
         for row in reversed (range(len(diagram_val))):
@@ -706,8 +667,8 @@ class loc2ap_c (object):
             self.plot_num_of_vehs_in_cell_heatmaps()
             self.plot_num_of_vehs_per_AP()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.print_demog_diagram ()
-            # self.plot_demography_heatmap()
+            # self.print_demog_diagram ()
+            self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
             
             # first, fix the speed, as we assumed a first veh with speed '0'.
@@ -854,12 +815,12 @@ if __name__ == '__main__':
     # print (ar)
     # exit () 
 
-    max_power_of_4 = 1
+    max_power_of_4 = 3
     my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['Lux_0829_0830_1secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #
+    my_loc2ap.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #
     # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post=processing

@@ -133,6 +133,10 @@ class loc2ap_c (object):
             self.parse_antloc_file(self.antloc_file_name, plot_ap_locs_heatmap=False)
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_in_ap = [[] for _ in range (self.num_of_APs)]
+        if (VERBOSE_SPEED in self.verbose):
+            self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
+            self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
+        self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell. #$$$$$$
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.joined_ap          = [[] for _ in range(self.num_of_APs)] # self.joined_ap[i][j] will count the # of clients that joined AP i at slot j
             self.joined_cell        = [[] for _ in range(self.num_of_cells)] # self.joined_cell[i][j] will count the # of clients that joined cell i at slot j
@@ -140,82 +144,62 @@ class loc2ap_c (object):
             self.left_cell          = [[] for _ in range(self.num_of_cells)] # self.left_cell[i][j] will count the # of clients that left cell i at slot j
             self.joined_ap_sim_via  = [[] for _ in range(self.num_of_APs)] # self.joined_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last AP in the sim was AP i
             self.left_ap_sim_via    = [[] for _ in range(self.num_of_APs)] # self.left_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last cell in the sim was cell i 
-            
             self.left_cell_to       = [{'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0}]* self.num_of_cells
-            
-            # np.empty ([self.num_of_cells, 9], dtype='int16') # Will hold the number of vehs which left each cell to any direction
-        if (VERBOSE_SPEED in self.verbose):
-            self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
-            self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
-        self.calc_tile2cell (lvl=0) # calc_tile2cell translates the number as a "tile" (XY grid) to the ID of the covering cell. #$$$$$$
-        self.tmp_file = open ('../res/tmp.txt', 'w')        
-        self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
         
-    # def gen_vec2mat_idx (self, vec):
+        # self.tmp_file = open ('../res/tmp.txt', 'w')
+        # printf (self.tmp_file, 'tile2cell=\n')        
+        # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
+        # printf (self.tmp_file, '\ncell2tile=\n')
+        # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.cell2tile))
+    
+    # def print_neighbor_rects (self):
     #     """
-    #     given a n**2 vector, return an vector that maps the indices in the vector into pairs of indices in the corresponding n X n mat.  
-    #     """
-    #     n = int (math.sqrt(len(vec)))
-    #     vec2mat_map = np.empty ([len(vec), 2], dtype='int16')
-    #     i = 0
-    #     for idx in np.ndindex (n, n):
-    #         vec2mat_map[i] = idx
-    #         i += 1
-    #     return vec2mat_map
-        
-    # def calc_neighbor_rects (self):
-    #     """
-    #     Find the 4 (north, south, east, west) neighbours of each cell (rect). If it's an edge cell, the tile number of the neighbor will be -1.  
+    #     Used for debugging only  
+    #     Find the 4 (north, south, east, west) neighbours of each cell (rect). If it's an edge cell, the tile number of the neighbor will be -1.
     #     """
     #     self.ngbrs_of_cell = [None] * self.num_of_cells
-        # tile2cell_as_mat = self.vec2sq_mat (self.tile2cell)
-        # mat2vec_idx = np.empty (self.num_of_cells, dtype='int8')
-
-        # n = self.sqrt_len (self.tile2cell)
-        # for cell in range(self.num_of_cells):
-        #     self.ngbrs_of_cell[cell] = {'w'  : -1 if (cell%n==0)    else self.tile2cell [cell-1], # west neighbor 
-        #                                 'e'  : -1 if (cell%n==n-1)  else self.tile2cell [cell+1], # east neighbor
-        #                                 'n'  : -1 if (cell//n==0)   else self.tile2cell [cell-n], # north neighbor
-        #                                 's'  : -1 if (cell//n==n-1) else self.tile2cell [cell+n],  # south neighbor
-        #                                 'nw' : -1 if (cell%n==0   or cell//n==0)   else self.tile2cell [cell-n-1], # north-west neighbor
-        #                                 'ne' : -1 if (cell%n==n-1 or cell//n==0)   else self.tile2cell [cell-n+1], # north-west neighbor
-        #                                 'sw' : -1 if (cell%n==0   or cell//n==n-1) else self.tile2cell [cell+n-1], # north-west neighbor
-        #                                 'se' : -1 if (cell%n==n-1 or cell//n==n-1) else self.tile2cell [cell+n+1] # north-west neighbor
-        #                                 }
-            
-        # printf (self.tmp_file, '\n')
-        # for cell in range(self.num_of_cells):
-        #     printf (self.tmp_file, '{}\t' .format (self.ngbrs_of_cell[cell]['se']))
-        #     if (cell % n == n-1):
-        #         printf (self.tmp_file, '\n') 
-
-        # for src in range(self.num_of_cells):
-        #     for dst in range(self.num_of_cells):
-        #         printf (self.tmp_file, 'direction of mv from src={} to {} is {}\n' .format (src, dst, self.direction_of_mv (src,dst))) 
-            
-    
-    def direction_of_mv (self, src, dst):
+    #
+    #     n = self.sqrt_num_of_cells
+    #     for cell in range(self.num_of_cells):
+    #         self.ngbrs_of_cell[cell] = {'w'  : -1 if (cell%n==0)    else self.tile2cell [cell-1], # west neighbor 
+    #                                     'e'  : -1 if (cell%n==n-1)  else self.tile2cell [cell+1], # east neighbor
+    #                                     'n'  : -1 if (cell//n==0)   else self.tile2cell [cell-n], # north neighbor
+    #                                     's'  : -1 if (cell//n==n-1) else self.tile2cell [cell+n],  # south neighbor
+    #                                     'nw' : -1 if (cell%n==0   or cell//n==0)   else self.tile2cell [cell-n-1], # north-west neighbor
+    #                                     'ne' : -1 if (cell%n==n-1 or cell//n==0)   else self.tile2cell [cell-n+1], # north-west neighbor
+    #                                     'sw' : -1 if (cell%n==0   or cell//n==n-1) else self.tile2cell [cell+n-1], # north-west neighbor
+    #                                     'se' : -1 if (cell%n==n-1 or cell//n==n-1) else self.tile2cell [cell+n+1] # north-west neighbor
+    #                                     }
+    #
+    #     printf (self.tmp_file, '\n')
+    #     for cell in range(self.num_of_cells):
+    #         printf (self.tmp_file, '{}\t' .format (self.ngbrs_of_cell[cell]['w']))
+    #         if (cell % n == n-1):
+    #             printf (self.tmp_file, '\n') 
+                        
+    def direction_of_mv (self, usr_id, src, dst):
         """
-        returns the direction of the move from src to dst
+        returns the direction of the move from cell src to cell dst
         """
-        if (dst==src-1):
+        if (dst == self.tile2cell[self.cell2tile[src]-1]):
             return 'w'
-        elif (dst==src+1):
+        elif (dst==self.tile2cell[self.cell2tile[src]+1]):
             return 'e'
-        elif (dst==src-self.sqrt_num_of_cells):
+        elif (dst==self.tile2cell[self.cell2tile[src]-self.sqrt_num_of_cells]):
             return 'n'
-        elif (dst==src+self.sqrt_num_of_cells):
+        elif (dst==self.tile2cell[self.cell2tile[src]+self.sqrt_num_of_cells]):
             return 's'
-        elif (dst==src-self.sqrt_num_of_cells-1):
+        elif (dst==self.tile2cell[self.cell2tile[src]-self.sqrt_num_of_cells-1]):
             return 'nw'
-        elif (dst==src-self.sqrt_num_of_cells+1):
+        elif (dst==self.tile2cell[self.cell2tile[src]-self.sqrt_num_of_cells+1]):
             return 'ne'
-        elif (dst==src+self.sqrt_num_of_cells-1):
+        elif (dst==self.tile2cell[self.cell2tile[src]+self.sqrt_num_of_cells-1]):
             return 'sw'
-        elif (dst==src+self.sqrt_num_of_cells+1):
+        elif (dst==self.tile2cell[self.cell2tile[src]+self.sqrt_num_of_cells+1]):
             return 'se'
         else:
-            print ('Error: direction_of_mv was called with src={}, dst={}', src, dst)
+            print ('cells {} and {} are not neighbors' .format (src, dst))
+            # print ('t={}. Error: direction_of_mv was called with usr_id={}, src={}, dst={}' .format (self.t, usr_id, src, dst))
             exit () 
     
     def parse_antloc_file (self, antennas_loc_file_name, plot_ap_locs_heatmap=False):
@@ -531,6 +515,12 @@ class loc2ap_c (object):
             for x in range (offset_y, self.max_x, self.max_x // n): 
                 self.tile2cell[rect] = self.loc2cell_using_rect_cells(x, y, max_power_of_4=max_power_of_4) 
                 rect+=1 
+        
+        # for demography verbose, we need also the other direction, which maps a given cell to its physical location in the tile. 
+        if (VERBOSE_DEMOGRAPHY in self.verbose):
+            self.cell2tile = np.empty (n**2, dtype = 'uint8')
+            for cell in range (self.num_of_cells):
+                self.cell2tile[self.tile2cell[cell]] = cell
 
     def plot_num_of_vehs_per_ap_graph (self):    
         """
@@ -569,6 +559,8 @@ class loc2ap_c (object):
                 if (VERBOSE_AP in self.verbose):
                     printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
+                if (self.is_first_slot):
+                    self.first_t = self.t
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
                     # for ap in range (self.num_of_APs): 
                     #     self.joined_ap        [ap]  .append(np.int16(0))
@@ -637,7 +629,7 @@ class loc2ap_c (object):
                                 # self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
                                 self.joined_cell[nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
                                 self.left_cell [list_of_usr[0]['cur cell']] [-1] += 1 # inc the # of usrs who left this cell at this cycle
-                                self.left_cell_to [cell][self.direction_of_mv(list_of_usr[0]['cur cell'], nxt_cell)] += 1 # increase the cntr of usrs who left this cell to the relevant direction 
+                                self.left_cell_to [cell][self.direction_of_mv (usr_id, list_of_usr[0]['cur cell'], nxt_cell)] += 1 # increase the cntr of usrs who left this cell to the relevant direction 
                                 # self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
                         else:
                             print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
@@ -655,7 +647,20 @@ class loc2ap_c (object):
                     usr['new']      = False
                     usr['cur ap']   = usr ['nxt ap']
                     usr['cur cell'] = usr['nxt cell']
+                self.is_first_slot = False
         # print ('min_x_pos_found=', min_x_pos_found, 'max_x_pos_found=', max_x_pos_found, 'min_y_pos_found=', min_y_pos_found, 'max_y_pos_found=', max_y_pos_found)
+    
+    def print_demog_diagram (self):
+        """
+        print a detailed demographic diagram, detailing the number of vehs left from each cell to each direction.
+        The directions to which a veh can move are 'n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se', and 'out'.
+        'out' indicates that a car left the simulated area.
+        """
+        cell=0
+        print ('{:.2f}\t\n' .format (self.left_cell_to[cell]['nw'] / self.sim_len))
+        exit ()
+        # print ('{:.2f}\t{:.2f}\t{:.2f}\n' .format (self.left_cell_to[cell]['nw'] / self.sim_len))
+    
     
     def post_processing (self):
         """
@@ -664,6 +669,7 @@ class loc2ap_c (object):
         - Adding some lines to the output .ap file.
         - Plot the num_of_vehs 
         """
+        self.sim_len = self.t - self.first_t + 1
         if (VERBOSE_AP in self.verbose):
             printf(self.ap_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
@@ -731,6 +737,7 @@ class loc2ap_c (object):
             printf (self.ap_file, '//"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
             printf (self.ap_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
+        self.is_first_slot = True
         for file_name in loc_file_names: 
             self.usrs_loc_file_name = file_name
             self.usrs_loc_file      = open ('../res/loc_files/' + self.usrs_loc_file_name,  "r") 
@@ -823,7 +830,7 @@ if __name__ == '__main__':
     # my_loc2ap.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['Lux_0829_0830_8secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #
+    my_loc2ap.parse_loc_files (['Lux_0829_0830_1secs.loc']) #(['0730_0740_1secs.loc', '0740_0750_1secs.loc', '0750_0800_1secs.loc', '0800_0810_1secs.loc', '0810_0820_1secs.loc', '0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #
     # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post=processing

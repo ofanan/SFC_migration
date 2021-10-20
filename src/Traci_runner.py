@@ -90,7 +90,7 @@ class Traci_runner (object):
     
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         # prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
-        veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled
+        veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
         vehs_left_in_this_cycle  = []
         # prsns_left_in_this_cycle = []
         self.verbose             = verbose
@@ -130,7 +130,7 @@ class Traci_runner (object):
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             
                 vehs_left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
-                                                                   veh['id']  not in (veh_ids2recycle)), veh_key2id)) 
+                                                                   veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
                 veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
                 printf (loc_output_file, 'usrs_that_left: ')
                 if (len (vehs_left_in_this_cycle) > 0):

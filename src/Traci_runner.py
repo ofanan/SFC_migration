@@ -7,7 +7,7 @@ import numpy as np
 
 from printf import printf 
 from secs2hour import secs2hour
-import loc2ap_c
+import loc2poa_c
 
 VERBOSE_LOC      = 2
 VERBOSE_SPEED    = 3
@@ -21,22 +21,22 @@ lat_pos_idx = 7
 class Traci_runner (object):
 
     # Given the x,y position, return the x,y position within the simulated area (city center) 
-    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER [self.city]
+    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER [self.city]
 
     # Returns the relative location of a given vehicle ID. The relative location is the position w.r.t. the lower left (south-west) corner of the simulated area.
-    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER[self.city]
+    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER[self.city]
 
-    is_in_simulated_area  = lambda self, position : True if (self.city=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y[self.city]) else True)
+    is_in_simulated_area  = lambda self, position : True if (self.city=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2poa_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2poa_c.MAX_Y[self.city]) else True)
 
     # Checks whether the given vehicle is within the simulated area.
     # Input: key of a vehicle.
     # Output: True iff this vehicle is within the simulated area.
-    is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.MAX_Y[self.city]) else True
+    is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2poa_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2poa_c.MAX_Y[self.city]) else True
     
     # Checks whether the given (x,y) position is within the simulated area.
     # Input: (x,y) position
     # Output: True iff this position is within the simulated area.
-    is_in_global_area = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2ap_c.GLOBAL_MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2ap_c.GLOBAL_MAX_Y[self.city]) else True
+    is_in_global_area = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2poa_c.GLOBAL_MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2poa_c.GLOBAL_MAX_Y[self.city]) else True
     
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
@@ -168,7 +168,7 @@ class Traci_runner (object):
     #     """
     #     Given the geographical latitude and longitude, return the x,y position in meters w.r.t the south-west corner of the simulated area
     #     """       
-    #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2ap_c.LOWER_LEFT_CORNER[self.city]
+    #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER[self.city]
 
 
     def parse_antenna_locs_file (self, antenna_locs_file_name, provider=''):

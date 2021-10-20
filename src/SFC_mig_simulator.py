@@ -82,7 +82,7 @@ class SFC_mig_simulator (object):
     # Print a solution for the problem to the output res file  
     print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
     
-    # parse a line detailing the list of usrs who moved, in an input ".ap" format file
+    # parse a line detailing the list of usrs who moved, in an input ".poa" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
 
     # returns true iff server s has enough available capacity to host user u; assuming that usr.B (the required cpu allowing to place u on each lvl) is known  
@@ -106,7 +106,7 @@ class SFC_mig_simulator (object):
     # Pseudo-randomize a target delay for a usr, based on its given usr_id
     pseudo_random_target_delay = lambda self, usr_id : self.target_delay[0] if ( ((usr_id % 10)/10) < self.prob_of_target_delay[0]) else self.target_delay[1]
     
-    gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}.res' .format (self.ap_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0])
+    gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}.res' .format (self.poa_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0])
 
     # Returns a vector with the cpu capacities in each lvl of the tree, given the cpu cap at the leaf lvl
     calc_cpu_capacities = lambda self, cpu_cap_at_leaf : [2**(lvl)*cpu_cap_at_leaf for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cap else np.array ([cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
@@ -159,7 +159,7 @@ class SFC_mig_simulator (object):
 
 
     # Calculate the server-to-AP mapping. ASSUMES that the input server s is a leaf server.)
-    s2ap  = lambda self, s : self.ap2s.index(s)
+    s2ap  = lambda self, s : self.poa2s.index(s)
     
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
@@ -365,7 +365,7 @@ class SFC_mig_simulator (object):
         """
         Open the log file for writing and write initial comments lines on it
         """
-        self.log_file_name = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.mode + ('.detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
+        self.log_file_name = "../res/" + self.poa_file_name.split(".")[0] + '.' + self.mode + ('.detailed' if VERBOSE_ADD_LOG in self.verbose else '') +'.log'  
         self.log_output_file =  open ('../res/' + self.log_file_name,  "w") 
         printf (self.log_output_file, '//RCs = augmented capacity of server s\n' )
 
@@ -462,7 +462,7 @@ class SFC_mig_simulator (object):
                 n += 1
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up:\n')
-        if (self.t == self.slot_to_dump or self.ap_file_name=='shorter.ap' or self.ap_file_name == 'shorter_t2.ap'): #$$$ 
+        if (self.t == self.slot_to_dump or self.poa_file_name=='shorter.poa' or self.poa_file_name == 'shorter_t2.poa'): #$$$ 
             self.dump_state_to_log_file()  
 
     def CPUAll_single_usr (self, usr): 
@@ -499,7 +499,7 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr(usr)
     
        
-    def gen_parameterized_antloc_tree (self, ap2cell_file_name):
+    def gen_parameterized_antloc_tree (self, poa2cell_file_name):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         Add leaves for each AP, and prune sub-trees that don't have any descended APs.
@@ -523,7 +523,7 @@ class SFC_mig_simulator (object):
                 self.num_of_leaves += 1
 
         num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
-        self.rd_ap2cell_file(ap2cell_file_name)
+        self.rd_poa2cell_file(poa2cell_file_name)
         
         # nx.draw (self.G, with_labels=True) 
         # plt.show()
@@ -579,11 +579,11 @@ class SFC_mig_simulator (object):
             self.G.add_edge (self.cell2s[ap['cell']], ap['s']) # And vice versa
 
         self.num_of_leaves    = len(self.APs) # Each AP is co-located with a leaf server
-        self.ap2s             = [ap['s'] for ap in self.APs] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
+        self.poa2s             = [ap['s'] for ap in self.APs] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
 
         # Update the tree height's by the changes made, and set 
         shortest_path    = nx.shortest_path(self.G)
-        self.tree_height = len (shortest_path[self.ap2s[0]][root]) - 1
+        self.tree_height = len (shortest_path[self.poa2s[0]][root]) - 1
         
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
@@ -594,7 +594,7 @@ class SFC_mig_simulator (object):
         self.link_delay_of_CLP_at_lvl = [2 * sum([self.link_delay_at_lvl[i] for i in range (lvl)]) for lvl in range (self.tree_height+1)] 
 
         # Levelize the updated tree
-        for leaf in self.ap2s:
+        for leaf in self.poa2s:
             
             for lvl in range (self.tree_height):
                 self.G.nodes[shortest_path[leaf][root][lvl]]['lvl']     = np.uint8(lvl) # assume here a balanced tree
@@ -629,14 +629,14 @@ class SFC_mig_simulator (object):
         shortest_path = nx.shortest_path(self.G)
 
         # levelize the tree (assuming a balanced tree)
-        self.ap2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
+        self.poa2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         for s in self.G.nodes(): # for every server
             self.G.nodes[s]['id'] = s
             if self.G.out_degree(s)==1 and self.G.in_degree(s)==1: # is it a leaf?
                 self.G.nodes[s]['lvl']   = 0 # Yep --> its lvl is 0
-                self.ap2s.append (s) #[self.num_of_leaves] = s
+                self.poa2s.append (s) #[self.num_of_leaves] = s
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
@@ -677,20 +677,20 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, ap_file_name = 'shorter.ap', verbose = [], tree_height = 4, children_per_node = 4, prob_of_target_delay=0.3, ap2cell_file_name='', 
+    def __init__ (self, poa_file_name = 'shorter.ap', verbose = [], tree_height = 4, children_per_node = 4, prob_of_target_delay=0.3, poa2cell_file_name='', 
                   use_exp_cpu_cost=True, use_exp_cpu_cap=False):
         """
         """
 
         self.verbose                    = verbose
 
-        self.ap_file_name               = ap_file_name #input file containing the APs of all users along the simulation
+        self.poa_file_name               = poa_file_name #input file containing the APs of all users along the simulation
         self.use_exp_cpu_cost           = use_exp_cpu_cost
         self.use_exp_cpu_cap            = use_exp_cpu_cap
         
         # Network parameters
-        self.tree_height                = 2 if (self.ap_file_name=='shorter.ap' or self.ap_file_name=='shorter_t2.ap') else tree_height 
-        self.children_per_node          = 2 if (self.ap_file_name=='shorter.ap' or self.ap_file_name=='shorter_t2.ap') else children_per_node
+        self.tree_height                = 2 if (self.poa_file_name=='shorter.ap' or self.poa_file_name=='shorter_t2.ap') else tree_height 
+        self.children_per_node          = 2 if (self.poa_file_name=='shorter.ap' or self.poa_file_name=='shorter_t2.ap') else children_per_node
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -700,7 +700,7 @@ class SFC_mig_simulator (object):
         self.uniform_Cu                 = 20 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
         self.prob_of_target_delay       = [prob_of_target_delay]  
-        self.warned_about_too_large_ap  = False
+        self.warned_about_too_large_poa  = False
         self.usrs                       = []
         
         # Init output files
@@ -712,26 +712,26 @@ class SFC_mig_simulator (object):
         #     self.num_of_critical_usrs_in_slot = [] 
         #     self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
 
-        self.ap2cell_file_name = ap2cell_file_name
+        self.poa2cell_file_name = poa2cell_file_name
         
-        # ap_file_used_antloc will be True iff the ap file was generated using real antennas' location data.
-        ap_file_used_antloc = True if (self.ap_file_name.split('.ap')[0].split('_')[-1] in ['all', 'orange', 'post', 'Telecom_Monaco', 'short']) else False
-        # ap_file_used_antloc = True if (self.ap_file_name.split('.ap')[0].split('_')) else False 
+        # poa_file_used_antloc will be True iff the ap file was generated using real antennas' location data.
+        poa_file_used_antloc = True if (self.poa_file_name.split('.ap')[0].split('_')[-1] in ['all', 'orange', 'post', 'Telecom_Monaco', 'short']) else False
+        # poa_file_used_antloc = True if (self.poa_file_name.split('.ap')[0].split('_')) else False 
         
-        ap2cell_file_name if (ap2cell_file_name != '') else False  
-        if (self.ap_file_name=='shorter.ap'):
+        poa2cell_file_name if (poa2cell_file_name != '') else False  
+        if (self.poa_file_name=='shorter.ap'):
             self.gen_parameterized_full_tree  ()
         
-        elif (self.ap2cell_file_name==''):
-            if (ap_file_used_antloc):
+        elif (self.poa2cell_file_name==''):
+            if (poa_file_used_antloc):
                 print ('Error: you specified no ap2cell file name, but the .ap file was generated using an antloc file.')
                 exit ()
             self.gen_parameterized_full_tree  ()
         else:
-            if (not (ap_file_used_antloc)):
-                print ('Error: you specified ap2cell_file_name={}, but the .ap file was not generated using an antloc file.' .format (self.ap2cell_file_name))                
+            if (not (poa_file_used_antloc)):
+                print ('Error: you specified poa2cell_file_name={}, but the .ap file was not generated using an antloc file.' .format (self.poa2cell_file_name))                
                 exit ()
-            self.gen_parameterized_antloc_tree (self.ap2cell_file_name)
+            self.gen_parameterized_antloc_tree (self.poa2cell_file_name)
         self.delay_const_sanity_check()
 
     def delay_const_sanity_check (self):
@@ -759,7 +759,7 @@ class SFC_mig_simulator (object):
         self.slot_to_dump               = slot_to_dump
         self.delay_const_sanity_check()
 
-        self.cpu_cap_at_leaf = 30 if self.ap_file_name == 'shorter.ap' else cpu_cap_at_leaf 
+        self.cpu_cap_at_leaf = 30 if self.poa_file_name == 'shorter.ap' else cpu_cap_at_leaf 
         self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
         self.set_RCs_and_a  (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
@@ -783,11 +783,11 @@ class SFC_mig_simulator (object):
 
         self.init_input_and_output_files()        
                      
-        print ('Simulating {}. ap_file = {} cpu_cap_at_leaf={}. prob_of_RT={:.2f}' .format (self.mode, self.ap_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0]))
+        print ('Simulating {}. poa_file = {} cpu_cap_at_leaf={}. prob_of_RT={:.2f}' .format (self.mode, self.poa_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0]))
         self.stts     = sccs
 
         # extract the slot len from the input '.ap' file name
-        slot_len_str = self.ap_file_name.split('secs')
+        slot_len_str = self.poa_file_name.split('secs')
         self.slot_len = int(slot_len_str[0].split('_')[-1]) if (len (slot_len_str) > 1) else 1 # By default, slot len is 1
         
         if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf']):
@@ -806,7 +806,7 @@ class SFC_mig_simulator (object):
         """
 
         # open input file
-        self.ap_file  = open ("../res/ap_files/" + self.ap_file_name, "r")  
+        self.poa_file  = open ("../res/poa_files/" + self.poa_file_name, "r")  
 
         # open output files, and print there initial comments
         if (VERBOSE_RES in self.verbose):
@@ -815,7 +815,7 @@ class SFC_mig_simulator (object):
             if (self.use_exp_cpu_cost and self.use_exp_cpu_cap): 
                 self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu^2.res' 
             elif (self.use_exp_cpu_cost):
-                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu_cost_{}.res' .format (self.ap2cell_file_name)
+                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu_cost_{}.res' .format (self.poa2cell_file_name)
             else: 
                 self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'
 
@@ -831,9 +831,9 @@ class SFC_mig_simulator (object):
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
         if (VERBOSE_MOB in self.verbose):
-            self.mob_file_name   = "../res/" + self.ap_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
+            self.mob_file_name   = "../res/" + self.poa_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
             self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
-            printf (self.mob_output_file, '// results for running alg_top on input file {}\n' .format (self.ap_file_name))
+            printf (self.mob_output_file, '// results for running alg_top on input file {}\n' .format (self.poa_file_name))
             printf (self.mob_output_file, '// results for running alg_top on input file shorter.ap with {} leaves\n' .format (self.num_of_leaves))
             printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
     
@@ -863,7 +863,7 @@ class SFC_mig_simulator (object):
         """
         self.cur_st_params = []
         
-        for line in self.ap_file: 
+        for line in self.poa_file: 
         
             # Ignore comments and emtpy lines
             if (line == "\n" or line.split ("//")[0] == ""):
@@ -949,7 +949,7 @@ class SFC_mig_simulator (object):
             for s in self.G.nodes():
                 self.G.nodes[s]['Hs']  = set() 
         
-        for line in self.ap_file: 
+        for line in self.poa_file: 
 
             # Ignore comments lines
             if (line == "\n" or line.split ("//")[0] == ""):
@@ -1042,7 +1042,7 @@ class SFC_mig_simulator (object):
         plt.plot (range(int(sim_len)), self.num_of_migs_in_slot, label='Total chains migrated to another server [number/sec]', linestyle='None',  marker='.', markersize = 4)
         plt.xlabel ('time [seconds, starting at 07:30]')
         plt.legend()
-        plt.savefig ('../res/{}.mob.jpg' .format(self.ap_file_name.split('.')[0]))
+        plt.savefig ('../res/{}.mob.jpg' .format(self.poa_file_name.split('.')[0]))
         plt.clf()
         
     def cpvnf_reshuffle (self):
@@ -1216,7 +1216,7 @@ class SFC_mig_simulator (object):
         Looks for a feasible sol'.
         Returns sccs if a feasible sol was found, fail else.
         """      
-        if (self.t == self.slot_to_dump or self.ap_file_name=='shorter.ap' or self.ap_file_name == 'shorter_t2.ap'): #$$$ 
+        if (self.t == self.slot_to_dump or self.poa_file_name=='shorter.ap' or self.poa_file_name == 'shorter_t2.ap'): #$$$ 
             self.dump_state_to_log_file()  
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).v
             lvl = self.G.nodes[s]['lvl']
@@ -1358,14 +1358,14 @@ class SFC_mig_simulator (object):
         
         list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
         if (len(list_of_usr) == 0):
-            print  ('Error at t={}: input file={}. Did not find old / rescycled usr {}' .format (self.t, self.ap_file_name, usr_entry[0]))
+            print  ('Error at t={}: input file={}. Did not find old / rescycled usr {}' .format (self.t, self.poa_file_name, usr_entry[0]))
             exit ()
         return list_of_usr[0]
     
     def check_AP_id (self, AP_id):
         if (AP_id >= self.num_of_leaves):
             AP_id = self.num_of_leaves-1
-        if (self.warned_about_too_large_ap == False):
+        if (self.warned_about_too_large_poa == False):
             print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
             exit ()
     
@@ -1384,25 +1384,25 @@ class SFC_mig_simulator (object):
     
     def dump_state_to_log_file (self):
 
-        log_file = self.log_output_file #open ('../res/{}.t{}.log' .format (self.ap_file_name, self.t), 'w')
+        log_file = self.log_output_file #open ('../res/{}.t{}.log' .format (self.poa_file_name, self.t), 'w')
         printf (log_file, 't={}\n' .format (self.t))
         for usr in self.usrs:
             printf (log_file, 'u.id={}, cur_s={}, nxt_s={}\n' .format(usr.id, usr.cur_s, usr.nxt_s))
         for s in [s for s in self.G.nodes()]:
             printf (log_file, 's{}: Hs={}\n' .format (s, sorted (list ([usr.id for usr in self.G.nodes[s]['Hs']])))) 
 
-    def dump_usrs_to_ap_file (self):
+    def dump_usrs_to_poa_file (self):
 
-        output_ap_file = open ('../res/Lux_dump_{}.t{}.ap' .format (self.mode, self.t), 'w')
-        printf (output_ap_file, '// Dumping ap file={} ap2cell_file_name={}' .format (self.ap_file_name, self.ap2cell_file_name))
-        printf (output_ap_file, '// File format:\n//for each time slot:\n')
-        printf (output_ap_file, 't = {}\n' .format(self.t))
-        printf (output_ap_file, 'new_usrs: ' .format(self.t))
+        output_poa_file = open ('../res/Lux_dump_{}.t{}.ap' .format (self.mode, self.t), 'w')
+        printf (output_poa_file, '// Dumping ap file={} poa2cell_file_name={}' .format (self.poa_file_name, self.poa2cell_file_name))
+        printf (output_poa_file, '// File format:\n//for each time slot:\n')
+        printf (output_poa_file, 't = {}\n' .format(self.t))
+        printf (output_poa_file, 'new_usrs: ' .format(self.t))
 
         for usr in sorted (self.usrs, key = lambda usr : usr.id):
             self.CPUAll_single_usr (usr) 
-            printf (output_ap_file, '({},{})' .format (usr.id, self.s2ap(usr.S_u[0]))) # S_u is the list of delay-feasible servers for that usr. S_u[0] is the leaf server (namely, the PoA) out of them.
-        printf (output_ap_file, '\nold_usrs:\n')
+            printf (output_poa_file, '({},{})' .format (usr.id, self.s2ap(usr.S_u[0]))) # S_u is the list of delay-feasible servers for that usr. S_u[0] is the leaf server (namely, the PoA) out of them.
+        printf (output_poa_file, '\nold_usrs:\n')
     
     # def run_dump_usrs (self, slot_to_dump):
     #     """
@@ -1414,8 +1414,8 @@ class SFC_mig_simulator (object):
     #
     #     self.is_first_t = True # Will indicate that this is the first simulated time slot
     #
-    #     self.input_ap_file = open ("../res/" + self.ap_file_name, "r")  
-    #     for line in self.input_ap_file: 
+    #     self.input_poa_file = open ("../res/" + self.poa_file_name, "r")  
+    #     for line in self.input_poa_file: 
     #
     #         # Ignore comments lines
     #         if (line == "\n" or line.split ("//")[0] == ""):
@@ -1470,16 +1470,16 @@ class SFC_mig_simulator (object):
     #                 self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
     #
     #             # if (self.t == slot_to_dump): 
-    #             #     self.dump_usrs_to_ap_file() 
+    #             #     self.dump_usrs_to_poa_file() 
      
-    def rd_ap2cell_file (self, ap2cell_file_name):
+    def rd_poa2cell_file (self, poa2cell_file_name):
         """
         Parse an ap2cell file.
         An ap2cell file contains a list of APs, and, for each AP, the cell in which it is located.
         """
         
         self.APs = []
-        input_file = open ('../res/' + ap2cell_file_name, 'r')
+        input_file = open ('../res/' + poa2cell_file_name, 'r')
         
         for line in input_file:
     
@@ -1537,7 +1537,7 @@ class SFC_mig_simulator (object):
         print ('Running run_prob_of_RT_sim')
         sim_len_in_slots = 61
         mode             = 'ourAlg' #ffit' #'ourAlg'
-        output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (ap2cell_file_name, ap_file_name, ('_opt' if mode=='opt' else '')), 'a') 
+        output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, ('_opt' if mode=='opt' else '')), 'a') 
        
         # for mode in ['ffit', 'cpvnf']:
         #     cpu_cap_at_leaf = 300  #Initial cpu cap at the leaf server
@@ -1570,7 +1570,7 @@ class SFC_mig_simulator (object):
 #     my_simulator = pickle.load (open ('../res/' + sim_pickle_file_name, 'rb'))
 #     my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 
 
-def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
+def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
     """
     Run a simulation where the amount of resources varies. 
     Output the cost obtained at each time slot.
@@ -1579,7 +1579,7 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
     print ('Running run_cost_by_rsrc')
 
     min_req_cpu = {'opt' : 160, 'ourAlg' : 165, 'ffit' : 393, 'cpvnf' : 399}
-    my_simulator = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
     # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(14, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
@@ -1599,11 +1599,11 @@ def run_cost_by_rsrc (ap_file_name, ap2cell_file_name):
 if __name__ == "__main__":
 
 
-    ap_file_name      = 'Lux_0730_0830_16secs_post.ap' #'shorter.ap' #
-    ap2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
-    # run_cost_by_rsrc (ap_file_name, ap2cell_file_name)
+    poa_file_name      = 'Lux_0730_0830_16secs_post.ap' #'shorter.ap' #
+    poa2cell_file_name = 'Lux.center.post.antloc_256cells.ap2cell'
+    # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
     cpu_cap_at_leaf = 250
-    my_simulator    = SFC_mig_simulator (ap_file_name=ap_file_name, verbose=[VERBOSE_RES], ap2cell_file_name=ap2cell_file_name)
+    my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
     for seed in [40 + i for i in range (21)]:
         my_simulator.simulate (mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
         

@@ -8,9 +8,18 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 # from matplotlib.t icker import MaxNLocator
 # import itertools 
 # import time 
-
-from printf import printf, printar, printmat
 # from ntpath import split
+
+# My own format print functions 
+from printf import printf, printar, printmat
+
+# Verbose levels, defining the outputs produced
+VERBOSE_POA              = 1 # Generate ".poa" file, detailing the current Point of Access of each user during the sim.
+VERBOSE_CNT              = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim, and generate from it plots / heatmaps
+VERBOSE_DEMOGRAPHY       = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot, and generate from it diagrams / heatmaps
+VERBOSE_SPEED            = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
+VERBOSE_DEBUG            = 5
+VERBOSE_FIND_AREA        = 6 # Find the min and max positions of all simulated vehs along the simulation.
 
 # size of the city's area, in meters.
 GLOBAL_MAX_X = {'Lux' : int(13622), 'Monaco' : 9976}
@@ -23,17 +32,6 @@ MAX_Y = {'Lux' :  GLOBAL_MAX_Y['Lux']//2, 'Monaco' : GLOBAL_MAX_Y['Monaco']}
 # x,y indexes of the south-west corner of the simulated area
 LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
                     'Monaco' : np.zeros (2, dtype='int16')} 
-# LOWER_LEFT_CORNER['Lux'] = np.array ([GLOBAL_MAX_X[city]//4,   GLOBAL_MAX_Y[city]//4], dtype='int16') # x,y indexes of the south-west corner of the simulated area
-# for city in ['Lux', 'Monaco']:
-#     LOWER_LEFT_CORNER = {city : np.array ([GLOBAL_MAX_X[city]//4,   GLOBAL_MAX_Y[city]//4], dtype='int16')} # x,y indexes of the south-west corner of the simulated area
-
-# Verbose levels, defining the outputs produced
-VERBOSE_AP               = 1 # Generate ".ap" file, detailing the current cell of each vehicle during the sim.
-VERBOSE_CNT              = 2 # Generate ".txt" file, detailing the number of vehicles at each cell during the sim.
-VERBOSE_DEMOGRAPHY       = 3 # Collect data about the # of vehicles entering / leaving each cell, at each time slot`
-VERBOSE_SPEED            = 4 # Collect data about the speed of vehicles in each cell, at each time slot`
-VERBOSE_DEBUG            = 11
-VERBOSE_FIND_AREA        = 12 # Find the min and max positions of all simulated vehs along the simulation.
 
 # Indices of the various field within the input '.loc' file 
 type_idx   = 0 # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
@@ -49,20 +47,20 @@ speed_idx  = 4
 
 directions = ['s', 'n', 'e', 'w', 'se', 'sw', 'ne', 'nw', 'out']
 
-class loc2ap_c (object):
+class loc2poa_c (object):
     """
     This class processes the locations of users (vehicles/pedestrians) and of antennas; calculates and plots statistics (e.g., about usrs' mobility); and calculates / plots the assignment of usrs to antennas, and of antennas to rectangular cells.
     Inputs: 
     Typical input is a .loc file (a file detailing the locations of all users.
-    at each slot, all users who are either new (namely, just joined the simulated area); or "old" (users who already were in the simulated, but moved to another cell/AP).
+    at each slot, all users who are either new (namely, just joined the simulated area); or "old" (users who already were in the simulated, but moved to another cell/PoA).
     Optional input: a list of antennas locations. 
     Optional outputs: 
-    - An .ap file (a file detailing the Access Points of all the new users / users who moved at each slot).
+    - An .poa file (a file detailing the Access Points of all the new users / users who moved at each slot).
     - A cnt of the number of vehicles in each cell
     - various plots (e.g., heatmaps of the number of vehs within each rectangles, or the number of vehs joining/levaving each rec).
-    "AP" means: Access Point, with which a user is associated at each slot.
+    "PoA" means: Access Point, with which a user is associated at each slot.
     "cell" means: the rectangular cell, to which a user is associated at each slot.
-    When using real-world antennas locations, the user's cell is the cell of the AP with which the user is currently associated.
+    When using real-world antennas locations, the user's cell is the cell of the PoA with which the user is currently associated.
     Otherwise, "AP" and "cells" are identical.  
     """   
 
@@ -75,30 +73,30 @@ class loc2ap_c (object):
     # reshape a vector of length n^2 as a n X n mat   
     vec2sq_mat = lambda self, vec : vec.reshape ( [self.sqrt_len(vec), self.sqrt_len(vec)])
     
-    # Map a given x,y position to an AP.
-    # If there're real AP locations, use Voronoi distance (map each client to the nearest AP).
-    # Else, use uniform-size rectangular cells, rather than finding the , replace the function below with the commented function below it.
-    loc2ap = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_AP_cells else self.nearest_ap (x,y) 
+    # Map a given x,y position to an PoA (Point of Access).
+    # If there input include real PoA locations, the mapping is by Voronoi distance, namely, each client is mapped to the nearest poa.
+    # Else, use a partition of the area into uniform-size rectangular cells.
+    loc2poa = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_PoA_cells else self.nearest_poa (x,y) 
 
-    # inline function for formatted-printing the AP of a single user
-    print_usr_ap = lambda self, usr: printf(self.ap_file, "({},{})" .format (usr['id'], usr['nxt ap']))   
+    # inline function for formatted-printing the PoA of a single user
+    print_usr_poa = lambda self, usr: printf(self.poa_file, "({},{})" .format (usr['id'], usr['nxt poa']))   
     
     # returns the distance between a given (x,y) position, and a given antenna
     sq_dist = lambda self, x, y, antenna : (x - antenna['x'])**2 + (y - antenna['y'])**2
     
-    # Given a (x,y) position, returns the list of distances from it to all the APs
-    list_of_sq_dists_from_APs = lambda self, x, y : np.array([self.sq_dist(x,y, AP) for AP in self.list_of_APs])
+    # Given a (x,y) position, returns the list of distances from it to all the PoAs (Point of Access)
+    list_of_sq_dists_from_PoAs = lambda self, x, y : np.array([self.sq_dist(x,y, poa) for poa in self.list_of_PoAs])
     
     # returns the id of the nearest antenna to the given (x,y) position
-    # the func' ASSUMES THAT THE AP ID IS IDENTICAL TO THE INDEX OF THE AP IN THE LIST OF APS
-    nearest_ap = lambda self, x, y : np.argmin (self.list_of_sq_dists_from_APs (x,y))
+    # the func' ASSUMES THAT THE PoA ID IS IDENTICAL TO THE INDEX OF THE PoA IN THE LIST OF PoAS
+    nearest_poa = lambda self, x, y : np.argmin (self.list_of_sq_dists_from_PoAs (x,y))
     
-    # Returns the rectangular cell to which a given AP antenna belongs. 
-    # If using only rectangular cells (not real antennas locations), the "cell" is merely identical to the "ap"
-    ap2cell = lambda self, ap : np.int16 (ap if self.use_rect_AP_cells else self.list_of_APs[ap]['cell'])  
+    # Returns the rectangular cell to which a given PoA antenna belongs. 
+    # If using only rectangular cells (not real antennas locations), the "cell" is merely identical to the "poa"
+    poa2cell = lambda self, poa : np.int16 (poa if self.use_rect_PoA_cells else self.list_of_PoAs[poa]['cell'])  
 
     # generate a string, which indicates the input files. Used for generating meaningful indicative output files names.    
-    input_files_str = lambda self, loc_file_name : loc_file_name.split('.')[0] + '_{}' .format ('' if self.use_rect_AP_cells else self.antloc_file_name.split('.')[1]) 
+    input_files_str = lambda self, loc_file_name : loc_file_name.split('.')[0] + '_{}' .format ('' if self.use_rect_PoA_cells else self.antloc_file_name.split('.')[1]) 
     
     # Calculate the avg number of vehs in each cell, along the whole sim
     avg_num_of_vehs_per_cell = lambda self : np.array ([np.average(self.num_of_vehs_in_cell[cell]) for cell in range(self.num_of_cells)]) 
@@ -109,10 +107,10 @@ class loc2ap_c (object):
     # return True iff the given idx is between 0 and self.num_of_cells
     is_in_range_of_cells = lambda self, idx : (idx >=0 and idx <= self.num_of_cells)
 
-    def __init__(self, max_power_of_4=3, verbose = VERBOSE_AP, antloc_file_name='', city=''):
+    def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
-        Init a "loc2ap_c" object.
-        A loc2ap_c is used can read ".loc" files (files detailing the location of each veh over time), and output ".ap" files (files detailing the AP assignment of each veh), and/or statistics 
+        Init a "loc2poa_c" object.
+        A loc2poa_c is used can read ".loc" files (files detailing the location of each veh over time), and output ".poa" files (files detailing the PoA assignment of each veh), and/or statistics 
         (e.g., number of vehs entering/levaing each cell, avg # of vehs in each cell, etc.).
         """
 
@@ -123,31 +121,30 @@ class loc2ap_c (object):
        
         self.max_x, self.max_y = MAX_X[self.city], MAX_Y[self.city] # borders of the simulated area, in meters
         self.usrs              = []
-        self.use_rect_AP_cells   = True if (self.antloc_file_name=='') else False
+        self.use_rect_PoA_cells   = True if (self.antloc_file_name=='') else False
 
         self.max_power_of_4    = max_power_of_4
         self.num_of_cells      = 4**max_power_of_4
         self.num_of_tiles      = self.num_of_cells
         self.sqrt_num_of_cells = int (math.sqrt (self.num_of_cells))
-        self.list_of_APs = [] # List of the APs. Will be filled only if using antennas locations (and not synthetic rectangular cells).
+        self.list_of_PoAs = [] # List of the PoAs. Will be filled only if using antennas locations (and not synthetic rectangular cells).
         
-        if (self.use_rect_AP_cells):
-            self.num_of_APs        = self.num_of_cells 
+        if (self.use_rect_PoA_cells):
+            self.num_of_PoAs        = self.num_of_cells 
         else:
-            self.parse_antloc_file(self.antloc_file_name, plot_ap_locs_heatmap=False)
+            self.parse_antloc_file(self.antloc_file_name, plot_poa_locs_heatmap=False)
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_in_ap = [[] for _ in range (self.num_of_APs)]
+            self.num_of_vehs_in_poa = [[] for _ in range (self.num_of_PoAs)]
         if (VERBOSE_SPEED in self.verbose):
             self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
-            self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_APs)]
+            self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_PoAs)]
         self.calc_cell2tile (lvl=0) # calc_cell2tile translates the number as a "cell" to the ID in a vector, covering the same area as a tile
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.joined_ap          = [[] for _ in range(self.num_of_APs)] # self.joined_ap[i][j] will count the # of clients that joined AP i at slot j
+            self.joined_poa          = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa[i][j] will count the # of clients that joined PoA i at slot j
             self.joined_cell        = [[] for _ in range(self.num_of_cells)] # self.joined_cell[i][j] will count the # of clients that joined cell i at slot j
-            self.left_ap            = [[] for _ in range(self.num_of_APs)] # self.left_ap[i][j] will count the # of clients that left AP i at slot j
+            self.left_poa            = [[] for _ in range(self.num_of_PoAs)] # self.left_poa[i][j] will count the # of clients that left PoA i at slot j
             self.left_cell          = [[] for _ in range(self.num_of_cells)] # self.left_cell[i][j] will count the # of clients that left cell i at slot j
-            self.joined_ap_sim_via  = [[] for _ in range(self.num_of_APs)] # self.joined_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last AP in the sim was AP i
-            self.left_ap_sim_via    = [[] for _ in range(self.num_of_APs)] # self.left_ap_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last cell in the sim was cell i
+            self.joined_poa_sim_via  = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last PoA in the sim was PoA i
             
             self.left_cell_to = []
             for _ in range(self.num_of_cells):
@@ -159,7 +156,7 @@ class loc2ap_c (object):
         # self.print_as_sq_mat (self.tmp_file, self.vec2sq_mat (self.tile2cell))
         # old_x, old_y = 272,2113
         # new_x, new_y = 234,3454
-        # print ('old cell={}. new cell={}' .format (self.loc2ap(old_x, old_y), self.loc2ap(new_x, new_y))) 
+        # print ('old cell={}. new cell={}' .format (self.loc2poa(old_x, old_y), self.loc2poa(new_x, new_y))) 
         # exit ()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.calc_ngbr_rects ()
@@ -199,7 +196,7 @@ class loc2ap_c (object):
         return -1 # Error code - didn't find the relation between src and dst 
     
         
-    def parse_antloc_file (self, antennas_loc_file_name, plot_ap_locs_heatmap=False):
+    def parse_antloc_file (self, antennas_loc_file_name, plot_poa_locs_heatmap=False):
         """
         Parse an .antloc file.
         An .antloc file is a file containing the list of antennas, with their IDs and (x,y) position within the simulated area
@@ -214,92 +211,91 @@ class loc2ap_c (object):
             splitted_line = line.split (',')
             x = float(splitted_line[1])
             y = float(splitted_line[2])
-            self.list_of_APs.append ({'id' : float(splitted_line[0]), 'x' : x, 'y' : y, 'cell' : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4)}) # 'cell' is the rectangle of the simulated area in which this AP is found
+            self.list_of_PoAs.append ({'id' : float(splitted_line[0]), 'x' : x, 'y' : y, 'cell' : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4)}) # 'cell' is the rectangle of the simulated area in which this PoA is found
             
-        self.num_of_APs = len (self.list_of_APs)
+        self.num_of_PoAs = len (self.list_of_PoAs)
         
-        ap2cell_file = open ('../res/{}_{}cells.ap2cell' .format(antennas_loc_file_name, self.num_of_cells), 'w')
-        printf (ap2cell_file, '// This file details the cell associated with each AP.\n// Format: a c\n// Where a is the ap number, and c is the number of cell associated with it.\n')
+        poa2cell_file = open ('../res/{}_{}cells.poa2cell' .format(antennas_loc_file_name, self.num_of_cells), 'w')
+        printf (poa2cell_file, '// This file details the cell associated with each PoA.\n// Format: a c\n// Where a is the poa number, and c is the number of cell associated with it.\n')
         
-        for ap in range(self.num_of_APs):
-            printf (ap2cell_file, '{} {}\n' .format (ap, self.ap2cell(ap)))
+        for poa in range(self.num_of_PoAs):
+            printf (poa2cell_file, '{} {}\n' .format (poa, self.poa2cell(poa)))
         
         self.calc_cell2tile (lvl=0)
         
         return
          
-        # if (plot_ap_locs_heatmap):
-            # num_of_aps_per_cell = self.calc_num_of_aps_per_cell()        
+        # if (plot_poa_locs_heatmap):
+            # num_of_poas_per_cell = self.calc_num_of_poas_per_cell()        
 
-        # Plots a heatmap, showing the number of APs in each cell.
-        # When using rectangular AP-cells, the heatmap should show fix 1 for all cells.
+        # Plots a heatmap, showing the number of PoAs in each cell.
+        # When using rectangular PoA-cells, the heatmap should show fix 1 for all cells.
         # When using an '.antloc' file, the heatmap shows the number of antennas in each cell.
-        # num_of_aps_per_cell = self.calc_num_of_aps_per_cell()
+        # num_of_poas_per_cell = self.calc_num_of_poas_per_cell()
         # for lvl in range (self.max_power_of_4):
         #     plt.figure()       
-        #     my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_aps_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap="YlGnBu")#, norm=LogNorm())
+        #     my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_poas_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap="YlGnBu")#, norm=LogNorm())
         #     my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        #     plt.title   ('number of APs per cell')
-        #     plt.savefig ('../res/heatmap_num_APs_per_cell_{}_{}cells.jpg' .format (self.antloc_file_name, int(self.num_of_cells/(4**lvl))))
+        #     plt.title   ('number of PoAs per cell')
+        #     plt.savefig ('../res/heatmap_num_PoAs_per_cell_{}_{}cells.jpg' .format (self.antloc_file_name, int(self.num_of_cells/(4**lvl))))
         #
         #     if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
-        #         num_of_aps_per_cell = self.aggregate_heatmap_cells (num_of_aps_per_cell)
+        #         num_of_poas_per_cell = self.aggregate_heatmap_cells (num_of_poas_per_cell)
         
         plt.figure()
-        plt.plot([ap['x'] for ap in self.list_of_APs], [ap['y'] for ap in self.list_of_APs], 'o', color='black');
+        plt.plot([poa['x'] for poa in self.list_of_PoAs], [poa['y'] for poa in self.list_of_PoAs], 'o', color='black');
         plt.axis([0, MAX_X[self.city], 0, MAX_Y[self.city]])
-        plt.savefig('../res/{}_ap_points.jpg' .format (self.antloc_file_name))
+        plt.savefig('../res/{}_poa_points.jpg' .format (self.antloc_file_name))
         plt.clf()
         
     def loc2cell_using_rect_cells (self, x, y, max_power_of_4):
         """
-        Finding the AP covering the user's area, assuming that the number of APs is a power of 4, and rectangular cells.
+        Finding the PoA covering the user's area, assuming that the number of PoAs is a power of 4, and rectangular cells.
         Input:  (x,y) location data
-        Output: ap that covers this area
+        Output: poa that covers this area
         """
-        ap = np.int8(0)
+        poa = np.int8(0)
         x_offset, y_offset = x, y
         x_edge, y_edge = 0.5*self.max_x, 0.5*self.max_y
         for p in range (max_power_of_4):
-            ap += 4**(max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) 
+            poa += 4**(max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) 
             x_offset, y_offset = x_offset % x_edge, y_offset % y_edge   
             x_edge /= 2
             y_edge /= 2
-        return ap
+        return poa
     
-    def print_usrs_ap (self):
+    def print_usrs_poa (self):
         """
-        Format-prints the users' AP, as calculated earlier, to the .ap output file
+        Format-prints the users' PoA, as calculated earlier, to the .poa output file
         """
         usrs = list (filter (lambda usr: usr['new'], self.usrs))
         if (len (usrs) > 0):
-            printf (self.ap_file, 'new_usrs: ')
+            printf (self.poa_file, 'new_usrs: ')
             for usr in usrs: # for every new usr
-                self.print_usr_ap (usr)
+                self.print_usr_poa (usr)
 
-        usrs = list (filter (lambda usr: (usr['new'] == False) and (usr['nxt ap'] != usr['cur ap']), self.usrs))
-        printf (self.ap_file, '\nold_usrs: ')
+        usrs = list (filter (lambda usr: (usr['new'] == False) and (usr['nxt poa'] != usr['cur poa']), self.usrs))
+        printf (self.poa_file, '\nold_usrs: ')
         for usr in usrs: 
-            self.print_usr_ap (usr)
-            usr['cur ap'] = usr['nxt ap']
+            self.print_usr_poa (usr)
+            usr['cur poa'] = usr['nxt poa']
                 
-    def cnt_num_of_vehs_per_ap (self):
+    def cnt_num_of_vehs_per_poa (self):
         """
-        Count the number of vehicles associated with each AP in the current time slot.
+        Count the number of vehicles associated with each PoA in the current time slot.
         """
-        for ap in range(self.num_of_APs): 
-            self.num_of_vehs_in_ap[ap].append (np.int16 (len (list (filter (lambda usr: usr['nxt ap'] == ap, self.usrs) ))))
+        for poa in range(self.num_of_PoAs): 
+            self.num_of_vehs_in_poa[poa].append (np.int16 (len (list (filter (lambda usr: usr['nxt poa'] == poa, self.usrs) ))))
     
     def print_demography (self):
         """
         Prints the number of vehicles that joined/left each cell during the last simulated time slot.
         """
-        # for ap in range(self.num_of_APs):
-        #     printf (self.demography_file, 'ap_{}: joined {}\nap_{}: joined_ap_sim_via{}\nap_{}: left {}\nap_{}: left_sim_via {}\n' .format (
-        #                                         ap, self.joined_ap[ap], 
-        #                                         ap, self.joined_ap_sim_via[ap], 
-        #                                         ap, self.left_ap[ap], 
-        #                                         ap, self.left_ap_sim_via[ap]))
+        # for poa in range(self.num_of_PoAs):
+        #     printf (self.demography_file, 'poa_{}: joined {}\npoa_{}: joined_poa_sim_via{}\npoa_{}: left {}\npoa_{}: \n' .format (
+        #                                         poa, self.joined_poa[poa], 
+        #                                         poa, self.joined_poa_sim_via[poa], 
+        #                                         poa, self.left_poa[poa]))
         for cell in range (self.num_of_cells):
             printf (self.demography_file, 'cell_{}: left {}\n' .format (cell, self.left_cell[cell]))
 
@@ -307,47 +303,33 @@ class loc2ap_c (object):
         """
         Prints the speed of vehicles that joined/left each cell during the last simulated time slot.
         """
-        printf (self.speed_file, '{}' .format ([self.speed[ap]['speed'] for ap in range(self.num_of_APs)]))                                        
+        printf (self.speed_file, '{}' .format ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]))                                        
 
     def plot_demography_heatmap (self):
         """
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
         """
         
-        # Trunc the data of the first entry, in which obviously no veh joined/left any AP, or cell
-        # self.joined_ap         = [self.joined_ap        [ap][1:] for ap in range (self.num_of_APs)] 
-        self.joined_cell       = [self.joined_cell      [ap][1:] for ap in range (self.num_of_cells)] 
-        # self.joined_ap_sim_via = [self.joined_ap_sim_via[ap][1:] for ap in range (self.num_of_APs)]
-
-        # print ('avg num of vehs that: joined AP={:.2f}  ' .format 
-        #        (np.average ([np.average(self.joined_ap[ap]) for ap in range(self.num_of_APs)])))
-        # print ('avg num of vehs that: joined cell={:.2f}  ' .format 
-        #        (np.average ([np.average(self.joined_cell[cell]) for cell in range(self.num_of_cells)])))
-        # print ('left an AP={:.2f}' .format 
-        #        (np.average ([np.average(self.left_ap[ap]) for ap in range(self.num_of_APs)])))
+        # Trunc the data of the first entry, in which obviously no veh joined/left any PoA, or cell
+        # self.joined_poa         = [self.joined_poa        [poa][1:] for poa in range (self.num_of_PoAs)] 
+        self.joined_cell       = [self.joined_cell      [poa][1:] for poa in range (self.num_of_cells)] 
         print ('left a cell={:.2f}' .format 
                (np.average ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])))
-        # print ('joined the simulated area from ap={:.2f}' .format 
-        #        (np.average ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])))
-        # print ('left the simulated area from ap={:.2f}' .format 
-        #        (np.average ([np.average(self.left_ap_sim_via[ap]) for ap in range(self.num_of_APs)])))
+        # print ('joined the simulated area from poa={:.2f}' .format 
+        #        (np.average ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])))
+        # print ('left the simulated area from poa={:.2f}' .format 
+        #        (np.average ([np.average(self.left_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])))
         #
         # plt.figure()
         #
         # columns = self.gen_columns_for_heatmap()
-        file_name_suffix = '{}rects' .format (self.num_of_cells)
-        #
-        # my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_cell[cell])    for cell in range(self.num_of_cell)])), columns=columns), cmap="YlGnBu")
-        # # plt.title ('avg num of vehs that joined cell every sec in {}' .format (self.time_period_str))
-        # plt.savefig('../res/heatmap_vehs_joined_cell{}.jpg' .format (file_name_suffix))
-        # return
-        
+        file_name_suffix = '{}rects' .format (self.num_of_cells)       
         heatmap_txt_file = open ('../res/heatmap_vehs_left.txt', 'a') 
         plt.figure()
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
          
         columns = self.gen_columns_for_heatmap (lvl=0)
-        self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering AP.
+        self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
         my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals, columns=columns), cmap="YlGnBu")
@@ -358,12 +340,12 @@ class loc2ap_c (object):
 
         return 
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_ap_sim_via[ap]) for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of vehs that joined the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_vehs_joined_sim_via_{}.jpg' .format (file_name_suffix))
         
         plt.figure ()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_ap_sim_via[ap])   for ap in range(self.num_of_APs)])), columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_poa_sim_via[poa])   for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of vehs that left the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_vehs_left_sim_via_{}.jpg' .format (file_name_suffix))
         
@@ -411,7 +393,7 @@ class loc2ap_c (object):
         tmp_file = open ('../res/tmp.txt', 'w')
         for lvl in range (0, self.max_power_of_4):
             columns = self.gen_columns_for_heatmap (lvl=lvl)
-            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering PoA.
             plt.figure()       
             heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
             if (lvl==3):
@@ -440,7 +422,7 @@ class loc2ap_c (object):
         reshaped_heatmap = vec.reshape (int(len(vec)/4), 4) # prepare the averaging for the next iteration
         return np.array([np.mean(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
 
-    def plot_num_of_vehs_per_AP (self, usrs_loc_file_name=''):
+    def plot_num_of_vehs_per_PoA (self, usrs_loc_file_name=''):
         """
         Generate a Python heatmap, showing for each cell the average number of vehicles found at that cell, over the number of antennas in this cell.
         The heatmaps are plotted for all possible resolutions between 4 cells, and the maximal # of cells simulated.
@@ -449,34 +431,34 @@ class loc2ap_c (object):
         self.set_usrs_loc_file_name(usrs_loc_file_name)
         self.calc_num_of_vehs_per_cell()
         avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell ()
-        num_of_aps_per_cell      = self.calc_num_of_aps_per_cell()
-        avg_num_of_vehs_per_AP = np.array([(0 if (num_of_aps_per_cell[c]==0) else avg_num_of_vehs_per_cell[c] / num_of_aps_per_cell[c]) for c in range(self.num_of_cells) ])
+        num_of_poas_per_cell      = self.calc_num_of_poas_per_cell()
+        avg_num_of_vehs_per_PoA = np.array([(0 if (num_of_poas_per_cell[c]==0) else avg_num_of_vehs_per_cell[c] / num_of_poas_per_cell[c]) for c in range(self.num_of_cells) ])
         for lvl in range (0, self.max_power_of_4):
-            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
+            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering PoA.
             plt.figure()       
-            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_AP),columns=self.gen_columns_for_heatmap(lvl=lvl)), cmap="YlGnBu")#, norm=LogNorm())
+            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_PoA),columns=self.gen_columns_for_heatmap(lvl=lvl)), cmap="YlGnBu")#, norm=LogNorm())
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            # plt.title ('avg num of vehs per AP')
-            plt.savefig('../res/heatmap_num_vehs_per_AP_{}_{}_{}cells.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
-            reshaped_heatmap = avg_num_of_vehs_per_AP.reshape (int(len(avg_num_of_vehs_per_AP)/4), 4) # prepare the averaging for the next iteration
-            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_AP for the next iteration
-                avg_num_of_vehs_per_AP = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
+            # plt.title ('avg num of vehs per PoA')
+            plt.savefig('../res/heatmap_num_vehs_per_PoA_{}_{}_{}cells.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
+            reshaped_heatmap = avg_num_of_vehs_per_PoA.reshape (int(len(avg_num_of_vehs_per_PoA)/4), 4) # prepare the averaging for the next iteration
+            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_PoA for the next iteration
+                avg_num_of_vehs_per_PoA = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
 
     def calc_num_of_vehs_per_cell (self): 
         """
-        Calculate the number of vehicles per cell at each slot during the simulated period, given the num of vehs per AP:
+        Calculate the number of vehicles per cell at each slot during the simulated period, given the num of vehs per PoA:
         self.num_of_vehs_in_cell[i][j] will hold the num of vehs in cell i in time slot j 
         """
-        self.num_of_vehs_in_cell = np.zeros ( (self.num_of_cells, len(self.num_of_vehs_in_ap[0])), dtype='int16')  
-        for ap in range (self.num_of_APs):
-            self.num_of_vehs_in_cell[self.ap2cell(ap)] += np.array (self.num_of_vehs_in_ap[ap], dtype='int16') # Add the # of vehs in this AP to the (avg) number of vehs in the cell to which this AP belongs    
+        self.num_of_vehs_in_cell = np.zeros ( (self.num_of_cells, len(self.num_of_vehs_in_poa[0])), dtype='int16')  
+        for poa in range (self.num_of_PoAs):
+            self.num_of_vehs_in_cell[self.poa2cell(poa)] += np.array (self.num_of_vehs_in_poa[poa], dtype='int16') # Add the # of vehs in this PoA to the (avg) number of vehs in the cell to which this PoA belongs    
         
     def plot_speed_heatmap (self):
         """
         Plot a heatmap, showing the average speed of vehicles at each cell.
         """
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap ([self.speed[ap]['speed'] for ap in range(self.num_of_APs)]), 
+        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]), 
                                                 columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
         plt.title ('avg speed in each cell')
         plt.savefig('../res/heatmap_speed.jpg')
@@ -502,16 +484,16 @@ class loc2ap_c (object):
             for cell in range (self.num_of_cells):
                 self.tile2cell[self.cell2tile[cell]] = cell
 
-    def plot_num_of_vehs_per_ap_graph (self):    
+    def plot_num_of_vehs_per_poa_graph (self):    
         """
-        Plot for each ap the number of vehicles associated with it along the trace.
+        Plot for each poa the number of vehicles associated with it along the trace.
         """
         for plot_num in range (4**(self.max_power_of_4-1)):
             for cell in range (4*plot_num, 4*(plot_num+1)):
                 if (VERBOSE_CNT in self.verbose):
                     printf (self.num_of_vehs_output_file, 'num_of_vehs_in_cell{}: {}\n' .format (cell, self.num_of_vehs_in_cell[cell])) 
             #     plt.title ('Number of vehicles in each cell')
-            #     plt.plot (range(len(self.num_of_vehs_in_ap[ap])), self.num_of_vehs_in_ap[ap], label='cell {}' .format(ap))
+            #     plt.plot (range(len(self.num_of_vehs_in_poa[poa])), self.num_of_vehs_in_poa[poa], label='cell {}' .format(poa))
             #     plt.ylabel ('Number of vehicles')
             #     plt.xlabel ('time [minutes, starting at 07:30]')
             # plt.legend()
@@ -522,7 +504,7 @@ class loc2ap_c (object):
     def parse_file (self):
         """
         - Read and parse input ".loc" file, detailing the users locations 
-        - Write the appropriate user-to-PoA connections to the file self.ap_file, or to files summing the number of vehicles per cell.
+        - Write the appropriate user-to-PoA connections to the file self.poa_file, or to files summing the number of vehicles per cell.
         """
         if (VERBOSE_FIND_AREA in self.verbose):
             min_x_pos_found, min_y_pos_found = float ('inf'), float ('inf')   
@@ -538,32 +520,30 @@ class loc2ap_c (object):
             splitted_line = line.split (" ")
             
             if (splitted_line[0] == "t"): # reached the next simulation time slot
-                if (VERBOSE_AP in self.verbose):
-                    printf(self.ap_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
+                if (VERBOSE_POA in self.verbose):
+                    printf(self.poa_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
                 if (self.is_first_slot):
                     self.first_t = self.t
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
-                    # for ap in range (self.num_of_APs): 
-                    #     self.joined_ap        [ap]  .append(np.int16(0))
-                    #     self.left_ap          [ap]  .append(np.int16(0))
-                    #     self.joined_ap_sim_via[ap]  .append(np.int16(0))
-                    #     self.left_ap_sim_via  [ap]  .append(np.int16(0))
+                    # for poa in range (self.num_of_PoAs): 
+                    #     self.joined_poa        [poa]  .append(np.int16(0))
+                    #     self.left_poa          [poa]  .append(np.int16(0))
+                    #     self.joined_poa_sim_via[poa]  .append(np.int16(0))
                     for cell in range (self.num_of_cells): 
                         self.joined_cell [cell].append(np.int16(0))
                         self.left_cell   [cell].append(np.int16(0))
                 continue
 
             elif (splitted_line[0] == 'usrs_that_left:'):
-                if (VERBOSE_AP in self.verbose):
-                    printf(self.ap_file, '{}\n' .format (line))
-                ids_of_usrs_that_left_ap = [int(usr_id) for usr_id in splitted_line[1:] if usr_id!= '']                
+                if (VERBOSE_POA in self.verbose):
+                    printf(self.poa_file, '{}\n' .format (line))
+                ids_of_usrs_that_left_poa = [int(usr_id) for usr_id in splitted_line[1:] if usr_id!= '']                
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
-                    for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_ap, self.usrs)): # for each usr that left
-                        # self.left_ap_sim_via[usr['cur ap']][-1] += 1 # inc the # of vehicles left the sim' via this cell
+                    for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_poa, self.usrs)): # for each usr that left
                         self.left_cell    [usr['cur cell']][-1]    += 1 # increase the cntr of the usrs that left from the cur cell of that usr at this cycle
                         self.left_cell_to [usr['cur cell']]['out'] += 1 # inc the cntr of the # of veh left this cell to outside the sim (counting along the whole sim, not per cycle)
-                self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left_ap), self.usrs))
+                self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left_poa), self.usrs))
                 continue
     
             elif (splitted_line[0] == 'new_or_moved:'): 
@@ -583,21 +563,21 @@ class loc2ap_c (object):
                             min_y_pos_found = min (y, min_y_pos_found)
                             max_x_pos_found = max (x, max_x_pos_found)
                             max_y_pos_found = max (y, max_y_pos_found)
-                        nxt_ap   = self.loc2ap (x,y)
-                        nxt_cell = self.ap2cell (nxt_ap)
+                        nxt_poa   = self.loc2poa (x,y)
+                        nxt_cell = self.poa2cell (nxt_poa)
                         if (VERBOSE_DEBUG in self.verbose):
-                            if (nxt_ap not in range(self.num_of_APs)):
-                                print ('Error: t = {} usr={}, nxt_ap={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_aps={} ' .format (self.t, usr_id, nxt_ap, x, y, MAX_X['Lux'], MAX_Y['Lux'], self.num_of_APs))
-                                print ('Calling loc2ap again for deubgging')
-                                nxt_ap = self.loc2ap (float(x), float(y))
-                                nxt_cell = self.ap2cell (nxt_ap)
+                            if (nxt_poa not in range(self.num_of_PoAs)):
+                                print ('Error: t = {} usr={}, nxt_poa={}, pos=({},{}), MAX_X={}, MAX_Y={}. num_of_poas={} ' .format (self.t, usr_id, nxt_poa, x, y, MAX_X['Lux'], MAX_Y['Lux'], self.num_of_PoAs))
+                                print ('Calling loc2poa again for deubgging')
+                                nxt_poa = self.loc2poa (float(x), float(y))
+                                nxt_cell = self.poa2cell (nxt_poa)
                                 exit ()
                         
                         if (my_tuple[type_idx] == 'n'): # new vehicle
-                            self.usrs.append ({'id' : usr_id, 'cur ap' : nxt_ap, 'nxt ap' : nxt_ap, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_ap same as nxt_ap 
+                            self.usrs.append ({'id' : usr_id, 'cur poa' : nxt_poa, 'nxt poa' : nxt_poa, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_poa same as nxt_poa 
                             if (VERBOSE_DEMOGRAPHY in self.verbose): 
-                                # self.joined_ap_sim_via[nxt_ap][-1] += 1 # inc the # of usrs that joined the sim' via this cell
-                                # self.joined_ap        [nxt_ap][-1]   += 1 # inc the # of usrs that joined this AP at this slot
+                                # self.joined_poa_sim_via[nxt_poa][-1] += 1 # inc the # of usrs that joined the sim' via this cell
+                                # self.joined_poa        [nxt_poa][-1]   += 1 # inc the # of usrs that joined this PoA at this slot
                                 self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
 
                         elif (my_tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
@@ -605,37 +585,37 @@ class loc2ap_c (object):
                             if (len(list_of_usr) == 0):
                                 print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
                                 exit ()
-                            list_of_usr[0]['nxt ap']   = nxt_ap # list_of_usr[0] is the old usr who moved.
+                            list_of_usr[0]['nxt poa']   = nxt_poa # list_of_usr[0] is the old usr who moved.
                             list_of_usr[0]['nxt cell'] = nxt_cell
                             cur_cell                   = list_of_usr[0]['cur cell']
-                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_ap!= cur_cell): #this user moved to another cell  
-                                # self.joined_ap[nxt_ap][-1]                   += 1 # inc the # of usrs that joined this AP
-                                # self.left_ap  [list_of_usr[0]['cur ap']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
+                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_poa!= cur_cell): #this user moved to another cell  
+                                # self.joined_poa[nxt_poa][-1]                   += 1 # inc the # of usrs that joined this PoA
+                                # self.left_poa  [list_of_usr[0]['cur poa']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
                                 self.joined_cell  [nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
                                 self.left_cell    [cur_cell] [-1]              += 1 # inc the # of usrs who left this cell at this cycle
                                 
                                 
                                 direction = self.direction_of_mv (cur_cell, nxt_cell)
                                 if (direction == -1): # error 
-                                    printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_ap={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_ap, nxt_cell))
+                                    printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
                                 else:
                                     self.left_cell_to [cur_cell][direction] += 1 # increase the cntr of usrs who left this cell to the relevant direction
                         else:
                             print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
                             exit () 
                         if (VERBOSE_SPEED in self.verbose):
-                            self.speed[nxt_ap] = {'speed' : (float(my_tuple[speed_idx]) + self.speed[nxt_ap]['num of smpls'] * self.speed[nxt_ap]['speed'])/(self.speed[nxt_ap]['num of smpls'] + 1), 
-                                                  'num of smpls' : self.speed[nxt_ap]['num of smpls'] + 1}
+                            self.speed[nxt_poa] = {'speed' : (float(my_tuple[speed_idx]) + self.speed[nxt_poa]['num of smpls'] * self.speed[nxt_poa]['speed'])/(self.speed[nxt_poa]['num of smpls'] + 1), 
+                                                  'num of smpls' : self.speed[nxt_poa]['num of smpls'] + 1}
                 
-                # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to ".ap" file, and/or to a file, counting the vehicles at each cell
-                if (VERBOSE_AP in self.verbose):
-                    self.print_usrs_ap() # Print the APs of the users 
+                # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to "..poa" file, and/or to a file, counting the vehicles at each cell
+                if (VERBOSE_POA in self.verbose):
+                    self.print_usrs_poa() # Print the PoAs of the users 
                 if (VERBOSE_CNT in self.verbose):
-                    self.cnt_num_of_vehs_per_ap ()
+                    self.cnt_num_of_vehs_per_poa ()
                 for usr in self.usrs: # mark all existing usrs as old
                     usr['new']      = False
-                    usr['cur ap']   = usr ['nxt ap']
-                    usr['cur cell'] = usr['nxt cell']
+                    usr['cur poa']  = usr ['nxt poa']
+                    usr['cur cell'] = usr ['nxt cell']
                 self.is_first_slot = False
         # print ('min_x_pos_found=', min_x_pos_found, 'max_x_pos_found=', max_x_pos_found, 'min_y_pos_found=', min_y_pos_found, 'max_y_pos_found=', max_y_pos_found)
     
@@ -684,24 +664,24 @@ class loc2ap_c (object):
         """
         Post processing after finished parsing all the input file(s).
         The post processing may include:
-        - Adding some lines to the output .ap file.
+        - Adding some lines to the output .poa file.
         - Plot the num_of_vehs 
         """
         self.sim_len = self.t - self.first_t + 1
-        if (VERBOSE_AP in self.verbose):
-            printf(self.ap_file, "\n")   
+        if (VERBOSE_POA in self.verbose):
+            printf(self.poa_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
-            # self.plot_num_of_vehs_per_ap_graph ()
+            # self.plot_num_of_vehs_per_poa_graph ()
             self.plot_num_of_vehs_in_cell_heatmaps()
-            self.plot_num_of_vehs_per_AP()
+            self.plot_num_of_vehs_per_PoA()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.print_demography_diagram ()
             self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
             
             # first, fix the speed, as we assumed a first veh with speed '0'.
-            for ap in [ap for ap in range (self.num_of_APs) if (self.speed[ap]['num of smpls'] > 0)]:
-                self.speed[ap]['speed'] = self.speed[ap]['speed'] * (self.speed[ap]['num of smpls'] +1) / self.speed[ap]['num of smpls']
+            for poa in [poa for poa in range (self.num_of_PoAs) if (self.speed[poa]['num of smpls'] > 0)]:
+                self.speed[poa]['speed'] = self.speed[poa]['speed'] * (self.speed[poa]['num of smpls'] +1) / self.speed[poa]['num of smpls']
             self.print_speed()
             self.plot_speed_heatmap()
      
@@ -712,9 +692,9 @@ class loc2ap_c (object):
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
-            for ap in range (self.num_of_APs):
-                printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_ap_{}: ' .format (ap))
-                printar (self.num_of_vehs_output_file, self.num_of_vehs_in_ap[ap])
+            for poa in range (self.num_of_PoAs):
+                printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_poa_{}: ' .format (poa))
+                printf (self.num_of_vehs_output_file, self.num_of_vehs_in_poa[poa])
             self.calc_num_of_vehs_per_cell()
             for cell in range (self.num_of_cells):
                 printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}:' .format (cell))
@@ -734,7 +714,7 @@ class loc2ap_c (object):
         this function will parse the files vehicles_0.loc, vehicles_1.loc
         for each of the parsed files, the function will:
         1. output the number of vehicles at each ap. AND/OR
-        2. output the APs of all new/left/moved users at each time slot.
+        2. output the PoAs of all new/left/moved users at each time slot.
         The exact behavior is by the value of self.verbose
         """
         if (VERBOSE_CNT in self.verbose):
@@ -742,20 +722,20 @@ class loc2ap_c (object):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.demography_file = open ('../res/demography_{}_{}.txt' .format(loc_file_names[0].split('.')[0], self.num_of_cells), 'w+')
-        if (VERBOSE_AP in self.verbose):
-            self.ap_file_name = self.input_files_str (loc_file_names[0]) + '.ap'
-            self.ap_file      = open ("../res/ap_files/" + self.ap_file_name, "w+")  
-            if (self.use_rect_AP_cells):
-                printf (self.ap_file, '// Using rectangle cells\n')
+        if (VERBOSE_POA in self.verbose):
+            self.poa_file_name = self.input_files_str (loc_file_names[0]) + '.poa'
+            self.poa_file      = open ("../res/ap_files/" + self.poa_file_name, "w+")  
+            if (self.use_rect_PoA_cells):
+                printf (self.poa_file, '// Using rectangle cells\n')
             else:
-                printf (self.ap_file, '// .antloc file={}\n' .format (self.antloc_file_name))
+                printf (self.poa_file, '// .antloc file={}\n' .format (self.antloc_file_name))
 
-            printf (self.ap_file, '// File format:\n//for each time slot:\n')
-            printf (self.ap_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
-            printf (self.ap_file, '//"new_usrs" is a list of the new usrs, and their APs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
-            printf (self.ap_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current APs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
+            printf (self.poa_file, '// File format:\n//for each time slot:\n')
+            printf (self.poa_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
+            printf (self.poa_file, '//"new_usrs" is a list of the new usrs, and their PoAs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
+            printf (self.poa_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current PoAs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
-        print ('Starting parsing file {} with max_power_of_4={}' .format (loc_file_names[0], self.max_power_of_4))
+        print ('Begin parsing files with max_power_of_4={}' .format (self.max_power_of_4))
         self.is_first_slot = True
         for file_name in loc_file_names: 
             self.usrs_loc_file_name = file_name
@@ -783,32 +763,32 @@ class loc2ap_c (object):
         """
         output_file = open ('../res/' + output_file_name, 'w')
         printf (output_file, 'avg num of vehs per server\n')
-        avg_num_of_vehs_per_ap = np.array ([np.average(self.num_of_vehs_in_ap[ap]) for ap in range(self.num_of_APs)]) 
+        avg_num_of_vehs_per_poa = np.array ([np.average(self.num_of_vehs_in_poa[poa]) for poa in range(self.num_of_PoAs)]) 
         for lvl in range (self.max_power_of_4):
             printf (output_file, '\nlvl {}\n********************************\n' .format(lvl))
-            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering AP.
-            self.print_as_sq_mat (output_file, self.vec2heatmap (avg_num_of_vehs_per_ap))
-            reshaped_heatmap = avg_num_of_vehs_per_ap.reshape (int(len(avg_num_of_vehs_per_ap)/4), 4) # prepare the averaging for the next iteration
-            avg_num_of_vehs_per_ap = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
+            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering PoA.
+            self.print_as_sq_mat (output_file, self.vec2heatmap (avg_num_of_vehs_per_poa))
+            reshaped_heatmap = avg_num_of_vehs_per_poa.reshape (int(len(avg_num_of_vehs_per_poa)/4), 4) # prepare the averaging for the next iteration
+            avg_num_of_vehs_per_poa = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
 
-    def calc_num_of_aps_per_cell (self):
+    def calc_num_of_poas_per_cell (self):
         """
-        Returns the number of aps in each cell
+        Returns the number of poas in each cell
         """
-        num_of_aps_in_cell = np.zeros (self.num_of_cells)
+        num_of_poas_in_cell = np.zeros (self.num_of_cells)
         
-        for ap in range(self.num_of_APs):
-            num_of_aps_in_cell[self.ap2cell(ap)] += 1
+        for poa in range(self.num_of_PoAs):
+            num_of_poas_in_cell[self.poa2cell(poa)] += 1
         
-        return num_of_aps_in_cell
+        return num_of_poas_in_cell
 
-    def rd_num_of_vehs_per_ap_n_cell (self, input_file_name):
+    def rd_num_of_vehs_per_poa_n_cell (self, input_file_name):
         """
-        Read the number of vehicles at each ap, and each cell, as written in the input files. 
+        Read the number of vehicles at each poa, and each cell, as written in the input files. 
         """
         input_file  = open ('../res/' + input_file_name, "r")  
     
-        self.num_of_vehs_in_ap   = [] #[[] for _ in range (self.num_of_APs)]   # self.num_of_vehs_in_ap[i][j] will hold the # of vehs in ap i in time slot j 
+        self.num_of_vehs_in_poa   = [] #[[] for _ in range (self.num_of_PoAs)]   # self.num_of_vehs_in_poa[i][j] will hold the # of vehs in poa i in time slot j 
         self.num_of_vehs_in_cell = [] #[[] for _ in range (self.num_of_cells)] # self.num_of_vehs_in_cell[i][j] will hold the # of vehs in cell i in time slot j
         for line in input_file:
     
@@ -822,17 +802,17 @@ class loc2ap_c (object):
             num_of_vehs = []
             for num_of_vehs_in_this_time_slot in vec_data:
                 num_of_vehs.append (int(num_of_vehs_in_this_time_slot))
-            if (vec_name[4] == 'ap'): # the vector's name begins by "num_of_vehs_in_ap"
-                self.num_of_vehs_in_ap.append(num_of_vehs)
+            if (vec_name[4] == 'poa'): # the vector's name begins by "num_of_vehs_in_poa"
+                self.num_of_vehs_in_poa.append(num_of_vehs)
             else: # Now we know that the vector's name begins by "num_of_vehs_in_cell"
                 self.num_of_vehs_in_cell.append(num_of_vehs)
 
 
     def plot_voronoi_diagram (self):
         """
-        Plot a Voronoi diagram of the PoAs in self.list_of_APs
+        Plot a Voronoi diagram of the PoAs in self.list_of_PoAs
         """
-        points = np.array ([[ap['x'], ap['y']] for ap in self.list_of_APs])
+        points = np.array ([[poa['x'], poa['y']] for poa in self.list_of_PoAs])
         
         voronoi_plot_2d(Voronoi(points), show_vertices=False)
         plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
@@ -841,14 +821,14 @@ class loc2ap_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 1
-    my_loc2ap      = loc2ap_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
-    # my_loc2ap.plot_voronoi_diagram()
+    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2ap.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
-    # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps( )
+    my_loc2poa.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
-    # # Post=processing
-    # my_loc2ap.rd_num_of_vehs_per_ap_n_cell ('num_of_vehs_Lux.center.post.antloc_1524aps.txt')# ('num_of_vehs_per_ap_256aps_ant.txt')
-    # # my_loc2ap.plot_num_of_vehs_per_AP (usrs_loc_file_name='0730_0830_8secs.loc')
-    # my_loc2ap.plot_num_of_vehs_in_cell_heatmaps (usrs_loc_file_name='0829_0830_8secs.loc')
+    # # Post-processing
+    # my_loc2poa.rd_num_of_vehs_per_poa_n_cell ('num_of_vehs_Lux.center.post.antloc_1524poas.txt')# ('num_of_vehs_per_poa_256aps_ant.txt')
+    # # my_loc2poa.plot_num_of_vehs_per_PoA (usrs_loc_file_name='0730_0830_8secs.loc')
+    # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps (usrs_loc_file_name='0829_0830_8secs.loc')

@@ -206,17 +206,17 @@ class Traci_runner (object):
         # self.list_of_antennas = list (filter (lambda item : item['radio']=='LTE', self.list_of_antennas)) # filter-out all non-LTE antennas
         print ('Num of antennas in the simulated area={}' .format (len(self.list_of_antennas)))
         
-        APs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + ('.center.' if self.city=='Lux' else '.') + provider + '.antloc', 'w')
-        printf (APs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
-        printf (APs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
-        printf (APs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
+        PoAs_loc_file     = open ('../res/Antennas_locs/' + antenna_locs_file_name.split('.')[0] + ('.center.' if self.city=='Lux' else '.') + provider + '.antloc', 'w')
+        printf (PoAs_loc_file, '// format: ID,X,Y\n// where X,Y is the position of the antenna in the given SUMO file\n')
+        printf (PoAs_loc_file, '// Parsed antenna location file: {}\n' .format (antenna_locs_file_name))
+        printf (PoAs_loc_file, '// SUMO cfg file: {}\n' .format (self.sumo_cfg_file))
 
-        AP_id = 0
+        poa_id = 0
         antennas_to_print = list (filter (lambda item : item['mnc']==self.providers_mnc[provider], self.list_of_antennas)) 
-        for ap in antennas_to_print:                       
+        for poa in antennas_to_print:                       
 
-            printf (APs_loc_file, '{},{},{}\n' .format (AP_id, ap['x'], ap['y']))
-            AP_id += 1
+            printf (PoAs_loc_file, '{},{},{}\n' .format (poa_id, poa['x'], poa['y']))
+            poa_id += 1
 
 if __name__ == '__main__':
     

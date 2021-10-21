@@ -1,0 +1,11 @@
+alias .="pwd"
+alias py="python"
+alias c="clear"
+alias l="less"
+alias so="source"
+alias ltr="ls -ltr"
+alias ltra="ls -ltra"
+alias la="ls -a"
+alias g="grep"
+alias aliaser="source ~/.myalias"
+alias h=history

@@ -1,6 +1,8 @@
 from __future__ import print_function
 import numpy as np
 
+# This file contains some accessory functions for format-printing.
+
 def printf(output_file, str2print, *args):
     """
     Format-print the requested str2printing to a given output file 

@@ -1,18 +1,15 @@
 import numpy as np
-import math
-import time
-import heapq
+import math, time, heapq, random
 import pulp as plp
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import networkx as nx
-import random
-# import pickle
 from pathlib import Path
 
 from usr_c    import usr_c    # class of the users of alg
 from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
-from printf import printf #, printmat
+from printf import printf ## My own format print functions 
+
 # from pandas.tests.arrays.sparse.test_array import test_first_fill_value_loc
 
 # Levels of verbose / operation modes (which output is generated)
@@ -22,7 +19,7 @@ VERBOSE_LOG           = 2 # Write to a ".log" file
 VERBOSE_ADD_LOG       = 3 # Write to a detailed ".log" file
 VERBOSE_ADD2_LOG      = 4
 VERBOSE_MOB           = 5 # Write data about the mobility of usrs, and about the num of migrated chains per slot
-VERBOSE_CALC_RSRC_AUG = 7 # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug 
+VERBOSE_CALC_RSRC_AUG = 7 # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug. Hence, this way of calculation is good for opt only, as opt searches each time fora solw from sratch.  
 VERBOSE_MOVED_RES     = 8 # calculate the cost incurred by the usrs who moved only 
 VERBOSE_CRITICAL_RES  = 9 # calculate the cost incurred by the usrs who moved only 
 
@@ -123,9 +120,6 @@ class SFC_mig_simulator (object):
     # Returns the total migration cost in the current time slot, when running an algo'
     calc_mig_cost_in_slot_alg = lambda self : self.uniform_chain_mig_cost * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
 
-
-    # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-
     # Returns the total cpu cost in the current time slot, according to the LP solution
     calc_cpu_cost_in_slot_opt = lambda self : sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
     
@@ -148,7 +142,7 @@ class SFC_mig_simulator (object):
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
     print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {} | num_usrs={} | num_crit_usrs={} \n' .format(
-            self.settings_str(), 
+            self.settings_str(), # The settings string, detailing various parameters values used.  
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
                                link_cost = self.calc_link_cost_in_slot_alg(),
                                mig_cost  = self.calc_mig_cost_in_slot_alg()),
@@ -156,7 +150,6 @@ class SFC_mig_simulator (object):
             len (self.critical_usrs)))
 
     augmented_cpu_cap_at_leaf = lambda self: self.G.nodes[len (self.G.nodes)-1]['RCs']
-
 
     # Calculate the server-to-AP mapping. ASSUMES that the input server s is a leaf server.)
     s2poa  = lambda self, s : self.poa2s.index(s)
@@ -168,6 +161,10 @@ class SFC_mig_simulator (object):
                 cpu_cost, link_cost, mig_cost, tot_cost, cpu_cost/tot_cost, link_cost/tot_cost, mig_cost/tot_cost)  
 
     def d_var_mig_cost (self, d_var): 
+        """
+        Calculate the mig' cost incurred by the value that the opt (LP) solution gave to the given decision variable.
+        """
+    
         if (d_var.usr.is_new): # No mig' cost for a new usr
             return 0
         my_param_list = list (filter (lambda param : param.usr==d_var.usr and param.s==d_var.s, self.cur_st_params)) # my_param_list is the list of cur-st param' assigning this usr to this server
@@ -423,8 +420,8 @@ class SFC_mig_simulator (object):
             
     def print_heap (self):
         """
-        print the id, level and CPU of each user in a heap.
         Used for debugginign only.
+        print the id, level and CPU of each user in a heap.
         """
         for usr in self.usrs:
             print ('id = {}, lvl = {}, CPU = {}' .format (usr.id, usr.lvl, usr.B[usr.lvl]))
@@ -432,7 +429,7 @@ class SFC_mig_simulator (object):
         
     def push_up (self, usrs):
         """
-        Push-up chains: take a feasible solution, and greedily try pushing each chain as high as possible in the tree. 
+        Push-up chains: given a feasible solution, greedily push each chain as high as possible in the tree, as long as this reduces the total cost.  
         Do that when chains are sorted in a decreasing order of the # of CPU units they're currently using.
         """
         # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
@@ -525,9 +522,6 @@ class SFC_mig_simulator (object):
         num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
         self.rd_poa2cell_file(poa2cell_file_name)
         
-        # nx.draw (self.G, with_labels=True) 
-        # plt.show()
-        
         # Remove all the servers in cells that don't contain AP
         shortest_path    = nx.shortest_path(self.G)
         for s in range (1, len(self.G.nodes())):
@@ -547,9 +541,6 @@ class SFC_mig_simulator (object):
                 if (self.G.nodes[prnt]['nChild']==0):
                     self.G.remove_node(prnt) # Remove the leaf server handling this cell
                 
-        # nx.draw (self.G, with_labels=True) 
-        # plt.show()
-
         # Garbage collection: condense all the remaining nodes (==servers), so that they'll have sequencing IDs, starting from 0
         server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
         for s in range(num_fo_nodes_b4_pruning): 
@@ -569,7 +560,7 @@ class SFC_mig_simulator (object):
                     self.cell2s[my_cell_as_list[0]] = id_to_recycle
                        
         # Add new leaves for the APs below each cell. 
-        # To keep the IDs of leaves the greatest in the tree, only after we finished removing all the useless cells.
+        # To keep the IDs of leaves the greatest in the tree, we do that only after we finished removing all the useless cells.
         self.num_of_srvrs = len(self.G.nodes())
         for poa in [poa for poa in self.PoAs]: #(filter (lambda item : item['cell']==cell, self.PoAs)): # for each poa belonging to this cell
             poa['s'] = len(self.G.nodes())   # We'll shortly add a server for this AP, so the id of this AP will be current number of servers+1.
@@ -602,8 +593,6 @@ class SFC_mig_simulator (object):
 
         for s in self.G.nodes(): # for every server
             self.G.nodes[s]['id'] = s
-        # nx.draw (self.G, with_labels=True) 
-        # plt.show()
 
         # Find parents of each node (except of the root)
         for s in range (1, len(self.G.nodes())):
@@ -640,14 +629,6 @@ class SFC_mig_simulator (object):
                 self.num_of_leaves += 1
                 for lvl in range (self.tree_height+1):
                     self.G.nodes[shortest_path[s][root][lvl]]['lvl']       = np.uint8(lvl) # assume here a balanced tree
-                    # # The lines below are for case one likes to vary the link and cpu costs of distinct servers on the same level. 
-                    # self.G.nodes[shortest_path[s][root][lvl]]['cpu cost']  = self.CPU_cost_at_lvl[lvl]                
-                    # self.G.nodes[shortest_path[s][root][lvl]]['link cost'] = self.link_cost_of_CLP_at_lvl[lvl]
-                    # # Iterate over all children of node i
-                    # for n in self.G.neighbors(i):
-                    #     if (n > i):
-                    #         print (n)
-
 
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
@@ -677,14 +658,20 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, poa_file_name = 'shorter.poa', verbose = [], tree_height = 4, children_per_node = 4, prob_of_target_delay=0.3, poa2cell_file_name='', 
-                  use_exp_cpu_cost=True, use_exp_cpu_cap=False):
+    def __init__ (self, poa_file_name = 'shorter.poa', # File detailing the PoA of each user (e.g., car, pedestrian) along the trace.  
+                        verbose = [], # the type of output produced, e.g.: costs, amount of cpu used, detailed log, debugging. See "VERBOSE_" at this file's header. 
+                        tree_height = 4, children_per_node = 4, # topology of the tree (apart from the leaf, which are potentially real antennas). 
+                        prob_of_target_delay=0.3, # prob' that a simulated usr has RT requirements 
+                        poa2cell_file_name='', # File detailing the attachment of each PoA to a rectangle. In our hierarchy, the leaves are antennas. The leaves' parents are the lowest-level rectangles.
+                                               # If no input is given here, the simulation assumes uses no real-data of antenna location, and each leaf in the tree is co-located with a server, covering a rectangled area. 
+                        use_exp_cpu_cost=True, # True iff the cost of the CPU exponentially incrase (costs are 1,2,4,16, ...); lowest cost is in the root  
+                        use_exp_cpu_cap=False):
         """
         """
 
         self.verbose                    = verbose
 
-        self.poa_file_name               = poa_file_name #input file containing the APs of all users along the simulation
+        self.poa_file_name               = poa_file_name #input file containing the PoAs of all users along the simulation
         self.use_exp_cpu_cost           = use_exp_cpu_cost
         self.use_exp_cpu_cap            = use_exp_cpu_cap
         
@@ -716,10 +703,8 @@ class SFC_mig_simulator (object):
         
         # poa_file_used_antloc will be True iff the poa file was generated using real antennas' location data.
         poa_file_used_antloc = True if (self.poa_file_name.split('.poa')[0].split('_')[-1] in ['all', 'orange', 'post', 'Telecom_Monaco', 'short']) else False
-        # poa_file_used_antloc = True if (self.poa_file_name.split('.poa')[0].split('_')) else False 
         
-        poa2cell_file_name if (poa2cell_file_name != '') else False  
-        if (self.poa_file_name=='shorter.poa'):
+        if (self.poa_file_name=='shorter.poa'): # 'shorter.poa' is used only for developing and debugging, and uses no real antennas' location ('.antloc')
             self.gen_parameterized_full_tree  ()
         
         elif (self.poa2cell_file_name==''):
@@ -1018,32 +1003,32 @@ class SFC_mig_simulator (object):
             print ('augmented cpu cap at leaf={}' .format (self.augmented_cpu_cap_at_leaf()))
             self.print_sol_res_line (self.rsrc_aug_file)
     
-    def print_mob (self):
-        """
-        print statistics about the number of usrs who moved, and the num of migrations between every two levels in the tree.
-        """
-
-        sim_len = float(self.t - self.first_slot)
-        del (self.num_of_migs_in_slot[0]) # remove the mig' recorded in the first slot, which is irrelevant (corner case)
-        printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moved_usrs_in_slot)) / sim_len))
-        printf (self.mob_output_file, '// avg num of usrs who migrated per slot = {:.0f}\n' .format (float(sum(self.num_of_migs_in_slot)) / sim_len))
-        avg_num_of_migs_to_from_per_slot = np.divide (self.mig_from_to_lvl, sim_len)
-        for lvl_src in range (self.tree_height+1):
-            for lvl_dst in range (self.tree_height+1):
-                printf (self.mob_output_file, '{:.0f}\t' .format (avg_num_of_migs_to_from_per_slot[lvl_src][lvl_dst]))
-            printf (self.mob_output_file, '\n')
-        printf (self.mob_output_file, 'moves_in_slot = {}\n' .format (self.num_of_moved_usrs_in_slot))
-        printf (self.mob_output_file, 'migs_in_slot = {}\n'  .format (self.num_of_migs_in_slot))
-
-        # plot the mobility
-        plt.figure()
-        plt.title ('Migrations and mobility at each slot')
-        plt.plot (range(int(sim_len)), self.num_of_moved_usrs_in_slot, label='Total vehicles moved to another cell [number/sec]', linestyle='None',  marker='o', markersize = 4)
-        plt.plot (range(int(sim_len)), self.num_of_migs_in_slot, label='Total chains migrated to another server [number/sec]', linestyle='None',  marker='.', markersize = 4)
-        plt.xlabel ('time [seconds, starting at 07:30]')
-        plt.legend()
-        plt.savefig ('../res/{}.mob.jpg' .format(self.poa_file_name.split('.')[0]))
-        plt.clf()
+    # def print_mob (self):
+    #     """
+    #     print statistics about the number of usrs who moved, and the num of migrations between every two levels in the tree.
+    #     """
+    #
+    #     sim_len = float(self.t - self.first_slot)
+    #     del (self.num_of_migs_in_slot[0]) # remove the mig' recorded in the first slot, which is irrelevant (corner case)
+    #     printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moved_usrs_in_slot)) / sim_len))
+    #     printf (self.mob_output_file, '// avg num of usrs who migrated per slot = {:.0f}\n' .format (float(sum(self.num_of_migs_in_slot)) / sim_len))
+    #     avg_num_of_migs_to_from_per_slot = np.divide (self.mig_from_to_lvl, sim_len)
+    #     for lvl_src in range (self.tree_height+1):
+    #         for lvl_dst in range (self.tree_height+1):
+    #             printf (self.mob_output_file, '{:.0f}\t' .format (avg_num_of_migs_to_from_per_slot[lvl_src][lvl_dst]))
+    #         printf (self.mob_output_file, '\n')
+    #     printf (self.mob_output_file, 'moves_in_slot = {}\n' .format (self.num_of_moved_usrs_in_slot))
+    #     printf (self.mob_output_file, 'migs_in_slot = {}\n'  .format (self.num_of_migs_in_slot))
+    #
+    #     # plot the mobility
+    #     plt.figure()
+    #     plt.title ('Migrations and mobility at each slot')
+    #     plt.plot (range(int(sim_len)), self.num_of_moved_usrs_in_slot, label='Total vehicles moved to another cell [number/sec]', linestyle='None',  marker='o', markersize = 4)
+    #     plt.plot (range(int(sim_len)), self.num_of_migs_in_slot, label='Total chains migrated to another server [number/sec]', linestyle='None',  marker='.', markersize = 4)
+    #     plt.xlabel ('time [seconds, starting at 07:30]')
+    #     plt.legend()
+    #     plt.savefig ('../res/{}.mob.jpg' .format(self.poa_file_name.split('.')[0]))
+    #     plt.clf()
         
     def cpvnf_reshuffle (self):
         """

@@ -1,6 +1,6 @@
 class usr_lp_c (object):
     """
-    class of "user", used by the lp 
+    class of "user", used by the lp (Linear Programming). 
     """ 
     def __init__ (self, id, theta_times_lambda, target_delay, C_u, mig_cost=1):
         self.id                 = id

@@ -6,7 +6,7 @@ max_rand_id = 1000
 class usr_c (object):
 
     """
-    class of "user", used by alg_top 
+    class of "user", used by algorithmic solutions for the mig' problem (e.g., first fit, cpvnf, and our BUPU algorithm). 
     """ 
     def __init__ (self, id, theta_times_lambda, target_delay, C_u, mig_cost=1, cur_s = -1, nxt_s = -1):
         self.id                 = id

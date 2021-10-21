@@ -2,11 +2,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib
 import math
 from scipy.spatial import Voronoi, voronoi_plot_2d
 # from matplotlib.co//lors import LogNorm, Normalize
-# from matplotlib.t icker import MaxNLocator
-# import itertools 
+# from matplotlib.ticker import MaxNLocator
+import itertools 
 # import time 
 # from ntpath import split
 
@@ -673,7 +674,7 @@ class loc2poa_c (object):
         if (VERBOSE_CNT in self.verbose):
             # self.plot_num_of_vehs_per_poa_graph ()
             self.plot_num_of_vehs_in_cell_heatmaps()
-            self.plot_num_of_vehs_per_PoA()
+            # self.plot_num_of_vehs_per_PoA()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.print_demography_diagram ()
             self.plot_demography_heatmap()
@@ -694,7 +695,8 @@ class loc2poa_c (object):
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             for poa in range (self.num_of_PoAs):
                 printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_poa_{}: ' .format (poa))
-                printf (self.num_of_vehs_output_file, self.num_of_vehs_in_poa[poa])
+                # print (self.num_of_vehs_in_poa[poa])
+                print ('{}' .format (self.num_of_vehs_in_poa[poa]), file = self.num_of_vehs_output_file, flush = True)
             self.calc_num_of_vehs_per_cell()
             for cell in range (self.num_of_cells):
                 printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}:' .format (cell))
@@ -820,12 +822,12 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 1
-    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    max_power_of_4 = 4
+    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

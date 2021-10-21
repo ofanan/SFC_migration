@@ -151,7 +151,7 @@ class SFC_mig_simulator (object):
 
     augmented_cpu_cap_at_leaf = lambda self: self.G.nodes[len (self.G.nodes)-1]['RCs']
 
-    # Calculate the server-to-AP mapping. ASSUMES that the input server s is a leaf server.)
+    # Calculate the server-to-PoA mapping. ASSUMES that the input server s is a leaf server.)
     s2poa  = lambda self, s : self.poa2s.index(s)
     
     # Returns a string, detailing the sim' costs' components
@@ -499,11 +499,11 @@ class SFC_mig_simulator (object):
     def gen_parameterized_antloc_tree (self, poa2cell_file_name):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
-        Add leaves for each AP, and prune sub-trees that don't have any descended APs.
+        Add leaves for each PoA, and prune sub-trees that don't have any descended PoAs.
         """
         
-        # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of APs.
-        # Note: after fixing, the tree's height will be 1 level more, as we'll be adding a level for the APs below the current tree.
+        # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of PoAs.
+        # Note: after fixing, the tree's height will be 1 level more, as we'll be adding a level for the PoAs below the current tree.
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         
         self.G = self.G.to_directed()
@@ -522,14 +522,14 @@ class SFC_mig_simulator (object):
         num_fo_nodes_b4_pruning = self.G.number_of_nodes() # We will later add servers, with increasing IDs
         self.rd_poa2cell_file(poa2cell_file_name)
         
-        # Remove all the servers in cells that don't contain AP
+        # Remove all the servers in cells that don't contain PoA
         shortest_path    = nx.shortest_path(self.G)
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt']   = shortest_path[s][root][1]
             self.G.nodes[s]['nChild'] = self.children_per_node # Num of children of this server (==node)
         for cell in range (self.num_of_leaves): # for each cell 
-            APs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.PoAs))
-            if (len(APs_of_this_cell)==0): # No APs at this cell
+            PoAs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.PoAs))
+            if (len(PoAs_of_this_cell)==0): # No PoAs at this cell
                 s2remove = self.cell2s[cell]
                 prnt = self.G.nodes[s2remove]['prnt'] # Find the parent of the node-to-remove
                 self.G.remove_node(self.cell2s[cell]) # Remove the leaf server handling this cell
@@ -559,18 +559,18 @@ class SFC_mig_simulator (object):
                 if (len (my_cell_as_list)>0): # This was indeed a server of cell that removed 
                     self.cell2s[my_cell_as_list[0]] = id_to_recycle
                        
-        # Add new leaves for the APs below each cell. 
+        # Add new leaves for the PoAs below each cell. 
         # To keep the IDs of leaves the greatest in the tree, we do that only after we finished removing all the useless cells.
         self.num_of_srvrs = len(self.G.nodes())
         for poa in [poa for poa in self.PoAs]: #(filter (lambda item : item['cell']==cell, self.PoAs)): # for each poa belonging to this cell
-            poa['s'] = len(self.G.nodes())   # We'll shortly add a server for this AP, so the id of this AP will be current number of servers+1.
-            self.G.add_node (poa['s']) # Add a server co-located with this AP
+            poa['s'] = len(self.G.nodes())   # We'll shortly add a server for this PoA, so the id of this PoA will be current number of servers+1.
+            self.G.add_node (poa['s']) # Add a server co-located with this PoA
             self.G.nodes[poa['s']]['lvl'] = 0 # The level of the newly added node is 0 (it's a leaf)
-            self.G.add_edge (poa['s'], self.cell2s[poa['cell']]) # Add an edge from the newly added server, to the server handling the cell of this AP, ...
+            self.G.add_edge (poa['s'], self.cell2s[poa['cell']]) # Add an edge from the newly added server, to the server handling the cell of this PoA, ...
             self.G.add_edge (self.cell2s[poa['cell']], poa['s']) # And vice versa
 
-        self.num_of_leaves    = len(self.PoAs) # Each AP is co-located with a leaf server
-        self.poa2s             = [poa['s'] for poa in self.PoAs] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
+        self.num_of_leaves    = len(self.PoAs) # Each PoA is co-located with a leaf server
+        self.poa2s             = [poa['s'] for poa in self.PoAs] # Will contain a least translating the PoA number (==leaf #) to the ID of the co-located server. 
 
         # Update the tree height's by the changes made, and set 
         shortest_path    = nx.shortest_path(self.G)
@@ -603,7 +603,7 @@ class SFC_mig_simulator (object):
         Generate a parameterized full tree with specified height and children-per-non-leaf-node. 
         """
         
-        # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of APs.
+        # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of PoAs.
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
@@ -618,7 +618,7 @@ class SFC_mig_simulator (object):
         shortest_path = nx.shortest_path(self.G)
 
         # levelize the tree (assuming a balanced tree)
-        self.poa2s             = [] # Will contain a least translating the AP number (==leaf #) to the ID of the co-located server. 
+        self.poa2s             = [] # Will contain a least translating the PoA number (==leaf #) to the ID of the co-located server. 
         root                  = 0 # In networkx, the ID of the root is 0
         self.num_of_leaves    = 0
         for s in self.G.nodes(): # for every server
@@ -664,8 +664,9 @@ class SFC_mig_simulator (object):
                         prob_of_target_delay=0.3, # prob' that a simulated usr has RT requirements 
                         poa2cell_file_name='', # File detailing the attachment of each PoA to a rectangle. In our hierarchy, the leaves are antennas. The leaves' parents are the lowest-level rectangles.
                                                # If no input is given here, the simulation assumes uses no real-data of antenna location, and each leaf in the tree is co-located with a server, covering a rectangled area. 
-                        use_exp_cpu_cost=True, # True iff the cost of the CPU exponentially incrase (costs are 1,2,4,16, ...); lowest cost is in the root  
-                        use_exp_cpu_cap=False):
+                        use_exp_cpu_cost=True, # True iff the cost of the CPU exponentially increase when moving down in the tree (costs are 1,2,4,16, lowest cost is in the root. When False, costs are linear (1, 2, 3.,,,).  
+                        use_exp_cpu_cap=False  # True iff the cpu capacities exponentially increase when moving up in the tree. (costs are 1,2,4,8, ..., ; lowest capacity is in the roots, When False, capacities are linear (1, 2, 3.,,,).
+                        ):
         """
         """
 
@@ -684,11 +685,11 @@ class SFC_mig_simulator (object):
         self.uniform_link_cost          = 3
         self.uniform_theta_times_lambda = [2, 10, 2] # "1" here means 100MHz
         self.uniform_chain_mig_cost     = self.uniform_vm_mig_cost * len (self.uniform_theta_times_lambda)
-        self.uniform_Cu                 = 20 
+        self.uniform_Cu                 = 20 # Maximum CPU amount that may be allocated to a single user. 
         self.target_delay               = [10, 100] # in [ms], lowest to highest
         self.prob_of_target_delay       = [prob_of_target_delay]  
         self.warned_about_too_large_poa  = False
-        self.usrs                       = []
+        self.usrs                       = [] # The list of usrs, to be dynamically change along the sim'.
         
         # Init output files
         if (VERBOSE_DEBUG in self.verbose):
@@ -707,12 +708,12 @@ class SFC_mig_simulator (object):
         if (self.poa_file_name=='shorter.poa'): # 'shorter.poa' is used only for developing and debugging, and uses no real antennas' location ('.antloc')
             self.gen_parameterized_full_tree  ()
         
-        elif (self.poa2cell_file_name==''):
+        elif (self.poa2cell_file_name==''): # The simulated network is synthetic - includes only rectangles, and not real antenna locations 
             if (poa_file_used_antloc):
                 print ('Error: you specified no poa2cell file name, but the .poa file was generated using an antloc file.')
                 exit ()
             self.gen_parameterized_full_tree  ()
-        else:
+        else: # The simulated network is synthetic - includes only rectangles, and not real antenna locations
             if (not (poa_file_used_antloc)):
                 print ('Error: you specified poa2cell_file_name={}, but the .poa file was not generated using an antloc file.' .format (self.poa2cell_file_name))                
                 exit ()
@@ -787,7 +788,7 @@ class SFC_mig_simulator (object):
     def init_input_and_output_files (self):
         """
         Initialize "self" variables for the file-handlers of input and output files.
-        Write several comments explanation files as headers to the output files. 
+        Write several comments at the output files headers. 
         """
 
         # open input file
@@ -809,18 +810,18 @@ class SFC_mig_simulator (object):
             else:
                 self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "w")
             
-        if (VERBOSE_MOVED_RES in self.verbose):
-            self.init_moved_res_file()
-        if (VERBOSE_CRITICAL_RES in self.verbose):
-            self.init_critical_res_file()
+        # if (VERBOSE_MOVED_RES in self.verbose):
+        #     self.init_moved_res_file()
+        # if (VERBOSE_CRITICAL_RES in self.verbose):
+        #     self.init_critical_res_file()
         if (VERBOSE_LOG in self.verbose):
             self.init_log_file()
-        if (VERBOSE_MOB in self.verbose):
-            self.mob_file_name   = "../res/" + self.poa_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
-            self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
-            printf (self.mob_output_file, '// results for running alg_top on input file {}\n' .format (self.poa_file_name))
-            printf (self.mob_output_file, '// results for running alg_top on input file shorter.poa with {} leaves\n' .format (self.num_of_leaves))
-            printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
+        # if (VERBOSE_MOB in self.verbose):
+        #     self.mob_file_name   = "../res/" + self.poa_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
+        #     self.mob_output_file =  open ('../res/' + self.mob_file_name,  "w") 
+        #     printf (self.mob_output_file, '// results for running alg_top on input file {}\n' .format (self.poa_file_name))
+        #     printf (self.mob_output_file, '// results for running alg_top on input file shorter.poa with {} leaves\n' .format (self.num_of_leaves))
+        #     printf (self.mob_output_file, '// index i,j in the matrices below represent the total num of migs from lvl i to lvl j\n')
     
     def rd_t_line (self, time_str):
         """
@@ -840,7 +841,7 @@ class SFC_mig_simulator (object):
         """
         Simulate the whole simulation, using a LP fractional solution.
         At each time step:
-        - Read and parse from an input ".poa" file the AP cells of each user who moved. 
+        - Read and parse from an input ".poa" file the PoA cells of each user who moved. 
         - solve the problem using a LP, using Python's Pulp LP solver. 
         - Write outputs results and/or logs to files.
         - update cur_st = nxt_st
@@ -857,21 +858,21 @@ class SFC_mig_simulator (object):
             line = line.split ('\n')[0]
             splitted_line = line.split (" ")
         
-            if (splitted_line[0] == "t"):
+            if (splitted_line[0] == "t"): # Reached a line indicating a new time slot in the ".poa" input file
                 self.rd_t_line (splitted_line[2])
                 if (self.t >= self.final_slot_to_simulate): # finished the desired simulation time
-                    self.post_processing ()
+                    self.post_processing () # Write statistics concluding the simulation to output files 
                     return 
         
-            elif (splitted_line[0] == "usrs_that_left:"):
+            elif (splitted_line[0] == "usrs_that_left:"): # Reached a line indicating usrs that left the sim in the ".poa" input file
         
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
                     self.usrs.remove  (usr) # Remove the usr from the list of usrs
                     self.cur_st_params = list (filter (lambda param : param.usr != usr, self.cur_st_params)) # Remove any parameter corresponding to the current state of this usr (who left)
         
-            elif (splitted_line[0] == "new_usrs:"):              
+            elif (splitted_line[0] == "new_usrs:"): # Reached a line indicating new usrs that joined the sim in the ".poa" input file
                 self.rd_new_usrs_line  (splitted_line[1:])
-            elif (splitted_line[0] == "old_usrs:"):              
+            elif (splitted_line[0] == "old_usrs:"): # Reached a line indicating 'old' existing usrs that moved in the ".poa" input file
                 self.rd_old_usrs_line_lp (splitted_line[1:])
                 if (VERBOSE_ADD_LOG in self.verbose):
                     self.last_rt = time.time ()
@@ -893,7 +894,6 @@ class SFC_mig_simulator (object):
                             break # found a feasible sol for this slot
             
                         self.cpu_cap_at_leaf = self.avg_up_and_lb(self.ub, self.lb)
-                        # printf (self.res_file, 'lb={}, ub={}, cpu_cap_at_leaf={}\n' .format (self.lb, self.ub, self.cpu_cap_at_leaf)) #$$$
                         self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
                         self.set_RCs_and_a (self.cpu_cap_at_lvl) 
                         self.stts = self.alg_top(self.solve_by_plp)
@@ -921,7 +921,7 @@ class SFC_mig_simulator (object):
         """
         Simulate using an algorithm (NOT a LP solver).
         At each time step:
-        - Read and parse from an input ".poa" file the AP cells of each user who moved. 
+        - Read and parse from an input ".poa" file the PoA cells of each user who moved. 
         - solve the problem using alg_top (our alg). 
         - Write outputs results and/or logs to files.
         - Update self.stts according to the solution's stts.
@@ -943,14 +943,14 @@ class SFC_mig_simulator (object):
             line = line.split ('\n')[0]
             splitted_line = line.split (" ")
 
-            if (splitted_line[0] == "t"):
+            if (splitted_line[0] == "t"): # Reached a line indicating new usrs that joined the sim in the ".poa" input file
                 self.rd_t_line (splitted_line[2])
                 if (self.t >= self.final_slot_to_simulate):
                     self.post_processing ()
                     return
                 continue
                 
-            elif (splitted_line[0] == "usrs_that_left:"):
+            elif (splitted_line[0] == "usrs_that_left:"): # Reached a line indicating usrs that left the sim in the ".poa" input file
 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
@@ -960,10 +960,10 @@ class SFC_mig_simulator (object):
                     self.usrs.remove (usr)                    
                 continue
         
-            elif (splitted_line[0] == "new_usrs:"):              
+            elif (splitted_line[0] == "new_usrs:"): # Reached a line listing the new usrs that joined the sim in the ".poa" input file
                 self.rd_new_usrs_line (splitted_line[1:])
-            elif (splitted_line[0] == "old_usrs:"):  
-                self.rd_old_usrs_line (splitted_line[1:])
+            elif (splitted_line[0] == "old_usrs:"): # Reached a line listing the 'old', existing usrs that moved, in the ".poa" input file 
+                self.rd_old_usrs_line (splitted_line[1:]) # Read the list of old usrs, and collecting their new PoA assignments
                 if (VERBOSE_ADD_LOG in self.verbose):
                     self.last_rt = time.time ()
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
@@ -1221,21 +1221,21 @@ class SFC_mig_simulator (object):
         u.lvl                 = self.G.nodes[s]['lvl']
         self.G.nodes[s]['a'] -= u.B[self.G.nodes[s]['lvl']]
 
-    def update_S_u (self, usr, AP_id):
+    def update_S_u (self, usr, poa_id):
         """
-        Update the S_u (list of delay-feasible servers) of a given usr, given the id of its current AP (Access Point server)
+        Update the S_u (list of delay-feasible servers) of a given usr, given the id of its current PoA (Access Point server)
         """                    
         usr.S_u = []
-        s       = self.poa2s[AP_id]
+        s       = self.poa2s[poa_id]
         usr.S_u.append (s)
-        for lvl in (range (len(usr.B)-1)):
+        for _ in (range (len(usr.B)-1)):
             s = self.parent_of(s)
             usr.S_u.append (s)
     
     def rd_old_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".poa" file.
-        The input includes a list of usr_entries of the format (usr,poa), where "usr" is the user id, and "poa" is its current access point (AP).
+        The input includes a list of usr_entries of the format (usr,poa), where "usr" is the user id, and "poa" is its current access point (PoA).
         After reading the usr entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
         if (line == []): # if the list of old users that moved is empty
@@ -1256,7 +1256,7 @@ class SFC_mig_simulator (object):
             # self.moved_usrs.append (usr)
             usr_cur_cpu = usr.B[usr.lvl]
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
-            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
+            self.update_S_u(usr, poa_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
                         
             if (self.mode in ['ourAlg']):
                 self.rmv_usr_from_all_Hs(usr) 
@@ -1277,7 +1277,7 @@ class SFC_mig_simulator (object):
     def rd_new_usrs_line (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".poa" file.
-        The input includes a list of usr_entries of the format (usr,poa), where "usr" is the user id, and "poa" is its current access point (AP).
+        The input includes a list of usr_entries of the format (usr,poa), where "usr" is the user id, and "poa" is its current access point (PoA).
         After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
         
@@ -1301,7 +1301,7 @@ class SFC_mig_simulator (object):
 
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr) 
-            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
+            self.update_S_u(usr, poa_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
 
             if (self.mode == 'ourAlg'):                
                 for s in usr.S_u: # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
@@ -1310,7 +1310,7 @@ class SFC_mig_simulator (object):
     def rd_old_usrs_line_lp (self, line):
         """
         Read a line detailing the new usrs just joined the system, in an ".poa" file, when using a LP solver for the problem.
-        The input includes a list of usr_entries of the format (usr,poa), where "usr" is the user id, and "poa" is its current access point (AP).
+        The input includes a list of usr_entries of the format (usr,poa), where "usr" is the user id, and "poa" is its current access point (PoA).
         After reading the usr_entries, the function assigns each chain to its relevant list of chains, Hs.  
         """
         if (line == []): # if the list of old users that moved is empty
@@ -1328,7 +1328,7 @@ class SFC_mig_simulator (object):
             usr.is_new = False
             # self.moved_usrs.append(usr)
             self.CPUAll_single_usr (usr)
-            self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs at its new location
+            self.update_S_u(usr, poa_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs at its new location
     
     def parse_usr_entry (self, usr_entry):
         """
@@ -1347,15 +1347,21 @@ class SFC_mig_simulator (object):
             exit ()
         return list_of_usr[0]
     
-    def check_AP_id (self, AP_id):
-        if (AP_id >= self.num_of_leaves):
-            AP_id = self.num_of_leaves-1
+    def check_poa_id (self, poa_id):
+        """
+        For debug only.
+        Basic sanity check for the given poa_id (Id of the PoA). 
+        """
+        if (poa_id >= self.num_of_leaves):
+            poa_id = self.num_of_leaves-1
         if (self.warned_about_too_large_poa == False):
-            print ('Encountered AP num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (AP_id, self.num_of_leaves, self.num_of_leaves-1))
+            print ('Encountered PoA num {} in the input file, but in the tree there are only {} leaves. Changing the ap to {}' .format (poa_id, self.num_of_leaves, self.num_of_leaves-1))
             exit ()
     
     def inc_array (self, ar, min_val, max_val):
         """
+        Currently unused.
+        An accessory function for brute-force searches.
         input: an array, in which elements[i] is within [min_val[i], max_val[i]] for each i within the array's size
         output: the same array, where the value is incremented by 1 
         Used for finding a brute-force solution.
@@ -1368,8 +1374,12 @@ class SFC_mig_simulator (object):
         return ar 
     
     def dump_state_to_log_file (self):
+        """
+        Used only for deep log / debugging.
+        Dumps data about the current network's state.
+        """
 
-        log_file = self.log_output_file #open ('../res/{}.t{}.log' .format (self.poa_file_name, self.t), 'w')
+        log_file = self.log_output_file 
         printf (log_file, 't={}\n' .format (self.t))
         for usr in self.usrs:
             printf (log_file, 'u.id={}, cur_s={}, nxt_s={}\n' .format(usr.id, usr.cur_s, usr.nxt_s))
@@ -1377,6 +1387,10 @@ class SFC_mig_simulator (object):
             printf (log_file, 's{}: Hs={}\n' .format (s, sorted (list ([usr.id for usr in self.G.nodes[s]['Hs']])))) 
 
     def dump_usrs_to_poa_file (self):
+        """
+        Used mainly for logging / debugging.
+        Dumps the PoA of all usrs at the current time slot.
+        """
 
         output_poa_file = open ('../res/Lux_dump_{}.t{}.poa' .format (self.mode, self.t), 'w')
         printf (output_poa_file, '// Dumping poa file={} poa2cell_file_name={}' .format (self.poa_file_name, self.poa2cell_file_name))
@@ -1391,7 +1405,7 @@ class SFC_mig_simulator (object):
     
     # def run_dump_usrs (self, slot_to_dump):
     #     """
-    #     Write the current AP association of all users at a given time slot to an .poa file
+    #     Write the current PoA association of all users at a given time slot to an .poa file
     #     """
     #     random.seed (42) # Use a fixed pseudo-number seed 
     #     self.usrs   = []
@@ -1433,7 +1447,7 @@ class SFC_mig_simulator (object):
     #                 usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
     #                 usr.is_new = True
     #                 self.CPUAll_single_usr (usr) 
-    #                 self.update_S_u(usr, AP_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
+    #                 self.update_S_u(usr, poa_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
     #                 self.usrs.append (usr)
     #
     #         elif (splitted_line[0] == "old_usrs:"):  
@@ -1452,7 +1466,7 @@ class SFC_mig_simulator (object):
     #                 list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
     #                 usr = list_of_usr[0]
     #                 self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
-    #                 self.update_S_u(usr, AP_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
+    #                 self.update_S_u(usr, poa_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
     #
     #             # if (self.t == slot_to_dump): 
     #             #     self.dump_usrs_to_poa_file() 
@@ -1460,7 +1474,7 @@ class SFC_mig_simulator (object):
     def rd_poa2cell_file (self, poa2cell_file_name):
         """
         Parse an poa2cell file.
-        An poa2cell file contains a list of APs, and, for each AP, the cell in which it is located.
+        An poa2cell file contains a list of PoAs, and, for each PoA, the cell in which it is located.
         """
         
         self.PoAs = []

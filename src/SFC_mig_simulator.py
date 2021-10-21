@@ -1544,16 +1544,16 @@ class SFC_mig_simulator (object):
         #         for prob_of_target_delay in [0.1*i for i in range (11)]:
         #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
     
-        # cpu_cap_at_leaf = 165  #Initial cpu cap at the leaf server
-        # for seed in [40 + i for i in range (11)]:
-        #     for prob_of_target_delay in [0.1*i for i in range (11)]:
-        #         self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+        cpu_cap_at_leaf = 150 #165  #Initial cpu cap at the leaf server
+        for seed in [40 + i for i in range (11)]:
+            for prob_of_target_delay in [0.1*i for i in range (11)]:
+                self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        cpu_cap_at_leaf = 143 #Initial cpu cap at the leaf server
-        mode = 'opt'
-        for prob_of_target_delay in [0]: #[(0.1*i) for i in range (11)]:
-            cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
-            self.print_sol_res_line (output_file)
+        # cpu_cap_at_leaf = 143 #Initial cpu cap at the leaf server
+        # mode = 'opt'
+        # for prob_of_target_delay in [0]: #[(0.1*i) for i in range (11)]:
+        #     cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+        #     self.print_sol_res_line (output_file)
 
     
 #######################################################################################################################################
@@ -1598,13 +1598,14 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 if __name__ == "__main__":
 
 
-    poa_file_name      = 'Lux_0730_0830_16secs_post.poa' #'shorter.poa' #
+    poa_file_name      = 'Lux_0829_0830_1secs_post.poa' #'shorter.poa' #
     poa2cell_file_name = 'Lux.center.post.antloc_256cells.poa2cell'
-    # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
-    cpu_cap_at_leaf = 250
     my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-    for seed in [40 + i for i in range (21)]:
-        my_simulator.simulate (mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-        
-    # my_simulator.run_prob_of_RT_sim ()
+    my_simulator.run_prob_of_RT_sim ()
+    # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
     
+    # cpu_cap_at_leaf = 250
+    # my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+    # for seed in [40 + i for i in range (21)]:
+    #     my_simulator.simulate (mode='ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        

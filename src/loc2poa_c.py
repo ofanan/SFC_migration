@@ -118,7 +118,7 @@ class loc2poa_c (object):
         self.verbose            = verbose      # verbose level - defining which outputs will be written
         self.debug              = False 
         self.antloc_file_name   = antloc_file_name
-        self.city                  = (antloc_file_name.split('.')[0] if antloc_file_name!='' else city)
+        self.city               = (antloc_file_name.split('.')[0] if antloc_file_name!='' else city)
        
         self.max_x, self.max_y = MAX_X[self.city], MAX_Y[self.city] # borders of the simulated area, in meters
         self.usrs              = []
@@ -217,7 +217,7 @@ class loc2poa_c (object):
         self.num_of_PoAs = len (self.list_of_PoAs)
         
         poa2cell_file = open ('../res/{}_{}cells.poa2cell' .format(antennas_loc_file_name, self.num_of_cells), 'w')
-        printf (poa2cell_file, '// This file details the cell associated with each PoA.\n// Format: a c\n// Where a is the poa number, and c is the number of cell associated with it.\n')
+        printf (poa2cell_file, '// This file details the cell associated with each PoA.\n// Format: p c\n// Where p is the poa number, and c is the number of cell associated with it.\n')
         
         for poa in range(self.num_of_PoAs):
             printf (poa2cell_file, '{} {}\n' .format (poa, self.poa2cell(poa)))
@@ -719,6 +719,10 @@ class loc2poa_c (object):
         2. output the PoAs of all new/left/moved users at each time slot.
         The exact behavior is by the value of self.verbose
         """
+        city_token_in_usr_loc_file_name = loc_file_names[0].split('_')[0]
+        if (city_token_in_usr_loc_file_name != self.city):
+            print ('Error: loc2poa_c initialized with city={}, but the input .loc file name is {}' .format (self.city, self.usrs_loc_file_name))
+            exit ()
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_file_name = '../res/num_of_vehs_{}_{}.txt' .format (loc_file_names[0], self.antloc_file_name)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
@@ -726,7 +730,7 @@ class loc2poa_c (object):
             self.demography_file = open ('../res/demography_{}_{}.txt' .format(loc_file_names[0].split('.')[0], self.num_of_cells), 'w+')
         if (VERBOSE_POA in self.verbose):
             self.poa_file_name = self.input_files_str (loc_file_names[0]) + '.poa'
-            self.poa_file      = open ("../res/ap_files/" + self.poa_file_name, "w+")  
+            self.poa_file      = open ("../res/poa_files/" + self.poa_file_name, "w")  
             if (self.use_rect_PoA_cells):
                 printf (self.poa_file, '// Using rectangle cells\n')
             else:
@@ -737,7 +741,7 @@ class loc2poa_c (object):
             printf (self.poa_file, '//"new_usrs" is a list of the new usrs, and their PoAs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
             printf (self.poa_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current PoAs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
-        print ('Begin parsing files with max_power_of_4={}' .format (self.max_power_of_4))
+        print ('Parsing .loc files. max_power_of_4={}. antloc_file={}' .format (self.max_power_of_4, self.antloc_file_name))
         self.is_first_slot = True
         for file_name in loc_file_names: 
             self.usrs_loc_file_name = file_name
@@ -823,11 +827,11 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 4
-    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Lux.post.antloc', city='') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    my_loc2poa.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

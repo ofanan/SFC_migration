@@ -5,6 +5,16 @@ b_*
 /res/*
 /old/*
 /src/__pycache*
+/src/sim*
+*.java
+src/config/*
+src/gui/*
+src/nodes/*
+src/CityMob*
+src/cityyMob*
+src/Citymob*
+src/*cplex*
+src/toy*.py
 src/Check_sol.py
 src/obj_func.py
 /.pydevproject

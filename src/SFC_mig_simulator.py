@@ -1489,7 +1489,7 @@ class SFC_mig_simulator (object):
             splitted_line = line.split ()
             self.PoAs.append ({'poa' : int(splitted_line[0]), 'cell' : int(splitted_line[1])})
     
-    def binary_search_opt (self, output_file, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=61, seed=42):
+    def binary_search_opt (self, output_file, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=float('inf'), seed=42):
         """
         Binary-search for the minimal rsrce aug' required by an algorithm (not opt) to find a feasible sol.
         As the results of opt are consistent (namely, If a run succeeds with cpu cap X, then in would succeed also with cpu cap X+1), 
@@ -1499,7 +1499,7 @@ class SFC_mig_simulator (object):
         self.verbose.append (VERBOSE_CALC_RSRC_AUG) 
         return self.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
 
-    def binary_search_algs (self, output_file, mode, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=61, seed=42):
+    def binary_search_algs (self, output_file, mode, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=float('inf'), seed=42):
         """
         Binary-search for the minimal rsrce aug' required by an algorithm (not opt) to find a feasible sol.
         As the results for algs' aren't necessarily consistent (namely, a run may succeed with cpu cap X, but fail with cpu cap X+1), 
@@ -1534,12 +1534,12 @@ class SFC_mig_simulator (object):
         """       
 
         print ('Running run_prob_of_RT_sim')
-        sim_len_in_slots = 61
+        sim_len_in_slots = float('inf')
         mode             = 'ourAlg' 
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, ('_opt' if mode=='opt' else '')), 'a') 
            
         # cpu_cap_at_leaf = 81 #165  #Initial cpu cap at the leaf server
-        # for seed in [40 + i for i in range (21)]:
+        # for seed in [40 + i for i in range (21) ]:
         #     for prob_of_target_delay in [0.1*i for i in range (11)]:
         #         self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 

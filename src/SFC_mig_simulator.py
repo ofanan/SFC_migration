@@ -273,8 +273,7 @@ class SFC_mig_simulator (object):
             if (cpu_cap_const != []):
                 model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
 
-        model.solve(plp.PULP_CBC_CMD(msg=0)) # solve the model, without printing output; to solve it using another solver: solve(GLPK(msg = 0))
-        
+        model.solve() # solve the model, using the default settings. to suppress outputs, may use: model.solve(plp.PULP_CBC_CMD(msg=0)). However, this causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
         
         self.stts = sccs if (model.status==1) else fail       
         # print the solution to the output, according to the desired self.verbose level
@@ -1527,7 +1526,7 @@ class SFC_mig_simulator (object):
             else: 
                 lb = cpu_cap_at_leaf
     
-    def run_prob_of_RT_sim (self):
+    def run_prob_of_RT_sim_algs (self):
         """
         Run a simulation where the probability of a RT application varies. 
         Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
@@ -1535,27 +1534,38 @@ class SFC_mig_simulator (object):
 
         print ('Running run_prob_of_RT_sim')
         sim_len_in_slots = float('inf')
-        mode             = 'ourAlg' 
-        output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, ('_opt' if mode=='opt' else '')), 'a') 
-           
-        # cpu_cap_at_leaf = 81 #165  #Initial cpu cap at the leaf server
-        # for seed in [40 + i for i in range (21) ]:
-        #     for prob_of_target_delay in [0.1*i for i in range (11)]:
-        #         self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        # for mode in ['cpvnf', 'ffit']:
-        #     cpu_cap_at_leaf = 180  #Initial cpu cap at the leaf server
-        #     for seed in [40 + i for i in range (21)]:
-        #         for prob_of_target_delay in [0.1*i for i in range (11)]:
-        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
-
-        
+        output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, '_algs'), 'a')    
         cpu_cap_at_leaf = 81 #Initial cpu cap at the leaf server
-        mode = 'opt'
+        mode             = 'ourAlg' 
+        for seed in [40 + i for i in range (21) ]:
+            for prob_of_target_delay in [0.1*i for i in range (11)]:
+                if (prob_of_target_delay == 0.7):
+                    cpu_cap_at_leaf = 113 
+                elif (prob_of_target_delay>0.7):
+                    cpu_cap_at_leaf = 129
+                self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+
+        for mode in ['cpvnf', 'ffit']: #cpvnf: at least 194
+            cpu_cap_at_leaf = 150  #Initial cpu cap at the leaf server
+            for seed in [40 + i for i in range (21)]:
+                for prob_of_target_delay in [0.1*i for i in range (11)]:
+                    self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+
+    def run_prob_of_RT_sim_opt (self):
+        """
+        Run a simulation where the probability of a RT application varies. 
+        Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
+        """       
+
+        print ('Running run_prob_of_RT_sim')
+        sim_len_in_slots = float('inf')
+
+        cpu_cap_at_leaf = 81 #Initial cpu cap at the leaf server
+        output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, '_opt'), 'a')    
         for prob_of_target_delay in [0]: #[(0.1*i) for i in range (11)]:
             cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
             self.print_sol_res_line (output_file)
-
     
 #######################################################################################################################################
 # Functions that are not part of the class
@@ -1591,10 +1601,10 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 if __name__ == "__main__":
 
 
-    poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'shorter.poa' #
+    poa_file_name      = 'Lux_0829_0830_1secs_post.poa' #'shorter.poa' #
     poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
-    my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-    my_simulator.run_prob_of_RT_sim ()
+    my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+    my_simulator.run_prob_of_RT_sim_algs ()
     # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
     
     # cpu_cap_at_leaf = 250

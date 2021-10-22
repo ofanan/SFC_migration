@@ -797,18 +797,18 @@ class SFC_mig_simulator (object):
         # open output files, and print there initial comments
         if (VERBOSE_RES in self.verbose):
             self.init_res_file()
-        if VERBOSE_CALC_RSRC_AUG in self.verbose:
-            if (self.use_exp_cpu_cost and self.use_exp_cpu_cap): 
-                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu^2.res' 
-            elif (self.use_exp_cpu_cost):
-                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu_cost_{}.res' .format (self.poa2cell_file_name)
-            else: 
-                self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'
-
-            if Path (self.rsrc_aug_file_name).is_file(): # does this res file already exist?
-                self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "a")
-            else:
-                self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "w")
+        # if VERBOSE_CALC_RSRC_AUG in self.verbose:
+        #     if (self.use_exp_cpu_cost and self.use_exp_cpu_cap): 
+        #         self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu^2.res' 
+        #     elif (self.use_exp_cpu_cost):
+        #         self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob_exp_cpu_cost_{}.res' .format (self.poa2cell_file_name)
+        #     else: 
+        #         self.rsrc_aug_file_name = '../res/rsrc_aug_by_RT_prob.res'
+        #
+        #     if Path (self.rsrc_aug_file_name).is_file(): # does this res file already exist?
+        #         self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "a")
+        #     else:
+        #         self.rsrc_aug_file =  open (self.rsrc_aug_file_name,  "w")
             
         # if (VERBOSE_MOVED_RES in self.verbose):
         #     self.init_moved_res_file()
@@ -997,11 +997,11 @@ class SFC_mig_simulator (object):
         """
         Organize, writes and plots the simulation results, after the simulation is done
         """
-        if (VERBOSE_MOB in self.verbose):
-            self.print_mob ()        
-        if (VERBOSE_CALC_RSRC_AUG in self.verbose):
-            print ('augmented cpu cap at leaf={}' .format (self.augmented_cpu_cap_at_leaf()))
-            self.print_sol_res_line (self.rsrc_aug_file)
+        # if (VERBOSE_MOB in self.verbose):
+        #     self.print_mob ()        
+        # if (VERBOSE_CALC_RSRC_AUG in self.verbose):
+        #     print ('augmented cpu cap at leaf={}' .format (self.augmented_cpu_cap_at_leaf()))
+        #     self.print_sol_res_line (self.rsrc_aug_file)
     
     # def print_mob (self):
     #     """
@@ -1535,39 +1535,32 @@ class SFC_mig_simulator (object):
 
         print ('Running run_prob_of_RT_sim')
         sim_len_in_slots = 61
-        mode             = 'ourAlg' #ffit' #'ourAlg'
+        mode             = 'ourAlg' 
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, ('_opt' if mode=='opt' else '')), 'a') 
-       
-        # for mode in ['ffit', 'cpvnf']:
-        #     cpu_cap_at_leaf = 300  #Initial cpu cap at the leaf server
-        #     for seed in [50 + i for i in range (3, 11)]:
+           
+        # cpu_cap_at_leaf = 81 #165  #Initial cpu cap at the leaf server
+        # for seed in [40 + i for i in range (21)]:
+        #     for prob_of_target_delay in [0.1*i for i in range (11)]:
+        #         self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+
+        # for mode in ['cpvnf', 'ffit']:
+        #     cpu_cap_at_leaf = 180  #Initial cpu cap at the leaf server
+        #     for seed in [40 + i for i in range (21)]:
         #         for prob_of_target_delay in [0.1*i for i in range (11)]:
         #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
-    
-        cpu_cap_at_leaf = 86 #165  #Initial cpu cap at the leaf server
-        for seed in [40 + i for i in range (21)]:
-            for prob_of_target_delay in [0.1*i for i in range (11)]:
-                self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
-        # cpu_cap_at_leaf = 143 #Initial cpu cap at the leaf server
-        # mode = 'opt'
-        # for prob_of_target_delay in [0]: #[(0.1*i) for i in range (11)]:
-        #     cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
-        #     self.print_sol_res_line (output_file)
+        
+        cpu_cap_at_leaf = 81 #Initial cpu cap at the leaf server
+        mode = 'opt'
+        for prob_of_target_delay in [0]: #[(0.1*i) for i in range (11)]:
+            cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+            self.print_sol_res_line (output_file)
 
     
 #######################################################################################################################################
 # Functions that are not part of the class
 #######################################################################################################################################
 
-
-# def run_simulator (sim_pickle_file_name):
-#     """
-#     loads a simulator, and runs it
-#     """
-#
-#     my_simulator = pickle.load (open ('../res/' + sim_pickle_file_name, 'rb'))
-#     my_simulator.simulate (mode = 'ffit', sim_len_in_slots = 61) 
 
 def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
     """
@@ -1598,8 +1591,8 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 if __name__ == "__main__":
 
 
-    poa_file_name      = 'Lux_0829_0830_1secs_post.poa' #'shorter.poa' #
-    poa2cell_file_name = 'Lux.center.post.antloc_256cells.poa2cell'
+    poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'shorter.poa' #
+    poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
     my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
     my_simulator.run_prob_of_RT_sim ()
     # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)

@@ -221,9 +221,9 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
     # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
 
-    my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
+    # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
 
-    # my_Traci_runner.simulate (warmup_period=3600*7.5, sim_length = 3600*1, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (warmup_period=(3600*8.5-600), sim_length = 600, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

@@ -108,6 +108,10 @@ class loc2poa_c (object):
     # return True iff the given idx is between 0 and self.num_of_cells
     is_in_range_of_cells = lambda self, idx : (idx >=0 and idx <= self.num_of_cells)
 
+    # rotate a given point by self.angle radians counter-clockwise around self.pivot
+    rotate_point = lambda self, point : [self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1]),
+                                         self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1])]
+ 
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
         Init a "loc2poa_c" object.
@@ -823,6 +827,17 @@ class loc2poa_c (object):
         voronoi_plot_2d(Voronoi(points), show_vertices=False)
         plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
         plt.show()
+        
+    def rotate_loc_file (self, angle=54):
+        """
+        Given an input .loc file, generate an output .loc file, where each location is rotated angle degrees clockwise w.r.t. the center of the simulated area.
+        """
+        if (self.city != 'Monaco'):
+            print ('Error: currently, we rotate only Monaco')
+            exit ()
+        self.pivot = [GLOBAL_MAX_X/2, GLOBAL_MAX_Y/2] # pivot point, around which the rotating is done
+        self.angle = -math.radians(angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
+        
 
 if __name__ == '__main__':
 
@@ -831,7 +846,7 @@ if __name__ == '__main__':
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    my_loc2poa.parse_loc_files (['Lux_0820_0830_1secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

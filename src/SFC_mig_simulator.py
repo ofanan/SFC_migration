@@ -1601,7 +1601,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 if __name__ == "__main__":
 
 
-    poa_file_name      = 'Lux_0829_0830_1secs_post.poa' #'shorter.poa' #
+    poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'shorter.poa' #
     poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
     my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
     my_simulator.run_prob_of_RT_sim_algs ()

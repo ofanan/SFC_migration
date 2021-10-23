@@ -77,10 +77,13 @@ class loc2poa_c (object):
     # Map a given x,y position to an PoA (Point of Access).
     # If there input include real PoA locations, the mapping is by Voronoi distance, namely, each client is mapped to the nearest poa.
     # Else, use a partition of the area into uniform-size rectangular cells.
-    loc2poa = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_PoA_cells else self.nearest_poa (x,y) 
-
+    loc2poa = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_PoA_cells else self.nearest_poa (x,y)
+     
+    #$$$$ Should assign correct non-default values for max_x, max_y when calling to _squarlets where the # of squarlets > 1 
+    loc2cell_using_rect_cells = lambda self, x, y, max_power_of_4 : self.loc2cell_using_squarlets (x % self.x_edge_of_squarlet, y) + (x // self.x_edge_of_squarlet)*4**self.max_power_of_4 
+ 
     # inline function for formatted-printing the PoA of a single user
-    print_usr_poa = lambda self, usr: printf(self.poa_file, "({},{})" .format (usr['id'], usr['nxt poa']))   
+    print_usr_poa = lambda self, usr: printf(self.poa_file, "({},{:.0f})" .format (usr['id'], usr['nxt poa']))   
     
     # returns the distance between a given (x,y) position, and a given antenna
     sq_dist = lambda self, x, y, antenna : (x - antenna['x'])**2 + (y - antenna['y'])**2
@@ -122,9 +125,18 @@ class loc2poa_c (object):
         self.verbose            = verbose      # verbose level - defining which outputs will be written
         self.debug              = False 
         self.antloc_file_name   = antloc_file_name
-        self.city               = (antloc_file_name.split('.')[0] if antloc_file_name!='' else city)
+        
+        if (antloc_file_name !='' ): 
+            self.city = antloc_file_name.split('.')[0] # extract the city from the antennas' location file 
+        elif (city != ''):
+            self.city = city
+        else:
+            print ('Error: nor antenna location file, neither city was specified.')
+            exit ()
+        self.num_of_squarlettes = 4 if (self.city=='Monaco') else 1 # in Monaco we divide the city area into 4 almost-square rectangles before further iteratively partitioning it into squares
        
         self.max_x, self.max_y = MAX_X[self.city], MAX_Y[self.city] # borders of the simulated area, in meters
+        self.x_edge_of_squarlet = self.max_x / self.num_of_squarlettes   
         self.usrs              = []
         self.use_rect_PoA_cells   = True if (self.antloc_file_name=='') else False
 
@@ -253,21 +265,24 @@ class loc2poa_c (object):
         plt.savefig('../res/{}_poa_points.jpg' .format (self.antloc_file_name))
         plt.clf()
         
-    def loc2cell_using_rect_cells (self, x, y, max_power_of_4):
+    def loc2cell_using_squarlets (self, x, y, max_x=None, max_y=None, max_power_of_4=None):
         """
-        Finding the PoA covering the user's area, assuming that the number of PoAs is a power of 4, and rectangular cells.
-        Input:  (x,y) location data
+        Finding the PoA covering the user's area, assuming that the number of PoAs is a power of 4, and the area is iteratively partitioned into 4 identical squares.
+        Input:  (x,y) location data; (max_x, max_y) - nort-east corner for the area to partition; the south-west corner is (0,0).
         Output: poa that covers this area
         """
+        max_x          = self.max_x           if (max_x == None)          else max_x
+        max_y          = self.max_y           if (max_y == None)          else max_x
+        max_power_of_4 = self.max_power_of_4  if (max_power_of_4 == None) else max_power_of_4
         poa = np.int8(0)
         x_offset, y_offset = x, y
-        x_edge, y_edge = 0.5*self.max_x, 0.5*self.max_y
+        x_edge, y_edge = 0.5*max_x, 0.5*max_y
         for p in range (max_power_of_4):
             poa += 4**(max_power_of_4-1-p)*int(2 * (y_offset // y_edge) + x_offset // x_edge) 
             x_offset, y_offset = x_offset % x_edge, y_offset % y_edge   
             x_edge /= 2
             y_edge /= 2
-        return poa
+        return int(poa)
     
     def print_usrs_poa (self):
         """
@@ -842,11 +857,11 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 4
-    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Lux.post.antloc', city='') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Lux_0820_0830_1secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    my_loc2poa.parse_loc_files (['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

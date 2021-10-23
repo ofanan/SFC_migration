@@ -79,8 +79,10 @@ class loc2poa_c (object):
     # Else, use a partition of the area into uniform-size rectangular cells.
     loc2poa = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_PoA_cells else self.nearest_poa (x,y)
      
-    #$$$$ Should assign correct non-default values for max_x, max_y when calling to _squarlets where the # of squarlets > 1 
-    loc2cell_using_rect_cells = lambda self, x, y, max_power_of_4 : self.loc2cell_using_squarlets (x % self.x_edge_of_squarlet, y) + (x // self.x_edge_of_squarlet)*4**self.max_power_of_4 
+    # calculate the respective cell when using rectangular cell.
+    # This is done by calling loc2cell_using_squarlets with the relative position w.r.t. the concrete squarlet's boarder, and adding the number of cells in more western squarlets. 
+    #$$$$ Should debug it. 
+    loc2cell_using_rect_cells = lambda self, x, y, max_power_of_4 : self.loc2cell_using_squarlets (x = x % self.x_edge_of_squarlet, y = y, max_x = self.x_edge_of_squarlet, max_y=self.max_y) + (x // self.x_edge_of_squarlet)*4**self.max_power_of_4 
  
     # inline function for formatted-printing the PoA of a single user
     print_usr_poa = lambda self, usr: printf(self.poa_file, "({},{:.0f})" .format (usr['id'], usr['nxt poa']))   
@@ -272,7 +274,7 @@ class loc2poa_c (object):
         Output: poa that covers this area
         """
         max_x          = self.max_x           if (max_x == None)          else max_x
-        max_y          = self.max_y           if (max_y == None)          else max_x
+        max_y          = self.max_y           if (max_y == None)          else max_y
         max_power_of_4 = self.max_power_of_4  if (max_power_of_4 == None) else max_power_of_4
         poa = np.int8(0)
         x_offset, y_offset = x, y

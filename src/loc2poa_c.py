@@ -114,8 +114,8 @@ class loc2poa_c (object):
     is_in_range_of_cells = lambda self, idx : (idx >=0 and idx <= self.num_of_cells)
 
     # rotate a given point by self.angle radians counter-clockwise around self.pivot
-    rotate_point = lambda self, point : [self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1]),
-                                         self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1])]
+    rotate_point = lambda self, point : [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
+                                         int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))]
  
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
@@ -845,25 +845,59 @@ class loc2poa_c (object):
         plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
         plt.show()
         
-    def rotate_loc_file (self, angle=54):
+    def rotate_loc_file (self, loc_file_names, angle=54):
         """
         Given an input .loc file, generate an output .loc file, where each location is rotated angle degrees clockwise w.r.t. the center of the simulated area.
         """
         if (self.city != 'Monaco'):
             print ('Error: currently, we rotate only Monaco')
             exit ()
-        self.pivot = [GLOBAL_MAX_X/2, GLOBAL_MAX_Y/2] # pivot point, around which the rotating is done
+        self.pivot = [GLOBAL_MAX_X[self.city]/2, GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
         self.angle = -math.radians(angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
         
+        for loc_file_name in loc_file_names: 
+            self.input_loc_file   = open ('../res/loc_files/' + loc_file_name,  "r")
+            self.rotated_loc_file = open ('../res/loc_files/' + loc_file_name.split('.poa')[0] + '_rotated{}.poa' .format (angle),  "w")
+            
+            for line in self.input_loc_file: 
+        
+                # copy empty and comments lines as is to the output  
+                line = line.split ('\n')[0] 
+                if (line.split ("//")[0] == ""):
+                    printf (self.rotated_loc_file, '{}\n' .format (line))
+                    continue
+        
+                splitted_line = line.split (" ")
+                
+                if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'): # copy each such line as is to the output
+                    printf (self.rotated_loc_file, '{}' .format (line))
+    
+                elif (splitted_line[0] == 'new_or_moved:'): 
+                    printf (self.rotated_loc_file, 'new_or_moved:')
+                    splitted_line = splitted_line[1:] # the rest of this line details the locations of users that are either new, or old (existing) users who moved during the last time slot
+                    if (splitted_line !=['']): # Is there a non-empty list of vehicles that are old / new / recycled?  
+    
+                        splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
+                        for my_tuple in splitted_line:  
+                            if (len(my_tuple) <= 1): # no more new vehicles in this list. 
+                                break
+                            my_tuple = my_tuple.split("(")
+                            my_tuple   = my_tuple[1].split (',')
+                            [x,y] = self.rotate_point ([float(my_tuple[x_pos_idx]), float(my_tuple[y_pos_idx])])
+                            printf (self.rotated_loc_file, '({},{},{})' .format (my_tuple[veh_id_idx], x, y))
+                    else: # no usrs in the list - merely write the token 'new_or_moved:' to the output file
+                        printf (self.rotated_loc_file, '{}' .format (line))
+                printf (self.rotated_loc_file, '\n' .format (line))
 
 if __name__ == '__main__':
 
     max_power_of_4 = 4
-    my_loc2poa      = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = '', city='Lux') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    # my_loc2poa.parse_loc_files (['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

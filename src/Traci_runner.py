@@ -3,6 +3,7 @@ from sumolib import checkBinary
 import traci  
 import sys
 import numpy as np
+import math
 # import matplotlib.pyplot as plt
 
 # My own format print functions 
@@ -27,6 +28,10 @@ class Traci_runner (object):
     # Returns the relative location of a given vehicle ID. The relative location is the position w.r.t. the lower left (south-west) corner of the simulated area.
     get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER[self.city]
 
+    # rotate a given point by self.angle radians counter-clockwise around self.pivot
+    rotate_point = lambda self, point : point if (self.angle==0) else [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
+                                                                       int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))]
+     
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
 
@@ -76,7 +81,10 @@ class Traci_runner (object):
         """
         Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input
         """
-    
+        self.pivot = [loc2poa_c.GLOBAL_MAX_X[self.city]/2, loc2poa_c.GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
+        angle = 54 # angle to rotate the points (in degrees).  
+        self.angle = -math.radians(angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
+
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         # prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
@@ -115,7 +123,7 @@ class Traci_runner (object):
                     print ('Successfully finished writing to file {}' .format (loc_output_file_name))
                     break
                 
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.rotate_point(self.get_relative_position(veh_key)))] # list of vehs currently found within the simulated area.
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             
                 vehs_left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
@@ -143,7 +151,7 @@ class Traci_runner (object):
                             continue
                         veh_type = 'o' # will indicate that this is a old vehicle 
                         veh_id = filtered_list[0]['id'] 
-                    position = self.get_relative_position (veh_key)
+                    position = self.rotate_point(self.get_relative_position (veh_key))
                     if (VERBOSE_SPEED in self.verbose): 
                         printf (loc_output_file, "({},{},{},{},{:.0f})" .format (veh_type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
                     elif (VERBOSE_LOC in self.verbose):
@@ -209,14 +217,9 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    x, y = 50000, 50000
-    city = 'Monaco'
-    if (loc2poa_c.gamad (city, [x, y])):
-        print ('({},{}) is within the simulated area of {}' .format (x,y,city))
-    exit ()
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
 
-    my_Traci_runner.simulate (warmup_period=(3600*8.5-600), sim_length = 600, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

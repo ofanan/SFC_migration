@@ -761,7 +761,7 @@ class SFC_mig_simulator (object):
         elif (self.mode == 'ourAlg'):   
             self.max_R = 2 
         else:
-            self.max_R = 4
+            self.max_R = 5
 
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
@@ -1536,14 +1536,16 @@ class SFC_mig_simulator (object):
         sim_len_in_slots = float('inf')
 
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, '_algs'), 'a')    
-        cpu_cap_at_leaf = 81 #Initial cpu cap at the leaf server
+        cpu_cap_at_leaf = 89 #Initial cpu cap at the leaf server
         mode             = 'ourAlg' 
         for seed in [40 + i for i in range (21) ]:
             for prob_of_target_delay in [0.1*i for i in range (11)]:
                 if (prob_of_target_delay == 0.7):
-                    cpu_cap_at_leaf = 113 
+                    cpu_cap_at_leaf = 130 
                 elif (prob_of_target_delay>0.7):
-                    cpu_cap_at_leaf = 129
+                    cpu_cap_at_leaf = 144
+                elif (prob_of_target_delay==1.0):
+                    cpu_cap_at_leaf = 171                
                 self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
 
         for mode in ['cpvnf', 'ffit']: #cpvnf: at least 194
@@ -1600,8 +1602,10 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 
 poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'shorter.poa' #
 poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
-my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-i = 0
-my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
+my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+my_simulator.run_prob_of_RT_sim_algs ()
 # SFC_mig_simulator.run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
+# my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+# i = 0
+# my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
     

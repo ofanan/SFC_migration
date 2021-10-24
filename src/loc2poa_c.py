@@ -142,7 +142,7 @@ class loc2poa_c (object):
         else:
             print ('Error: nor antenna location file, neither city was specified.')
             exit ()
-        self.num_of_squarlettes = 4 if (self.city=='Monaco') else 1 # in Monaco we divide the city area into 4 almost-square rectangles before further iteratively partitioning it into squares
+        self.num_of_squarlettes = 2 if (self.city=='Monaco') else 1 # in Monaco we divide the city area into 4 almost-square rectangles before further iteratively partitioning it into squares
        
         self.max_x, self.max_y = MAX_X[self.city], MAX_Y[self.city] # borders of the simulated area, in meters
         self.x_edge_of_squarlet = self.max_x / self.num_of_squarlettes   
@@ -172,12 +172,13 @@ class loc2poa_c (object):
             self.left_cell          = [[] for _ in range(self.num_of_cells)] # self.left_cell[i][j] will count the # of clients that left cell i at slot j
             self.joined_poa_sim_via  = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last PoA in the sim was PoA i
             
-            self.left_cell_to = []
-            for _ in range(self.num_of_cells):
-                self.left_cell_to.append ({'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0})
-        if (VERBOSE_DEMOGRAPHY in self.verbose):
-            self.calc_ngbr_rects ()
+            if (self.num_of_squarlettes==1): # Finding neighbors is currently supported only when there's a single squarlet
+                self.left_cell_to = []
+                for _ in range(self.num_of_cells):
+                    self.left_cell_to.append ({'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0})
+                    self.calc_ngbr_rects ()
     
+    #$$$ Need to revise it for the case when using more than a single squarlet
     def calc_ngbr_rects (self):
         """
         Used for debugging only  
@@ -311,6 +312,10 @@ class loc2poa_c (object):
         """
         Prints the number of vehicles that joined/left each cell during the last simulated time slot.
         """
+        if (self.num_of_squarlettes>1):
+            print ('Note: printing demography map when num_of_squarlettes>! is currently unsupported.')
+            return 
+
         # for poa in range(self.num_of_PoAs):
         #     printf (self.demography_file, 'poa_{}: joined {}\npoa_{}: joined_poa_sim_via{}\npoa_{}: left {}\npoa_{}: \n' .format (
         #                                         poa, self.joined_poa[poa], 
@@ -333,8 +338,6 @@ class loc2poa_c (object):
         # Trunc the data of the first entry, in which obviously no veh joined/left any PoA, or cell
         # self.joined_poa         = [self.joined_poa        [poa][1:] for poa in range (self.num_of_PoAs)] 
         self.joined_cell       = [self.joined_cell      [poa][1:] for poa in range (self.num_of_cells)] 
-        print ('left a cell={:.2f}' .format 
-               (np.average ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])))
         # print ('joined the simulated area from poa={:.2f}' .format 
         #        (np.average ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])))
         # print ('left the simulated area from poa={:.2f}' .format 
@@ -352,7 +355,7 @@ class loc2poa_c (object):
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals, columns=columns), cmap="YlGnBu")
+        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals), cmap="YlGnBu") #, columns=columns
         printf   (heatmap_txt_file, 'num of rects = {}\n' .format ( self.num_of_cells))
         printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
@@ -384,10 +387,18 @@ class loc2poa_c (object):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
-        n = self.sqrt_len(vec)
-        if (len(vec) != len(self.cell2tile)): # The current mapping of cell2tile doesn't fit the number of rectangles in the given vec --> calculate a cell2tile mapping fitting the required len
-            self.calc_cell2tile (lvl=self.max_power_of_4 - int(math.log2(n)))
-        heatmap_val = np.array ([vec[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [n, n])
+        if (self.num_of_squarlettes==1): # When there's only one squarlet, all the mapping is a single square mat
+            nrows = self.sqrt_len(vec)
+            ncols = nrows
+            if (len(vec) != len(self.cell2tile)): # The current mapping of cell2tile doesn't fit the number of rectangles in the given vec --> calculate a cell2tile mapping fitting the required len; currently generating heatmaps of other levels is supported only for lvl=0
+                self.calc_cell2tile (lvl=self.max_power_of_4 - int(math.log2(nrows)))
+        else:
+            nrows = int (2**self.max_power_of_4)
+            ncols = nrows * self.num_of_squarlettes
+            if (nrows*ncols != len (self.cell2tile)):
+                print ('Error in calculation. max_p_of_4={}, nrows={}, ncols={}, len(cell2tile)={}' .format(self.max_power_of_4, nrows, ncols, len(self.cell2tile)))
+                exit ()
+        heatmap_val = np.array ([vec[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [nrows, ncols])
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         # Hence, need to swap the matrix upside-down
@@ -494,7 +505,6 @@ class loc2poa_c (object):
         self.cell2tile = np.asarray(self.cell2tile).reshape(-1) 
 
         # for demography verbose, we need also the other direction, which maps a given cell to its physical location in the tile. 
-        print ('num of cells={}, num_of_tiles={}' .format (self.num_of_cells, self.num_of_tiles))
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.tile2cell = np.empty (self.num_of_tiles, dtype = 'uint8')
             for cell in range (self.num_of_cells):
@@ -578,7 +588,8 @@ class loc2poa_c (object):
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
                     for usr in list (filter (lambda usr: usr['id'] in ids_of_usrs_that_left_poa, self.usrs)): # for each usr that left
                         self.left_cell    [usr['cur cell']][-1]    += 1 # increase the cntr of the usrs that left from the cur cell of that usr at this cycle
-                        self.left_cell_to [usr['cur cell']]['out'] += 1 # inc the cntr of the # of veh left this cell to outside the sim (counting along the whole sim, not per cycle)
+                        if (self.num_of_squarlettes==1): # Finding neighbors is currently supported only when there's a single squarlet
+                            self.left_cell_to [usr['cur cell']]['out'] += 1 # inc the cntr of the # of veh left this cell to outside the sim (counting along the whole sim, not per cycle)
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left_poa), self.usrs))
                 continue
     
@@ -631,11 +642,12 @@ class loc2poa_c (object):
                                 self.left_cell    [cur_cell] [-1]              += 1 # inc the # of usrs who left this cell at this cycle
                                 
                                 
-                                direction = self.direction_of_mv (cur_cell, nxt_cell)
-                                if (direction == -1): # error 
-                                    printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
-                                else:
-                                    self.left_cell_to [cur_cell][direction] += 1 # increase the cntr of usrs who left this cell to the relevant direction
+                                if (self.num_of_squarlettes==1): # printing demography map when num_of_squarlettes>! is currently unsupported
+                                    direction = self.direction_of_mv (cur_cell, nxt_cell)
+                                    if (direction == -1): # error 
+                                        printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
+                                    else:
+                                        self.left_cell_to [cur_cell][direction] += 1 # increase the cntr of usrs who left this cell to the relevant direction
                         else:
                             print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
                             exit () 
@@ -661,6 +673,9 @@ class loc2poa_c (object):
         The directions to which a veh can move are 'n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se', and 'out'.
         'out' indicates that a car left the simulated area.
         """
+        if (self.num_of_squarlettes>1): # Finding neighbors is currently supported only when there's a single squarlet
+            print ('Sorry. Currently demography diagram are supported only when num_of_squarlets==1')
+            return
         printf (self.demography_file, '\\\ Demography diagrams\n')
         printf (self.demography_file, '\\\ Showing for each rectangle the average number of cars left to each direction, at each slot\n')
         printf (self.demography_file, '\\\ The number in the middle show the average number of cars left the simulated area from this rectangle\n\n\n')
@@ -711,8 +726,6 @@ class loc2poa_c (object):
             self.plot_num_of_vehs_in_cell_heatmaps()
             # self.plot_num_of_vehs_per_PoA()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            print ('arrived here') #$$$$
-            exit ()
             self.print_demography_diagram ()
             self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
@@ -910,7 +923,7 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 1
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA, VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     

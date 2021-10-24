@@ -492,8 +492,7 @@ class loc2poa_c (object):
             self.cell2tile = np.concatenate ((self.cell2tile, (sq_num+1)*4**self.max_power_of_4+cell2tile_in_squarlet), axis=1)
 
         self.cell2tile = np.asarray(self.cell2tile).reshape(-1) 
-        print ('After: len(cell2tile)={}\ncell2tile=\n{}' .format (len(self.cell2tile), self.cell2tile))
-        exit ()
+
         # for demography verbose, we need also the other direction, which maps a given cell to its physical location in the tile. 
         print ('num of cells={}, num_of_tiles={}' .format (self.num_of_cells, self.num_of_tiles))
         if (VERBOSE_DEMOGRAPHY in self.verbose):
@@ -712,7 +711,7 @@ class loc2poa_c (object):
             self.plot_num_of_vehs_in_cell_heatmaps()
             # self.plot_num_of_vehs_per_PoA()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
-            print ('arrived hree') #$$$$
+            print ('arrived here') #$$$$
             exit ()
             self.print_demography_diagram ()
             self.plot_demography_heatmap()

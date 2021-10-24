@@ -27,18 +27,6 @@ class Traci_runner (object):
     # Returns the relative location of a given vehicle ID. The relative location is the position w.r.t. the lower left (south-west) corner of the simulated area.
     get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER[self.city]
 
-    is_in_simulated_area  = lambda self, position : True if (self.city=='Monaco') else (False if (position[0] <= 0 or position[0] >= loc2poa_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2poa_c.MAX_Y[self.city]) else True)
-
-    # Checks whether the given vehicle is within the simulated area.
-    # Input: key of a vehicle.
-    # Output: True iff this vehicle is within the simulated area.
-    is_in_simulated_area_Lux  = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2poa_c.MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2poa_c.MAX_Y[self.city]) else True
-    
-    # Checks whether the given (x,y) position is within the simulated area.
-    # Input: (x,y) position
-    # Output: True iff this position is within the simulated area.
-    is_in_global_area = lambda self, position : False if (position[0] <= 0 or position[0] >= loc2poa_c.GLOBAL_MAX_X[self.city] or position[1] <= 0 or position[1] >= loc2poa_c.GLOBAL_MAX_Y[self.city]) else True
-    
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
 
@@ -75,7 +63,7 @@ class Traci_runner (object):
                 print ('Number of distinct cars during the simulated period={}' .format (len(known_veh_keys)))
                 break
             
-            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] #$$$$ if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] #$$$$ if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
             printf (self.cnt_output_file, 'vehs={:.0f}, persons={}\n' .format (len(cur_list_of_vehicles), traci.person.getIDCount()))
             sys.stdout.flush()
 
@@ -127,7 +115,7 @@ class Traci_runner (object):
                     print ('Successfully finished writing to file {}' .format (loc_output_file_name))
                     break
                 
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if self.is_in_simulated_area (self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
             
                 vehs_left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
@@ -197,7 +185,7 @@ class Traci_runner (object):
             radio   = splitted_line[radio_idx]
             mnc     = splitted_line[mnc_idx]
             
-            if (not (self.is_in_simulated_area(pos))):# or (not (radio=='LTE'))):  
+            if (not (loc2poa_c.is_in_simulated_area(self.city, pos))):# or (not (radio=='LTE'))):  
                 continue
         
             self.list_of_antennas.append ({'radio' : radio, 'mnc' : mnc, 'x' : pos[0], 'y' : pos[1]})    
@@ -221,6 +209,11 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
+    x, y = 50000, 50000
+    city = 'Monaco'
+    if (loc2poa_c.gamad (city, [x, y])):
+        print ('({},{}) is within the simulated area of {}' .format (x,y,city))
+    exit ()
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
     # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
 

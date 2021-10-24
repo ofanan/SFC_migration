@@ -6,7 +6,7 @@
         <net-file value="../../MoSTScenario/scenario/in/most.net.xml"/>
         <route-files value="../../MoSTScenario/scenario/in/route/most.buses.flows.xml,
 		../../MoSTScenario/scenario/in/route/most.trains.flows.xml,
-		../../MoSTScenario/scenario/in/route/most.pedestrian.rou.xml,
+		<!--../../MoSTScenario/scenario/in/route/most.pedestrian.rou.xml, -->
 		../../MoSTScenario/scenario/in/route/most.commercial.rou.xml,
 		../../MoSTScenario/scenario/in/route/most.special.rou.xml,
 		../../MoSTScenario/scenario/in/route/most.highway.flows.xml
@@ -26,9 +26,9 @@
         <time-to-teleport value="180"/>
         <max-depart-delay value="900"/>
         <time-to-impatience value="30"/>
-        <pedestrian.model value="striping"/>
-        <pedestrian.striping.stripe-width value="0.55"/>
-        <pedestrian.striping.jamtime value="30"/>
+        <!-- <pedestrian.model value="striping"/> -->
+        <!-- <pedestrian.striping.stripe-width value="0.55"/> -->
+        <!-- <pedestrian.striping.jamtime value="30"/> -->
         <!-- <default.action-step-length value="1"/> -->
         <!-- <emergencydecel.warning-threshold value="1.1"/> -->
         <default.emergencydecel value="decel"/>

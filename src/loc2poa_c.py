@@ -23,13 +23,21 @@ VERBOSE_FIND_AREA        = 6 # Find the min and max positions of all simulated v
 GLOBAL_MAX_X = {'Lux' : int(13622), 'Monaco' : 9976}
 GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 0.0 max_x_pos_found= 9976.0 min_y_pos_found= 143.0 max_y_pos_found= 6356.0            
 
-# maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
-MAX_X = {'Lux' :  GLOBAL_MAX_X['Lux']//2, 'Monaco' : 8000}
-MAX_Y = {'Lux' :  GLOBAL_MAX_Y['Lux']//2, 'Monaco' : 6000}
-
 # x,y indexes of the south-west corner of the simulated area
 LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
-                    'Monaco' : np.zeros (2, dtype='int16')} 
+                    'Monaco' : np.array ([2000, 1500], dtype='int16')} 
+
+# x,y indexes of the south-west corner of the simulated area
+UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
+                    'Monaco' : np.array ([5000, 6000], dtype='int16')} 
+
+# maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
+MIN_X = {'Lux' : 0, 'Monaco' : 0}
+MIN_Y = {'Lux' : 0, 'Monaco' : 0}
+MAX_X = {'Lux'    : UPPER_RIGHT_CORNER['Lux']   [0] - LOWER_LEFT_CORNER['Lux']   [0],
+         'Monaco' : UPPER_RIGHT_CORNER['Monaco'][0] - LOWER_LEFT_CORNER['Monaco'][0]}
+MAX_Y = {'Lux'    : UPPER_RIGHT_CORNER['Lux']   [1] - LOWER_LEFT_CORNER['Lux']   [1],
+         'Monaco' : UPPER_RIGHT_CORNER['Monaco'][1] - LOWER_LEFT_CORNER['Monaco'][1]}
 
 # Indices of the various field within the input '.loc' file 
 type_idx   = 0 # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
@@ -49,7 +57,7 @@ directions = ['s', 'n', 'e', 'w', 'se', 'sw', 'ne', 'nw', 'out']
 # Checks whether a given position is within the simulated area of a given city
 # Input: city, and [x,y] position
 # Output: True iff this vehicle is within the simulated area of this city.
-is_in_simulated_area = lambda city, position : False if (position[0] <= 0 or position[0] >= MAX_X[city] or position[1] <= 0 or position[1] >= MAX_Y[city]) else True
+is_in_simulated_area = lambda city, position : False if (position[0] <= MIN_X[city] or position[0] >= MAX_X[city] or position[1] <= MIN_Y[city] or position[1] >= MAX_Y[city]) else True
 
 # Checks whether the given (x,y) position is within the global area of the given city.
 # Input: city, and [x,y] position
@@ -124,6 +132,9 @@ class loc2poa_c (object):
     rotate_point = lambda self, point : [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
                                          int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))]
      
+    # Given the x,y position, return the x,y position within the simulated area (city center) 
+    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - LOWER_LEFT_CORNER [self.city]
+
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
         Init a "loc2poa_c" object.
@@ -144,7 +155,8 @@ class loc2poa_c (object):
             exit ()
         self.num_of_squarlettes = 1 if (self.city=='Monaco') else 1 # in Monaco we divide the city area into 4 almost-square rectangles before further iteratively partitioning it into squares
        
-        self.max_x, self.max_y = MAX_X[self.city], MAX_Y[self.city] # borders of the simulated area, in meters
+        self.max_x = MAX_X[self.city]
+        self.max_y = MAX_Y[self.city] # borders of the simulated area, in meters
         self.x_edge_of_squarlet = self.max_x / self.num_of_squarlettes   
         self.usrs              = []
         self.use_rect_PoA_cells   = True if (self.antloc_file_name=='') else False
@@ -394,7 +406,6 @@ class loc2poa_c (object):
             if (nrows*ncols != len (self.cell2tile)):
                 print ('Error in calculation. max_p_of_4={}, nrows={}, ncols={}, len(cell2tile)={}' .format(self.max_power_of_4, nrows, ncols, len(self.cell2tile)))
                 exit ()
-        print ('max_p_of_4={}, nrows={}, ncols={}, len(cell2tile)={}, len(vec)={}' .format(self.max_power_of_4, nrows, ncols, len(self.cell2tile), len(vec)))
         heatmap_val = np.array ([vec[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [nrows, ncols])
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
@@ -426,7 +437,7 @@ class loc2poa_c (object):
         printmat (tmp_file, heatmap_vals, my_precision=0)
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
         # plt.title ('avg num of vehs per cell')
-        plt.savefig('../res/num_vehs_{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells)))
+        plt.savefig('../res/num_vehs{}_{}_{}rects{}.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells), ('{}_sqrlts' .format(self.num_of_squarlettes) if self.num_of_squarlettes>1 else '') ))
 
     def aggregate_heatmap_cells (self, vec):
         """
@@ -459,7 +470,7 @@ class loc2poa_c (object):
             my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_PoA),columns=self.gen_columns_for_heatmap(lvl=lvl)), cmap="YlGnBu")#, norm=LogNorm())
             my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
             # plt.title ('avg num of vehs per PoA')
-            plt.savefig('../res/heatmap_num_vehs_per_PoA_{}_{}_{}cells.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
+            plt.savefig('../res/num_vehs_per_PoA_{}_{}_{}cells.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             reshaped_heatmap = avg_num_of_vehs_per_PoA.reshape (int(len(avg_num_of_vehs_per_PoA)/4), 4) # prepare the averaging for the next iteration
             if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_PoA for the next iteration
                 avg_num_of_vehs_per_PoA = np.array([np.sum(reshaped_heatmap[i][:])for i in range(reshaped_heatmap.shape[0])], dtype='int') #perform the averaging, to be used by the ext iteration.
@@ -794,7 +805,7 @@ class loc2poa_c (object):
             self.usrs_loc_file_name = file_name
             self.usrs_loc_file      = open ('../res/loc_files/' + self.usrs_loc_file_name,  "r")
             print ('parsing file {}' .format (self.usrs_loc_file_name)) 
-            self.input_loc_file_is_rotated = True if (len (file_name.split('rotated'))==2) else False
+            self.input_loc_file_is_rotated = True if (len (file_name.split('rttd'))==2) else False
             self.parse_file             ()
             self.print_intermediate_res ()
         self.post_processing ()
@@ -878,17 +889,14 @@ class loc2poa_c (object):
         """
         if (self.city != 'Monaco'):
             print ('Error: currently, we rotate only Monaco')
-            exit ()
         self.pivot = [GLOBAL_MAX_X[self.city]/2, GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
         self.angle = -math.radians(angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
         
         for loc_file_name in loc_file_names: 
             self.input_loc_file   = open ('../res/loc_files/' + loc_file_name,  "r")
-            loc_output_file = open ('../res/loc_files/' + loc_file_name.split('.poa')[0] + '_rotated{}.loc' .format (angle),  "w")
+            loc_output_file = open ('../res/loc_files/' + loc_file_name.split('.poa')[0] + '_rttd{}.loc' .format (angle),  "w")
 
-            printf (loc_output_file, '// (veh_type,usr_id,x,y)   where:\n')
-            printf (loc_output_file, '// veh_type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id.\n')
-            printf (loc_output_file, '// Generated by loc2poa_c.py .\n')
+            printf (loc_output_file, '// Generated by loc2poa_c.py\n')
             
             for line in self.input_loc_file: 
         
@@ -924,13 +932,14 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 2
+    max_power_of_4 = 4
     my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_60secs_rotated54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc_rttd54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

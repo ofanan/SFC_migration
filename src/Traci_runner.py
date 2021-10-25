@@ -25,12 +25,12 @@ class Traci_runner (object):
     # Given the x,y position, return the x,y position within the simulated area (city center) 
     pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER [self.city]
 
-    # Returns the relative location of a given vehicle ID. The relative location is the position w.r.t. the lower left (south-west) corner of the simulated area.
-    get_relative_position = lambda self, veh_key  : np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER[self.city]
+    # Returns the relative location of a given vehicle ID. The relative location found after rotating the point (if needed), and then position it w.r.t. the lower left (south-west) corner of the simulated area.
+    get_relative_position = lambda self, veh_key  : self.pos_to_relative_pos (self.rotate_point (traci.vehicle.getPosition(veh_key)))
 
     # rotate a given point by self.angle radians counter-clockwise around self.pivot
-    rotate_point = lambda self, point : point if (self.angle==0) else [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
-                                                                       int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))]
+    rotate_point = lambda self, point : np.array(point if (self.angle==0) else [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
+                                                                       int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))], dtype='int16')
      
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
@@ -77,13 +77,13 @@ class Traci_runner (object):
             traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
 
-    def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
+    def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [], rotate_angle = 54 # angle to rotate the points (in degrees).  
+                  ):
         """
         Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input
         """
         self.pivot = [loc2poa_c.GLOBAL_MAX_X[self.city]/2, loc2poa_c.GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
-        angle = 54 # angle to rotate the points (in degrees).  
-        self.angle = -math.radians(angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
+        self.angle = -math.radians(rotate_angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
 
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         # prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
@@ -99,7 +99,7 @@ class Traci_runner (object):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
-            loc_output_file_name = '../res/loc_files/{}_{}_{}secs.loc' .format (self.city, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec)  
+            loc_output_file_name = '../res/loc_files/{}_{}_{}secs{}.loc' .format (self.city, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec, ('_rttd{}' .format (rotate_angle) if (rotate_angle>0) else ''))   
             with open(loc_output_file_name, 'w') as loc_output_file:
                 loc_output_file.write('')                
             loc_output_file  = open (loc_output_file_name,  "w")
@@ -122,11 +122,11 @@ class Traci_runner (object):
                 if (cur_sim_time >= warmup_period + sim_length*(i+1) / num_of_output_files):
                     print ('Successfully finished writing to file {}' .format (loc_output_file_name))
                     break
-                
-                cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.rotate_point(self.get_relative_position(veh_key)))] # list of vehs currently found within the simulated area.
+                  
+                cur_list_of_vehicles    = [{'key' : veh_key, 'pos' : self.get_relative_position(veh_key)} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
                 printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
-            
-                vehs_left_in_this_cycle   = list (filter (lambda veh : (veh['key'] not in (cur_list_of_vehicles) and 
+
+                vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehicles] and 
                                                                    veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
                 veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
                 printf (loc_output_file, 'usrs_that_left: ')
@@ -135,8 +135,8 @@ class Traci_runner (object):
                         printf (loc_output_file, '{:.0f} ' .format(veh['id']))
                     veh_ids2recycle = sorted (list (set (veh_ids2recycle) | set([item['id'] for item in vehs_left_in_this_cycle]))) # add to veh_ids2recycle the IDs of the cars that left in this cycle
                 printf (loc_output_file, '\nnew_or_moved: ')
-                for veh_key in cur_list_of_vehicles:
-                    filtered_list = list (filter (lambda veh : veh['key'] == veh_key, veh_key2id)) # look for this veh in the list of already-known vehs
+                for item in cur_list_of_vehicles:
+                    filtered_list = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
                         veh_type = 'n' # will indicate that this is a new vehicle 
                         if (len (veh_ids2recycle) > 0): # can recycle an ID of a veh that left
@@ -145,28 +145,20 @@ class Traci_runner (object):
                         else:
                             # veh_type = 'n' # will indicate that this is a new vehicle 
                             veh_id = len (veh_key2id) # pick a new ID
-                        veh_key2id.append({'key' : veh_key, 'id' : veh_id}) # insert the new veh into the db 
+                        veh_key2id.append({'key' : item['key'], 'id' : veh_id}) # insert the new veh into the db 
                     else: # already seen this veh_key in the sim' --> extract its id from the hash
-                        if (traci.vehicle.getSpeed(veh_key) == 0):  
+                        if (traci.vehicle.getSpeed(item['key']) == 0):  
                             continue
                         veh_type = 'o' # will indicate that this is a old vehicle 
                         veh_id = filtered_list[0]['id'] 
-                    position = self.rotate_point(self.get_relative_position (veh_key))
                     if (VERBOSE_SPEED in self.verbose): 
-                        printf (loc_output_file, "({},{},{},{},{:.0f})" .format (veh_type, veh_id, position[0], position[1], traci.vehicle.getSpeed(veh_key)))
+                        printf (loc_output_file, "({},{},{},{},{:.0f})" .format (veh_type, veh_id, item['pos'][0], item['pos'][1], traci.vehicle.getSpeed(veh_key)))
                     elif (VERBOSE_LOC in self.verbose):
-                        printf (loc_output_file, "({},{},{},{})" .format (veh_type, veh_id, position[0], position[1]))
+                        printf (loc_output_file, "({},{},{},{})" .format (veh_type, veh_id, item['pos'][0], item['pos'][1]))
         
                 sys.stdout.flush()
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
-
-    # def get_relative_position_from_lat_lon (self, lat, lon): 
-    #     """
-    #     Given the geographical latitude and longitude, return the x,y position in meters w.r.t the south-west corner of the simulated area
-    #     """       
-    #     np.array(traci.vehicle.getPosition(veh_key), dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER[self.city]
-
 
     def parse_antenna_locs_file (self, antenna_locs_file_name, provider=''):
         """
@@ -221,5 +213,4 @@ if __name__ == '__main__':
     # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
-
-    my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (warmup_period=3600*7.5, sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

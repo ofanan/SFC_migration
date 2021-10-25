@@ -25,7 +25,7 @@ GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 
 
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 MAX_X = {'Lux' :  GLOBAL_MAX_X['Lux']//2, 'Monaco' : 8000}
-MAX_Y = {'Lux' :  GLOBAL_MAX_Y['Lux']//2, 'Monaco' : 2000}
+MAX_Y = {'Lux' :  GLOBAL_MAX_Y['Lux']//2, 'Monaco' : 6000}
 
 # x,y indexes of the south-west corner of the simulated area
 LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
@@ -394,6 +394,7 @@ class loc2poa_c (object):
             if (nrows*ncols != len (self.cell2tile)):
                 print ('Error in calculation. max_p_of_4={}, nrows={}, ncols={}, len(cell2tile)={}' .format(self.max_power_of_4, nrows, ncols, len(self.cell2tile)))
                 exit ()
+        print ('max_p_of_4={}, nrows={}, ncols={}, len(cell2tile)={}, len(vec)={}' .format(self.max_power_of_4, nrows, ncols, len(self.cell2tile), len(vec)))
         heatmap_val = np.array ([vec[self.cell2tile[i]] for i in range (len(self.cell2tile))]).reshape ( [nrows, ncols])
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
@@ -418,22 +419,14 @@ class loc2poa_c (object):
 
         avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell() 
         tmp_file = open ('../res/tmp.txt', 'w')
-        for lvl in range (0, self.max_power_of_4):
-            columns = self.gen_columns_for_heatmap (lvl=lvl)
-            self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering PoA.
-            plt.figure()       
-            heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
-            if (lvl==3):
-                my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals,columns=columns), cmap="YlGnBu", vmin=600, vmax=800)#, norm=LogNorm())
-            else:
-                my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals,columns=columns), cmap="YlGnBu")#, norm=LogNorm())
-            printf (tmp_file, 'lvl={}\n' .format (lvl+1))
-            printmat (tmp_file, heatmap_vals, my_precision=0)
-            my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-            # plt.title ('avg num of vehs per cell')
-            plt.savefig('../res/num_vehs_{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
-            if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
-                avg_num_of_vehs_per_cell = self.aggregate_heatmap_cells (avg_num_of_vehs_per_cell)
+        columns = self.gen_columns_for_heatmap ()
+        plt.figure()       
+        heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
+        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals,columns=columns), cmap="YlGnBu")#, norm=LogNorm())
+        printmat (tmp_file, heatmap_vals, my_precision=0)
+        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        # plt.title ('avg num of vehs per cell')
+        plt.savefig('../res/num_vehs_{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells)))
 
     def aggregate_heatmap_cells (self, vec):
         """
@@ -625,24 +618,32 @@ class loc2poa_c (object):
 
                         elif (my_tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
-                            if (len(list_of_usr) == 0):
-                                print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
-                                exit ()
-                            list_of_usr[0]['nxt poa']   = nxt_poa # list_of_usr[0] is the old usr who moved.
-                            list_of_usr[0]['nxt cell'] = nxt_cell
-                            cur_cell                   = list_of_usr[0]['cur cell']
-                            if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_poa!= cur_cell): #this user moved to another cell  
-                                # self.joined_poa[nxt_poa][-1]                   += 1 # inc the # of usrs that joined this PoA
-                                # self.left_poa  [list_of_usr[0]['cur poa']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
-                                self.joined_cell  [nxt_cell][-1]               += 1 # inc the # of usrs who joined this cell
-                                self.left_cell    [cur_cell] [-1]              += 1 # inc the # of usrs who left this cell at this cycleW
+                            if (len(list_of_usr) == 0): # Didn't find this old usr in the list of currently running usrs
+                                if (self.input_loc_file_is_rotated): # This indeed can happen in rotated files, where the simulated area changes
+                                    self.usrs.append ({'id' : usr_id, 'cur poa' : nxt_poa, 'nxt poa' : nxt_poa, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_poa same as nxt_poa 
+                                    if (VERBOSE_DEMOGRAPHY in self.verbose): 
+                                        # self.joined_poa_sim_via[nxt_poa][-1] += 1 # inc the # of usrs that joined the sim' via this cell
+                                        # self.joined_poa        [nxt_poa][-1]   += 1 # inc the # of usrs that joined this PoA at this slot
+                                        self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
+                                else: 
+                                    print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
+                                    exit ()
+                            else: # Found this usr in the list of existing usrs. So update its location and movement at the databases.
+                                list_of_usr[0]['nxt poa']  = nxt_poa # list_of_usr[0] is the old usr who moved.
+                                list_of_usr[0]['nxt cell'] = nxt_cell
+                                cur_cell                   = list_of_usr[0]['cur cell']
+                                if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_poa!= cur_cell): #this user moved to another cell  
+                                    # self.joined_poa[nxt_poa][-1]                   += 1 # inc the # of usrs that joined this PoA
+                                    # self.left_poa  [list_of_usr[0]['cur poa']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
+                                    self.joined_cell  [nxt_cell][-1] += 1 # inc the # of usrs who joined this cell
+                                    self.left_cell    [cur_cell][-1] += 1 # inc the # of usrs who left this cell at this cycleW
                                 
-                                if (self.num_of_squarlettes==1): # printing demography map when num_of_squarlettes>! is currently unsupported
-                                    direction = self.direction_of_mv (cur_cell, nxt_cell)
-                                    if (direction == -1): # error 
-                                        printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
-                                    else:
-                                        self.left_cell_to [cur_cell][direction] += 1 # increase the cntr of usrs who left this cell to the relevant direction
+                                    if (self.num_of_squarlettes==1): # printing demography map when num_of_squarlettes>! is currently unsupported
+                                        direction = self.direction_of_mv (cur_cell, nxt_cell)
+                                        if (direction == -1): # error 
+                                            printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
+                                        else:
+                                            self.left_cell_to [cur_cell][direction] += 1 # increase the cntr of usrs who left this cell to the relevant direction
                         else:
                             print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
                             exit () 
@@ -793,6 +794,7 @@ class loc2poa_c (object):
             self.usrs_loc_file_name = file_name
             self.usrs_loc_file      = open ('../res/loc_files/' + self.usrs_loc_file_name,  "r")
             print ('parsing file {}' .format (self.usrs_loc_file_name)) 
+            self.input_loc_file_is_rotated = True if (len (file_name.split('rotated'))==2) else False
             self.parse_file             ()
             self.print_intermediate_res ()
         self.post_processing ()
@@ -882,23 +884,27 @@ class loc2poa_c (object):
         
         for loc_file_name in loc_file_names: 
             self.input_loc_file   = open ('../res/loc_files/' + loc_file_name,  "r")
-            self.rotated_loc_file = open ('../res/loc_files/' + loc_file_name.split('.poa')[0] + '_rotated{}.loc' .format (angle),  "w")
+            loc_output_file = open ('../res/loc_files/' + loc_file_name.split('.poa')[0] + '_rotated{}.loc' .format (angle),  "w")
+
+            printf (loc_output_file, '// (veh_type,usr_id,x,y)   where:\n')
+            printf (loc_output_file, '// veh_type is either o (old veh), or n (new veh in the sim). (x,y) are the coordinates of the vehicle with this usr_id.\n')
+            printf (loc_output_file, '// Generated by loc2poa_c.py .\n')
             
             for line in self.input_loc_file: 
         
                 # copy empty and comments lines as is to the output  
                 line = line.split ('\n')[0] 
                 if (line.split ("//")[0] == ""):
-                    printf (self.rotated_loc_file, '{}\n' .format (line))
+                    printf (loc_output_file, '{}\n' .format (line))
                     continue
         
                 splitted_line = line.split (" ")
                 
                 if (splitted_line[0] == "t" or splitted_line[0] == 'usrs_that_left:'): # copy each such line as is to the output
-                    printf (self.rotated_loc_file, '{}' .format (line))
+                    printf (loc_output_file, '{}' .format (line))
     
                 elif (splitted_line[0] == 'new_or_moved:'): 
-                    printf (self.rotated_loc_file, 'new_or_moved: ')
+                    printf (loc_output_file, 'new_or_moved: ')
                     splitted_line = splitted_line[1:] # the rest of this line details the locations of users that are either new, or old (existing) users who moved during the last time slot
                     if (splitted_line !=['']): # Is there a non-empty list of vehicles that are old / new / recycled?  
     
@@ -911,20 +917,20 @@ class loc2poa_c (object):
                             [x,y] = self.rotate_point ([float(my_tuple[x_pos_idx]), float(my_tuple[y_pos_idx])])
                             if (not (is_in_simulated_area ('Monaco', [x,y]))):
                                 continue
-                            printf (self.rotated_loc_file, '({},{},{},{})' .format (my_tuple[type_idx], my_tuple[veh_id_idx], x, y))
+                            printf (loc_output_file, '({},{},{},{})' .format (my_tuple[type_idx], my_tuple[veh_id_idx], x, y))
                     else: # no usrs in the list - merely write the token 'new_or_moved:' to the output file
-                        printf (self.rotated_loc_file, '{}' .format (line))
-                printf (self.rotated_loc_file, '\n' .format (line))
+                        printf (loc_output_file, '{}' .format (line))
+                printf (loc_output_file, '\n' .format (line))
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 1
+    max_power_of_4 = 2
     my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc_rotated54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    my_loc2poa.parse_loc_files (['Monaco_0730_60secs_rotated54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

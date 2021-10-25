@@ -313,7 +313,9 @@ class SFC_mig_simulator (object):
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
         
-        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') ) + ('.expCPU.res' if (self.use_exp_cpu_cost) else '') + ('.expCPU2.res' if (self.use_exp_cpu_cap) else '')
+        # In the past, exponential CPU capacities/cost used special suffices, as in the commented line code below.
+        #('.expCPU.res' if (self.use_exp_cpu_cost) else '') + ('.expCPU2.res' if (self.use_exp_cpu_cap) else '')
+        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') ) + '.res' 
         
         if Path(self.res_file_name).is_file(): # does this res file already exist?
             self.res_file =  open (self.res_file_name,  "a")
@@ -1565,7 +1567,7 @@ class SFC_mig_simulator (object):
 
         cpu_cap_at_leaf = 89 #Initial cpu cap at the leaf server
         output_file      = open ('../res/RT_prob_sim_{}_{}{}.res' .format (poa2cell_file_name, poa_file_name, '_opt'), 'a')    
-        for prob_of_target_delay in [0]: #[(0.1*i) for i in range (11)]:
+        for prob_of_target_delay in [0.6]: #[(0.1*i) for i in range (11)]:
             cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
             self.print_sol_res_line (output_file)
     
@@ -1603,7 +1605,8 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'shorter.poa' #
 poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
 my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-my_simulator.run_prob_of_RT_sim_algs ()
+my_simulator.run_prob_of_RT_sim_opt ()
+# my_simulator.run_prob_of_RT_sim_algs ()
 # SFC_mig_simulator.run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # i = 0

@@ -10,8 +10,6 @@ from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf ## My own format print functions 
 
-# from pandas.tests.arrays.sparse.test_array import test_first_fill_value_loc
-
 # Levels of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
 VERBOSE_RES           = 1 # Write to a file the total cost and rsrc aug. upon every event
@@ -1608,11 +1606,12 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
 
 poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'shorter.poa' #
 poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
+
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
-my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+# my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  ()
-my_simulator.run_prob_of_RT_sim_algs ()
-# my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-# i = 0
-# my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
+# my_simulator.run_prob_of_RT_sim_algs ()
+my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+i = 0
+my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
     

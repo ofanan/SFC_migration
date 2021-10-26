@@ -30,7 +30,7 @@ class Traci_runner (object):
 
     # rotate a given point by self.angle radians counter-clockwise around self.pivot
     rotate_point = lambda self, point : np.array(point if (self.angle==0) else [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
-                                                                       int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))], dtype='int16')
+                                                                                int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))], dtype='int16')
      
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
@@ -41,7 +41,7 @@ class Traci_runner (object):
             self.providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}         # Mobile Network Codes of various operators in Luxembourg
         elif (sumo_cfg_file=='myMoST.sumocfg'):
             self.city = 'Monaco'
-            self.providers_mnc = {'Monaco_Telecom' : '10'}                        
+            self.providers_mnc = {'Telecom' : '10'}                        
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
@@ -160,9 +160,9 @@ class Traci_runner (object):
                 traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
         traci.close()
 
-    def parse_antenna_locs_file (self, antenna_locs_file_name, provider=''):
+    def gen_antloc_file (self, antenna_locs_file_name, provider=''):
         """
-        Parse an antenna location file (downloaded from https://opencellid.org/), and extract for each antenna its X,Y position in the given SUMO configuration.
+        Parse a raw antenna location file (downloaded from https://opencellid.org/), and extract for each antenna its X,Y position in the given SUMO configuration.
         Outputs a ".antloc" file, that details the x,y position of a all antennas within the simulated area.
         """
         
@@ -210,7 +210,7 @@ class Traci_runner (object):
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
-    # my_Traci_runner.parse_antenna_locs_file ('Monaco.txt', provider='Monaco_Telecom')
+    my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
-    my_Traci_runner.simulate (warmup_period=3600*7.5, sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    # my_Traci_runner.simulate (warmup_period=(3600*8.5-60), sim_length = 60, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

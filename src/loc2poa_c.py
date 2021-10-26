@@ -25,11 +25,11 @@ GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 
 
 # x,y indexes of the south-west corner of the simulated area
 LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
-                    'Monaco' : np.array ([2000, 1500], dtype='int16')} 
+                    'Monaco' : np.array ([2400, 1800], dtype='int16')} 
 
 # x,y indexes of the south-west corner of the simulated area
 UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
-                    'Monaco' : np.array ([5000, 6000], dtype='int16')} 
+                    'Monaco' : np.array ([5500, 3200], dtype='int16')} 
 
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 MIN_X = {'Lux' : 0, 'Monaco' : 0}
@@ -189,6 +189,7 @@ class loc2poa_c (object):
                 self.left_cell_to = []
                 for _ in range(self.num_of_cells):
                     self.left_cell_to.append ({'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0})
+        print ('Dimensions of each rectangles are: {}x{}' .format ((self.max_x/self.num_of_squarlettes) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)))
     
     #$$$ Need to revise it for the case when using more than a single squarlet
     def calc_ngbr_rects (self):
@@ -880,7 +881,7 @@ class loc2poa_c (object):
         points = np.array ([[poa['x'], poa['y']] for poa in self.list_of_PoAs])
         
         voronoi_plot_2d(Voronoi(points), show_vertices=False)
-        plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
+        # plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
         plt.show()
         
     def rotate_loc_file (self, loc_file_names, angle=54):
@@ -932,14 +933,14 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 4
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Monaco_Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    max_power_of_4 = 1
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = 'Monaco.all_area.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
-    # my_loc2poa.plot_voronoi_diagram()
+    my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc_rttd54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    # my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs_rttd54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

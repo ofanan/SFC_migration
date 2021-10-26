@@ -26,11 +26,18 @@ class Traci_runner (object):
     pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER [self.city]
 
     # Returns the relative location of a given vehicle ID. The relative location found after rotating the point (if needed), and then position it w.r.t. the lower left (south-west) corner of the simulated area.
-    get_relative_position = lambda self, veh_key  : self.pos_to_relative_pos (self.rotate_point (traci.vehicle.getPosition(veh_key)))
+    get_relative_position = lambda self, veh_key  : self.pos_to_relative_pos (self.tmp_rotate_point (traci.vehicle.getPosition(veh_key))) #$$$$$
 
     # rotate a given point by self.angle radians counter-clockwise around self.pivot
-    rotate_point = lambda self, point : np.array(point if (self.angle==0) else [int (self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1])),
-                                                                                int (self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1]))], dtype='int16')
+    rotate_point = lambda self, point : np.array(point if (self.angle==0) else [self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1]),
+                                                                                self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1])], dtype='int16')
+     
+    
+    def tmp_rotate_point (self, point): 
+        print ('point is ({},{})' .format (point[0], point[1]))
+        rttd_point = self.rotate_point (point)
+        print ('rttd point is ({},{})' .format (rttd_point[0], rttd_point[1]))            
+        return rttd_point
      
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
@@ -210,7 +217,7 @@ class Traci_runner (object):
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
-    my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
+    # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
-    # my_Traci_runner.simulate (warmup_period=(3600*8.5-60), sim_length = 60, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (warmup_period=(28289), sim_length = 10, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

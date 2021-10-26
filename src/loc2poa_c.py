@@ -191,11 +191,11 @@ class loc2poa_c (object):
                     self.left_cell_to.append ({'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0})
         print ('Dimensions of each rectangles are: {}x{}' .format ((self.max_x/self.num_of_squarlettes) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)))
     
-    #$$$ Need to revise it for the case when using more than a single squarlet
     def calc_ngbr_rects (self):
         """
         Used for debugging only  
         Find the 4 (north, south, east, west) neighbours of each cell (rect). If it's an edge cell, the tile number of the neighbor will be -1.
+        Assumes that the simulated area includes exactly one squarlet, iteratively pratitioned to 4 quadrants.
         """
         self.ngbrs_of_cell = [None] * self.num_of_cells
     
@@ -414,7 +414,7 @@ class loc2poa_c (object):
         return self.invert_mat_bottom_up(heatmap_val)
 
     def set_usrs_loc_file_name (self, usrs_loc_file_name=''):
-        if (hasattr (self, 'usrs_loc_file_name')): # The field self.usrs_loc_file_name is already define
+        if (hasattr (self, 'usrs_loc_file_name')): # The field self.usrs_loc_file_name is already defined
             return
         if (usrs_loc_file_name==''):
             print ('Please specify an existing usr loc file name')

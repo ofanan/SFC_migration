@@ -1,4 +1,3 @@
-# import optparse
 from sumolib import checkBinary  
 import traci  
 import sys
@@ -23,21 +22,77 @@ lat_pos_idx = 7
 class Traci_runner (object):
 
     # Given the x,y position, return the x,y position within the simulated area (city center) 
-    pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER [self.city]
+    relative_to_abs_pos = lambda self, pos: np.array(pos, dtype='int16') + loc2poa_c.LOWER_LEFT_CORNER [self.city]
+
+    # Given the x,y position, return the x,y position within the simulated area (city center) 
+    abs_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - loc2poa_c.LOWER_LEFT_CORNER [self.city]
 
     # Returns the relative location of a given vehicle ID. The relative location found after rotating the point (if needed), and then position it w.r.t. the lower left (south-west) corner of the simulated area.
-    get_relative_position = lambda self, veh_key  : self.pos_to_relative_pos (self.tmp_rotate_point (traci.vehicle.getPosition(veh_key))) #$$$$$
+    get_relative_position = lambda self, veh_key  : self.abs_to_relative_pos (self.rotate_point (traci.vehicle.getPosition(veh_key))) 
 
-    # rotate a given point by self.angle radians counter-clockwise around self.pivot
-    rotate_point = lambda self, point : np.array(point if (self.angle==0) else [self.pivot[0] + math.cos(self.angle) * (point[0] - self.pivot[0]) - math.sin(self.angle) * (point[1] - self.pivot[1]),
-                                                                                self.pivot[1] + math.sin(self.angle) * (point[0] - self.pivot[0]) + math.cos(self.angle) * (point[1] - self.pivot[1])], dtype='int16')
-     
+    # rotate a given point by self.rotate_angle radians counter-clockwise around self.pivot
+    # rotate_point = lambda self, point : self.handle_Nan_point() if (math.isnan(point[0]) or math.isnan(point[0])) else (np.array (point if (self.rotate_angle==0) else [self.pivot[0] + math.cos(self.rotate_angle) * (point[0] - self.pivot[0]) - math.sin(self.rotate_angle) * (point[1] - self.pivot[1]),self.pivot[1] + math.sin(self.rotate_angle) * (point[0] - self.pivot[0]) + math.cos(self.rotate_angle) * (point[1] - self.pivot[1])], dtype='int16'))
+
+    # Given the lon, lat coordinates of a point, return the (x,y) coordinates of its relative position within the simulated area 
+    lon_lat_to_relative_pos = lambda self, lon, lat : self.abs_to_relative_pos (self.rotate_point (traci.simulation.convertGeo (lon, lat, True)))
+                
+    def handle_Nan_point (self): 
+        print ('Warning: encountered a Nan point at t={}' .format (self.t))
+        return [-1, -1] # return a dumy point, that would be out of any simulated area
     
-    def tmp_rotate_point (self, point): 
-        print ('point is ({},{})' .format (point[0], point[1]))
-        rttd_point = self.rotate_point (point)
-        print ('rttd point is ({},{})' .format (rttd_point[0], rttd_point[1]))            
-        return rttd_point
+    def rotate_point (self, point, angle=None):
+        """
+        rotate a given point by self.rotate_angle radians counter-clockwise around self.pivot
+        """ 
+        if (math.isnan(point[0]) or math.isnan(point[0])):
+            return self.handle_Nan_point()
+        angle = angle if (angle!=None) else self.rotate_angle
+        if (angle==0):
+            return np.array (point)
+        return np.array ([self.pivot[0] + math.cos(angle) * (point[0] - self.pivot[0]) - math.sin(angle) * (point[1] - self.pivot[1]),
+                          self.pivot[1] + math.sin(angle) * (point[0] - self.pivot[0]) + math.cos(angle) * (point[1] - self.pivot[1])], 
+                          dtype='int16')
+    
+    def relative_pos_to_lon_lat (self, point):
+        """
+        Given the relative position of a point (x,y) within the simulated area, return its [latitude, longitude] 
+        """
+        if (math.isnan(point[0]) or math.isnan(point[0])):
+            self.handle_Nan_point()
+            return 
+        if (not (loc2poa_c.is_in_simulated_area(self.city, point))):
+            print ('Warning: relative_pos_to_lon_lat was called with point {} which is outside the simulated area' .format(point))
+            return
+        
+        # Now we know that this point is within the simulated area
+        abs_point = self.relative_to_abs_pos (point)
+        # print ('abs_point={}' .format (abs_point))
+
+        rttd_back_point = self.rotate_point (abs_point, -self.rotate_angle)
+        return traci.simulation.convertGeo (rttd_back_point[0],rttd_back_point[1])
+            
+    def print_lon_lat_corners_of_simulated_area (self):
+        
+        """
+        Print the latitude and longitude of the 4 corners of the simulated area
+        """
+        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
+        sw_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MIN_X[self.city],loc2poa_c.MIN_Y[self.city]])
+        print ('sw_corner(lat,lon)={}, {}' .format (sw_corner[1], sw_corner[0]))
+        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(sw_corner[0], sw_corner[1])))
+
+        nw_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MIN_X[self.city], loc2poa_c.MAX_Y[self.city]])
+        print ('nw_corner(lat,lon)={}, {}' .format (nw_corner[1],nw_corner[0]))
+        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(nw_corner[0], nw_corner[1])))
+
+        se_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MAX_X[self.city], loc2poa_c.MIN_Y[self.city]])
+        print ('se_corner(lat,lon)={}, {}' .format (se_corner[1],se_corner[0]))
+        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(se_corner[0], se_corner[1])))
+
+        ne_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MAX_X[self.city], loc2poa_c.MAX_Y[self.city]])
+        print ('ne_corner(lat,lon)={}, {}' .format (ne_corner[1],ne_corner[0]))
+        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(ne_corner[0], ne_corner[1])))
+        traci.close()
      
     def __init__ (self, sumo_cfg_file='LuST.sumocfg'):
         self.sumo_cfg_file = sumo_cfg_file
@@ -49,6 +104,9 @@ class Traci_runner (object):
         elif (sumo_cfg_file=='myMoST.sumocfg'):
             self.city = 'Monaco'
             self.providers_mnc = {'Telecom' : '10'}                        
+        
+        self.rotate_angle = -math.radians(54) if self.city=='Monaco' else 0 # angle to rotate the points. The requested angle degrees of clcokwise is converted to the radians value of rotating counter-clockwise used by rotate_point.
+        self.pivot = [loc2poa_c.GLOBAL_MAX_X[self.city]/2, loc2poa_c.GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
 
     def simulate_to_cnt_vehs_only (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, verbose = []):
         """
@@ -68,29 +126,26 @@ class Traci_runner (object):
             
         while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
             
-            cur_sim_time = traci.simulation.getTime()
+            self.t = traci.simulation.getTime()
             
             # Finished the sim. Now, just make some post-processing. 
-            if (cur_sim_time >= warmup_period + sim_length):
+            if (self.t >= warmup_period + sim_length):
                 print ('Number of distinct cars during the simulated period={}' .format (len(known_veh_keys)))
                 break
             
-            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList()] #$$$$ if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
+            cur_list_of_vehicles = [veh_key for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))] # list of vehs currently found within the simulated area.
             printf (self.cnt_output_file, 'vehs={:.0f}, persons={}\n' .format (len(cur_list_of_vehicles), traci.person.getIDCount()))
             sys.stdout.flush()
 
             known_veh_keys       = set (cur_list_of_vehicles) | set (known_veh_keys) # Union known_veh_keys with the set of vehicles' keys of this cycle
                    
-            traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
+            traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
 
-    def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [], rotate_angle = 54 # angle to rotate the points (in degrees).  
-                  ):
+    def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
         Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input
         """
-        self.pivot = [loc2poa_c.GLOBAL_MAX_X[self.city]/2, loc2poa_c.GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
-        self.angle = -math.radians(rotate_angle) # convert the requested angle degrees of clcokwise rotating to the radians value of rotating counter-clockwise used by rotate_point.
 
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         # prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
@@ -106,7 +161,7 @@ class Traci_runner (object):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
-            loc_output_file_name = '../res/loc_files/{}_{}_{}secs{}.loc' .format (self.city, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec, ('_rttd{}' .format (rotate_angle) if (rotate_angle>0) else ''))   
+            loc_output_file_name = '../res/loc_files/{}_{}_{}secs{}.loc' .format (self.city, secs2hour(traci.simulation.getTime()), len_of_time_slot_in_sec, ('_rttd{}' .format (-math.degrees(self.rotate_angle)) if (self.rotate_angle>0) else ''))   
             with open(loc_output_file_name, 'w') as loc_output_file:
                 loc_output_file.write('')                
             loc_output_file  = open (loc_output_file_name,  "w")
@@ -123,15 +178,15 @@ class Traci_runner (object):
                 
             while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
                 
-                cur_sim_time = traci.simulation.getTime()
+                self.t = traci.simulation.getTime()
                 
                 # Finished the sim. Now, just make some post-processing. 
-                if (cur_sim_time >= warmup_period + sim_length*(i+1) / num_of_output_files):
+                if (self.t >= warmup_period + sim_length*(i+1) / num_of_output_files):
                     print ('Successfully finished writing to file {}' .format (loc_output_file_name))
                     break
                   
                 cur_list_of_vehicles    = [{'key' : veh_key, 'pos' : self.get_relative_position(veh_key)} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
-                printf (loc_output_file, '\nt = {:.0f}\n' .format (cur_sim_time))
+                printf (loc_output_file, '\nt = {:.0f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehicles] and 
                                                                    veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
@@ -164,7 +219,7 @@ class Traci_runner (object):
                         printf (loc_output_file, "({},{},{},{})" .format (veh_type, veh_id, item['pos'][0], item['pos'][1]))
         
                 sys.stdout.flush()
-                traci.simulationStep (cur_sim_time + len_of_time_slot_in_sec)
+                traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
 
     def gen_antloc_file (self, antenna_locs_file_name, provider=''):
@@ -188,7 +243,7 @@ class Traci_runner (object):
             if (splitted_line[0]=='radio'):
                 continue
 
-            pos     = self.pos_to_relative_pos (traci.simulation.convertGeo (float (splitted_line[lon_pos_idx]), float (splitted_line[lat_pos_idx]), True))
+            pos     = self.abs_to_relative_pos (self.rotate_point (traci.simulation.convertGeo (float (splitted_line[lon_pos_idx]), float (splitted_line[lat_pos_idx]), True)))
             radio   = splitted_line[radio_idx]
             mnc     = splitted_line[mnc_idx]
             
@@ -217,7 +272,8 @@ class Traci_runner (object):
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
 
     # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
-    my_Traci_runner.simulate (warmup_period=(28289), sim_length = 10, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    # my_Traci_runner.simulate (warmup_period=(3600*8.5-60), sim_length = 60, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

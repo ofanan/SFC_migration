@@ -57,7 +57,7 @@ directions = ['s', 'n', 'e', 'w', 'se', 'sw', 'ne', 'nw', 'out']
 # Checks whether a given position is within the simulated area of a given city
 # Input: city, and [x,y] position
 # Output: True iff this vehicle is within the simulated area of this city.
-is_in_simulated_area = lambda city, position : False if (position[0] <= MIN_X[city] or position[0] >= MAX_X[city] or position[1] <= MIN_Y[city] or position[1] >= MAX_Y[city]) else True
+is_in_simulated_area = lambda city, position : False if (position[0] < MIN_X[city] or position[0] > MAX_X[city] or position[1] < MIN_Y[city] or position[1] > MAX_Y[city]) else True
 
 # Checks whether the given (x,y) position is within the global area of the given city.
 # Input: city, and [x,y] position
@@ -179,7 +179,7 @@ class loc2poa_c (object):
         self.calc_cell2tile (lvl=0) # calc_cell2tile translates the number as a "cell" to the ID in a vector, covering the same area as a tile
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.joined_poa         = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa[i][j] will count the # of clients that joined PoA i at slot j
-            self.joined_cell        = [[] for _ in range(self.num_of_cells)] # self.joined_cell[i][j] will count the # of clients that joined cell i at slot j
+            # self.joined_cell        = [[] for _ in range(self.num_of_cells)] # self.joined_cell[i][j] will count the # of clients that joined cell i at slot j
             self.left_poa           = [[] for _ in range(self.num_of_PoAs)] # self.left_poa[i][j] will count the # of clients that left PoA i at slot j
             self.left_cell          = [[] for _ in range(self.num_of_cells)] # self.left_cell[i][j] will count the # of clients that left cell i at slot j
             self.joined_poa_sim_via = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last PoA in the sim was PoA i
@@ -346,7 +346,7 @@ class loc2poa_c (object):
         
         # Trunc the data of the first entry, in which obviously no veh joined/left any PoA, or cell
         # self.joined_poa         = [self.joined_poa        [poa][1:] for poa in range (self.num_of_PoAs)] 
-        self.joined_cell       = [self.joined_cell      [poa][1:] for poa in range (self.num_of_cells)] 
+        # self.joined_cell       = [self.joined_cell      [poa][1:] for poa in range (self.num_of_cells)] 
         # print ('joined the simulated area from poa={:.2f}' .format 
         #        (np.average ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])))
         # print ('left the simulated area from poa={:.2f}' .format 
@@ -578,7 +578,7 @@ class loc2poa_c (object):
                     #     self.left_poa          [poa]  .append(np.int16(0))
                     #     self.joined_poa_sim_via[poa]  .append(np.int16(0))
                     for cell in range (self.num_of_cells): 
-                        self.joined_cell [cell].append(np.int16(0))
+                        # self.joined_cell [cell].append(np.int16(0))
                         self.left_cell   [cell].append(np.int16(0))
                 continue
 
@@ -623,20 +623,20 @@ class loc2poa_c (object):
                         
                         if (my_tuple[type_idx] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur poa' : nxt_poa, 'nxt poa' : nxt_poa, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_poa same as nxt_poa 
-                            if (VERBOSE_DEMOGRAPHY in self.verbose): 
+                            # if (VERBOSE_DEMOGRAPHY in self.verbose): 
                                 # self.joined_poa_sim_via[nxt_poa][-1] += 1 # inc the # of usrs that joined the sim' via this cell
                                 # self.joined_poa        [nxt_poa][-1]   += 1 # inc the # of usrs that joined this PoA at this slot
-                                self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
+                                # self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
 
                         elif (my_tuple[type_idx] == 'o'): # recycled vehicle's id, or an existing user, who moved
                             list_of_usr = list (filter (lambda usr: usr['id'] == usr_id, self.usrs))
                             if (len(list_of_usr) == 0): # Didn't find this old usr in the list of currently running usrs
                                 if (self.input_loc_file_is_rotated): # This indeed can happen in rotated files, where the simulated area changes
                                     self.usrs.append ({'id' : usr_id, 'cur poa' : nxt_poa, 'nxt poa' : nxt_poa, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_poa same as nxt_poa 
-                                    if (VERBOSE_DEMOGRAPHY in self.verbose): 
+                                    # if (VERBOSE_DEMOGRAPHY in self.verbose): 
                                         # self.joined_poa_sim_via[nxt_poa][-1] += 1 # inc the # of usrs that joined the sim' via this cell
                                         # self.joined_poa        [nxt_poa][-1]   += 1 # inc the # of usrs that joined this PoA at this slot
-                                        self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
+                                        # self.joined_cell      [nxt_cell][-1] += 1 # inc the # of usrs that joined this cell at this slot
                                 else: 
                                     print  ('Error at t={}: input file={}. Did not find old / recycled usr {}' .format (self.t, self.usrs_loc_file_name, usr_id))
                                     exit ()
@@ -647,7 +647,7 @@ class loc2poa_c (object):
                                 if (VERBOSE_DEMOGRAPHY in self.verbose and nxt_poa!= cur_cell): #this user moved to another cell  
                                     # self.joined_poa[nxt_poa][-1]                   += 1 # inc the # of usrs that joined this PoA
                                     # self.left_poa  [list_of_usr[0]['cur poa']][-1] += 1 # inc the # of usrs that left the previous cell of that usr
-                                    self.joined_cell  [nxt_cell][-1] += 1 # inc the # of usrs who joined this cell
+                                    # self.joined_cell  [nxt_cell][-1] += 1 # inc the # of usrs who joined this cell
                                     self.left_cell    [cur_cell][-1] += 1 # inc the # of usrs who left this cell at this cycleW
                                 
                                     if (self.num_of_squarlettes==1): # printing demography map when num_of_squarlettes>! is currently unsupported
@@ -735,8 +735,8 @@ class loc2poa_c (object):
             # self.plot_num_of_vehs_per_PoA()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.print_demography()
-            # self.print_demography_diagram ()
-            # self.plot_demography_heatmap()
+            self.print_demography_diagram ()
+            self.plot_demography_heatmap()
         if (VERBOSE_SPEED in self.verbose):
             
             # first, fix the speed, as we assumed a first veh with speed '0'.
@@ -933,14 +933,14 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 1
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = 'Monaco.all_area.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    max_power_of_4 = 3
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = 'Monaco.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    # my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs_rttd54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
+    # my_loc2poa.parse_loc_files (['Monaco_0730_0800_1secs_rttd54.loc']) #(['Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #(['Monaco_0730_0830_60secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc']) #'0730_0830_8secs.loc']) #(['0829_0830_8secs.loc' '0730_0830_8secs.loc']) #'0730_0830_8secs.loc'  (['0730.loc', '0740.loc', '0750.loc', '0800.loc', '0810.loc', '0820.loc'])  #['Lux_0829_0830_1secs.loc']
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

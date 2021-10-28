@@ -1,7 +1,6 @@
 import numpy as np
 import math, time, heapq, random
 import pulp as plp
-# import matplotlib.pyplot as plt
 import networkx as nx
 from pathlib import Path
 
@@ -10,6 +9,7 @@ from usr_lp_c import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
 from printf import printf ## My own format print functions 
 # from scipy._lib import _fpumode
+import matplotlib.pyplot as plt
 
 # Levels of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
@@ -531,6 +531,8 @@ class SFC_mig_simulator (object):
         
         # Remove all the servers in cells that don't contain PoA
         shortest_path    = nx.shortest_path(self.G)
+        
+        self.G.nodes[root]['nChild'] = self.children_per_node
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt']   = shortest_path[s][root][1]
             self.G.nodes[s]['nChild'] = self.children_per_node # Num of children of this server (==node)
@@ -543,16 +545,14 @@ class SFC_mig_simulator (object):
                 self.num_of_leaves -= 1 # We have just removed one leaf server
                 self.cell2s[cell] = -1 # Now, this cell isn't associated with any server
 
-        # Iteratively remove all nodes that don't have any descendant 
-        srvrs2remove = [s for s in range(1, len(self.G.nodes())) if self.G.nodes[s]['nChild']==0]
+        srvrs2remove = [s for s in self.G.nodes() if (s>0 and self.G.nodes[s]['nChild']==0)]
         for s in srvrs2remove:
             prnt = self.prnt_of_srvr(s)
-            if (prnt==0): # Don't try to remove the root, as this means there's no tree at all
-                continue 
-            self.G.nodes[prnt]['nChild'] -= 1 # Dec. the # of children of the parent
+            if (prnt!=0): # Don't try to remove the root, as this means there's no tree at all
+                self.G.nodes[prnt]['nChild'] -= 1 # Dec. the # of children of the parent
+                if (self.G.nodes[prnt]['nChild']==0):
+                    srvrs2remove.append(prnt)
             self.G.remove_node(s)
-            if (self.G.nodes[prnt]['nChild']==0):
-                srvrs2remove.append(prnt)
                 
         # Garbage collection: condense all the remaining nodes (==servers), so that they'll have sequencing IDs, starting from 0
         server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
@@ -610,9 +610,16 @@ class SFC_mig_simulator (object):
         # Find parents of each node (except of the root)
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
-            
-        self.G.draw() #$$$
-        exit ()
+        
+        self.draw_graph()
+        
+    
+    def draw_graph (self):
+        """
+        Plotting the graph of servers. Used for debugging / logging only.
+        """
+        nx.draw(self.G, with_labels=True)
+        plt.show()
 
     def gen_parameterized_full_tree (self):
         """
@@ -698,7 +705,10 @@ class SFC_mig_simulator (object):
         self.use_exp_cpu_cap            = use_exp_cpu_cap
         
         # Network parameters
-        self.tree_height                = 2 if (self.poa_file_name=='shorter.poa' or self.poa_file_name=='shorter_t2.poa') else tree_height 
+        if (self.poa_file_name=='shorter.poa' or self.poa_file_name=='shorter_t2.poa'):
+            self.tree_height            = 2
+        else:
+            self.tree_height            = 4 
         self.children_per_node          = 2 if (self.poa_file_name=='shorter.poa' or self.poa_file_name=='shorter_t2.poa') else children_per_node
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
@@ -781,7 +791,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.3 
         elif (self.mode == 'ourAlg'):   
-            self.max_R = 1.6 
+            self.max_R = 5 
         else:
             self.max_R = 5
 
@@ -790,7 +800,7 @@ class SFC_mig_simulator (object):
 
         self.init_input_and_output_files()        
                      
-        print ('Simulating {}. poa_file = {} cpu_cap_at_leaf={}. prob_of_RT={:.2f}. seed={}' .format (self.mode, self.poa_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0], self.seed))
+        print ('Simulating {}. poa_file = {} cpu_cap_at_leaf={}, prob_of_RT={:.2f}, seed={}' .format (self.mode, self.poa_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0], self.seed))
         self.stts     = sccs
 
         # extract the slot len from the input '.poa' file name
@@ -1535,6 +1545,12 @@ class SFC_mig_simulator (object):
 
         lb = cpu_cap_at_leaf
         ub = cpu_cap_at_leaf * self.max_R
+        res = self.simulate (mode = mode, cpu_cap_at_leaf=ub, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
+        if (res == None): # found a feasible solution without a binary search 
+            print ('*** Did not find a feasible solution, even with the maximal rsrc aug: cpu_cap_at_leaf={} ***' .format (ub))
+            self.print_sol_res_line (output_file)
+            return res
+        
         while True:
             if (ub <= lb+1): # the difference between the lb and the ub is at most 1
                 cpu_cap_at_leaf = ub
@@ -1556,19 +1572,20 @@ class SFC_mig_simulator (object):
 
         print ('Running run_prob_of_RT_sim')
 
-        # output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
-        # # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
-        # min_cpu_cap_at_leaf_alg = {'Lux' : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171}} 
-        # for seed in [40 + delta_sd for delta_sd in range (1) ]:
-        #     for prob_of_target_delay in [0.1*i for i in range (10)]:
-        #         self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
+        output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
+        # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
+        min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
+                                   'Monaco' : {0.0 : 100, 0.1 : 10, 0.2 : 10, 0.3 : 10, 0.4 : 10, 0.5 : 10, 0.6 : 10, 0.7 : 100, 0.8 : 100, 0.9 : 100, 1.0 : 100}} 
+        for seed in [40 + delta_sd for delta_sd in range (1) ]:
+            for prob_of_target_delay in [0.1*i for i in range (10)]:
+                self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-        for mode in ['cpvnf', 'ffit']: #cpvnf: at least 194
-            output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
-            cpu_cap_at_leaf = 150  #Initial cpu cap at the leaf server
-            for seed in [40 + i for i in range (21)]:
-                for prob_of_target_delay in [0.1*i for i in range (11)]:
-                    self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, seed=seed)
+        # for mode in ['cpvnf', 'ffit']: #cpvnf: at least 194
+        #     output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
+        #     cpu_cap_at_leaf = 150  #Initial cpu cap at the leaf server
+        #     for seed in [40 + i for i in range (21)]:
+        #         for prob_of_target_delay in [0.1*i for i in range (11)]:
+        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, seed=seed)
 
     def run_prob_of_RT_sim_opt (self, prob=None):
         """
@@ -1617,13 +1634,13 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'short_Telecom.poa' #'Monaco_0829_0830_20secs_Telecom.poa' #'shorter.poa' #
-poa2cell_file_name = 'short.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+poa_file_name      = 'Monaco_0829_0830_20secs_Telecom.poa' 
+poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  ()
-# my_simulator.run_prob_of_RT_sim_algs ()
+my_simulator.run_prob_of_RT_sim_algs ()
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [43 + i for i in range (17) ]:
 #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=100)

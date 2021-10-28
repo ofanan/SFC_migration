@@ -505,6 +505,7 @@ class SFC_mig_simulator (object):
        
     def gen_parameterized_antloc_tree (self, poa2cell_file_name):
         """
+        
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         Add leaves for each PoA, and prune sub-trees that don't have any descended PoAs.
         """

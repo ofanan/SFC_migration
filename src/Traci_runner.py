@@ -77,19 +77,22 @@ class Traci_runner (object):
         Print the latitude and longitude of the 4 corners of the simulated area
         """
         traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
-        sw_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MIN_X[self.city],loc2poa_c.MIN_Y[self.city]])
+        EPSILON=0.01
+        min_x, min_y = loc2poa_c.MIN_X[self.city] + EPSILON, loc2poa_c.MIN_Y[self.city] + EPSILON
+        max_x, max_y = loc2poa_c.MAX_X[self.city] - EPSILON, loc2poa_c.MAX_Y[self.city] - EPSILON
+        sw_corner = self.relative_pos_to_lon_lat ([min_x, min_y])
         print ('sw_corner(lat,lon)={}, {}' .format (sw_corner[1], sw_corner[0]))
         # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(sw_corner[0], sw_corner[1])))
 
-        nw_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MIN_X[self.city], loc2poa_c.MAX_Y[self.city]])
+        nw_corner = self.relative_pos_to_lon_lat ([min_x, max_y])
         print ('nw_corner(lat,lon)={}, {}' .format (nw_corner[1],nw_corner[0]))
         # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(nw_corner[0], nw_corner[1])))
 
-        se_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MAX_X[self.city], loc2poa_c.MIN_Y[self.city]])
+        se_corner = self.relative_pos_to_lon_lat ([max_x, min_y])
         print ('se_corner(lat,lon)={}, {}' .format (se_corner[1],se_corner[0]))
         # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(se_corner[0], se_corner[1])))
 
-        ne_corner = self.relative_pos_to_lon_lat ([loc2poa_c.MAX_X[self.city], loc2poa_c.MAX_Y[self.city]])
+        ne_corner = self.relative_pos_to_lon_lat ([max_x, max_y])
         print ('ne_corner(lat,lon)={}, {}' .format (ne_corner[1],ne_corner[0]))
         # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(ne_corner[0], ne_corner[1])))
         traci.close()
@@ -272,8 +275,7 @@ class Traci_runner (object):
 if __name__ == '__main__':
     
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
-    my_Traci_runner.print_lon_lat_corners_of_simulated_area()
+    # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
 
-    # my_Traci_runner.simulate_to_cnt_vehs_only (sim_length = 3600*24, len_of_time_slot_in_sec = 60)
-    # my_Traci_runner.simulate (warmup_period=(3600*8.5-60), sim_length = 60, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate (warmup_period=3600*7.5, sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5

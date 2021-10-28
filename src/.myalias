@@ -7,5 +7,6 @@ alias ltr="ls -ltr"
 alias ltra="ls -ltra"
 alias la="ls -a"
 alias g="grep"
-alias aliaser="source ~/.myalias"
+alias aliaser="source .myalias"
 alias h=history
+alias pusher="git push -f https://github.com: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@github.com/ofanan/SFC_migration.git HEAD:master"

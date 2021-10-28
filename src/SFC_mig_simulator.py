@@ -158,7 +158,7 @@ class SFC_mig_simulator (object):
     gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
 
     # Return the ID of the parent of the server given as input
-    prnt_of_srvr = lambda self , s : self.G.nodes[s]['prnt']
+    prnt_of_srvr = lambda self, s : self.G.nodes[s]['prnt']
 
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
@@ -505,7 +505,6 @@ class SFC_mig_simulator (object):
        
     def gen_parameterized_antloc_tree (self, poa2cell_file_name):
         """
-        
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
         Add leaves for each PoA, and prune sub-trees that don't have any descended PoAs.
         """
@@ -539,19 +538,21 @@ class SFC_mig_simulator (object):
             PoAs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.PoAs))
             if (len(PoAs_of_this_cell)==0): # No PoAs at this cell
                 s2remove = self.cell2s[cell] #server to be removed
+                self.G.nodes[self.prnt_of_srvr(s2remove)]['nChild'] -= 1 # Dec. the # of children of the parent
                 self.G.remove_node(self.cell2s[cell]) # Remove the leaf server handling this cell
                 self.num_of_leaves -= 1 # We have just removed one leaf server
                 self.cell2s[cell] = -1 # Now, this cell isn't associated with any server
-                self.G.nodes[self.prnt_of_srvr(s2remove)]['nChild'] -= 1 # Dec. the # of children of the parent
 
         # Iteratively remove all nodes that don't have any descendant 
-        srvrs2remove = [s for s in range(1, len(self.G.nodes())) if self.G.nodes[s]['nchild']==0] 
+        srvrs2remove = [s for s in range(1, len(self.G.nodes())) if self.G.nodes[s]['nChild']==0]
         for s in srvrs2remove:
             prnt = self.prnt_of_srvr(s)
+            if (prnt==0): # Don't try to remove the root, as this means there's no tree at all
+                continue 
             self.G.nodes[prnt]['nChild'] -= 1 # Dec. the # of children of the parent
-            self.G.remove_node(s) 
+            self.G.remove_node(s)
             if (self.G.nodes[prnt]['nChild']==0):
-                srvrs2remove.add(prnt)
+                srvrs2remove.append(prnt)
                 
         # Garbage collection: condense all the remaining nodes (==servers), so that they'll have sequencing IDs, starting from 0
         server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])
@@ -609,6 +610,9 @@ class SFC_mig_simulator (object):
         # Find parents of each node (except of the root)
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
+            
+        self.G.draw() #$$$
+        exit ()
 
     def gen_parameterized_full_tree (self):
         """
@@ -688,7 +692,7 @@ class SFC_mig_simulator (object):
         self.city                       = self.poa_file_name.split('_')[0]
         if (poa2cell_file_name != ''):
             if (poa2cell_file_name.split('.')[0] != self.city):
-                print ('Error: the cities specified by poa file and by po2cell file differ. poacell_file_name={}, poa2cell_file_name={}' .format (self.poa_file_name, poa2cell_file_name))
+                print ('Error: the cities specified by poa file and by po2cell file differ. poacell_file_name={}, poa2cell_file_name={}. self.city={}. splitter={}' .format (self.poa_file_name, poa2cell_file_name, self.city, poa2cell_file_name.split('.')[0]))
                 exit ()
         self.use_exp_cpu_cost           = use_exp_cpu_cost
         self.use_exp_cpu_cap            = use_exp_cpu_cap
@@ -1613,12 +1617,12 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0829_0830_20secs_Telecom.poa' #'shorter.poa' #
-poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+poa_file_name      = 'short_Telecom.poa' #'Monaco_0829_0830_20secs_Telecom.poa' #'shorter.poa' #
+poa2cell_file_name = 'short.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-my_simulator.run_prob_of_RT_sim_opt  ()
+# my_simulator.run_prob_of_RT_sim_opt  ()
 # my_simulator.run_prob_of_RT_sim_algs ()
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [43 + i for i in range (17) ]:

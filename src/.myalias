@@ -9,6 +9,7 @@ alias la="ls -a"
 alias g="grep"
 alias aliaser="source .myalias"
 alias h=history
-# alias pusher="git push -f https://github.com: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@github.com/ofanan/SFC_migration.git HEAD:master"
-alias pusher="git push -f https://github.com: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@github.com/ofanan/SFC_migration.git HEAD:master"
+# alias pusher="git push -f https://github.com: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@github.com/ofanan/SFC_migration.git HEAD:master"
+alias pusher="git push -f https://github.com/ofanan/SFC_migration HEAD:master"
+
 

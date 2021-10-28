@@ -157,6 +157,9 @@ class SFC_mig_simulator (object):
     # Generate output file for RT_prob_sim, namely, simulations where we vary the prob' of a usr to be a RT usr, and measure the min' required CPU to find a feasible sol.
     gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
 
+    # Return the ID of the parent of the server given as input
+    prnt_of_srvr = lambda self , s : self.G.nodes[s]['prnt']
+
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
         tot_cost = cpu_cost + link_cost + mig_cost 
@@ -534,16 +537,20 @@ class SFC_mig_simulator (object):
         for cell in range (self.num_of_leaves): # for each cell 
             PoAs_of_this_cell = list (filter (lambda item : item['cell']==cell, self.PoAs))
             if (len(PoAs_of_this_cell)==0): # No PoAs at this cell
-                s2remove = self.cell2s[cell]
-                prnt = self.G.nodes[s2remove]['prnt'] # Find the parent of the node-to-remove
+                s2remove = self.cell2s[cell] #server to be removed
                 self.G.remove_node(self.cell2s[cell]) # Remove the leaf server handling this cell
                 self.num_of_leaves -= 1 # We have just removed one leaf server
                 self.cell2s[cell] = -1 # Now, this cell isn't associated with any server
-                self.G.nodes[prnt]['nChild'] -= 1 # Dec. the # of children of the parent
+                self.G.nodes[self.prnt_of_srvr(s2remove)]['nChild'] -= 1 # Dec. the # of children of the parent
 
-                # Remove all parents that don't have any child
-                if (self.G.nodes[prnt]['nChild']==0):
-                    self.G.remove_node(prnt) # Remove the leaf server handling this cell
+        # Iteratively remove all nodes that don't have any descendant 
+        srvrs2remove = [s for s in range(1, len(self.G.nodes())) if self.G.nodes[s]['nchild']==0] 
+        for s in srvrs2remove:
+            prnt = self.prnt_of_srvr(s)
+            self.G.nodes[prnt]['nChild'] -= 1 # Dec. the # of children of the parent
+            self.G.remove_node(s) 
+            if (self.G.nodes[prnt]['nChild']==0):
+                srvrs2remove.add(prnt)
                 
         # Garbage collection: condense all the remaining nodes (==servers), so that they'll have sequencing IDs, starting from 0
         server_ids_to_recycle = set ([s for s in range (num_fo_nodes_b4_pruning) if (s not in self.G.nodes())])

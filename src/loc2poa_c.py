@@ -90,8 +90,8 @@ class loc2poa_c (object):
     # reshape a vector of length n^2 as a n X n mat   
     vec2sq_mat = lambda self, vec : vec.reshape ( [self.sqrt_len(vec), self.sqrt_len(vec)])
     
-    # Map a given x,y position to an PoA (Point of Access).
-    # If there input include real PoA locations, the mapping is by Voronoi distance, namely, each client is mapped to the nearest poa.
+    # Map a given x,y position to a PoA (Point of Access).
+    # If the input includes real PoA locations, the mapping is by Voronoi distance, namely, each client is mapped to the nearest poa.
     # Else, use a partition of the area into uniform-size rectangular cells.
     loc2poa = lambda self, x, y : self.loc2cell_using_rect_cells (x, y, max_power_of_4=self.max_power_of_4) if self.use_rect_PoA_cells else self.nearest_poa (x,y)
      
@@ -154,7 +154,7 @@ class loc2poa_c (object):
             print ('Error: nor antenna location file, neither city was specified.')
             exit ()
             
-        self.num_of_top_lvl_sqs = 2 if (self.city=='Monaco') else 1 # in Monaco we partition the city area into several horizontal almost-square rectangles before further iteratively partitioning it into squares
+        self.num_of_top_lvl_sqs = 3 if (self.city=='Monaco') else 1 # in Monaco we partition the city area into several horizontal almost-square rectangles before further iteratively partitioning it into squares
        
         self.max_x = MAX_X[self.city]
         self.max_y = MAX_Y[self.city] # borders of the simulated area, in meters
@@ -228,14 +228,15 @@ class loc2poa_c (object):
         return -1 # Error code - didn't find the relation between src and dst 
     
         
-    def parse_antloc_file (self, antennas_loc_file_name, plot_poa_locs_heatmap=False):
+    def parse_antloc_file (self, antloc_file_name, plot_poa_locs_heatmap=False):
         """
-        Parse an .antloc file.
-        An .antloc file is a file containing the list of antennas, with their IDs and (x,y) position within the simulated area
+        - Parse an .antloc file (an .antloc file is a file containing the list of antennas, with their IDs and (x,y) position within the simulated area).
+        - Generate an output .poa2cell file. A .poa2cell is a file showing which cell (rectangle area) each antenna belongs to. 
         """
-        antennas_loc_file = open ('../res/antennas_locs/' + antennas_loc_file_name, 'r')
+        antloc_file = open ('../res/antennas_locs/' + antloc_file_name, 'r')
         
-        for line in antennas_loc_file: 
+        self.use_rect_PoA_cells = False
+        for line in antloc_file: 
         
             if (line == "\n" or line.split ("//")[0] == ""): # skip lines of comments and empty lines
                 continue
@@ -247,8 +248,9 @@ class loc2poa_c (object):
             
         self.num_of_PoAs = len (self.list_of_PoAs)
         
-        poa2cell_file = open ('../res/{}_{}cells.poa2cell' .format(antennas_loc_file_name, self.num_of_cells), 'w')
+        poa2cell_file = open ('../res/{}_{}cells.poa2cell' .format(antloc_file_name, self.num_of_cells), 'w')
         printf (poa2cell_file, '// This file details the cell associated with each PoA.\n// Format: p c\n// Where p is the poa number, and c is the number of cell associated with it.\n')
+        
         
         for poa in range(self.num_of_PoAs):
             printf (poa2cell_file, '{} {}\n' .format (poa, self.poa2cell(poa)))
@@ -438,7 +440,8 @@ class loc2poa_c (object):
         printmat (tmp_file, heatmap_vals, my_precision=0)
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
         # plt.title ('avg num of vehs per cell')
-        plt.savefig('../res/num_vehs{}_{}_{}rects{} .jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells), '_{}sqrlts' .format(self.num_of_top_lvl_sqs) if self.num_of_top_lvl_sqs>1 else '') )
+        my_heatmap.set_aspect("equal") # Keep each rectangle square
+        plt.savefig('../res/num_vehs{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells))) #, '_{}sqrlts' .format(self.num_of_top_lvl_sqs) if self.num_of_top_lvl_sqs>1 else '') )
 
     def aggregate_heatmap_cells (self, vec):
         """
@@ -897,7 +900,7 @@ class loc2poa_c (object):
         points = np.array ([[poa['x'], poa['y']] for poa in self.list_of_PoAs])
         
         voronoi_plot_2d(Voronoi(points), show_vertices=False)
-        # plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
+        plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
         plt.show()
         
     def rotate_loc_file (self, loc_file_names, angle=54):
@@ -950,13 +953,14 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 3
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Monaco.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    my_loc2poa.parse_loc_files (['Monaco_0829_0830_20secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

@@ -24,7 +24,7 @@ def printmat (output_file, mat, my_precision=0):
     """
     Format-print a given matrix to a given output file, using the requested precision (number of digits beyond the decimal point).
     """
-    precision_str = '{{:.{}f}} ' .format (my_precision)
+    precision_str = '{{:.{}f}}\t' .format (my_precision)
     for row in range(len(mat)):
         for col in range(len(mat[0])):
             printf (output_file, precision_str .format (mat[row][col]))

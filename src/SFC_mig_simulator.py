@@ -678,6 +678,10 @@ class SFC_mig_simulator (object):
 
         self.poa_file_name              = poa_file_name #input file containing the PoAs of all users along the simulation
         self.city                       = self.poa_file_name.split('_')[0]
+        if (poa2cell_file_name != ''):
+            if (poa2cell_file_name.split('.')[0] != self.city):
+                print ('Error: the cities specified by poa file and by po2cell file differ. poacell_file_name={}, poa2cell_file_name={}' .format (self.poa_file_name, poa2cell_file_name))
+                exit ()
         self.use_exp_cpu_cost           = use_exp_cpu_cost
         self.use_exp_cpu_cap            = use_exp_cpu_cap
         
@@ -1398,7 +1402,7 @@ class SFC_mig_simulator (object):
         """
 
         output_poa_file = open ('../res/Lux_dump_{}.t{}.poa' .format (self.mode, self.t), 'w')
-        printf (output_poa_file, '// Dumping poa file={} poa2cell_file_name={}' .format (self.poa_file_name, self.poa2cell_file_name))
+        printf (output_poa_file, '// Dumping into poa file={} poa2cell_file_name={}' .format (self.poa_file_name, self.poa2cell_file_name))
         printf (output_poa_file, '// File format:\n//for each time slot:\n')
         printf (output_poa_file, 't = {}\n' .format(self.t))
         printf (output_poa_file, 'new_usrs: ' .format(self.t))
@@ -1583,7 +1587,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
     
     print ('Running run_cost_by_rsrc')
 
-    min_req_cpu = {'opt' : 89, 'ourAlg' : 165, 'ffit' : 393, 'cpvnf' : 399}
+    min_req_cpu = {'opt' : 89, 'ourAlg' : 94, 'ffit' : 393, 'cpvnf' : 399}
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
     # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(14, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
@@ -1601,12 +1605,12 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Lux_0730_0730_16secs_post.poa' #'shorter.poa' #
-poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
+poa_file_name      = 'Monaco_0829_0830_20secs_Telecom.poa' #'shorter.poa' #
+poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-my_simulator.run_prob_of_RT_sim_opt  (0.3)
+my_simulator.run_prob_of_RT_sim_opt  ()
 # my_simulator.run_prob_of_RT_sim_algs ()
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [43 + i for i in range (17) ]:

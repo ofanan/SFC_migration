@@ -135,6 +135,8 @@ class loc2poa_c (object):
     # Given the x,y position, return the x,y position within the simulated area (city center) 
     pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - LOWER_LEFT_CORNER [self.city]
 
+    edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
+
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
         Init a "loc2poa_c" object.
@@ -190,7 +192,10 @@ class loc2poa_c (object):
                 self.left_cell_to = []
                 for _ in range(self.num_of_cells):
                     self.left_cell_to.append ({'s' : 0, 'n' : 0, 'e' : 0, 'w' : 0, 'se' : 0, 'sw' : 0, 'ne' : 0, 'nw' : 0, 'out' : 0})
-        print ('Dimensions of smallest rectangles are: {:.1f} x {:.1f}' .format ((self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)))
+        
+        edges_of_smallest_rect = self.edges_of_smallest_rect ()
+
+        print ('Smallest rectangles is: {:.1f} x {:.1f}' .format (edges_of_smallest_rect[0], edges_of_smallest_rect[1]))
     
     def calc_ngbr_rects (self):
         """
@@ -248,7 +253,7 @@ class loc2poa_c (object):
             
         self.num_of_PoAs = len (self.list_of_PoAs)
         
-        poa2cell_file = open ('../res/{}_{}cells.poa2cell' .format(antloc_file_name, self.num_of_cells), 'w')
+        poa2cell_file = open ('../res/poa2cell_files/{}_{}cells.poa2cell' .format(antloc_file_name, self.num_of_cells), 'w')
         printf (poa2cell_file, '// This file details the cell associated with each PoA.\n// Format: p c\n// Where p is the poa number, and c is the number of cell associated with it.\n')
         
         
@@ -432,7 +437,7 @@ class loc2poa_c (object):
         
         self.set_usrs_loc_file_name(usrs_loc_file_name)
 
-        avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell() 
+        avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell()
         tmp_file = open ('../res/tmp.txt', 'w')
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
@@ -765,14 +770,17 @@ class loc2poa_c (object):
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
-            for poa in range (self.num_of_PoAs):
-                printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_poa_{}: ' .format (poa))
-                # print (self.num_of_vehs_in_poa[poa])
-                print ('{}' .format (self.num_of_vehs_in_poa[poa]), file = self.num_of_vehs_output_file, flush = True)
+            # for poa in range (self.num_of_PoAs):
+            #     printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_poa_{}: ' .format (poa))
+            #     print ('{}' .format (self.num_of_vehs_in_poa[poa]), file = self.num_of_vehs_output_file, flush = True)
             self.calc_num_of_vehs_per_cell()
             for cell in range (self.num_of_cells):
                 printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_cell_{}:' .format (cell))
                 printar (self.num_of_vehs_output_file, self.num_of_vehs_in_cell[cell])
+            peak_num_of_vehs_in_any_cell = max ([self.num_of_vehs_in_cell[cell][t] for cell in range(self.num_of_cells) for t in range(len(self.num_of_vehs_in_cell[0]))]  )
+            edges_of_smallest_rect = self.edges_of_smallest_rect () 
+            printf (self.num_of_vehs_output_file, '\n// maximal num of vehs in a rect at any time={}, rect size={} x {}, maximal car density={} \n' .format (
+                    peak_num_of_vehs_in_any_cell, edges_of_smallest_rect[0], edges_of_smallest_rect[1], peak_num_of_vehs_in_any_cell/(edges_of_smallest_rect[0]*edges_of_smallest_rect[1])))
         # if (VERBOSE_DEMOGRAPHY in self.verbose): 
         #     printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))
         #     self.print_demography()                
@@ -952,15 +960,15 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 3
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Monaco.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    max_power_of_4 = 4
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0829_0830_20secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    my_loc2poa.parse_loc_files (['Lux_0829_0830_8secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

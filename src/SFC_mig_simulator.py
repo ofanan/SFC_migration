@@ -2,6 +2,7 @@ import numpy as np
 import math, time, heapq, random
 import pulp as plp
 import networkx as nx
+import os
 from pathlib import Path
 
 from usr_c    import usr_c    # class of the users of alg
@@ -25,6 +26,9 @@ VERBOSE_CRITICAL_RES  = 9 # calculate the cost incurred by the usrs who moved on
 # Status returned by algorithms solving the prob' 
 sccs = 1
 fail = 2
+
+# Round a float, and cast it to int
+inter = lambda float_num : int (round(float_num))
 
 class SFC_mig_simulator (object):
     """
@@ -279,7 +283,8 @@ class SFC_mig_simulator (object):
             if (cpu_cap_const != []):
                 model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
 
-        model.solve() # solve the model, using the default settings. to suppress outputs, may use: model.solve(plp.PULP_CBC_CMD(msg=0)). However, this causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
+        # solve the model, using the default settings. 
+        model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC  
         
         self.stts = sccs if (model.status==1) else fail       
         # print the solution to the output, according to the desired self.verbose level
@@ -611,7 +616,7 @@ class SFC_mig_simulator (object):
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = shortest_path[s][root][1]
         
-        self.draw_graph()
+        # self.draw_graph()
         
     
     def draw_graph (self):
@@ -692,6 +697,11 @@ class SFC_mig_simulator (object):
                         ):
         """
         """
+
+        if ('ofana' in os.getcwd().split ('\\')):
+            self.host = 'laptop'
+        else:
+            self.host = 'container'
 
         self.verbose                    = verbose
 
@@ -789,11 +799,11 @@ class SFC_mig_simulator (object):
         
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
-            self.max_R = 1.3 
+            self.max_R = 3 
         elif (self.mode == 'ourAlg'):   
-            self.max_R = 5 
+            self.max_R = 1.5 
         else:
-            self.max_R = 5
+            self.max_R = 2
 
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
@@ -1509,7 +1519,7 @@ class SFC_mig_simulator (object):
         """
         
         self.PoAs = []
-        input_file = open ('../res/' + poa2cell_file_name, 'r')
+        input_file = open ('../res/poa2cell_files/' + poa2cell_file_name, 'r')
         
         for line in input_file:
     
@@ -1544,12 +1554,11 @@ class SFC_mig_simulator (object):
             return res
 
         lb = cpu_cap_at_leaf
-        ub = cpu_cap_at_leaf * self.max_R
+        ub = inter (cpu_cap_at_leaf * self.max_R)
         res = self.simulate (mode = mode, cpu_cap_at_leaf=ub, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
         if (res == None): # found a feasible solution without a binary search 
-            print ('*** Did not find a feasible solution, even with the maximal rsrc aug: cpu_cap_at_leaf={} ***' .format (ub))
-            self.print_sol_res_line (output_file)
-            return res
+            print ('Did not find a feasible solution, even with the maximal rsrc aug: cpu_cap_at_leaf={}' .format (ub))
+            exit ()
         
         while True:
             if (ub <= lb+1): # the difference between the lb and the ub is at most 1
@@ -1574,18 +1583,19 @@ class SFC_mig_simulator (object):
 
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
-        min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
-                                   'Monaco' : {0.0 : 100, 0.1 : 10, 0.2 : 10, 0.3 : 10, 0.4 : 10, 0.5 : 10, 0.6 : 10, 0.7 : 100, 0.8 : 100, 0.9 : 100, 1.0 : 100}} 
+        min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 158, 1.0 : 171},
+                                   'Monaco' : {0.0 : 834, 0.1 : 834, 0.2 : 834, 0.3 : 838, 0.4 : 862, 0.5 : 1077, 0.6 : 1312, 0.7 : 1556, 0.8 : 1736, 0.9 : 2177, 1.0 : 1700}} 
         for seed in [40 + delta_sd for delta_sd in range (1) ]:
-            for prob_of_target_delay in [0.1*i for i in range (10)]:
+            for prob_of_target_delay in [0.9]: #[i/10 for i in range (11)]:
                 self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-        # for mode in ['cpvnf', 'ffit']: #cpvnf: at least 194
-        #     output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
-        #     cpu_cap_at_leaf = 150  #Initial cpu cap at the leaf server
-        #     for seed in [40 + i for i in range (21)]:
-        #         for prob_of_target_delay in [0.1*i for i in range (11)]:
-        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, seed=seed)
+        # min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 158, 1.0 : 171},
+        #                            'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1200, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
+        # for seed in [40 + i for i in range (21)]:
+        #     for mode in ['cpvnf', 'ffit']: #Lux cpvnf: at least 194
+        #         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
+        #         for prob_of_target_delay in [i/10 for i in range (11)]:
+        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
     def run_prob_of_RT_sim_opt (self, prob=None):
         """
@@ -1596,11 +1606,13 @@ class SFC_mig_simulator (object):
         """       
 
         print ('Running run_prob_of_RT_sim')
-        cpu_cap_at_leaf = 89 #Initial cpu cap at the leaf server
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'opt')
-        probabilities = [prob] if (prob!=None) else ([(0.1*i) for i in range (11)])     
+        min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
+                               'Monaco' : {0.0 : 832, 0.1 : 832, 0.2 : 832, 0.3 : 835, 0.4 : 860, 0.5 : 1074, 0.6 : 1310, 0.7 : 1554, 0.8 : 1736, 0.9 : 1962, 1.0 : 2176}} 
+        probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
+        cpu_cap_at_leaf = min_cpu_cap_at_leaf[self.city][0.0]     
         for prob_of_target_delay in probabilities: 
-            cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay)
+            cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=min (cpu_cap_at_leaf, min_cpu_cap_at_leaf[self.city][prob_of_target_delay]), prob_of_target_delay=prob_of_target_delay)
             self.print_sol_res_line (output_file)
     
 #######################################################################################################################################
@@ -1616,17 +1628,18 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
     
     print ('Running run_cost_by_rsrc')
 
-    min_req_cpu = {'opt' : 89, 'ourAlg' : 94, 'ffit' : 393, 'cpvnf' : 399}
+    min_req_cpu = {'Lux'    : {'opt' : 89, 'ourAlg' : 94, 'ffit' : 393, 'cpvnf' : 399},
+                   'Monaco' : {'opt' : 89, 'ourAlg' : 94, 'ffit' : 393, 'cpvnf' : 399}}
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
-    # for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(14, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    # for cpu_cap_at_leaf in [inter (min_req_cpu['opt']*(1 + i/10)) for i in range(14, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
     # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                      
     for mode in ['ourAlg']:
         for seed in [40 + i for i in range (21)]:
-            for cpu_cap_at_leaf in [int (min_req_cpu['opt']*(1 + 0.1*i)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+            for cpu_cap_at_leaf in [inter (min_req_cpu['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
                 if (cpu_cap_at_leaf >= min_req_cpu[mode]):
                     my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
             # for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit']]: #, min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
@@ -1634,8 +1647,8 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0829_0830_20secs_Telecom.poa' 
-poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Monaco_0829_0830_20secs_Telecom.poa' 
+poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)

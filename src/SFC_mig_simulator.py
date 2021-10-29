@@ -1632,17 +1632,17 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
                    'Monaco' : {'opt' : 89, 'ourAlg' : 94, 'ffit' : 393, 'cpvnf' : 399}}
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
-    # for cpu_cap_at_leaf in [inter (min_req_cpu['opt']*(1 + i/10)) for i in range(14, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    for cpu_cap_at_leaf in [inter (min_req_cpu['Lux']['opt']*(1 + i/10)) for i in range(1, 5)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+        my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
     # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                      
-    seeds = [seeds] if (seeds!=None) else [40 + i for i in range (21)]
-    for mode in ['ourAlg']:
-        for seed in seeds:
-            for cpu_cap_at_leaf in [inter (min_req_cpu['Lux']['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-                if (cpu_cap_at_leaf >= min_req_cpu['Lux'][mode]):
-                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+    # seeds = [seeds] if (seeds!=None) else [40 + i for i in range (21)]
+    # for mode in ['ourAlg']:
+    #     for seed in seeds:
+    #         for cpu_cap_at_leaf in [inter (min_req_cpu['Lux']['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #             if (cpu_cap_at_leaf >= min_req_cpu['Lux'][mode]):
+    #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
             # for cpu_cap_at_leaf in [min_req_cpu['cpvnf'], min_req_cpu['ffit']]: #, min_req_cpu['ourAlg']]: # simulate for the special points which are the minimal cpu req. for a feasible sol' for each mode
             #     if (cpu_cap_at_leaf >= min_req_cpu[mode]):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)

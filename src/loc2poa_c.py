@@ -156,6 +156,10 @@ class loc2poa_c (object):
             print ('Error: nor antenna location file, neither city was specified.')
             exit ()
             
+        if (self.city=='Monaco' and max_power_of_4 > 3):
+            print ('Error: you chose to run Monaco with max_power_of_4={}. We currently run Monaco with max_power_of_4 <= 3' .format (max_power_of_4))
+            exit ()
+            
         self.num_of_top_lvl_sqs = 3 if (self.city=='Monaco') else 1 # in Monaco we partition the city area into several horizontal almost-square rectangles before further iteratively partitioning it into squares
        
         self.max_x = MAX_X[self.city]
@@ -556,6 +560,31 @@ class loc2poa_c (object):
             # plt.clf()
             
  
+    # def cnt_tot_vehs_per_slot (self, input_loc_file_name):
+    #     """
+    #     A fast run, which only count the number of vehicles in the whole simualated area in each slot, and its average.
+    #     """
+    #
+    #     tot_num_of_vehs_in_slot = [0]
+    #     for line in self.usrs_loc_file: 
+    #
+    #         # remove the new-line character at the end (if any), and ignore comments lines 
+    #         line = line.split ('\n')[0] 
+    #         if (line.split ("//")[0] == ""):
+    #             continue
+    #
+    #         splitted_line = line.split (" ")
+    #
+    #         if (splitted_line[0] == "t"): # reached the next simulation time slot
+    #
+    #         elif (splitted_line[0] == 'usrs_that_left:'):
+    #
+    #
+    #         elif (splitted_line[0] == 'new_or_moved:'): 
+    #
+    #             if (my_tuple[type_idx] == 'n'): # new vehicle
+
+    
     def parse_file (self):
         """
         - Read and parse input ".loc" file, detailing the users locations 
@@ -909,6 +938,9 @@ class loc2poa_c (object):
         
         voronoi_plot_2d(Voronoi(points), show_vertices=False)
         plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
+        frame1 = plt.gca()
+        frame1.axes.get_xaxis().set_visible(False)
+        frame1.axes.get_yaxis().set_visible(False)
         plt.show()
         
     def rotate_loc_file (self, loc_file_names, angle=54):
@@ -960,15 +992,15 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 4
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.center.post.antloc')
+    max_power_of_4 = 3
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Monaco.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Lux_0829_0830_8secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    my_loc2poa.parse_loc_files (['Monaco_0730_0830_16secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

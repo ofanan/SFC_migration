@@ -14,6 +14,9 @@ seed_idx      = 4
 stts_idx      = 5
 num_of_fields = stts_idx+1
 
+num_usrs_idx      = 6
+num_crit_usrs_idx = 7
+
 opt_idx   = 0
 alg_idx   = 1
 ffit_idx  = 2
@@ -151,7 +154,7 @@ class Res_file_parser (object):
 
         self.input_file.close
 
-    def parse_line (self, line):
+    def parse_line (self, line, parse_cost=True, parse_cost_comps=True):
         """
         Parse a line in a result file. Such a line should begin with a string having several fields, detailing the settings.
         """
@@ -159,7 +162,6 @@ class Res_file_parser (object):
         splitted_line = line.split (" | ")
          
         settings          = splitted_line[0]
-        cost              = float(splitted_line[1].split("=")[1])
         splitted_settings = settings.split ("_")
 
         if len (splitted_settings) != num_of_fields:
@@ -172,15 +174,20 @@ class Res_file_parser (object):
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
             "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
-            "stts"      : int   (splitted_settings [stts_idx].split("stts")[1]),  
-            "cpu_cost"  : float (splitted_line[1].split("=")[1]),
-            "link_cost" : float (splitted_line[2].split("=")[1]),
-            "mig_cost"  : float (splitted_line[3].split("=")[1]),            
-            "cost"      : float (splitted_line[4].split("=")[1])
-            }
-        if (splitted_line > 5): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
-            self.dict['num_usrs']      = int (splitted_line[5].split("=")[1])
-            self.dict['num_crit_usrs'] = int (splitted_line[6].split("=")[1])
+            "stts"      : int   (splitted_settings [stts_idx].split("stts")[1])   
+        }
+
+        if (parse_cost):
+            self.dict["cost"] = float (splitted_line[4].split("=")[1])
+
+        if (parse_cost_comps):        
+            self.dict["cpu_cost"]  = float (splitted_line[1].split("=")[1])
+            self.dict["link_cost"] = float (splitted_line[2].split("=")[1])
+            self.dict["mig_cost" ] = float (splitted_line[3].split("=")[1])            
+
+        if (len(splitted_line) > num_usrs_idx): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
+            self.dict['num_usrs']      = int (splitted_line[num_usrs_idx]     .split("=")[1])
+            self.dict['num_crit_usrs'] = int (splitted_line[num_crit_usrs_idx].split("=")[1])
 
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, mode = None, cpu = None, stts = -1):
         """
@@ -424,10 +431,10 @@ if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
     
-    input_file_name = 'tmp.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
+    input_file_name = 'RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
     my_res_file_parser.parse_file (input_file_name) 
-    # my_res_file_parser.plot_RT_prob_sim_python()
-    my_res_file_parser.plot_cost_vs_rsrcs()
+    my_res_file_parser.plot_RT_prob_sim_python()
+    # my_res_file_parser.plot_cost_vs_rsrcs()
     
     # input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        

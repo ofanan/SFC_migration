@@ -803,7 +803,7 @@ class SFC_mig_simulator (object):
         elif (self.mode == 'ourAlg'):   
             self.max_R = 1.3 
         else:
-            self.max_R = 3.5
+            self.max_R = 1.5
 
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
@@ -1589,10 +1589,19 @@ class SFC_mig_simulator (object):
         #     for prob_of_target_delay in [0.9]:#[i/10 for i in range (3)]:
         #         self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-        min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 160, 0.1 : 160, 0.2 : 160, 0.3 : 160, 0.4 : 160, 0.5 : 170, 0.6 : 170, 0.7 : 170, 0.8 : 180, 0.9 : 180, 1.0 : 180},
+        # min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 160, 0.1 : 160, 0.2 : 165, 0.3 : 165, 0.4 : 165, 0.5 : 170, 0.6 : 170, 0.7 : 170, 0.8 : 180, 0.9 : 195, 1.0 : 225},
+        #                            'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1200, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
+        # for seed in [40 + i for i in range (6)]:
+        #     for mode in ['cpvnf']: 
+        #         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
+        #         for prob_of_target_delay in [i/10 for i in range (1, 11)]:
+        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
+
+
+        min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 150, 0.1 : 150, 0.2 : 150, 0.3 : 150, 0.4 : 150, 0.5 : 150, 0.6 : 150, 0.7 : 150, 0.8 : 150, 0.9 : 160, 1.0 : 160},
                                    'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1200, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
         for seed in [40 + i for i in range (6)]:
-            for mode in ['cpvnf', 'ffit']: #Lux cpvnf: at least 194
+            for mode in ['ffit']: 
                 output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
                 for prob_of_target_delay in [i/10 for i in range (11)]:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
@@ -1648,16 +1657,16 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
     #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Lux_0730_0830_1secs_post.poa' #'Monaco_0829_0830_20secs_Telecom.poa' 
+poa_file_name      = 'Lux_0829_0830_8secs_post.poa' #'Monaco_0829_0830_20secs_Telecom.poa' 
 poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name, 40)
-# my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.0)
-# my_simulator.run_prob_of_RT_sim_algs ()
-my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-for seed in [40 + i for i in range (1) ]:
-    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=100)
+my_simulator.run_prob_of_RT_sim_algs ()
+# my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+# for seed in [40 + i for i in range (1) ]:
+#     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=100)
 # i = 0
 # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
     

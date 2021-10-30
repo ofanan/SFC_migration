@@ -1657,7 +1657,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
     #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Lux_0829_0830_8secs_post.poa' #'Monaco_0829_0830_20secs_Telecom.poa' 
+poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Monaco_0829_0830_20secs_Telecom.poa' 
 poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name, 40)

@@ -1579,6 +1579,7 @@ class SFC_mig_simulator (object):
         Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
         """       
 
+
         print ('Running run_prob_of_RT_sim')
 
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    

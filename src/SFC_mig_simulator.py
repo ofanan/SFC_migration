@@ -159,7 +159,7 @@ class SFC_mig_simulator (object):
 
 
     # Generate output file for RT_prob_sim, namely, simulations where we vary the prob' of a usr to be a RT usr, and measure the min' required CPU to find a feasible sol.
-    gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
+    gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}_.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
 
     # Return the ID of the parent of the server given as input
     prnt_of_srvr = lambda self, s : self.G.nodes[s]['prnt']
@@ -1592,8 +1592,8 @@ class SFC_mig_simulator (object):
 
         min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 160, 0.1 : 160, 0.2 : 165, 0.3 : 165, 0.4 : 165, 0.5 : 170, 0.6 : 170, 0.7 : 170, 0.8 : 180, 0.9 : 195, 1.0 : 225},
                                    'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1200, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
-        for seed in [40 + i for i in range (6,11)]:
-            mode='cpvnf'
+        for seed in [40 + i for i in range (16,21)]:
+            mode='ffit'
             output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode=mode)    
             for prob_of_target_delay in [i/10 for i in range (11)]:
                 self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)

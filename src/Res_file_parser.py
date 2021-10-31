@@ -79,35 +79,36 @@ class Res_file_parser (object):
     # Calculate the confidence interval, given the avg and the std 
     conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
         
-    def plot_mig_cost_n_ratio_crit_usrs_tikz (self):
+    def plot_cost_comp_tikz (self):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.   
         """
 
         # Generate a vector for the x axis (the t line).
-        t_min, t_max = min ([item['t'] for item in self.list_of_dicts]), max ([item['t'] for item in self.list_of_dicts])
-        t = range (t_min, t_max+1)
+        list_of_dicts_of_sd42 = list ([item for item in self.list_of_dicts if item['seed']==42])
+        print ('len={}' .format (len (list_of_dicts_of_sd42)))
+        exit ()
+        t_min, t_max          = min ([item['t'] for item in list_of_dicts_of_sd42]), max ([item['t'] for item in list_of_dicts_of_sd42])
 
         num_of_periods     = 10 # number of marker points in the plot 
-        period_len         = len (t) / num_of_periods # Each point will be assigned the avg value, where averaging over period of length period_len
+        period_len         = int( (t_max-t_min+1) / num_of_periods) # Each point will be assigned the avg value, where averaging over period of length period_len
         mig_cost           = np.empty (num_of_periods)
         ratio_of_crit_usrs = np.empty (num_of_periods)
         
-        period_begin = t_min
-        for period in period_len: # for every considered period
-            period_end = period_begin + period_len
-            res_from_this_period = list (filter (lambda item : item['t'] >= period_begin and item['t'] <= period_end, self.list_of_dicts))
-            mig_cost[period]   = np.average ([item['mig_cost'] for item in res_from_this_period])
-            ratio_of_crit_usrs = [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
+        for period in range(num_of_periods): # for every considered period
+            res_from_this_period        = list (filter (lambda item : item['t'] >= t_min + period*period_len and item['t'] < t_min + (period+1)*period_len, list_of_dicts_of_sd42))
+            mig_cost[period]            = np.average ([item['mig_cost'] for item in res_from_this_period])
+            ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
             
+        self.output_file = open ('../res/cost_comp_{}.dat' .format (self.input_file_name), 'w')
         printf (self.output_file, self.add_plot_mig_cost)
-        for i in range (num_of_periods):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (t[i], mig_cost[i]))
+        for period in range (num_of_periods):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (period*period_len, mig_cost[period]))
         printf (self.output_file, '};' + self.add_legend_str + 'mig.}\n')
 
         printf (self.output_file, self.add_plot_num_of_critical_chains)
-        for i in range (num_of_periods):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (t[i], ratio_of_crit_usrs[i]))
+        for period in range (num_of_periods):
+            printf (self.output_file, '({:.2f}, {:.2f})' .format (period*period_len, ratio_of_crit_usrs[period]))
         printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
                    
     def gen_vec_for_period (self, vec_for_slot):
@@ -147,7 +148,8 @@ class Res_file_parser (object):
             if (line.split ("//")[0] == ""):
                 continue
            
-            self.parse_line(line)
+            if (self.parse_line(line)==None): # An ill-formatted line
+                continue
             if ( not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)
                 
@@ -157,6 +159,7 @@ class Res_file_parser (object):
     def parse_line (self, line, parse_cost=True, parse_cost_comps=True):
         """
         Parse a line in a result file. Such a line should begin with a string having several fields, detailing the settings.
+        If the format is wrong, print an error message, and return None.
         """
 
         splitted_line = line.split (" | ")
@@ -165,8 +168,8 @@ class Res_file_parser (object):
         splitted_settings = settings.split ("_")
 
         if len (splitted_settings) != num_of_fields:
-            print ("encountered a format error.\nSplitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
-            exit ()
+            print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
+            return None
                
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
@@ -174,7 +177,7 @@ class Res_file_parser (object):
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
             "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
-            "stts"      : int   (splitted_settings [stts_idx].split("stts")[1])   
+            "stts"      : int   (splitted_settings [stts_idx].split("stts")[1]),
         }
 
         if (parse_cost):
@@ -429,13 +432,12 @@ class Res_file_parser (object):
 
 if __name__ == '__main__':
 
-    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser = Res_file_parser ()    
+    my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3.res')
     
-    input_file_name = 'RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'Lux_0829_0830_1secs_256aps_p0.3.res.expCPU.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap.res' 
-    my_res_file_parser.parse_file (input_file_name) 
-    my_res_file_parser.plot_RT_prob_sim_python()
+    my_res_file_parser.plot_cost_comp_tikz () 
+    # my_res_file_parser.plot_RT_prob_sim_python()
     # my_res_file_parser.plot_cost_vs_rsrcs()
     
-    # input_file_name = '0829_0830_1secs_256aps_p0.3.res.expCPU_POST.res' #'RT_prob_sim_Lux.center.post.antloc_256cells.ap2cell_0829_0830_1secs_256aps.ap_deter_usr_id.res'
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
     

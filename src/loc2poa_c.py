@@ -140,7 +140,7 @@ class loc2poa_c (object):
     edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
     # Generate a well-customized sns heatmap from the given data frame
-    gen_heatmap = lambda self, df : sns.heatmap(df, vmin=0, vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
+    gen_heatmap = lambda self, df : sns.heatmap(df, vmin=df.values.min(), vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
 
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
@@ -844,7 +844,7 @@ class loc2poa_c (object):
             exit ()
         self.slot_len = int (loc_file_names[0].split('secs')[0].split('_')[-1])
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_file_name = '../res/num_of_vehs_{}_{}.txt' .format (loc_file_names[0], self.antloc_file_name)
+            self.num_of_vehs_file_name = '../res/num_of_vehs_{}_{}_{}rects.txt' .format (loc_file_names[0], self.antloc_file_name, self.num_of_cells)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
             
         if (VERBOSE_DEMOGRAPHY in self.verbose and self.num_of_top_lvl_sqs==1):
@@ -1003,14 +1003,14 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 3
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Monaco.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_1secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    my_loc2poa.parse_loc_files (['Monaco_0730_0830_16secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

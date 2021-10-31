@@ -139,6 +139,9 @@ class loc2poa_c (object):
 
     edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
+    # Generate a well-customized sns heatmap from the given data frame
+    gen_heatmap = lambda self, df : sns.heatmap(df, vmin=0, vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
+
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
         Init a "loc2poa_c" object.
@@ -156,6 +159,10 @@ class loc2poa_c (object):
             self.city = city
         else:
             print ('Error: nor antenna location file, neither city was specified.')
+            exit ()
+            
+        if (antloc_file_name=='' and VERBOSE_POA in self.verbose):
+            print ('Error: VERBOSE_POA was requested, but no antloc file was specified')
             exit ()
             
         if (self.city=='Monaco' and max_power_of_4 > 3):
@@ -444,16 +451,14 @@ class loc2poa_c (object):
         self.set_usrs_loc_file_name(usrs_loc_file_name)
 
         avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell()
-        tmp_file = open ('../res/tmp.txt', 'w')
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
-        heatmap_df = pd.DataFrame (heatmap_vals)
-        my_heatmap = sns.heatmap(heatmap_df, vmin=heatmap_df.values.min(), vmax=heatmap_df.values.max(), cmap="YlGnBu", linewidths=0.1, 
-                                 annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
+        my_heatmap = self.gen_heatmap (pd.DataFrame (heatmap_vals)) 
         my_heatmap.set_aspect("equal") # Keep each rectangle 
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
          
-        printmat (tmp_file, heatmap_vals, my_precision=0)
+        printmat (self.num_of_vehs_output_file, heatmap_vals, my_precision=0)
+        printf   (self.num_of_vehs_output_file, 'sum of vals in the heatmap={:.0f}, max_val in the heatmap={:.0f}' .format (np.sum(heatmap_vals), np.max(heatmap_vals)))
         # plt.title ('avg num of vehs per cell')
         plt.savefig('../res/num_vehs{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells))) #, '_{}sqrlts' .format(self.num_of_top_lvl_sqs) if self.num_of_top_lvl_sqs>1 else '') )
 
@@ -813,7 +818,7 @@ class loc2poa_c (object):
                 printar (self.num_of_vehs_output_file, self.num_of_vehs_in_cell[cell])
             peak_num_of_vehs_in_any_cell = max ([self.num_of_vehs_in_cell[cell][t] for cell in range(self.num_of_cells) for t in range(len(self.num_of_vehs_in_cell[0]))]  )
             edges_of_smallest_rect = self.edges_of_smallest_rect () 
-            printf (self.num_of_vehs_output_file, '\n// maximal num of vehs in a rect at any time={}, rect size={} x {}, maximal car density={} \n' .format (
+            printf (self.num_of_vehs_output_file, '\n// maximal num of vehs in a rect at any time={}, rect size={:.1f} x {:.1f}, maximal car density={} \n' .format (
                     peak_num_of_vehs_in_any_cell, edges_of_smallest_rect[0], edges_of_smallest_rect[1], peak_num_of_vehs_in_any_cell/(edges_of_smallest_rect[0]*edges_of_smallest_rect[1])))
         # if (VERBOSE_DEMOGRAPHY in self.verbose): 
         #     printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))
@@ -861,7 +866,7 @@ class loc2poa_c (object):
             printf (self.poa_file, '//"new_usrs" is a list of the new usrs, and their PoAs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
             printf (self.poa_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current PoAs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
         
-        print ('Parsing .loc files. max_power_of_4={}. antloc_file={}' .format (self.max_power_of_4, self.antloc_file_name))
+        print ('Parsing .loc files. verbose={}, max_power_of_4={}. antloc_file={}' .format (self.verbose, self.max_power_of_4, self.antloc_file_name))
         self.is_first_slot = True
         for file_name in loc_file_names: 
             self.usrs_loc_file_name = file_name
@@ -997,7 +1002,7 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 1
+    max_power_of_4 = 3
     my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
@@ -1005,7 +1010,7 @@ if __name__ == '__main__':
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0829_0830_20secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    my_loc2poa.parse_loc_files (['Monaco_0730_0830_1secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

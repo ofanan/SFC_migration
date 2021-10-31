@@ -290,6 +290,6 @@ if __name__ == '__main__':
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
     # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
     
-    my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 1, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
-    # my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 1, verbose=[])
+    # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
      

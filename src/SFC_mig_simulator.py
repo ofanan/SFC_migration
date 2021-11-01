@@ -1223,7 +1223,7 @@ class SFC_mig_simulator (object):
         if (self.mode in ['ourAlg']):
             self.rst_sol()
             self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
-            if (VERBOSE_RES in self.verbose):
+            if (VERBOSE_LOG in self.verbose):
                 printf (self.res_file, '// reshuffling\n')
             self.stts = self.bottom_up()
             if (VERBOSE_ADD_LOG in self.verbose):
@@ -1631,27 +1631,29 @@ class SFC_mig_simulator (object):
 #######################################################################################################################################
 
 
-def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=42):
+def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=None):
     """
     Run a simulation where the amount of resources varies. 
     Output the cost obtained at each time slot.
     """
     
     print ('Running run_cost_by_rsrc')
+    seeds = [seed] if (seed!=None) else [40 + i for i in range (21)]
 
-    min_req_cpu = {'Lux'    : {'opt' : 89, 'ourAlg' : 94, 'ffit' : 150, 'cpvnf' : 150},
-                   'Monaco' : {'opt' : 840, 'ourAlg' : 94, 'ffit' : 1360, 'cpvnf' : 1360}}
+    min_req_cpu = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 219, 'cpvnf' : 222},
+                   'Monaco' : {'opt' : 840, 'ourAlg' : 94, 'ffit' : 1354, 'cpvnf' : 1357}}
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
     # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(11)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
+    # for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                      
-    for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-    # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
-    #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
+    # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+    for seed in seeds:
+        for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
+            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
 
     # seeds = [seeds] if (seeds!=None) else [40 + i for i in range (11)]
     # for mode in ['cpvnf']:
@@ -1664,13 +1666,13 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=42):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
-poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
-# run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=46)
-my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
+# my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.9)
-my_simulator.run_prob_of_RT_sim_algs (0.0)
+# my_simulator.run_prob_of_RT_sim_algs (0.0)
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [40 + i for i in range (1) ]:
 # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1000, seed=40)

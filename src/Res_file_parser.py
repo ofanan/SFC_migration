@@ -295,7 +295,7 @@ class Res_file_parser (object):
                 [y_lo, y_hi] = self.conf_interval (avg, np.std(samples))
                 
                 if (x_val==0.3 and mode in ['ffit', 'cpvnf']):
-                    print ('mode={}, x_val=0.3, y_hi={}' .format (mode, int(math.ceil(y_hi))))
+                    print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 y.append (avg)

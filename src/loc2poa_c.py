@@ -139,8 +139,15 @@ class loc2poa_c (object):
 
     edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
-    # Generate a well-customized sns heatmap from the given data frame
-    gen_heatmap = lambda self, df : sns.heatmap(df, vmin=df.values.min(), vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
+    
+    def gen_heatmap (self, df): 
+        """
+        Generate a well-customized sns heatmap from the given data frame
+        """
+        my_heatmap = sns.heatmap(df, vmin=df.values.min(), vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
+        my_heatmap.set_aspect("equal") # Keep each rectangle 
+        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        return my_heatmap
 
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
@@ -360,7 +367,7 @@ class loc2poa_c (object):
         """
         printf (self.speed_file, '{}' .format ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]))                                        
 
-    def plot_demography_heatmap (self):
+    def plot_demography_heatmap (self, usrs_loc_file_name):
         """
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
         """
@@ -381,17 +388,18 @@ class loc2poa_c (object):
         plt.figure()
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
          
-        columns = self.gen_columns_for_heatmap (lvl=0)
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        my_heatmap = sns.heatmap (pd.DataFrame (heatmap_vals), cmap="YlGnBu") #, columns=columns
+        my_heatmap = self.gen_heatmap (pd.DataFrame (heatmap_vals))
         printf   (heatmap_txt_file, 'num of rects = {}\n' .format ( self.num_of_cells))
         printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
-        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells)))
+        # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        usrs_loc_file_name = usrs_loc_file_name if (usrs_loc_file_name!=None) else self.usrs_loc_file_name 
+        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_{}rects.jpg' .format (self.antloc_file_name, usrs_loc_file_name, int(self.num_of_cells)))
 
         return 
+        columns = self.gen_columns_for_heatmap (lvl=0)
         plt.figure()
         my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of vehs that joined the sim every sec in {}' .format (self.time_period_str))
@@ -454,8 +462,8 @@ class loc2poa_c (object):
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
         my_heatmap = self.gen_heatmap (pd.DataFrame (heatmap_vals)) 
-        my_heatmap.set_aspect("equal") # Keep each rectangle 
-        my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        # my_heatmap.set_aspect("equal") # Keep each rectangle 
+        # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
          
         printmat (self.num_of_vehs_output_file, heatmap_vals, my_precision=0)
         printf   (self.num_of_vehs_output_file, 'sum of vals in the heatmap={:.0f}, max_val in the heatmap={:.0f}' .format (np.sum(heatmap_vals), np.max(heatmap_vals)))
@@ -490,8 +498,8 @@ class loc2poa_c (object):
         for lvl in range (0, self.max_power_of_4):
             self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering PoA.
             plt.figure()       
-            my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_PoA),columns=self.gen_columns_for_heatmap(lvl=lvl)), cmap="YlGnBu")#, norm=LogNorm())
-            my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+            my_heatmap = self.gen_heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_PoA)))
+            # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
             # plt.title ('avg num of vehs per PoA')
             plt.savefig('../res/num_vehs_per_PoA_{}_{}_{}cells.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
             reshaped_heatmap = avg_num_of_vehs_per_PoA.reshape (int(len(avg_num_of_vehs_per_PoA)/4), 4) # prepare the averaging for the next iteration
@@ -507,15 +515,14 @@ class loc2poa_c (object):
         for poa in range (self.num_of_PoAs):
             self.num_of_vehs_in_cell[self.poa2cell(poa)] += np.array (self.num_of_vehs_in_poa[poa], dtype='int16') # Add the # of vehs in this PoA to the (avg) number of vehs in the cell to which this PoA belongs    
         
-    def plot_speed_heatmap (self):
-        """
-        Plot a heatmap, showing the average speed of vehicles at each cell.
-        """
-        plt.figure()
-        sns.heatmap (pd.DataFrame (self.vec2heatmap ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]), 
-                                                columns=["0","1","2","3","4","5","6","7"]), cmap="YlGnBu")
-        plt.title ('avg speed in each cell')
-        plt.savefig('../res/heatmap_speed.jpg')
+    # def plot_speed_heatmap (self):
+    #     """
+    #     Plot a heatmap, showing the average speed of vehicles at each cell.
+    #     """
+    #     plt.figure()
+    #     sns.heatmap = self.gen_heatmap (pd.DataFrame (self.vec2heatmap ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)])))
+    #     plt.title ('avg speed in each cell')
+    #     plt.savefig('../res/heatmap_speed.jpg')
         
     def calc_cell2tile (self, lvl=0): 
  
@@ -939,6 +946,27 @@ class loc2poa_c (object):
             else: # Now we know that the vector's name begins by "num_of_vehs_in_cell"
                 self.num_of_vehs_in_cell.append(num_of_vehs)
 
+    def rd_num_vehs_left (self, input_file_name):
+        """
+        Read the number of vehicles at each poa, and each cell, as written in the input files. 
+        """
+        input_file  = open ('../res/' + input_file_name, "r")  
+    
+        self.left_cell = [] 
+        
+        for line in input_file:
+    
+            if (line == "\n" or line.split ("//")[0] == ""):
+                continue
+    
+            self.left_cell.append([])
+            line = line.split ("\n")[0]
+            splitted_line = line.split (":")
+            cell_num = int(splitted_line[0].split('_')[1]) 
+            vec_data = splitted_line[1].split('[')[1].split(']')[0].split(', ')
+            for num_of_vehs_in_this_time_slot in vec_data:
+                self.left_cell[cell_num].append (int(num_of_vehs_in_this_time_slot))
+
 
     def plot_voronoi_diagram (self):
         """
@@ -1002,7 +1030,7 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 2
+    max_power_of_4 = 3
     my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
@@ -1017,3 +1045,6 @@ if __name__ == '__main__':
     # my_loc2poa.rd_num_of_vehs_per_poa_n_cell ('num_of_vehs_Lux.center.post.antloc_1524poas.txt')# ('num_of_vehs_per_poa_256aps_ant.txt')
     # # my_loc2poa.plot_num_of_vehs_per_PoA (usrs_loc_file_name='0730_0830_8secs.loc')
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps (usrs_loc_file_name='0829_0830_8secs.loc')
+    # my_loc2poa.rd_num_vehs_left ('demography_Monaco_0730_0830_1secs_192.txt')
+    # my_loc2poa.plot_demography_heatmap (usrs_loc_file_name='Monaco_0730_0830_1secs.loc')
+    

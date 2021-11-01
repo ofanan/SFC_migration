@@ -1586,7 +1586,7 @@ class SFC_mig_simulator (object):
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
         min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
-                                   'Monaco' : {0.0 : 834, 0.1 : 834, 0.2 : 834, 0.3 : 838, 0.4 : 862, 0.5 : 900, 0.6 : 1200, 0.7 : 1400, 0.8 : 1700, 0.9 : 1840, 1.0 : 2116}} 
+                                   'Monaco' : {0.0 : 834, 0.1 : 834, 0.2 : 834, 0.3 : 924, 0.4 : 924, 0.5 : 924, 0.6 : 1200, 0.7 : 1400, 0.8 : 1700, 0.9 : 1840, 1.0 : 2116}} 
         for seed in [40]: #[40 + delta_sd for delta_sd in range (1) ]:
             for prob_of_target_delay in probabilities:
                 self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
@@ -1673,7 +1673,7 @@ my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], po
 # my_simulator.run_prob_of_RT_sim_algs (0.0)
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [40 + i for i in range (1) ]:
-my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=880, prob_of_target_delay=0.0, seed=42)
+my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=890, prob_of_target_delay=0.0, seed=42)
 # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=900, prob_of_target_delay=0.3, seed=42)
 # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=950, prob_of_target_delay=0.5, seed=42)
 # i = 0

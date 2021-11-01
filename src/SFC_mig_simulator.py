@@ -801,7 +801,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode == 'ourAlg'):   
-            self.max_R = 1.3 
+            self.max_R = 1.6 
         else:
             self.max_R = 1.8
 

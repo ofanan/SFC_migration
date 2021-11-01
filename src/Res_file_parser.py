@@ -433,10 +433,10 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()    
-    my_res_file_parser.parse_file ('tmp.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+    my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
     
     # my_res_file_parser.plot_cost_comp_tikz () 
-    # my_res_file_parser.plot_RT_prob_sim_python()
+    my_res_file_parser.plot_RT_prob_sim_python()
     # my_res_file_parser.plot_cost_vs_rsrcs()
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        

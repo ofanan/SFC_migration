@@ -312,10 +312,11 @@ class loc2poa_c (object):
         Finding the PoA covering the user's area, assuming that the number of PoAs is a power of 4, and the area is iteratively partitioned into 4 identical squares.
         Input:  (x,y) location data; (max_x, max_y) - nort-east corner for the area to partition; the south-west corner is (0,0).
         Output: poa that covers this area
-        """
+        """        
         max_x          = self.max_x           if (max_x == None)          else max_x
         max_y          = self.max_y           if (max_y == None)          else max_y
         max_power_of_4 = self.max_power_of_4  if (max_power_of_4 == None) else max_power_of_4
+
         poa = np.int8(0)
         x_offset, y_offset = x, y
         x_edge, y_edge = 0.5*max_x, 0.5*max_y
@@ -367,7 +368,7 @@ class loc2poa_c (object):
         """
         printf (self.speed_file, '{}' .format ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]))                                        
 
-    def plot_demography_heatmap (self, usrs_loc_file_name):
+    def plot_demography_heatmap (self, usrs_loc_file_name='None'):
         """
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
         """
@@ -1030,8 +1031,8 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 3
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    max_power_of_4 = 0
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])

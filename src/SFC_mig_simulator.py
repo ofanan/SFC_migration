@@ -1618,7 +1618,7 @@ class SFC_mig_simulator (object):
         print ('Running run_prob_of_RT_sim')
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'opt')
         min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
-                               'Monaco' : {0.0 : 832, 0.1 : 832, 0.2 : 832, 0.3 : 835, 0.4 : 860, 0.5 : 1074, 0.6 : 1310, 0.7 : 1554, 0.8 : 1736, 0.9 : 1962, 1.0 : 2176}} 
+                               'Monaco' : {0.0 : 832, 0.1 : 832, 0.2 : 832, 0.3 : 835, 0.4 : 860, 0.5 : 1074, 0.6 : 1310, 0.7 : 1554, 0.8 : 1736, 0.9 : 1922, 1.0 : 2176}} 
         probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
         cpu_cap_at_leaf = min_cpu_cap_at_leaf[self.city][0.0]     
         for prob_of_target_delay in probabilities: 
@@ -1658,7 +1658,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
             #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0730_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
 poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)

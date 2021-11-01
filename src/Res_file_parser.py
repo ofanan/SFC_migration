@@ -1,6 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 from printf import printf 
 from pandas._libs.tslibs import period
@@ -266,12 +267,13 @@ class Res_file_parser (object):
             
             self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
-    def plot_RT_prob_sim_python (self):
+    def plot_RT_prob_sim_python (self, input_file_name=''):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         Show the conf' intervals.
         """
         
+        input_file_name = input_file_name if (input_file_name != '') else self.input_file_name 
         fig, ax = plt.subplots()
         for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
@@ -291,6 +293,9 @@ class Res_file_parser (object):
                 avg = np.average(samples)
                 
                 [y_lo, y_hi] = self.conf_interval (avg, np.std(samples))
+                
+                if (x_val==0.3 and mode in ['ffit', 'cpvnf']):
+                    print ('mode={}, x_val=0.3, y_hi={}' .format (mode, int(math.ceil(y_hi))))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 y.append (avg)
@@ -301,8 +306,8 @@ class Res_file_parser (object):
         ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
             
-        # plt.savefig ('../res/{}.jpg' .format (input_file_name))
-        plt.show ()            
+        plt.savefig ('../res/{}.jpg' .format (input_file_name))
+        # plt.show ()            
 
     def gen_cost_vs_rsrcs_tbl (self, normalize_X = True, slot_len_in_sec=1):
         """

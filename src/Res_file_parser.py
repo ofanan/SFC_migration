@@ -131,7 +131,7 @@ class Res_file_parser (object):
         return np.array(vec)
 
         
-    def parse_file (self, input_file_name):
+    def parse_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True):
         """
         Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
         """
@@ -148,18 +148,18 @@ class Res_file_parser (object):
             if (line.split ("//")[0] == ""):
                 continue
            
-            if (self.parse_line(line)==None): # An ill-formatted line
-                continue
-            if ( not(self.dict in self.list_of_dicts)):
+            self.parse_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs)
+            if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)
                 
 
         self.input_file.close
 
-    def parse_line (self, line, parse_cost=True, parse_cost_comps=True):
+
+
+    def parse_line (self, line, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True):
         """
         Parse a line in a result file. Such a line should begin with a string having several fields, detailing the settings.
-        If the format is wrong, print an error message, and return None.
         """
 
         splitted_line = line.split (" | ")
@@ -169,7 +169,7 @@ class Res_file_parser (object):
 
         if len (splitted_settings) != num_of_fields:
             print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
-            return None
+            exit ()
                
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
@@ -188,7 +188,7 @@ class Res_file_parser (object):
             self.dict["link_cost"] = float (splitted_line[2].split("=")[1])
             self.dict["mig_cost" ] = float (splitted_line[3].split("=")[1])            
 
-        if (len(splitted_line) > num_usrs_idx): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
+        if (parse_num_usrs and len(splitted_line) > num_usrs_idx): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
             self.dict['num_usrs']      = int (splitted_line[num_usrs_idx]     .split("=")[1])
             self.dict['num_crit_usrs'] = int (splitted_line[num_crit_usrs_idx].split("=")[1])
 
@@ -433,9 +433,9 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()    
-    my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3.res')
+    my_res_file_parser.parse_file ('tmp.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
     
-    my_res_file_parser.plot_cost_comp_tikz () 
+    # my_res_file_parser.plot_cost_comp_tikz () 
     # my_res_file_parser.plot_RT_prob_sim_python()
     # my_res_file_parser.plot_cost_vs_rsrcs()
     

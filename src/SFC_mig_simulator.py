@@ -1630,7 +1630,7 @@ class SFC_mig_simulator (object):
 #######################################################################################################################################
 
 
-def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
+def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=42):
     """
     Run a simulation where the amount of resources varies. 
     Output the cost obtained at each time slot.
@@ -1648,7 +1648,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                      
     for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
+        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     # for cpu_cap_at_leaf in [min_req_cpu['ourAlg'], min_req_cpu['ffit'], min_req_cpu['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
 
@@ -1666,7 +1666,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seeds=None):
 poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
 poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
-run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
+run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=46)
 # my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.9)
 # my_simulator.run_prob_of_RT_sim_algs ()

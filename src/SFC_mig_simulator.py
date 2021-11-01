@@ -1668,12 +1668,12 @@ poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_
 poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
-my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+# my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.9)
 # my_simulator.run_prob_of_RT_sim_algs (0.0)
-# my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [40 + i for i in range (1) ]:
-my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=890, prob_of_target_delay=0.0, seed=42)
+my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1100, prob_of_target_delay=0.5, seed=92)
 # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=900, prob_of_target_delay=0.3, seed=42)
 # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=950, prob_of_target_delay=0.5, seed=42)
 # i = 0

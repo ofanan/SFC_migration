@@ -803,7 +803,7 @@ class SFC_mig_simulator (object):
         elif (self.mode == 'ourAlg'):   
             self.max_R = 1.3 
         else:
-            self.max_R = 1.7
+            self.max_R = 1.8
 
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
@@ -1592,8 +1592,8 @@ class SFC_mig_simulator (object):
 
         min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 160, 0.1 : 160, 0.2 : 165, 0.3 : 165, 0.4 : 165, 0.5 : 170, 0.6 : 170, 0.7 : 170, 0.8 : 180, 0.9 : 195, 1.0 : 225},
                                    'Monaco' : {0.0 : 1100, 0.1 : 1100, 0.2 : 1100, 0.3 : 1100, 0.4 : 1100, 0.5 : 1100, 0.6 : 1100, 0.7 : 1200, 0.8 : 1300, 0.9 : 1600, 1.0 : 1600}} 
-        for seed in [60]: #[40 + i for i in range (16,21)]:
-            mode='cpvnf'
+        for seed in [40 + i for i in range (1,4)]:
+            mode='ffit'
             output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode=mode)    
             for prob_of_target_delay in [i/10 for i in range (11)]:
                 self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)

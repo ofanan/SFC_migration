@@ -159,7 +159,7 @@ class SFC_mig_simulator (object):
 
 
     # Generate output file for RT_prob_sim, namely, simulations where we vary the prob' of a usr to be a RT usr, and measure the min' required CPU to find a feasible sol.
-    gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}.res_1' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
+    gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}_1.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
 
     # Return the ID of the parent of the server given as input
     prnt_of_srvr = lambda self, s : self.G.nodes[s]['prnt']
@@ -1670,10 +1670,12 @@ poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.9)
-my_simulator.run_prob_of_RT_sim_algs (0.0)
+# my_simulator.run_prob_of_RT_sim_algs (0.0)
 # my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # for seed in [40 + i for i in range (1) ]:
-# my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1000, seed=40)
+my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=880, prob_of_target_delay=0.0, seed=42)
+# my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=900, prob_of_target_delay=0.3, seed=42)
+# my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=950, prob_of_target_delay=0.5, seed=42)
 # i = 0
 # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
     

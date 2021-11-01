@@ -847,7 +847,7 @@ class loc2poa_c (object):
             self.num_of_vehs_file_name = '../res/num_of_vehs_{}_{}_{}rects.txt' .format (loc_file_names[0], self.antloc_file_name, self.num_of_cells)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
             
-        if (VERBOSE_DEMOGRAPHY in self.verbose and self.num_of_top_lvl_sqs==1):
+        if (VERBOSE_DEMOGRAPHY in self.verbose):
             if (self.slot_len > 1): # Demography (usrs' mobility) should be measured only using the smallest time scale, namely, when the length of a simulation slot is 1. 
                 print ('Cancelling demography verbose because slot len>1. slot_len={}' .format (self.slot_len)) 
                 self.verbose.remove(VERBOSE_DEMOGRAPHY)
@@ -1002,15 +1002,15 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 1
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    max_power_of_4 = 2
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_DEMOGRAPHY], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
 
     # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
     # my_loc2poa.plot_voronoi_diagram()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    my_loc2poa.parse_loc_files (['Monaco_0730_0830_1secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
     
     # # Post-processing

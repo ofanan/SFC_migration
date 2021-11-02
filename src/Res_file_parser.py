@@ -86,9 +86,7 @@ class Res_file_parser (object):
         """
 
         # Generate a vector for the x axis (the t line).
-        list_of_dicts_of_sd42 = list ([item for item in self.list_of_dicts if item['seed']==42])
-        print ('len={}' .format (len (list_of_dicts_of_sd42)))
-        exit ()
+        list_of_dicts_of_sd42 = list ([item for item in self.list_of_dicts if item['seed']==40])
         t_min, t_max          = min ([item['t'] for item in list_of_dicts_of_sd42]), max ([item['t'] for item in list_of_dicts_of_sd42])
 
         num_of_periods     = 10 # number of marker points in the plot 
@@ -438,11 +436,11 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()    
-    my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+    my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_all.res') #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
     # my_res_file_parser.plot_cost_comp_tikz () 
-    my_res_file_parser.plot_RT_prob_sim_python()
-    # my_res_file_parser.plot_cost_vs_rsrcs()
+    # my_res_file_parser.plot_RT_prob_sim_python()
+    my_res_file_parser.plot_cost_vs_rsrcs()
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
     

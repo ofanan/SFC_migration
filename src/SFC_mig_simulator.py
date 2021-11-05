@@ -801,7 +801,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode == 'ourAlg'):   
-            self.max_R = 1.1 
+            self.max_R = 1.05 
         else:
             self.max_R = 1.8
 
@@ -1664,7 +1664,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=None):
         #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0829_0830_20secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
 poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 # run_cost_by_rsrc (poa_file_name, poa2cell_file_name)

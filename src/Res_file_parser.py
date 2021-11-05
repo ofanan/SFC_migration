@@ -442,5 +442,7 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_RT_prob_sim_python()
     my_res_file_parser.plot_cost_vs_rsrcs()
     
-    # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)        
+    # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
+# ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']
+# splitted settings=['| num', 'usrs=8114']            
     

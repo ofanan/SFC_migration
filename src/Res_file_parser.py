@@ -5,6 +5,7 @@ import math
 
 from printf import printf 
 from pandas._libs.tslibs import period
+from pickle import NONE
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
@@ -107,7 +108,7 @@ class Res_file_parser (object):
 
         printf (self.output_file, self.add_plot_num_of_critical_chains)
         for period in range (num_of_periods):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (period*period_len, ratio_of_crit_usrs[period]))
+            printf (self.output_file, '({:.2f}, {:.4f})' .format (period*period_len, ratio_of_crit_usrs[period]))
         printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
                    
     def gen_vec_for_period (self, vec_for_slot):
@@ -148,6 +149,8 @@ class Res_file_parser (object):
                 continue
            
             self.parse_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs)
+            if (self.dict==None): # No new data from this line
+                continue
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)
                 
@@ -168,7 +171,8 @@ class Res_file_parser (object):
 
         if len (splitted_settings) != num_of_fields:
             print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
-            exit ()
+            self.dict = None
+            return
                
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
@@ -369,7 +373,7 @@ class Res_file_parser (object):
             printf (self.output_file, '\\\\ \\hline \n')
 
 
-    def plot_cost_vs_rsrcs (self, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1):
+    def plot_cost_vs_rsrcs (self, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1, min_cpu=None):
         """
         Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
@@ -436,11 +440,11 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()    
-    my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_all.res') #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_ffit.res') #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
     # my_res_file_parser.plot_cost_comp_tikz () 
     # my_res_file_parser.plot_RT_prob_sim_python()
-    my_res_file_parser.plot_cost_vs_rsrcs()
+    my_res_file_parser.plot_cost_vs_rsrcs(min_cpu=840)
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 # ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']

@@ -175,7 +175,7 @@ class Traci_runner (object):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
-            loc_output_file_name = '../res/loc_files/{}_{}_{}secs{}.loc' .format (self.city, time_str, len_of_time_slot_in_sec, ('_rttd{}' .format (-math.degrees(self.rotate_angle)) if (self.rotate_angle>0) else ''))   
+            loc_output_file_name = '../res/loc_files/{}_{}_{}secs{}.loc' .format (self.city, time_str, len_of_time_slot_in_sec, ('_spd' if (VERBOSE_SPEED in self.verbose) else ''))   
             with open(loc_output_file_name, 'w') as loc_output_file:
                 loc_output_file.write('')                
             loc_output_file  = open (loc_output_file_name,  "w")
@@ -288,6 +288,6 @@ if __name__ == '__main__':
     my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
-    # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC]) #warmup_period = 3600*7.5
-    my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
+    my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5
+    # my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
      

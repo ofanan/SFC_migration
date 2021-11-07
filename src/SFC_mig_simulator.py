@@ -1586,7 +1586,7 @@ class SFC_mig_simulator (object):
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
         min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
-                                   'Monaco' : {0.0 : 832, 0.1 : 834, 0.2 : 834, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1200, 0.7 : 1400, 0.8 : 1700, 0.9 : 1840, 1.0 : 2116}} 
+                                   'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 841, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
         for seed in [40]: #[40 + delta_sd for delta_sd in range (1) ]:
             for prob_of_target_delay in probabilities:
                 self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
@@ -1619,7 +1619,7 @@ class SFC_mig_simulator (object):
         print ('Running run_prob_of_RT_sim')
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'opt')
         min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
-                               'Monaco' : {0.0 : 832, 0.1 : 832, 0.2 : 832, 0.3 : 835, 0.4 : 860, 0.5 : 1074, 0.6 : 1310, 0.7 : 1554, 0.8 : 1736, 0.9 : 1922, 1.0 : 2176}} 
+                               'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}} 
         probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
         cpu_cap_at_leaf = min_cpu_cap_at_leaf[self.city][0.0]     
         for prob_of_target_delay in probabilities: 

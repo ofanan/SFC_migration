@@ -24,7 +24,7 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE = 1 #15
+MARKER_SIZE = 3 #15
 LINE_WIDTH  = 3 #4
 FONT_SIZE   = 15 #30
 
@@ -380,6 +380,7 @@ class Res_file_parser (object):
         and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
         
+        cost_vs_rsrcs_output_file = open ('../res/{}.dat' .format (self.input_file_name), 'a')
         fig, ax = plt.subplots()
         for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
@@ -414,7 +415,7 @@ class Res_file_parser (object):
                 
                 avg_cost_of_all_seeds = np.average (avg_cost_of_each_seed) 
                 [y_lo, y_hi]          = self.conf_interval (avg_cost_of_all_seeds, np.std (avg_cost_of_each_seed)) # low, high y values for this plotted conf' interval    
-                print ('mode={}, cpu_val={}, avg_cost_of_each_seed={}, y_lo={:.0f}, y_hi={:.0f}' .format (mode, cpu_val, avg_cost_of_each_seed, y_lo, y_hi))
+                printf (cost_vs_rsrcs_output_file, 'mode={}, cpu_val={}, avg_cost_of_each_seed={}, y_lo={:.0f}, y_hi={:.0f}' .format (mode, cpu_val, avg_cost_of_each_seed, y_lo, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval for this mode and cpu_val
                 y.append (avg_cost_of_all_seeds)
@@ -432,15 +433,60 @@ class Res_file_parser (object):
         plt.tight_layout()
         plt.savefig ('../res/cost_by_rsrc_{}.jpg' .format (self.input_file_name), dpi=100)
 
-        plt.ylim (390000,450000)
-        plt.xlim (2.4,3.1)
-        plt.savefig ('../res/cost_by_rsrc_{}_zoomed.jpg' .format (self.input_file_name), dpi=99)
+        # plt.ylim (390000,450000)
+        # plt.xlim (2.4,3.1)
+        # plt.savefig ('../res/cost_by_rsrc_{}_zoomed.jpg' .format (self.input_file_name), dpi=99)
 
+    def calc_cost_vs_rsrcs (self, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1):
+        """
+        Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
+        Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
+        and/or normalize the cost (the Y axis) by the costs obtained by opt.   
+        """
+    
+        self.cost_vs_rsrc_data = []
+    
+        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
+    
+            cost_vs_rsrc_data_of_this_mode = []
+    
+            mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, mode=mode, min_t=min_t, max_t=max_t), key = lambda item : item['cpu']) # list of lines with data about this mode
+    
+            if (len(mode_list)==0): # If no info about this mode - continue
+                continue
+    
+            # Filter-out all results of failed runs 
+            failed_runs = [] # failed_runs will include the cpu and seed values for all runs that fail: we've to filter-out these results while calculating the mean cost
+            for item in [item for item in mode_list if item['stts']!=1 ]:
+                failed_runs.append ({'cpu' : item['cpu'], 'seed' : item['seed']})
+            for failed_run in failed_runs: # Remove all results of this failed_run from the list of relevant results 
+                mode_list = list (filter (lambda item : not (item['cpu']==failed_run['cpu'] and item['seed']==failed_run['seed']), mode_list))
+    
+            cpu_vals = sorted (set ([item['cpu'] for item in mode_list]))
+    
+            for cpu_val in cpu_vals: 
+                
+                mode_cpu_list = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # list of results of runs for this mode, and cpu value
+                avg_cost_of_each_seed = [] # will hold the avg cost of each successful run with a given mode, cpu value, and seed (averaging the cost over all the slots in the trace)
+                for seed in set ([item['seed'] for item in mode_cpu_list]): # list of seeds for which the whole run succeeded with this mode (algorithm), and this cpu val
+                    avg_cost_of_each_seed.append (np.average ([item['cost'] for item in mode_cpu_list if item['seed']==seed]))                    
+    
+                avg_cost_of_all_seeds = np.average (avg_cost_of_each_seed)
+                [y_lo, y_hi]          = self.conf_interval (avg_cost_of_all_seeds, np.std (avg_cost_of_each_seed)) # low, high y values for this plotted conf' interval
+                
+                cost_vs_rsrc_data_of_this_mode.append ({'cpu_val' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds})
+            
+            cost_vs_rsrc_data_of_this_mode = sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu_val']) 
+    
+            for point in cost_vs_rsrc_data_of_this_mode:
+                self.cost_vs_rsrc_data.append (point)
+                point['mode'] = mode
+    
 
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()    
-    my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_ffit.res') #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_ffit.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
     # my_res_file_parser.plot_cost_comp_tikz () 
     # my_res_file_parser.plot_RT_prob_sim_python()

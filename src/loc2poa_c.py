@@ -40,11 +40,11 @@ MAX_Y = {'Lux'    : UPPER_RIGHT_CORNER['Lux']   [1] - LOWER_LEFT_CORNER['Lux']  
          'Monaco' : UPPER_RIGHT_CORNER['Monaco'][1] - LOWER_LEFT_CORNER['Monaco'][1]}
 
 # Indices of the various field within the input '.loc' file 
-type_idx   = 0 # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
-veh_id_idx = 1
-x_pos_idx  = 2
-y_pos_idx  = 3
-speed_idx  = 4
+type_idx   = int(0) # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
+veh_id_idx = int(1)
+x_pos_idx  = int(2)
+y_pos_idx  = int(3)
+speed_idx  = int(4)
 
 HEATMAP_FONT_SCALE = 1.6
 
@@ -197,8 +197,9 @@ class loc2poa_c (object):
         if (VERBOSE_CNT in self.verbose):
             self.num_of_vehs_in_poa = [[] for _ in range (self.num_of_PoAs)]
         if (VERBOSE_SPEED in self.verbose):
-            self.speed_file = open ('../res/vehicles_speed.txt', 'w+')
-            self.speed           = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_PoAs)]
+            self.speed_file    = open ('../res/{}_speed.txt' .format (self.city), 'a')
+            self.speed         = [{'speed' : 0, 'num of smpls' : 0} for _ in range(self.num_of_PoAs)] # self.speed[poa] will hold the avg. speed (averaging along the whole sim' time) in Point-of-Access poa 
+            self.speed_in_slot = [] # self.speed[t] will hold the average speed (averaing over all the vehicles within the simulated area) at time slot t 
         self.calc_cell2tile (lvl=0) # calc_cell2tile translates the number as a "cell" to the ID in a vector, covering the same area as a tile
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.joined_poa         = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa[i][j] will count the # of clients that joined PoA i at slot j
@@ -366,8 +367,12 @@ class loc2poa_c (object):
         """
         Prints the speed of vehicles that joined/left each cell during the last simulated time slot.
         """
-        printf (self.speed_file, '{}' .format ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]))                                        
-
+        # printf (self.speed_file, '{}' .format ([self.speed[poa]['speed'] for poa in range(self.num_of_PoAs)]))
+        del (self.speed_in_slot[0]) # Remove the first element, which may represent a non-stable warm-up                                         
+        printf (self.speed_file, 'avg_speed_in_slot={}\navg_speed={}\n' .format (self.speed_in_slot, np.average(self.speed_in_slot)))
+        plt.plot ([t for t in range (len(self.speed_in_slot))], self.speed_in_slot)
+        plt.show()
+        
     def plot_demography_heatmap (self, usrs_loc_file_name='None'):
         """
         Plot heatmaps, showing the avg number of vehicles that joined/left each cell during the simulated period.
@@ -625,6 +630,10 @@ class loc2poa_c (object):
                 if (VERBOSE_POA in self.verbose):
                     printf(self.poa_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
+                if (VERBOSE_SPEED in self.verbose):
+                    num_of_smpls_in_cur_slot = 0
+                    avg_speed_in_cur_slot    = 0
+
                 if (self.is_first_slot):
                     self.first_t = self.t
                 if (VERBOSE_DEMOGRAPHY in self.verbose):
@@ -636,7 +645,7 @@ class loc2poa_c (object):
                         # self.joined_cell [cell].append(np.int16(0))
                         self.left_cell[cell].append(np.int16(0))
                 continue
-
+            
             elif (splitted_line[0] == 'usrs_that_left:'):
                 if (VERBOSE_POA in self.verbose):
                     printf(self.poa_file, '{}\n' .format (line))
@@ -686,6 +695,13 @@ class loc2poa_c (object):
                                 nxt_cell = self.poa2cell (nxt_poa)
                                 exit ()
                         
+                        if (VERBOSE_SPEED in self.verbose):
+                            num_of_smpls_in_cur_slot += 1
+                            avg_speed_in_cur_slot     = (avg_speed_in_cur_slot*(num_of_smpls_in_cur_slot-1) + float(my_tuple[speed_idx]))/num_of_smpls_in_cur_slot # Reservoir sampling for the speed in current slot  
+                            # nxt_poa = int (nxt_poa)
+                            # self.speed[nxt_poa] = {'speed' : (float(my_tuple[speed_idx]) + self.speed[nxt_poa]['num of smpls'] * self.speed[nxt_poa]['speed'])/(self.speed[nxt_poa]['num of smpls'] + 1), # implement a Reservoir sampling for the avg. speed among all vehicles in this PoA. 
+                            #                       'num of smpls' : self.speed[nxt_poa]['num of smpls'] + 1}
+                            
                         if (my_tuple[type_idx] == 'n'): # new vehicle
                             self.usrs.append ({'id' : usr_id, 'cur poa' : nxt_poa, 'nxt poa' : nxt_poa, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_poa same as nxt_poa 
                             # if (VERBOSE_DEMOGRAPHY in self.verbose): 
@@ -721,13 +737,10 @@ class loc2poa_c (object):
                                             printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
                                         else:
                                             self.left_cell_to [cur_cell][direction] += 1 # increase the cntr of usrs who left this cell to the relevant direction
+
                         else:
                             print ('Wrong type of usr:{}' .format (my_tuple[type_idx]))
                             exit () 
-                        if (VERBOSE_SPEED in self.verbose):
-                            self.speed[nxt_poa] = {'speed' : (float(my_tuple[speed_idx]) + self.speed[nxt_poa]['num of smpls'] * self.speed[nxt_poa]['speed'])/(self.speed[nxt_poa]['num of smpls'] + 1), 
-                                                  'num of smpls' : self.speed[nxt_poa]['num of smpls'] + 1}
-                
                 # At this point we finished handling all the usrs (left / new / moved) reported by the input ".loc" file at this slot. So now, output the data to "..poa" file, and/or to a file, counting the vehicles at each cell
                 if (VERBOSE_POA in self.verbose):
                     self.print_usrs_poa() # Print the PoAs of the users 
@@ -738,6 +751,9 @@ class loc2poa_c (object):
                     usr['cur poa']  = usr ['nxt poa']
                     usr['cur cell'] = usr ['nxt cell']
                 self.is_first_slot = False
+                if (VERBOSE_SPEED in self.verbose):
+                    self.speed_in_slot.append (avg_speed_in_cur_slot) 
+                
         # print ('min_x_pos_found=', min_x_pos_found, 'max_x_pos_found=', max_x_pos_found, 'min_y_pos_found=', min_y_pos_found, 'max_y_pos_found=', max_y_pos_found)
     
     def print_demography_diagram (self):
@@ -802,13 +818,10 @@ class loc2poa_c (object):
             self.print_demography()
             self.print_demography_diagram ()
             self.plot_demography_heatmap()
-        if (VERBOSE_SPEED in self.verbose):
-            
-            # first, fix the speed, as we assumed a first veh with speed '0'.
-            for poa in [poa for poa in range (self.num_of_PoAs) if (self.speed[poa]['num of smpls'] > 0)]:
-                self.speed[poa]['speed'] = self.speed[poa]['speed'] * (self.speed[poa]['num of smpls'] +1) / self.speed[poa]['num of smpls']
+        if (VERBOSE_SPEED in self.verbose): 
+            printf (self.speed_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
             self.print_speed()
-            self.plot_speed_heatmap()
+            # self.plot_speed_heatmap()
      
     def print_intermediate_res (self): 
         """
@@ -831,10 +844,6 @@ class loc2poa_c (object):
         # if (VERBOSE_DEMOGRAPHY in self.verbose): 
         #     printf (self.demography_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))
         #     self.print_demography()                
-        if (VERBOSE_SPEED in self.verbose): 
-            self.speed_file   = open ('../res/vehicles_speed.txt', 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
-            printf (self.speed_file, '// after parsing {}\n' .format (self.usrs_loc_file_name))                
-            self.print_speed()
     
     def parse_loc_files (self, loc_file_names):
         """
@@ -1029,18 +1038,30 @@ class loc2poa_c (object):
     #                     printf (loc_output_file, '{}' .format (line))
     #             printf (loc_output_file, '\n' .format (line))
 
+    def plot_tot_num_of_vehs_over_t (self):
+        
+        # num_of_vehs_in_cell_0 = np.array ([2076,2093,2115,2131,2138,2157,2161,2193,2209,2217,2220,2242,2270,2284,2308,2327,2331,2332,2339,2346,2381,2411,2413,2442,2432,2471,2509,2499,2512,2538,2536,2554,2579,2588,2584,2608,2623,2649,2632,2668,2660,2679,2708,2727,2743,2745,2762,2771,2805,2813,2807,2837,2837,2828,2829,2864,2866,2877,2887,2929], dtype='int16')
+        # num_of_vehs_in_cell_1 = np.array ([2335,2342,2355,2385,2410,2421,2435,2435,2450,2487,2517,2518,2524,2514,2539,2567,2591,2622,2632,2639,2636,2650,2692,2716,2737,2759,2764,2787,2820,2829,2845,2859,2881,2886,2914,2924,2943,2969,2997,2998,3031,3050,3070,3099,3123,3155,3148,3177,3185,3205,3220,3251,3256,3306,3305,3295,3331,3368,3390,3392], dtype='int16')
+        # num_of_vehs_in_cell_2 = np.array ([1424,1438,1446,1453,1482,1480,1513,1533,1543,1535,1541,1551,1558,1591,1593,1603,1620,1622,1635,1643,1660,1661,1659,1666,1687,1696,1703,1716,1724,1740,1744,1765,1765,1784,1796,1809,1820,1816,1809,1824,1834,1849,1871,1876,1875,1880,1907,1906,1910,1907,1926,1931,1945,1964,1981,2000,2009,1987,1992,2028], dtype='int16')
+        # tot_num_of_vehs_in_slot = num_of_vehs_in_cell_0 + num_of_vehs_in_cell_1 + num_of_vehs_in_cell_2
+        tot_num_of_vehs_in_slot = [2678,2706,2734,2781,2758,2764,2786,2783,2799,2725,2739,2704,2706,2722,2728,2725,2734,2765,2767,2756,2794,2809,2815,2830,2901,2940,2965,2973,2958,2934,2878,2952,2884,2866,2884,2923,2951,2988,2952,2967,2957,2956,2959,2889,2894,2922,2951,2983,2925,2898,2901,2870,2932,2972,2920,2950,2906,2912,2946,2931]
+
+        plt.plot ([t for t in range (len(tot_num_of_vehs_in_slot))], tot_num_of_vehs_in_slot)
+        plt.show ()
+
 if __name__ == '__main__':
 
     max_power_of_4 = 0
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
-
-    # my_loc2poa.rotate_loc_file(['Monaco_0730_0830_60secs.loc'])
-    # my_loc2poa.plot_voronoi_diagram()
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_SPEED], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    # my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs_spd.loc'])
+    my_loc2poa.plot_tot_num_of_vehs_over_t ()
     
     # Processing
-    my_loc2poa.parse_loc_files (['Monaco_0730_0830_1secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
-    # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps( )
+    # my_loc2poa.parse_loc_files (['Lux_0730_0830_16secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+
+    # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_SPEED], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    # my_loc2poa.parse_loc_files (['Lux_0730_0830_16secs']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
+    # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps()
     
     # # Post-processing
     # my_loc2poa.rd_num_of_vehs_per_poa_n_cell ('num_of_vehs_Lux.center.post.antloc_1524poas.txt')# ('num_of_vehs_per_poa_256aps_ant.txt')
@@ -1048,4 +1069,5 @@ if __name__ == '__main__':
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps (usrs_loc_file_name='0829_0830_8secs.loc')
     # my_loc2poa.rd_num_vehs_left ('demography_Monaco_0730_0830_1secs_192.txt')
     # my_loc2poa.plot_demography_heatmap (usrs_loc_file_name='Monaco_0730_0830_1secs.loc')
-    
+    # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
+    # my_loc2poa.plot_voronoi_diagram()

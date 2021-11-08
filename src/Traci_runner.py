@@ -285,7 +285,7 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
     my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5

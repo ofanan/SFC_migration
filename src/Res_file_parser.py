@@ -5,7 +5,7 @@ import math
 
 from printf import printf 
 from pandas._libs.tslibs import period
-from pickle import NONE
+import pickle
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
@@ -87,7 +87,7 @@ class Res_file_parser (object):
         """
 
         # Generate a vector for the x axis (the t line).
-        list_of_dicts_of_sd42 = list ([item for item in self.list_of_dicts if item['seed']==40])
+        list_of_dicts_of_sd42 = list ([item for item in self.list_of_dicts if item['seed']==42])
         t_min, t_max          = min ([item['t'] for item in list_of_dicts_of_sd42]), max ([item['t'] for item in list_of_dicts_of_sd42])
 
         num_of_periods     = 10 # number of marker points in the plot 
@@ -97,6 +97,8 @@ class Res_file_parser (object):
         
         for period in range(num_of_periods): # for every considered period
             res_from_this_period        = list (filter (lambda item : item['t'] >= t_min + period*period_len and item['t'] < t_min + (period+1)*period_len, list_of_dicts_of_sd42))
+            if (period==0): # Remove the results of the first slot, which are distorted, as in this slot there cannot be migrations
+                del(res_from_this_period[0])
             mig_cost[period]            = np.average ([item['mig_cost'] for item in res_from_this_period])
             ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
             
@@ -474,27 +476,40 @@ class Res_file_parser (object):
                 avg_cost_of_all_seeds = np.average (avg_cost_of_each_seed)
                 [y_lo, y_hi]          = self.conf_interval (avg_cost_of_all_seeds, np.std (avg_cost_of_each_seed)) # low, high y values for this plotted conf' interval
                 
-                cost_vs_rsrc_data_of_this_mode.append ({'cpu_val' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds})
+                cost_vs_rsrc_data_of_this_mode.append ({'cpu_val' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds,'num_of_seeds' : len(avg_cost_of_each_seed)})
             
-            cost_vs_rsrc_data_of_this_mode = sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu_val']) 
-    
-            for point in cost_vs_rsrc_data_of_this_mode:
+            for point in sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu_val']):
                 self.cost_vs_rsrc_data.append (point)
                 point['mode'] = mode
         
-        print ('dummy')
-    
+        # store the data as binary data stream
+        self.cost_vs_rsrc_data_file_name = '{}.data' .format (self.input_file_name.split('.res')[0]) 
+        with open('../res/' + self.cost_vs_rsrc_data_file_name, 'wb') as cost_vs_rsrc_data_file:
+            pickle.dump(self.cost_vs_rsrc_data, cost_vs_rsrc_data_file)
+        print (self.cost_vs_rsrc_data)
+
 
 if __name__ == '__main__':
 
-    my_res_file_parser = Res_file_parser ()    
-    # my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_opt.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    # placesList = ['Berlin', 'Cape Town', 'Sydney', 'Moscow']
+    #
+    # with open('../res/cost_vs_rsrc.data', 'wb') as cost_vs_rsrc_data_file:
+    #     # store the data as binary data stream
+    #     pickle.dump(placesList, cost_vs_rsrc_data_file)
+    # with open('../res/cost_vs_rsrc.data', 'rb') as cost_vs_rsrc_data_file:
+    #     placesList = pickle.load(cost_vs_rsrc_data_file)
+    # print (placesList)
+    my_res_file_parser = Res_file_parser ()
     
-    # my_res_file_parser.plot_cost_comp_tikz () 
-    # my_res_file_parser.calc_cost_vs_rsrcs()
+    my_res_file_parser.parse_file ('Monaco_0820_0830_Telecom_p0.3_all.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    my_res_file_parser.calc_cost_vs_rsrcs()
 
-    my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
-    my_res_file_parser.plot_RT_prob_sim_python()
+    # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)  
+    # my_res_file_parser.plot_cost_comp_tikz () 
+    
+
+    # my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
+    # my_res_file_parser.plot_RT_prob_sim_python()
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 # ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']

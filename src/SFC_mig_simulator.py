@@ -106,6 +106,8 @@ class SFC_mig_simulator (object):
     # Pseudo-randomize a target delay for a usr, based on its given usr_id
     pseudo_random_target_delay = lambda self, usr_id : self.target_delay[0] if ( ((usr_id % 10)/10) < self.prob_of_target_delay[0]) else self.target_delay[1]
     
+    # Generate a string for the res file name. The sting will express the settings of this particular run, plus a user-requested string, 'mid_str', in which the caller may detail a concrete setting of 
+    # this run (e.g. 'critical_usrs_only'). 
     gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}_{}_sd{}.res' .format (self.poa_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0], self.mode, self.seed)
 
     # Returns a vector with the cpu capacities in each lvl of the tree, given the cpu cap at the leaf lvl
@@ -326,7 +328,7 @@ class SFC_mig_simulator (object):
         
         # In the past, exponential CPU capacities/cost used special suffices, as in the commented line code below.
         #('.expCPU.res' if (self.use_exp_cpu_cost) else '') + ('.expCPU2.res' if (self.use_exp_cpu_cap) else '')
-        self.res_file_name = self.gen_res_file_name (mid_str = ('_opt' if self.mode=='opt' else '') )  
+        self.res_file_name = self.gen_res_file_name (mid_str = '')  
         
         if Path(self.res_file_name).is_file(): # does this res file already exist?
             self.res_file =  open (self.res_file_name,  "a")
@@ -1586,7 +1588,7 @@ class SFC_mig_simulator (object):
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
         min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
-                                   'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 844, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
+                                   'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
         for seed in [40]: #[40 + delta_sd for delta_sd in range (1) ]:
             for prob_of_target_delay in probabilities:
                 self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
@@ -1644,7 +1646,7 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=None):
                    'Monaco' : {'opt' : 840, 'ourAlg' : 844, 'ffit' : 1354, 'cpvnf' : 1357}}
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
-    for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 6)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 3)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
         my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
     # for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
@@ -1664,8 +1666,8 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=None):
         #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
-poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
 run_cost_by_rsrc (poa_file_name, poa2cell_file_name)
 # my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)

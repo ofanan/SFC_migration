@@ -1678,8 +1678,8 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=None):
 
 def main ():
 
-    poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
-    poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+    poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+    poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
 
     print ('Running cost_by_rsrc')
 

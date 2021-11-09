@@ -1,17 +1,15 @@
 import numpy as np
-import math, time, heapq, random
+import math, time, heapq, random, sys, os
 import pulp as plp
 import networkx as nx
-import os
-import pickle
-from pathlib import Path
-
-from usr_c    import usr_c    # class of the users of alg
-from usr_lp_c import usr_lp_c # class of the users, when using LP
-from decision_var_c import decision_var_c # class of the decision variables
-from printf import printf ## My own format print functions 
-# from scipy._lib import _fpumode
 import matplotlib.pyplot as plt
+from   pathlib import Path
+
+from usr_c          import usr_c    # class of the users of alg
+from usr_lp_c       import usr_lp_c # class of the users, when using LP
+from decision_var_c import decision_var_c # class of the decision variables
+from printf         import printf ## My own format print functions 
+# from scipy._lib import _fpumode
 
 # Levels of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
@@ -1669,10 +1667,6 @@ def run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=None):
         #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
-poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
-poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
-
-run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=40)
 # my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.9)
 # my_simulator.run_prob_of_RT_sim_algs (0.0)
@@ -1681,4 +1675,23 @@ run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=40)
 # for seed in [40 + i for i in range (1) ]:
 # i = 0
 # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
+
+# if __name__ == '__main__' ():
+
+def main ():
+
+    # args = sys.argv[1:]
+
+    poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+    poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+
+    run_cost_by_rsrc (poa_file_name, poa2cell_file_name, seed=int(sys.argv[1]))
+
+if __name__ == "__main__":
+    main()
+    # args = sys.argv[1:]
+    # poa_file_name      = 'Lux_0820_0830_1secs_post.poa' #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+    # poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell' #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+    #
+    # print (args[1])
     

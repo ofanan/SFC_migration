@@ -453,7 +453,6 @@ class Res_file_parser (object):
         """
         
         self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pickle_input_file_name))
-        print (self.cost_vs_rsrc_data)
 
         fig, ax = plt.subplots()
 
@@ -568,9 +567,9 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_RT_prob_sim_python()
 
     
-    my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    my_res_file_parser.calc_cost_vs_rsrcs()
-    my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name='Monaco_0820_0830_Telecom_p0.3.data')
+    # my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    # my_res_file_parser.calc_cost_vs_rsrcs()
+    my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name='Monaco_0820_0830_1secs_Telecom_p0.3_copy.data')
 
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)  
     # my_res_file_parser.plot_cost_comp_tikz () 

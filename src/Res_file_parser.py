@@ -176,7 +176,8 @@ class Res_file_parser (object):
             print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
             self.dict = None
             return
-               
+
+        print (line)               
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
             "mode"       : splitted_settings      [mode_idx],
@@ -476,8 +477,7 @@ class Res_file_parser (object):
         
                 list_of_item = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # all items with this cpu value, of this mode (the list should usually include a single item)
                 if (len(list_of_item)!=1):
-                    print ('error: len(list_of_item) != 1')
-                    exit ()
+                    print ('Warning: len(list_of_item)=={}' .format (len(list_of_item)))
                 item  = list_of_item[0]
                 x_val = cpu_val/x_norm_factor
                 x.append (x_val)
@@ -500,7 +500,7 @@ class Res_file_parser (object):
         # plt.ylim (390000,450000)
         # plt.xlim (2.4,3.1)
         # plt.savefig ('../res/cost_by_rsrc_{}_zoomed.jpg' .format (self.input_file_name), dpi=99)
-    def calc_cost_vs_rsrcs (self, min_t=30541, max_t=30600, prob=0.3):
+    def calc_cost_vs_rsrcs (self, pickle_input_file_name='', min_t=30541, max_t=30600, prob=0.3):
         """
         Calculate the data needed for plotting a graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Read the data found in self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
@@ -508,7 +508,10 @@ class Res_file_parser (object):
         * Save the processed data into self.cost_vs_rsrc_data. 
         """
     
-        self.cost_vs_rsrc_data = []
+        if (pickle_input_file_name==''):
+            self.cost_vs_rsrc_data = []
+        else:
+            self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pickle_input_file_name))
     
         for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
     
@@ -540,8 +543,10 @@ class Res_file_parser (object):
                 
                 cost_vs_rsrc_data_of_this_mode.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds,'num_of_seeds' : len(avg_cost_of_each_seed)})
             
+            # Add this new calculated point to the ds. Avoid duplications of point.
             for point in sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu']):
-                self.cost_vs_rsrc_data.append (point)
+                if (point not in self.cost_vs_rsrc_data):
+                    self.cost_vs_rsrc_data.append (point)
                 point['mode'] = mode
         
         # store the data as binary data stream
@@ -553,23 +558,16 @@ class Res_file_parser (object):
 
 if __name__ == '__main__':
 
-    # placesList = ['Berlin', 'Cape Town', 'Sydney', 'Moscow']
-    #
-    # with open('../res/cost_vs_rsrc.data', 'wb') as cost_vs_rsrc_data_file:
-    #     # store the data as binary data stream
-    #     pickle.dump(placesList, cost_vs_rsrc_data_file)
-    # with open('../res/cost_vs_rsrc.data', 'rb') as cost_vs_rsrc_data_file:
-    #     placesList = pickle.load(cost_vs_rsrc_data_file)
-    # print (placesList)
     my_res_file_parser = Res_file_parser ()
     
     # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     # my_res_file_parser.plot_RT_prob_sim_python()
 
-    
-    # my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    # my_res_file_parser.calc_cost_vs_rsrcs()
-    my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name='Monaco_0820_0830_1secs_Telecom_p0.3_copy.data')
+    my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    # my_res_file_parser.parse_file ('Lux_0820_0830_1secs_post_p0.3_cpvnf.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    pickle_input_file_name = '' 
+    my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
+    my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
 
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)  
     # my_res_file_parser.plot_cost_comp_tikz () 

@@ -39,6 +39,9 @@ class Res_file_parser (object):
     # If the length of the slot is 8, we need to multiply the CPU and link cost by 7.5. This is because in 1 minutes (60 seconds), where we ignore the first we have only 7.5 8-seconds solots #$$$ ????        
     calc_cost_of_item = lambda self, item : item['mig_cost'] + (item['cpu_cost'] + item['link_cost']) * (7.5 if self.time_slot_len == 8 else 1)    
 
+    # Calculate the confidence interval, given the avg and the std 
+    conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
+
     def __init__ (self):
         """
         Initialize a Res_file_parser, used to parse result files, and generate plots. 
@@ -78,10 +81,8 @@ class Res_file_parser (object):
         
         matplotlib.rcParams.update({'font.size': FONT_SIZE})
 
-
-    # Calculate the confidence interval, given the avg and the std 
-    conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
-        
+        self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
+      
     def plot_cost_comp_tikz (self):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.   
@@ -143,7 +144,6 @@ class Res_file_parser (object):
         self.input_file      = open ("../res/" + input_file_name,  "r")
         lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines                = (line for line in lines if line)       # Discard blank lines
-        self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
         
         for line in lines:
         
@@ -177,7 +177,6 @@ class Res_file_parser (object):
             self.dict = None
             return
 
-        print (line)               
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
             "mode"       : splitted_settings      [mode_idx],
@@ -563,11 +562,11 @@ if __name__ == '__main__':
     # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     # my_res_file_parser.plot_RT_prob_sim_python()
 
-    my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    # my_res_file_parser.parse_file ('Lux_0820_0830_1secs_post_p0.3_cpvnf.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    pickle_input_file_name = '' 
+    for file_name in ['Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res']:
+        my_res_file_parser.parse_file (file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    pickle_input_file_name = 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.data' 
     my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
-    my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
+    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
 
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)  
     # my_res_file_parser.plot_cost_comp_tikz () 

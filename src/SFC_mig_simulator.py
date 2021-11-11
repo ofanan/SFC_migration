@@ -1650,16 +1650,16 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
     # for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
                      
-    for seed in seeds:
-        for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-        for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
-            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-
     # for seed in seeds:
-    #     my_simulator.simulate (mode = 'cpvnf', cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['cpvnf'], seed=seed)
-        # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['cpvnf'], seed=seed)
-        # my_simulator.simulate (mode = 'ffit', cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['ffit'], seed=seed)
+    #     for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+    #     for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
+    #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+
+    for seed in seeds:
+        my_simulator.simulate (mode = 'cpvnf', cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['cpvnf'], seed=seed)
+        my_simulator.simulate (mode = 'cpvnf', cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['ffit'] , seed=seed)
+        my_simulator.simulate (mode = 'ffit',  cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['ffit'] , seed=seed)
         # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
         #     if (cpu_cap_at_leaf >= min_req_cpu[my_simulator.city][mode]):
         #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
@@ -1676,7 +1676,9 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
 
 def main ():
 
-    seed=int(sys.argv[1])
+    seed = None
+    if (len (sys.argv)>1):
+        seed=int(sys.argv[1])   
     poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
     run_cost_vs_rsrc(poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, seed=seed)

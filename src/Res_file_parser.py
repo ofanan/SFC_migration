@@ -25,7 +25,7 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE = 3 #15
+MARKER_SIZE = 7 #15
 LINE_WIDTH  = 3 #4
 FONT_SIZE   = 15 #30
 
@@ -89,8 +89,7 @@ class Res_file_parser (object):
         """
 
         # Generate a vector for the x axis (the t line).
-        list_of_dicts_of_sd42 = list ([item for item in self.list_of_dicts if item['seed']==42])
-        t_min, t_max          = min ([item['t'] for item in list_of_dicts_of_sd42]), max ([item['t'] for item in list_of_dicts_of_sd42])
+        t_min, t_max          = min ([item['t'] for item in self.list_of_dicts]), max ([item['t'] for item in self.list_of_dicts])
 
         num_of_periods     = 10 # number of marker points in the plot 
         period_len         = int( (t_max-t_min+1) / num_of_periods) # Each point will be assigned the avg value, where averaging over period of length period_len
@@ -98,10 +97,10 @@ class Res_file_parser (object):
         ratio_of_crit_usrs = np.empty (num_of_periods)
         
         for period in range(num_of_periods): # for every considered period
-            res_from_this_period        = list (filter (lambda item : item['t'] >= t_min + period*period_len and item['t'] < t_min + (period+1)*period_len, list_of_dicts_of_sd42))
+            res_from_this_period        = list (filter (lambda item : item['t'] >= t_min + period*period_len and item['t'] < t_min + (period+1)*period_len, self.list_of_dicts))
             if (period==0): # Remove the results of the first slot, which are distorted, as in this slot there cannot be migrations
                 del(res_from_this_period[0])
-            mig_cost[period]            = np.average ([item['mig_cost'] for item in res_from_this_period])
+            mig_cost[period]            = np.average ([item['mig_cost']/item['num_usrs'] for item in res_from_this_period])
             ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
             
         self.output_file = open ('../res/cost_comp_{}.dat' .format (self.input_file_name), 'w')
@@ -311,7 +310,7 @@ class Res_file_parser (object):
         ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
             
-        plt.savefig ('../res/{}.jpg' .format (input_file_name))
+        plt.savefig ('../res/{}.pdf' .format (input_file_name))
         # plt.show ()            
 
     def gen_cost_vs_rsrcs_tbl (self, normalize_X = True, slot_len_in_sec=1):
@@ -561,15 +560,16 @@ if __name__ == '__main__':
     
     # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     # my_res_file_parser.plot_RT_prob_sim_python()
-
-    for file_name in ['Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res']:
-        my_res_file_parser.parse_file (file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    pickle_input_file_name = 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.data' 
-    my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
+    # exit ()
+    #
+    # for file_name in ['Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res']:
+    #     my_res_file_parser.parse_file (file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    # pickle_input_file_name = 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.data' 
+    # my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
     # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
 
-    # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)  
-    # my_res_file_parser.plot_cost_comp_tikz () 
+    my_res_file_parser.parse_file ('Lux_0730_0830_16secs_post_p0.3_ourAlg_sd99.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True) #'Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res'  
+    my_res_file_parser.plot_cost_comp_tikz () 
     
 
     

@@ -83,9 +83,10 @@ class Res_file_parser (object):
 
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
-    def plot_cost_comp_tikz (self):
+    def plot_cost_comp_tikz (self, plot_tikz=True, plot_python=True):
         """
-        Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.   
+        Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
+        The output plot may be either tikz, and/or python.   
         """
 
         # Generate a vector for the x axis (the t line).
@@ -100,19 +101,35 @@ class Res_file_parser (object):
             res_from_this_period        = list (filter (lambda item : item['t'] >= t_min + period*period_len and item['t'] < t_min + (period+1)*period_len, self.list_of_dicts))
             if (period==0): # Remove the results of the first slot, which are distorted, as in this slot there cannot be migrations
                 del(res_from_this_period[0])
-            mig_cost[period]            = np.average ([item['mig_cost']/item['num_usrs'] for item in res_from_this_period])
-            ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_this_period])
+            mig_cost           [period] = np.average ([item['mig_cost']     /(item['num_usrs']*self.time_slot_len) for item in res_from_this_period])
+            ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs']                      for item in res_from_this_period])
             
-        self.output_file = open ('../res/cost_comp_{}.dat' .format (self.input_file_name), 'w')
-        printf (self.output_file, self.add_plot_mig_cost)
-        for period in range (num_of_periods):
-            printf (self.output_file, '({:.2f}, {:.2f})' .format (period*period_len, mig_cost[period]))
-        printf (self.output_file, '};' + self.add_legend_str + 'mig.}\n')
-
-        printf (self.output_file, self.add_plot_num_of_critical_chains)
-        for period in range (num_of_periods):
-            printf (self.output_file, '({:.2f}, {:.4f})' .format (period*period_len, ratio_of_crit_usrs[period]))
-        printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
+        x = [period*period_len for period in range (num_of_periods)]
+        # y1 = [mig_cost[period] for period in range (num_of_periods)]
+        # ratio_of_crit_usrs[period]
+        if (plot_python):
+            fig, ax_mig_cost = plt.subplots()
+            ax_ratio_of_crit = ax_mig_cost.twinx()
+            ax_mig_cost.plot      (x, mig_cost, 'g')
+            ax_ratio_of_crit.plot (x, ratio_of_crit_usrs, 'r')
+            
+            ax_mig_cost.     set_xlabel('X data')
+            ax_mig_cost.     set_ylabel('X data')
+            ax_ratio_of_crit.set_xlabel('X data', color='g')
+            ax_ratio_of_crit.set_ylabel('X data', color='r')
+            plt.show()
+            
+        if (plot_tikz):
+            self.output_file = open ('../res/cost_comp_{}.dat' .format (self.input_file_name), 'w')
+            printf (self.output_file, self.add_plot_mig_cost)
+            for period in range (num_of_periods):
+                printf (self.output_file, '({:.2f}, {:.2f})' .format (x[period],mig_cost[period]))
+            printf (self.output_file, '};' + self.add_legend_str + 'mig.}\n')
+    
+            printf (self.output_file, self.add_plot_num_of_critical_chains)
+            for period in range (num_of_periods):
+                printf (self.output_file, '({:.2f}, {:.4f})' .format (x[period], ratio_of_crit_usrs[period]))
+            printf (self.output_file, '};' + self.add_legend_str + 'Frac. of Critical Chains}\n')
                    
     def gen_vec_for_period (self, vec_for_slot):
         vec_for_period = []
@@ -140,6 +157,7 @@ class Res_file_parser (object):
         """
         
         self.input_file_name = input_file_name
+        self.time_slot_len   = int(self.input_file_name.split('secs')[0].split('_')[-1])
         self.input_file      = open ("../res/" + input_file_name,  "r")
         lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines                = (line for line in lines if line)       # Discard blank lines
@@ -305,12 +323,12 @@ class Res_file_parser (object):
                 y.append (avg)
             
             ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode])
-        plt.xlabel('Fraction of users with RT requirements')
+        plt.xlabel('Fraction of Users with RT Requirements')
         plt.ylabel('Min CPU at leaf [GHz]')
         ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
             
-        plt.savefig ('../res/{}.pdf' .format (input_file_name))
+        plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
         # plt.show ()            
 
     def gen_cost_vs_rsrcs_tbl (self, normalize_X = True, slot_len_in_sec=1):
@@ -498,15 +516,16 @@ class Res_file_parser (object):
         # plt.ylim (390000,450000)
         # plt.xlim (2.4,3.1)
         # plt.savefig ('../res/cost_by_rsrc_{}_zoomed.jpg' .format (self.input_file_name), dpi=99)
-    def calc_cost_vs_rsrcs (self, pickle_input_file_name='', min_t=30541, max_t=30600, prob=0.3):
+    def calc_cost_vs_rsrcs (self, pickle_input_file_name=None, min_t=30541, max_t=30600, prob=0.3):
         """
         Calculate the data needed for plotting a graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Read the data found in self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
         * Calculate the average cost for each mode and seed during the whole trace for each seed, the confidence intervals, etc. 
-        * Save the processed data into self.cost_vs_rsrc_data. 
+        * Save the (pickled) processed data into self.cost_vs_rsrc_data.pcl.
+        * Returns the file name to which it saved the pickled results. 
         """
     
-        if (pickle_input_file_name==''):
+        if (pickle_input_file_name==None):
             self.cost_vs_rsrc_data = []
         else:
             self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pickle_input_file_name))
@@ -548,30 +567,31 @@ class Res_file_parser (object):
                 point['mode'] = mode
         
         # store the data as binary data stream
-        self.cost_vs_rsrc_data_file_name = '{}.data' .format (self.input_file_name.split('.res')[0]) 
-        with open('../res/' + self.cost_vs_rsrc_data_file_name, 'wb') as cost_vs_rsrc_data_file:
+        self.pickle_output_file_name = '{}.pcl' .format (self.input_file_name.split('.res')[0]) 
+        with open('../res/' + self.pickle_output_file_name, 'wb') as cost_vs_rsrc_data_file:
             pickle.dump(self.cost_vs_rsrc_data, cost_vs_rsrc_data_file)
         # print (self.cost_vs_rsrc_data)
+        return self.pickle_output_file_name 
 
 
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
     
-    # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+    # my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) 
+    # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
+    # my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
     # my_res_file_parser.plot_RT_prob_sim_python()
-    # exit ()
-    #
+    
     # for file_name in ['Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res']:
     #     my_res_file_parser.parse_file (file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) #('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res')# ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    # pickle_input_file_name = 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.data' 
-    # my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
-    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
+    # pickle_input_file_name = 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.pcl' 
+    # pickle_input_file_name  = None
+    # pickle_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=pickle_input_file_name)
+    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_output_file_name)
 
     my_res_file_parser.parse_file ('Lux_0730_0830_16secs_post_p0.3_ourAlg_sd99.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True) #'Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res'  
     my_res_file_parser.plot_cost_comp_tikz () 
-    
-
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 # ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import math
+import math, pickle
 from scipy.spatial import Voronoi, voronoi_plot_2d
 # from matplotlib.co//lors import LogNorm, Normalize
 # from matplotlib.ticker import MaxNLocator
@@ -46,7 +46,7 @@ x_pos_idx  = int(2)
 y_pos_idx  = int(3)
 speed_idx  = int(4)
 
-HEATMAP_FONT_SCALE = 1.6
+HEATMAP_FONT_SIZE = 10 #1.6
 
 # # types of vehicles' id
 # new      = 0 # a new (unused before) vehicle's id
@@ -140,11 +140,34 @@ class loc2poa_c (object):
     edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
     
-    def gen_heatmap (self, df): 
+    def gen_heatmap (self, df, pcl_input_file_name=None, pcl_output_file_name=None): 
         """
-        Generate a well-customized sns heatmap from the given data frame
+        Generate a well-customized sns heatmap from the given data frame.
+        When given a pickle output file name, save the data frame needed for the heatmap in a pickle file.
+        Input: df - the data frame for the heatmap.
+               However, when given a pickle input file name, read the df from this input file, rather than from the "df" input 
+        Output: the heatmap
         """
-        my_heatmap = sns.heatmap(df, vmin=df.values.min(), vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, annot_kws={"fontsize":HEATMAP_FONT_SCALE}, xticklabels=False, yticklabels=False) 
+        
+        # data = np.random.rand(10, 12)*100
+        # ax = sns.heatmap(data, cbar_kws={'label': 'Accuracy %'})
+        # ax.figure.axes[-1].yaxis.label.set_size(20) 
+        # ax.figure.axes[-1].yaxis.legend.set_size (20)
+        # ax.legend(loc=2, prop={'size': 10})
+        # plt.show()
+        # exit ()
+
+        if (pcl_output_file_name!=None):
+            with open ('../res/' + pcl_output_file_name, 'wb') as pcl_output_file:
+                pickle.dump (df, pcl_output_file)
+        
+        if (pcl_input_file_name != None):
+            df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+
+        my_heatmap = sns.heatmap(df, vmin=0, vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False) #, annot=True, annot_kws={"fontsize":HEATMAP_FONT_SIZE})
+        my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
+
+        # sns.set(font_scale=HEATMAP_FONT_SIZE)  
         my_heatmap.set_aspect("equal") # Keep each rectangle 
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
         return my_heatmap
@@ -390,14 +413,14 @@ class loc2poa_c (object):
         #
         # columns = self.gen_columns_for_heatmap()
         file_name_suffix = '{}rects' .format (self.num_of_cells)       
-        heatmap_txt_file = open ('../res/heatmap_vehs_left.txt', 'a') 
         plt.figure()
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
          
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        my_heatmap = self.gen_heatmap (pd.DataFrame (heatmap_vals))
+        self.gen_heatmap (pd.DataFrame (heatmap_vals))
+        heatmap_txt_file = open ('../res/heatmap_vehs_left.txt', 'a') 
         printf   (heatmap_txt_file, 'num of rects = {}\n' .format ( self.num_of_cells))
         printmat (heatmap_txt_file, heatmap_vals, my_precision=2)
         # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
@@ -407,12 +430,12 @@ class loc2poa_c (object):
         return 
         columns = self.gen_columns_for_heatmap (lvl=0)
         plt.figure()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
+        sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of vehs that joined the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_vehs_joined_sim_via_{}.jpg' .format (file_name_suffix))
         
         plt.figure ()
-        my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_poa_sim_via[poa])   for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
+        sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_poa_sim_via[poa])   for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
         # plt.title ('avg num of vehs that left the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_vehs_left_sim_via_{}.jpg' .format (file_name_suffix))
         
@@ -467,8 +490,7 @@ class loc2poa_c (object):
         avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell()
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
-        my_heatmap = self.gen_heatmap (pd.DataFrame (heatmap_vals)) 
-        # my_heatmap.set_aspect("equal") # Keep each rectangle 
+        self.gen_heatmap (pd.DataFrame (heatmap_vals), pcl_output_file_name=self.num_of_vehs_output_file_name.split('.res')[0] + '.pcl') 
         # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
          
         printmat (self.num_of_vehs_output_file, heatmap_vals, my_precision=0)
@@ -828,7 +850,7 @@ class loc2poa_c (object):
         Print the current aggregate results; used for having intermediate results when running long simulation.
         """
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
+            self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_output_file_name, 'w') # overwrite previous content at the output file. The results to be printed now include the results printed earlier.
             printf (self.num_of_vehs_output_file, '// after parsing the file {}\n' .format (self.usrs_loc_file_name))
             # for poa in range (self.num_of_PoAs):
             #     printf  (self.num_of_vehs_output_file, 'num_of_vehs_in_poa_{}: ' .format (poa))
@@ -861,8 +883,8 @@ class loc2poa_c (object):
             exit ()
         self.slot_len = int (loc_file_names[0].split('secs')[0].split('_')[-1])
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_file_name = '../res/num_of_vehs_{}_{}_{}rects.txt' .format (loc_file_names[0], self.antloc_file_name, self.num_of_cells)
-            self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_file_name, 'w+')
+            self.num_of_vehs_output_file_name = '../res/num_of_vehs_{}_{}_{}rects.txt' .format (loc_file_names[0], self.antloc_file_name, self.num_of_cells)
+            self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_output_file_name, 'w+')
             
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             if (self.slot_len > 1): # Demography (usrs' mobility) should be measured only using the smallest time scale, namely, when the length of a simulation slot is 1. 
@@ -1052,9 +1074,11 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 0
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_SPEED], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    # my_loc2poa.parse_loc_files (['Monaco_0730_0830_60secs_spd.loc'])
-    my_loc2poa.plot_tot_num_of_vehs_over_t ()
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    my_loc2poa.gen_heatmap (df=None, pcl_input_file_name='num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl')
+    plt.savefig('../res/num_vehs_Monaco_0730_0830_1secs.loc_3rects_10.jpg')
+    # my_loc2poa.parse_loc_files (['Monaco_0730_0830_1secs.loc'])
+    # my_loc2poa.plot_tot_num_of_vehs_over_t ()
     
     # Processing
     # my_loc2poa.parse_loc_files (['Lux_0730_0830_16secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])

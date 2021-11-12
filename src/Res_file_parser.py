@@ -83,7 +83,7 @@ class Res_file_parser (object):
 
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
-    def plot_cost_comp_tikz (self, plot_tikz=True, plot_python=True):
+    def plot_cost_comp_tikz (self, plot_tikz=False, plot_python=True):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
         The output plot may be either tikz, and/or python.   
@@ -108,16 +108,24 @@ class Res_file_parser (object):
         # y1 = [mig_cost[period] for period in range (num_of_periods)]
         # ratio_of_crit_usrs[period]
         if (plot_python):
-            fig, ax_mig_cost = plt.subplots()
-            ax_ratio_of_crit = ax_mig_cost.twinx()
-            ax_mig_cost.plot      (x, mig_cost, 'g')
-            ax_ratio_of_crit.plot (x, ratio_of_crit_usrs, 'r')
+            _, ax_mig_cost      = plt.subplots()
+            ax_ratio_of_crit_usrs = ax_mig_cost.twinx()
             
-            ax_mig_cost.     set_xlabel('X data')
-            ax_mig_cost.     set_ylabel('X data')
-            ax_ratio_of_crit.set_xlabel('X data', color='g')
-            ax_ratio_of_crit.set_ylabel('X data', color='r')
-            plt.show()
+            ax_mig_cost.     set_xlabel('Time[s]')
+            ax_mig_cost.     set_ylabel('Norm. Mig. Cost')
+            ax_ratio_of_crit_usrs.set_xlabel('Time[s]', color='blue')
+            ax_ratio_of_crit_usrs.set_ylabel('Frac. of Critical Chains', color='black')
+            line1 = ax_mig_cost.plot           (x, mig_cost,           color='blue',  marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Mig. Cost')
+            line2 = ax_ratio_of_crit_usrs.plot (x, ratio_of_crit_usrs, color='black', marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
+            lines = line1 + line2
+            plt.xlim (0)
+            plt.ylim (0)
+            ax_ratio_of_crit_usrs.set_ylim (0, 0.5)
+            plt.legend (lines, [line.get_label() for line in lines], loc='lower center')
+
+            # ax_mig_cost          .legend ()
+            # ax_ratio_of_crit_usrs.legend ()
+            plt.savefig ('../res/{}.pdf' .format (self.input_file_name), bbox_inches='tight')
             
         if (plot_tikz):
             self.output_file = open ('../res/cost_comp_{}.dat' .format (self.input_file_name), 'w')

@@ -46,7 +46,7 @@ x_pos_idx  = int(2)
 y_pos_idx  = int(3)
 speed_idx  = int(4)
 
-HEATMAP_FONT_SIZE = 10 #1.6
+HEATMAP_FONT_SIZE = 30 #1.6
 
 # # types of vehicles' id
 # new      = 0 # a new (unused before) vehicle's id
@@ -164,12 +164,17 @@ class loc2poa_c (object):
         if (pcl_input_file_name != None):
             df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
 
+        plt.rcParams.update({'font.size': 20})
         my_heatmap = sns.heatmap(df, vmin=0, vmax=df.values.max(), cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False) #, annot=True, annot_kws={"fontsize":HEATMAP_FONT_SIZE})
         my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
 
         # sns.set(font_scale=HEATMAP_FONT_SIZE)  
         my_heatmap.set_aspect("equal") # Keep each rectangle 
         my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        
+        # _, ax = plt.subplots ()
+        # ax.figure.axes[-1].tick_params(labelsize=10)
+
         return my_heatmap
 
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
@@ -1076,7 +1081,7 @@ if __name__ == '__main__':
     max_power_of_4 = 0
     my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     my_loc2poa.gen_heatmap (df=None, pcl_input_file_name='num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl')
-    plt.savefig('../res/num_vehs_Monaco_0730_0830_1secs.loc_3rects_10.jpg')
+    plt.savefig('../res/num_vehs_Monaco_0730_0830_1secs.loc_3rects.pdf', bbox_inches='tight')
     # my_loc2poa.parse_loc_files (['Monaco_0730_0830_1secs.loc'])
     # my_loc2poa.plot_tot_num_of_vehs_over_t ()
     

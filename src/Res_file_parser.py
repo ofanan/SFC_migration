@@ -496,7 +496,8 @@ class Res_file_parser (object):
                 min_cpu = cpu_vals[0]
             x_norm_factor = min_cpu if (normalize_X) else 1 
 
-            x, y = [], []        
+            x = []
+            y = []        
             for cpu_val in cpu_vals: 
         
                 list_of_item = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # all items with this cpu value, of this mode (the list should usually include a single item)

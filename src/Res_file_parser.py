@@ -1,7 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import math
+# import math
 
 from printf import printf 
 import pandas as pd
@@ -115,7 +115,7 @@ class Res_file_parser (object):
             lines = line1 + line2
             plt.xlim (0)
             plt.ylim (0)
-            ax_ratio_of_crit_usrs.set_ylim (0, 0.5)
+            ax_ratio_of_crit_usrs.set_ylim (0, 0.08)
             plt.legend (lines, [line.get_label() for line in lines], loc='lower center')
 
             # ax_mig_cost          .legend ()
@@ -504,11 +504,13 @@ class Res_file_parser (object):
                 
                 cost_vs_rsrc_data_of_this_mode.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds,'num_of_seeds' : len(avg_cost_of_each_seed)})
             
-            # Add this new calculated point to the ds. Avoid duplications of point.
+            # Add this new calculated point to the ds. Avoid duplications of points.
             for point in sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu']):
-                if (point not in self.cost_vs_rsrc_data):
+                
+                list_of_item = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, self.cost_vs_rsrc_data)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
+                if (point not in self.cost_vs_rsrc_data and len(list_of_item)==0): # insert this new point to the list of points only if it's not already found in self.cost_vs_rsrc_data
                     self.cost_vs_rsrc_data.append (point)
-                point['mode'] = mode
+                    point['mode'] = mode
         
         # store the data as binary data stream
         self.pickle_output_file_name = '{}.pcl' .format (self.input_file_name.split('.res')[0]) 
@@ -527,12 +529,12 @@ if __name__ == '__main__':
     # my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
     # my_res_file_parser.plot_RT_prob_sim_python()
     
-    pickle_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=None, 
-                                                                     res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt_short.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
-    my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_output_file_name)
+    # pickle_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=None, 
+    #                                                                  res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt_short.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
+    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_output_file_name)
 
-    # my_res_file_parser.parse_file ('Lux_0730_0830_16secs_post_p0.3_ourAlg_sd99.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True) #'Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res'  
-    # my_res_file_parser.plot_cost_comp_tikz () 
+    my_res_file_parser.parse_file ('Lux_0730_0830_1secs_post_p0.3_ourAlg_sd99.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True) #'Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res'  
+    my_res_file_parser.plot_cost_comp_tikz () 
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 # ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']

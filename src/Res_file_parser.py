@@ -25,9 +25,10 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE = 7 #15
-LINE_WIDTH  = 3 #4
-FONT_SIZE   = 15 #30
+MARKER_SIZE      = 9 
+LINE_WIDTH       = 3 
+FONT_SIZE        = 20
+LEGEND_FONT_SIZE = 17
 
 class Res_file_parser (object):
     """
@@ -36,6 +37,9 @@ class Res_file_parser (object):
 
     # Calculate the confidence interval, given the avg and the std 
     conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
+
+    # Plot a single x, y, python line, with the required settings (colors, markers etc). 
+    my_plot = lambda self, ax, x, y, mode : ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode], mfc='none') #mfc='none' makes the markers empty.
 
     def __init__ (self):
         """
@@ -100,27 +104,38 @@ class Res_file_parser (object):
             ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs']                      for item in res_from_this_period])
             
         x = [period*period_len for period in range (num_of_periods)]
-        # y1 = [mig_cost[period] for period in range (num_of_periods)]
-        # ratio_of_crit_usrs[period]
         if (plot_python):
-            _, ax_mig_cost      = plt.subplots()
-            ax_ratio_of_crit_usrs = ax_mig_cost.twinx()
+            
+            # Tune maximal values for the Y axes
+            Y_LIM_MIG_COST           = {'Lux' : 260, 'Monaco' : 60}
+            Y_LIM_RATIO_OF_CRIT_USRS = {'Lux' : 0.5, 'Monaco' : 0.1}
+            mig_cost_color           = 'blue'
+            # fig                      = plt.figure ()
+            # ax_mig_cost             = plt.subplots()
+            _, ax_mig_cost           = plt.subplots()
+            ax_ratio_of_crit_usrs    = ax_mig_cost.twinx()
             
             ax_mig_cost.     set_xlabel('Time[s]')
-            ax_mig_cost.     set_ylabel('Norm. Mig. Cost')
-            ax_ratio_of_crit_usrs.set_xlabel('Time[s]', color='blue')
+            ax_mig_cost.     set_ylabel('Norm. Mig. Cost', color=mig_cost_color)
+            ax_mig_cost.tick_params (axis='y', colors=mig_cost_color)
+            ax_ratio_of_crit_usrs.set_xlabel('Time[s]', color=mig_cost_color)
             ax_ratio_of_crit_usrs.set_ylabel('Frac. of Critical Chains', color='black')
-            line1 = ax_mig_cost.plot           (x, mig_cost,           color='blue',  marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Mig. Cost')
-            line2 = ax_ratio_of_crit_usrs.plot (x, ratio_of_crit_usrs, color='black', marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
+            line1 = ax_mig_cost.plot           (x, mig_cost,           color=mig_cost_color,  marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Norm. Mig. Cost')
+            line2 = ax_ratio_of_crit_usrs.plot (x, ratio_of_crit_usrs, color='black',         marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
             lines = line1 + line2
             plt.xlim (0)
-            plt.ylim (0)
-            ax_ratio_of_crit_usrs.set_ylim (0, 0.08)
-            plt.legend (lines, [line.get_label() for line in lines], loc='lower center')
+            ax_mig_cost.          set_ylim (0, Y_LIM_MIG_COST          [self.city])
+            
+            if (self.city=='Monaco'):
+                ax_ratio_of_crit_usrs.set_yscale ('log')
+                ax_ratio_of_crit_usrs.set_ylim (0.001, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+            else:
+                ax_ratio_of_crit_usrs.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+            # ax_ratio_of_crit_usrs.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
 
-            # ax_mig_cost          .legend ()
-            # ax_ratio_of_crit_usrs.legend ()
-            plt.savefig ('../res/{}.pdf' .format (self.input_file_name), bbox_inches='tight')
+            plt.legend (lines, [line.get_label() for line in lines], loc='center')
+
+            plt.savefig ('../res/cost_comp_{}.pdf' .format (self.input_file_name), bbox_inches='tight')
             
         if (plot_tikz):
             self.output_file = open ('../res/cost_comp_{}.dat' .format (self.input_file_name), 'w')
@@ -159,6 +174,8 @@ class Res_file_parser (object):
         Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
         """
         
+        self.city = input_file_name.split ('_')[0]
+        print ('city is ', self.city)
         self.input_file_name = input_file_name
         self.time_slot_len   = int(self.input_file_name.split('secs')[0].split('_')[-1])
         self.input_file      = open ("../res/" + input_file_name,  "r")
@@ -277,29 +294,33 @@ class Res_file_parser (object):
         plt.plot (np.array(t)/3600, tot_num_of_vehs)
         plt.show ()
         
-    def plot_RT_prob_sim_tikz (self):
-        """
-        Generating a tikz-plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
-        """
-        output_file_name = self.input_file_name + '.dat' 
-        self.output_file = open ('../res/{}' .format (output_file_name), 'w')
-        for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
-            
-            list_of_points = self.gen_filtered_list (self.list_of_dicts, mode=mode, stts=1)
-        
-            for point in list_of_points:
-                point['cpu'] /= 10
-            
-            self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
+    # def plot_RT_prob_sim_tikz (self):
+    #     """
+    #     Generating a tikz-plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
+    #     """
+    #     output_file_name = self.input_file_name + '.dat' 
+    #     self.output_file = open ('../res/{}' .format (output_file_name), 'w')
+    #     for mode in ['ourAlg', 'ffit', 'cpvnf', 'opt']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+    #
+    #         list_of_points = self.gen_filtered_list (self.list_of_dicts, mode=mode, stts=1)
+    #
+    #         for point in list_of_points:
+    #             point['cpu'] /= 10
+    #
+    #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
-    def plot_RT_prob_sim_python (self, input_file_name=''):
+    def plot_RT_prob_sim_python (self, input_file_name=None):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         Show the conf' intervals.
+        When given an input file name, parse it first.
+        If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
         """
         
-        input_file_name = input_file_name if (input_file_name != '') else self.input_file_name 
-        fig, ax = plt.subplots()
+        if (input_file_name != None):
+            self.parse_file(input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+        input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
+        _, ax = plt.subplots()
         for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -325,10 +346,10 @@ class Res_file_parser (object):
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 y.append (avg)
             
-            ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode])
+            self.my_plot (ax, x, y, mode)
         plt.xlabel('Fraction of Users with RT Requirements')
         plt.ylabel('Min CPU at leaf [GHz]')
-        ax.legend () #(loc='upper center', shadow=True, fontsize='x-large')
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
             
         plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
@@ -396,7 +417,7 @@ class Res_file_parser (object):
             printf (self.output_file, '\\\\ \\hline \n')
 
 
-    def plot_cost_vs_rsrcs (self, pickle_input_file_name, min_t=30541, max_t=30600, prob=0.3, normalize_X = True, slot_len_in_sec=1, min_cpu=None):
+    def plot_cost_vs_rsrcs (self, pickle_input_file_name, normalize_X = True, min_cpu=None):
         """
         Plot a Python graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Read the required pickled data from an input file.
@@ -404,6 +425,10 @@ class Res_file_parser (object):
           Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
           and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
+        
+        if (int(pickle_input_file_name.split('secs')[0].split('_')[-1])!=1):
+            print ('Error: currently, plot_cost_vs_rsrcs runs only on slot_len=1 sec')
+            return
         
         self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pickle_input_file_name))
 
@@ -437,14 +462,13 @@ class Res_file_parser (object):
                 ax.plot ((x_val, x_val), (item['y_lo'], item['y_hi']), color=self.color_dict[mode]) # Plot the confidence interval for this mode and cpu_val
                 y.append (item['y_avg'])
         
-            ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode])                
+            my_plot (ax, x, y, mode)
         
         
         
         plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
         plt.ylabel('Norm Avg. Cost')
         plt.xlim (1,3)
-        # plt.yscale ('log')
         plt.legend ()
         
         plt.tight_layout()
@@ -513,10 +537,9 @@ class Res_file_parser (object):
                     point['mode'] = mode
         
         # store the data as binary data stream
-        self.pickle_output_file_name = '{}.pcl' .format (self.input_file_name.split('.res')[0]) 
+        self.pickle_output_file_name = 'cost_vs_rsrc_{}.pcl' .format (self.input_file_name.split('.res')[0]) 
         with open('../res/' + self.pickle_output_file_name, 'wb') as cost_vs_rsrc_data_file:
             pickle.dump(self.cost_vs_rsrc_data, cost_vs_rsrc_data_file)
-        # print (self.cost_vs_rsrc_data)
         return self.pickle_output_file_name 
 
 
@@ -524,17 +547,15 @@ if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
     
-    # my_res_file_parser.parse_file ('Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=False, parse_num_usrs=False) 
-    # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
-    # my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', parse_cost=False, parse_cost_comps=False, parse_num_usrs=False) 
-    # my_res_file_parser.plot_RT_prob_sim_python()
+    my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
     
-    # pickle_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pickle_input_file_name=None, 
-    #                                                                  res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt_short.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
+    # pickle_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt_short.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf_short.res', 'Lux_0820_0830_1secs_post_p0.3_ffit_short.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
+    # print ('pickle output file name is ', pickle_output_file_name)
     # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_output_file_name)
+    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
 
-    my_res_file_parser.parse_file ('Lux_0730_0830_1secs_post_p0.3_ourAlg_sd99.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True) #'Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg_sd42.res'  
-    my_res_file_parser.plot_cost_comp_tikz () 
+    # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
+    # my_res_file_parser.plot_cost_comp_tikz () 
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 # ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']

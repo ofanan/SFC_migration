@@ -10,7 +10,7 @@ import pickle
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
-mode_idx       = 1
+mode_idx      = 1
 cpu_idx       = 2
 prob_idx      = 3
 seed_idx      = 4
@@ -417,7 +417,7 @@ class Res_file_parser (object):
             printf (self.output_file, '\\\\ \\hline \n')
 
 
-    def plot_cost_vs_rsrcs (self, pickle_input_file_name, normalize_X = True, min_cpu=None):
+    def plot_cost_vs_rsrcs (self, pcl_input_file_name, normalize_X = True, min_cpu=None):
         """
         Plot a Python graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Read the required pickled data from an input file.
@@ -426,11 +426,11 @@ class Res_file_parser (object):
           and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
         
-        if (int(pickle_input_file_name.split('secs')[0].split('_')[-1])!=1):
+        if (int(pcl_input_file_name.split('secs')[0].split('_')[-1])!=1):
             print ('Error: currently, plot_cost_vs_rsrcs runs only on slot_len=1 sec')
             return
         
-        self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pickle_input_file_name))
+        self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
 
         _, ax = plt.subplots()
 
@@ -462,19 +462,18 @@ class Res_file_parser (object):
                 ax.plot ((x_val, x_val), (item['y_lo'], item['y_hi']), color=self.color_dict[mode]) # Plot the confidence interval for this mode and cpu_val
                 y.append (item['y_avg'])
         
-            my_plot (ax, x, y, mode)
-        
-        
+            self.my_plot (ax, x, y, mode)
         
         plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
         plt.ylabel('Norm Avg. Cost')
-        plt.xlim (1,3)
-        plt.legend ()
+        plt.xlim (1, 3)
+        plt.ylim (0, 2000000)
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
         
         plt.tight_layout()
-        plt.savefig ('../res/cost_by_rsrc_{}.pdf' .format (pickle_input_file_name), bbox_inches='tight')
+        plt.savefig ('../res/cost_vs_rsrc_{}.pdf' .format (pcl_input_file_name), bbox_inches='tight')
 
-    def calc_cost_vs_rsrcs (self, pickle_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3):
+    def calc_cost_vs_rsrcs (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3):
         """
         Calculate the data needed for plotting a graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Optional inputs: 
@@ -486,15 +485,18 @@ class Res_file_parser (object):
         * Returns the file name to which it saved the pickled results. 
         """
         
-        if (pickle_input_file_name==None and res_input_file_names==None):
+        # Caller must provide either a .pcl input file, or a .res input file
+        if (pcl_input_file_name==None and res_input_file_names==None):
             print ('Error: calc_cost_vs_rsrcs must be called with at least one input file - either a .pcl file, or a .res file')
             return
     
-        if (pickle_input_file_name==None):
+        # If the caller provided a .pcl input file, read the data from it
+        if (pcl_input_file_name==None):
             self.cost_vs_rsrc_data = []
         else:
-            self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pickle_input_file_name))
+            self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
     
+        # If the caller provided a .res input file, parse the data from it
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
@@ -537,22 +539,28 @@ class Res_file_parser (object):
                     point['mode'] = mode
         
         # store the data as binary data stream
-        self.pickle_output_file_name = 'cost_vs_rsrc_{}.pcl' .format (self.input_file_name.split('.res')[0]) 
-        with open('../res/' + self.pickle_output_file_name, 'wb') as cost_vs_rsrc_data_file:
+        self.pcl_output_file_name = 'cost_vs_rsrc_{}.pcl' .format (self.input_file_name.split('.res')[0]) 
+        with open('../res/' + self.pcl_output_file_name, 'wb') as cost_vs_rsrc_data_file:
             pickle.dump(self.cost_vs_rsrc_data, cost_vs_rsrc_data_file)
-        return self.pickle_output_file_name 
+        return self.pcl_output_file_name 
 
 
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
     
-    my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
+    # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
+    # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
+    #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
+        
     
-    # pickle_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt_short.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf_short.res', 'Lux_0820_0830_1secs_post_p0.3_ffit_short.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
-    # print ('pickle output file name is ', pickle_output_file_name)
-    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name=pickle_output_file_name)
-    # my_res_file_parser.plot_cost_vs_rsrcs (pickle_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
+    # my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    
+    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res'])
+        # 'Lux_0820_0830_1secs_post_p0.3_opt_short.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf_short.res', 'Lux_0820_0830_1secs_post_p0.3_ffit_short.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
+    my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') #'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl
+    # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3_ourAlg_short.pcl')
 
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
     # my_res_file_parser.plot_cost_comp_tikz () 

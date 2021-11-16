@@ -3,6 +3,7 @@ import traci
 import sys
 import numpy as np
 import math
+import pickle
 # import matplotlib.pyplot as plt
 
 # My own format print functions 
@@ -130,7 +131,7 @@ class Traci_runner (object):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
             
         known_veh_keys      = () # will hold the set of known vehicles' keys
-        num_of_vehs_in_slot = []  # num_of_vehs_in_slot [t] will hold the number of distinct vehs at each slot t          
+        tot_num_of_vehs_in_slot = []  # tot_num_of_vehs_in_slot [t] will hold the number of distinct vehs in the simulated area at each slot t          
             
         while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
             
@@ -147,13 +148,16 @@ class Traci_runner (object):
             # sys.stdout.flush()
 
             known_veh_keys       =  set (cur_list_of_vehs) | set (known_veh_keys) # Union known_veh_keys with the set of vehicles' keys of this cycle
-            num_of_vehs_in_slot.append (len(known_veh_keys))
+            tot_num_of_vehs_in_slot.append (len(cur_list_of_vehs))
                    
             traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
         
-        printf (self.cnt_output_file, 'avg_num_of_vehs_in_simulated_area={:.2f}\nmax_num_of_vehs_in_simulated_area={}\n' .format (np.average(num_of_vehs_in_slot), max (num_of_vehs_in_slot))) 
-        printf (self.cnt_output_file, 'num_of_vehs_in_simulated_area={}\n' .format (num_of_vehs_in_slot)) 
+        printf (self.cnt_output_file, 'avg_num_of_vehs_in_simulated_area={:.2f}\nmax_num_of_vehs_in_simulated_area={}\n' .format (np.average(tot_num_of_vehs_in_slot), max (tot_num_of_vehs_in_slot))) 
+        printf (self.cnt_output_file, 'num_of_vehs_in_simulated_area={}\n' .format (tot_num_of_vehs_in_slot)) 
+        
+        with open ('../res/{}_{}_{}secs_cnt.pcl' .format (self.city, time_str, len_of_time_slot_in_sec), 'wb') as pcl_output_file:
+            pickle.dump (tot_num_of_vehs_in_slot, pcl_output_file)
 
     def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
@@ -285,9 +289,9 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
-    my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5
-    # my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
-     
+    # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5
+    my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
+    # my_Traci_runner.print_lon_lat_corners_of_simulated_area()

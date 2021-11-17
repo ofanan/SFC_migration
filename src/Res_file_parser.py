@@ -379,14 +379,12 @@ class Res_file_parser (object):
                 y.append (avg)
             
             self.my_plot (ax, x, y, mode)
-        return #$$$$
         plt.xlabel('Fraction of Users with RT Requirements')
         plt.ylabel('Min CPU at leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
             
         plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
-        # plt.show ()            
 
     def gen_cost_vs_rsrcs_tbl (self, normalize_X = True, slot_len_in_sec=1):
         """
@@ -581,7 +579,6 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
     
     # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
@@ -589,7 +586,7 @@ if __name__ == '__main__':
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
         
     
-    my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res'])
         # 'Lux_0820_0830_1secs_post_p0.3_opt_short.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf_short.res', 'Lux_0820_0830_1secs_post_p0.3_ffit_short.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
@@ -602,3 +599,4 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 
     
+    # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])

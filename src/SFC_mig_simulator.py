@@ -1658,11 +1658,11 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
 
     for seed in seeds:
         my_simulator.simulate (mode = 'cpvnf', cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['cpvnf'], seed=seed)
-        # my_simulator.simulate (mode = 'ffit',  cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['ffit'] , seed=seed)
-        mode = 'cpvnf'
-        for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-            if (cpu_cap_at_leaf >= min_req_cpu[my_simulator.city][mode]):
-                my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        my_simulator.simulate (mode = 'ffit',  cpu_cap_at_leaf=min_req_cpu[my_simulator.city]['ffit'] , seed=seed)
+        # mode = 'cpvnf'
+        # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+        #     if (cpu_cap_at_leaf >= min_req_cpu[my_simulator.city][mode]):
+        #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     
 
 # my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
@@ -1685,8 +1685,8 @@ def main ():
 
     # print ('Running cost_vs_rsrc')
     #
-    # min_req_cpu = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 219, 'cpvnf' : 222},
-    #                'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1354, 'cpvnf' : 1357}}
+    # min_req_cpu = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 209, 'cpvnf': 214}, #Old: 'ffit' : 219, 'cpvnf' : 214
+    #                'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
     # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
     #
     # seed=int(sys.argv[1])

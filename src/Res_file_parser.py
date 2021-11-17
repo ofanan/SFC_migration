@@ -1,11 +1,12 @@
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np, scipy.stats as st
+import pandas as pd
+from pandas._libs.tslibs import period
+
 # import math
 
 from printf import printf 
-import pandas as pd
-from pandas._libs.tslibs import period
 import pickle
 
 # Indices of fields indicating the settings in a standard ".res" file
@@ -35,11 +36,18 @@ class Res_file_parser (object):
     Parse "res" (result) files, and generate plots from them.
     """
 
-    # Calculate the confidence interval, given the avg and the std 
-    conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
+    # Old (possibly wrong) calculation of the conf' interval
+    # conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
+    
+    # Calculate the confidence interval of an array of values ar, given its avg. Based on 
+    # https://stackoverflow.com/questions/15033511/compute-a-confidence-interval-from-sample-data
+    conf_interval = lambda self, ar, avg, conf_lvl=0.99 : st.t.interval (conf_lvl, len(ar)-1, loc=avg, scale=st.sem(ar)) if np.std(ar)>0 else [avg, avg]
 
     # Plot a single x, y, python line, with the required settings (colors, markers etc). 
     my_plot = lambda self, ax, x, y, mode : ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode], mfc='none') #mfc='none' makes the markers empty.
+
+    # Understand which city's data are these, based on the input file name 
+    parse_city_from_input_file_name = lambda self, input_file_name : input_file_name.split ('_')[0]
 
     def __init__ (self):
         """
@@ -82,6 +90,32 @@ class Res_file_parser (object):
 
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
+    def plot_tot_num_of_vehs_per_slot (self, pcl_input_file_names):
+        """
+        Plots the number of vehicles in the simulated area as a function of time.
+        """  
+        
+        t = range (3600)
+        
+        _, ax = plt.subplots ()
+        ax.set_xlabel ('Time[s]')
+        ax.set_ylabel ('# of Vehicles')
+
+        for pcl_input_file_name in pcl_input_file_names:
+            num_vehs_in_slot = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            city = self.parse_city_from_input_file_name (pcl_input_file_name)
+            
+            ax.plot (t, num_vehs_in_slot, color = 'black' if city=='Lux' else 'blue', marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
+            plt.xlim (0, 3600)
+            plt.ylim (0)
+        
+        ax.legend (fontsize=22, loc='center') 
+        # plt.show ()
+
+        plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
+        
+      
+      
     def plot_cost_comp_tikz (self, plot_tikz=False, plot_python=True):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
@@ -110,8 +144,6 @@ class Res_file_parser (object):
             Y_LIM_MIG_COST           = {'Lux' : 260, 'Monaco' : 60}
             Y_LIM_RATIO_OF_CRIT_USRS = {'Lux' : 0.5, 'Monaco' : 0.1}
             mig_cost_color           = 'blue'
-            # fig                      = plt.figure ()
-            # ax_mig_cost             = plt.subplots()
             _, ax_mig_cost           = plt.subplots()
             ax_ratio_of_crit_usrs    = ax_mig_cost.twinx()
             
@@ -174,7 +206,7 @@ class Res_file_parser (object):
         Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
         """
         
-        self.city = input_file_name.split ('_')[0]
+        self.city = self.parse_city_from_input_file_name(input_file_name)
         print ('city is ', self.city)
         self.input_file_name = input_file_name
         self.time_slot_len   = int(self.input_file_name.split('secs')[0].split('_')[-1])
@@ -338,7 +370,7 @@ class Res_file_parser (object):
                 samples = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
                 avg = np.average(samples)
                 
-                [y_lo, y_hi] = self.conf_interval (avg, np.std(samples))
+                [y_lo, y_hi] = self.conf_interval (samples, avg)
                 
                 if (x_val==0.3 and mode in ['ffit', 'cpvnf']):
                     print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
@@ -347,6 +379,7 @@ class Res_file_parser (object):
                 y.append (avg)
             
             self.my_plot (ax, x, y, mode)
+        return #$$$$
         plt.xlabel('Fraction of Users with RT Requirements')
         plt.ylabel('Min CPU at leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
@@ -526,7 +559,7 @@ class Res_file_parser (object):
                     avg_cost_of_each_seed.append (np.average ([item['cost'] for item in mode_cpu_list if item['seed']==seed]))                    
     
                 avg_cost_of_all_seeds = np.average (avg_cost_of_each_seed)
-                [y_lo, y_hi]          = self.conf_interval (avg_cost_of_all_seeds, np.std (avg_cost_of_each_seed)) # low, high y values for this plotted conf' interval
+                [y_lo, y_hi]          = self.conf_interval (ar=avg_cost_of_each_seed, avg=avg_cost_of_all_seeds) # low, high y values for this plotted conf' interval
                 
                 cost_vs_rsrc_data_of_this_mode.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds,'num_of_seeds' : len(avg_cost_of_each_seed)})
             
@@ -548,6 +581,7 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
     
     # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
@@ -555,17 +589,16 @@ if __name__ == '__main__':
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
         
     
-    # my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res'])
         # 'Lux_0820_0830_1secs_post_p0.3_opt_short.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf_short.res', 'Lux_0820_0830_1secs_post_p0.3_ffit_short.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
-    my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') #'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl
+    # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') #'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl
     # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3_ourAlg_short.pcl')
 
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
     # my_res_file_parser.plot_cost_comp_tikz () 
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
-# ncountered a format error. Splitted line=['| num_usrs=8114', 'num_crit_usrs=28']
-# splitted settings=['| num', 'usrs=8114']            
+
     

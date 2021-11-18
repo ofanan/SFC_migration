@@ -1,3 +1,4 @@
+import sumolib
 from sumolib import checkBinary  
 import traci  
 import sys
@@ -10,6 +11,7 @@ import pickle
 from printf import printf 
 from secs2hour import secs2hour
 import loc2poa_c
+from shapely.geometry import Polygon, box
 
 VERBOSE_LOC      = 2
 VERBOSE_SPEED    = 3
@@ -19,6 +21,9 @@ radio_idx = 0 # Radio type: GSM, LTE etc.
 mnc_idx   = 2 # Mobile Network Code
 lon_pos_idx = 6 
 lat_pos_idx = 7
+                  
+
+netFile = {'Lux' : r'../../LuSTScenario/scenario/lust.net.xml'}
 
 class Traci_runner (object):
 
@@ -39,7 +44,12 @@ class Traci_runner (object):
 
     # Generate a string, showing the start and end time of the sim, in a 24-h clock
     gen_time_str = lambda self, start_time, end_time : '{}_{}' .format (secs2hour(start_time), secs2hour(end_time)) 
-                    
+
+    # My Sumo command, to start a Traci simulation
+    mysumoCmd = lambda self : [checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true']
+
+    LaneLengthSumoCmd = lambda self : [checkBinary('sumo'), '-c', self.sumo_cfg_file, "--start", "--quit-on-end", '-W', '-V', 'false', '--no-step-log', 'true']
+
     def handle_Nan_point (self): 
         print ('Warning: encountered a Nan point at t={}' .format (self.t))
         return [-1, -1] # return a dumy point, that would be out of any simulated area
@@ -80,7 +90,7 @@ class Traci_runner (object):
         """
         Print the latitude and longitude of the 4 corners of the simulated area
         """
-        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
+        traci.start (self.mysumoCmd())
         EPSILON=0.01
         min_x, min_y = loc2poa_c.MIN_X[self.city] + EPSILON, loc2poa_c.MIN_Y[self.city] + EPSILON
         max_x, max_y = loc2poa_c.MAX_X[self.city] - EPSILON, loc2poa_c.MAX_Y[self.city] - EPSILON
@@ -123,7 +133,7 @@ class Traci_runner (object):
         
         time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
         print ('Running Traci for the period {}' .format (time_str))
-        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
+        traci.start(self.mysumoCmd())
         self.cnt_output_file_name = '../res/{}_{}_{}secs_cnt.res' .format (self.city, time_str, len_of_time_slot_in_sec) 
         self.cnt_output_file      = open (self.cnt_output_file_name, 'w')
                
@@ -173,7 +183,7 @@ class Traci_runner (object):
         
         time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
         print ('Running Traci for the period {}. Will write res to {} output files' .format (time_str, num_of_output_files))
-        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
+        traci.start (self.mysumoCmd())
         
         if (warmup_period > 0):
             traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
@@ -248,7 +258,7 @@ class Traci_runner (object):
         
         antenna_loc_file = open ('../res/Antennas_locs/' + antenna_locs_file_name, 'r')
 
-        traci.start([checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true'])
+        traci.start (self.mysumoCmd())
 
         self.list_of_antennas = []
     
@@ -287,11 +297,63 @@ class Traci_runner (object):
             printf (PoAs_loc_file, '{},{},{}\n' .format (poa_id, poa['x'], poa['y']))
             poa_id += 1
 
+
+    def calc_lane_legnth (self, rectangle):
+        """
+        Given a rectangle, this function returns the total lengths of lanes in it.
+        input rectangle should be given in order: Top Left, Top Right, Bottom Right, Bottom Left. 
+        """
+
+        # mention 4 corners positions of the area of interest as a rectangle.
+        # Position in this order Top Left, Top Right, Bottom Right, Bottom Left, Top Left
+        ROI = Polygon(rectangle)
+        
+        edgesOfInterest = []
+        edgesInfo = {}
+
+        traci.start(self.LaneLengthSumoCmd())
+        net = sumolib.net.readNet(netFile[self.city])  # net file
+        totalLength = 0 # total length of lanes under the region of interest
+        
+        for edge in traci.edge.getIDList():
+            # if edge ID starts with : then its a junction according to SUMO docs.
+            if edge[0] == ":":
+                # avoiding the junctions
+                continue
+            curEdge = net.getEdge(edge)
+            # get bounding box of the edge
+            curEdgeBBCoords = curEdge.getBoundingBox()
+            # create the bounding box geometrically
+            curEdgeBBox = box(*curEdgeBBCoords)
+            # check if the edge is inside the region of interest
+            isInside = ROI.intersects(curEdgeBBox) or ROI.contains(curEdgeBBox)
+            
+            if isInside:
+                # store the valid edges in a list
+                edgesOfInterest.append(edge)
+                # store valid edge informations in a dictionary
+                edgesInfo[edge] = {}
+                edgesInfo[edge]["length"] = curEdge.getLength()
+                # total length based on edge
+                totalLength = totalLength + edgesInfo[edge]["length"]
+                # edge length will be the same as lane length just to check additional info about multiple lanes in the edge
+                lanes = curEdge.getLanes()
+                edgesInfo[edge]["Lanes"] = {}
+                for lane in lanes:
+                    laneIndex = lane.getIndex()
+                    edgesInfo[edge]["Lanes"][f"Lane{laneIndex}"] = {}
+                    edgesInfo[edge]["Lanes"][f"Lane{laneIndex}"]["length"] = lane.getLength()
+        
+        traci.close()
+        print ('totalLength={:.2f}' .format(totalLength))
+        return totalLength
+
 if __name__ == '__main__':
     
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myMoST.sumocfg')
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg')
+    my_Traci_runner.calc_lane_legnth (rectangle=[(5089.78, 6805.97), (5779.82, 6811.18), (5793.73, 6494.84), (5103.68, 6439.22), (5089.78, 6805.97)])
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
     # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5
-    my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
+    # my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()

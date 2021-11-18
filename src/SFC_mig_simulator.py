@@ -1579,7 +1579,7 @@ class SFC_mig_simulator (object):
             else: 
                 lb = cpu_cap_at_leaf
     
-    def run_prob_of_RT_sim_algs (self, prob=None):
+    def run_prob_of_RT_sim_algs (self, poa2cell_file_name, poa_file_name, prob=None):
         """
         Run a simulation where the probability of a RT application varies. 
         Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
@@ -1614,7 +1614,7 @@ class SFC_mig_simulator (object):
         #         for prob_of_target_delay in [i/10 for i in range (11)]:
         #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-    def run_prob_of_RT_sim_opt (self, prob=None):
+    def run_prob_of_RT_sim_opt (self, poa2cell_file_name, poa_file_name, prob=None):
         """
         Run a simulation where the probability of a RT application varies. 
         If a "prob" input argument is explicitly given, run the simulation with this given prob'

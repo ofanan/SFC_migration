@@ -143,12 +143,12 @@ class loc2poa_c (object):
     edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
     
-    def gen_heatmap (self, df, vmax, pcl_input_file_name=None): 
+    def gen_heatmap (self, df, vmax=None, pcl_input_file_name=None): 
         """
         Generate a well-customized sns heatmap from the given data frame.
         Input: df - the data frame for the heatmap.
                However, when given a pickle input file name, read the df from this input file, rather than from the "df" input
-               vmax - maximum value in the heatmap 
+               vmax - maximum value in the heatmap (optional input) 
         Output: the heatmap
         """
         
@@ -156,7 +156,10 @@ class loc2poa_c (object):
             df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
         
         plt.rcParams.update({'font.size': HEATMAP_FONT_SIZE})
-        my_heatmap = sns.heatmap(df, vmin=0, vmax=vmax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True) # vmax=df.values.max()
+        if (vmax==None):
+            my_heatmap = sns.heatmap(df, vmin=0, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True) # vmax=df.values.max()
+        else:
+            my_heatmap = sns.heatmap(df, vmin=0, vmax=vmax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True) # vmax=df.values.max()
         # my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
 
         my_heatmap.set_aspect("equal") # Keep each rectangle as square 
@@ -434,12 +437,15 @@ class loc2poa_c (object):
             self.parse_demongraphy_file(input_demography_file_name)
 
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
+        
+        printf (open ('../res/demography.txt', 'a'), '{}_{}rects. avg vehs left per rect={:.2f}\n' .format(usrs_loc_file_name, self.num_of_cells, np.average(avg_vehs_left_per_rect)))
          
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city])
+        self.gen_heatmap (df=pd.DataFrame (heatmap_vals)) #$$$
+        # self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city]) #$$$
         usrs_loc_file_name = usrs_loc_file_name if (usrs_loc_file_name!=None) else self.usrs_loc_file_name 
-        plt.savefig('../res/heatmap_vehs_left_rect{}_{}.pdf' .format (self.antloc_file_name, usrs_loc_file_name.split('.txt')[0]), bbox_inches='tight')
+        plt.savefig('../res/heatmap_vehs_left_rect{}_{}_tmp.pdf' .format (self.antloc_file_name, usrs_loc_file_name.split('.txt')[0]), bbox_inches='tight')
 
         return 
         
@@ -1100,8 +1106,10 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 3
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    max_power_of_4 = 4
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    input_demography_file_name='Lux_demography_0730_0830_1secs_256.txt'
+    my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
     
     # my_loc2poa.gen_heatmap_series (['num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__48rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__12rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl'])
     # plt.savefig('../res/num_of_vehs_Monaco_0730_0830_1secs.loc_w_cbar.pdf', bbox_inches='tight')
@@ -1120,7 +1128,5 @@ if __name__ == '__main__':
     # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps()
     
     # Post-processing
-    input_demography_file_name='demography_Monaco_0730_0830_1secs_192.txt'
-    my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
     # my_loc2poa.plot_voronoi_diagram()

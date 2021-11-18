@@ -29,6 +29,10 @@ fail = 2
 # Round a float, and cast it to int
 inter = lambda float_num : int (round(float_num))
 
+# Minimum required CPU when prob=0.3, as found by previous runs. Used as a base for run_cost_vs_rsrc
+MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 209, 'cpvnf': 214},     #Old: 'ffit' : 219, 'cpvnf' : 214
+               'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
+
 class SFC_mig_simulator (object):
     """
     Run a simulation of the Service Function Chains migration problem.
@@ -164,6 +168,7 @@ class SFC_mig_simulator (object):
 
     # Return the ID of the parent of the server given as input
     prnt_of_srvr = lambda self, s : self.G.nodes[s]['prnt']
+
 
     # Returns a string, detailing the sim' costs' components
     def sol_cost_str (self, cpu_cost, link_cost, mig_cost):
@@ -1574,7 +1579,7 @@ class SFC_mig_simulator (object):
             else: 
                 lb = cpu_cap_at_leaf
     
-    def run_prob_of_RT_sim_algs (self, poa2cell_file_name, poa_file_name, prob=None):
+    def run_prob_of_RT_sim_algs (self, prob=None):
         """
         Run a simulation where the probability of a RT application varies. 
         Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
@@ -1609,7 +1614,7 @@ class SFC_mig_simulator (object):
         #         for prob_of_target_delay in [i/10 for i in range (11)]:
         #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-    def run_prob_of_RT_sim_opt (self, poa2cell_file_name, poa_file_name, prob=None):
+    def run_prob_of_RT_sim_opt (self, prob=None):
         """
         Run a simulation where the probability of a RT application varies. 
         If a "prob" input argument is explicitly given, run the simulation with this given prob'
@@ -1641,28 +1646,25 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
     print ('Running run_cost_vs_rsrc')
     seeds = [seed] if (seed!=None) else [40 + i for i in range (21)]
 
-    min_req_cpu = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 219, 'cpvnf' : 222},
-                   'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1354, 'cpvnf' : 1357}}
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
-    # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 3)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 3)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
-    # for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
+    # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-                     
+    
     # for seed in seeds:
-    #     for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #     for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-    #     for cpu_cap_at_leaf in [min_req_cpu[my_simulator.city]['ourAlg'], min_req_cpu[my_simulator.city]['ffit'], min_req_cpu[my_simulator.city]['cpvnf']]:
+    #     for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     for seed in seeds:
         for mode in ['cpvnf', 'ffit']:
-            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=min_req_cpu[my_simulator.city][mode], seed=seed)
-            for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-                if (cpu_cap_at_leaf >= min_req_cpu[my_simulator.city][mode]):
-                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-    
+            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=MIN_REQ_CPU[my_simulator.city][mode], seed=seed)
+            for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+                if (cpu_cap_at_leaf >= MIN_REQ_CPU[my_simulator.city][mode]):
+                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)   
 
 # my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 # my_simulator.run_prob_of_RT_sim_opt  (0.9)
@@ -1678,26 +1680,22 @@ def main ():
     seed = None
     if (len (sys.argv)>1):
         seed=int(sys.argv[1])   
-    poa_file_name      = 'Monaco_0730_0830_16secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+    poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
     run_cost_vs_rsrc(poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, seed=seed)
 
     # print ('Running cost_vs_rsrc')
-    #
-    # min_req_cpu = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 209, 'cpvnf': 214}, #Old: 'ffit' : 219, 'cpvnf' : 222
-    #                'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
-    # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-    #
+
     # seed=int(sys.argv[1])
-    # cpu_cap_at_leaf = inter (min_req_cpu[my_simulator.city]['opt']*(1 + seed/10)) 
+    # cpu_cap_at_leaf = inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + seed/10)) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-    # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-    # for cpu_cap_at_leaf in [inter (min_req_cpu[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=926, seed=99)
 

@@ -31,6 +31,17 @@ LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y
 UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
                     'Monaco' : np.array ([5450, 3050], dtype='int16')} 
 
+# x,y indexes of the south-west corner of the simulated area
+UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
+                    'Monaco' : np.array ([5450, 3050], dtype='int16')} 
+
+# The 4 corners of the absolute (non-rotated) position of the simulated area
+SIMULATED_AREA_RECT = {'Lux': [ (GLOBAL_MAX_X['Lux']//4, GLOBAL_MAX_Y['Lux']*3//4),
+                       UPPER_RIGHT_CORNER['Lux'],
+                       (GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']//4),
+                       LOWER_LEFT_CORNER['Lux']
+                       ]} 
+
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 MIN_X = {'Lux' : 0, 'Monaco' : 0}
 MIN_Y = {'Lux' : 0, 'Monaco' : 0}

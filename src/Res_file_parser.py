@@ -1,7 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np, scipy.stats as st
-import pandas as pd
+import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 
 # import math

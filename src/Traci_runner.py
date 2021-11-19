@@ -1,17 +1,13 @@
 import sumolib
 from sumolib import checkBinary  
-import traci  
-import sys
+import traci, sys, math, pickle
 import numpy as np
-import math
-import pickle
-# import matplotlib.pyplot as plt
+from shapely.geometry import Polygon, box
 
 # My own format print functions 
 from printf import printf 
 from secs2hour import secs2hour
 import loc2poa_c
-from shapely.geometry import Polygon, box
 
 VERBOSE_LOC      = 2
 VERBOSE_SPEED    = 3
@@ -22,8 +18,12 @@ mnc_idx   = 2 # Mobile Network Code
 lon_pos_idx = 6 
 lat_pos_idx = 7
                   
+EPSILON=0.01
 
-netFile = {'Lux' : r'../../LuSTScenario/scenario/lust.net.xml'}
+netFile = {'Lux' : r'../../LuSTScenario/scenario/lust.net.xml', 'Monaco' : r'../../MoSTScenario/scenario/in/most.net.xml'}
+
+# Return the Euclidian dist between two points
+dist = lambda p1, p2 : math.sqrt( (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
 
 class Traci_runner (object):
 
@@ -36,9 +36,6 @@ class Traci_runner (object):
     # Returns the relative location of a given vehicle ID. The relative location found after rotating the point (if needed), and then position it w.r.t. the lower left (south-west) corner of the simulated area.
     get_relative_position = lambda self, veh_key  : self.abs_to_relative_pos (self.rotate_point (traci.vehicle.getPosition(veh_key))) 
 
-    # rotate a given point by self.rotate_angle radians counter-clockwise around self.pivot
-    # rotate_point = lambda self, point : self.handle_Nan_point() if (math.isnan(point[0]) or math.isnan(point[0])) else (np.array (point if (self.rotate_angle==0) else [self.pivot[0] + math.cos(self.rotate_angle) * (point[0] - self.pivot[0]) - math.sin(self.rotate_angle) * (point[1] - self.pivot[1]),self.pivot[1] + math.sin(self.rotate_angle) * (point[0] - self.pivot[0]) + math.cos(self.rotate_angle) * (point[1] - self.pivot[1])], dtype='int16'))
-
     # Given the lon, lat coordinates of a point, return the (x,y) coordinates of its relative position within the simulated area 
     lon_lat_to_relative_pos = lambda self, lon, lat : self.abs_to_relative_pos (self.rotate_point (traci.simulation.convertGeo (lon, lat, True)))
 
@@ -48,6 +45,7 @@ class Traci_runner (object):
     # My Sumo command, to start a Traci simulation
     mysumoCmd = lambda self : [checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true']
 
+    # My Sumo command, to start a dummy Traci simulation, used merely to calculate the total length of lanes within a given rectangle
     LaneLengthSumoCmd = lambda self : [checkBinary('sumo'), '-c', self.sumo_cfg_file, "--start", "--quit-on-end", '-W', '-V', 'false', '--no-step-log', 'true']
 
     def handle_Nan_point (self): 
@@ -67,47 +65,80 @@ class Traci_runner (object):
                           self.pivot[1] + math.sin(angle) * (point[0] - self.pivot[0]) + math.cos(angle) * (point[1] - self.pivot[1])], 
                           dtype='int16')
     
+    def relative_rttd_pos_to_abs_pos (self, point):
+        """
+        Given the relative position of a point (x,y) within the simulated area return its absolute (x,y) position.
+        If the relative position was obtained by a rotation, this casting includes also the performas counter rotation. 
+        """
+        if (math.isnan(point[0]) or math.isnan(point[0])):
+            self.handle_Nan_point()
+            return None 
+        if (not (loc2poa_c.is_in_simulated_area(self.city, point))):
+            print ('Warning: relative_rttd_pos_to_abs_pos was called with point {} which is outside the simulated area' .format(point))
+            return None
+        
+        # Now we know that this point is within the simulated area
+        # abs_point = self.relative_to_abs_pos (point)
+        # print ('abs_point={}' .format (abs_point))
+
+        return self.rotate_point (self.relative_to_abs_pos (point), -self.rotate_angle)
+    
+    
     def relative_pos_to_lon_lat (self, point):
         """
         Given the relative position of a point (x,y) within the simulated area, return its [latitude, longitude] 
         """
-        if (math.isnan(point[0]) or math.isnan(point[0])):
-            self.handle_Nan_point()
-            return 
-        if (not (loc2poa_c.is_in_simulated_area(self.city, point))):
-            print ('Warning: relative_pos_to_lon_lat was called with point {} which is outside the simulated area' .format(point))
-            return
-        
-        # Now we know that this point is within the simulated area
-        abs_point = self.relative_to_abs_pos (point)
-        # print ('abs_point={}' .format (abs_point))
-
-        rttd_back_point = self.rotate_point (abs_point, -self.rotate_angle)
-        return traci.simulation.convertGeo (rttd_back_point[0],rttd_back_point[1])
+        rttd_back_point = self.relative_rttd_pos_to_abs_pos (point)
+        if (not(rttd_back_point.any() == None)): 
+            return traci.simulation.convertGeo (rttd_back_point[0],rttd_back_point[1])
             
+    def calc_relative_pos_corners (self):
+        """
+        Calculate the relative positions of the 4 corners of the simulated area
+        """
+        min_x, min_y = loc2poa_c.MIN_X[self.city] + EPSILON, loc2poa_c.MIN_Y[self.city] + EPSILON
+        max_x, max_y = loc2poa_c.MAX_X[self.city] - EPSILON, loc2poa_c.MAX_Y[self.city] - EPSILON
+        self.relative_sw_corner = [min_x, min_y]
+        self.relative_nw_corner = [min_x, max_y]
+        self.relative_se_corner = [max_x, min_y]
+        self.relative_ne_corner = [max_x, max_y]
+            
+    def print_abs_pos_corners_of_simulated_area (self):
+        
+        """
+        Print the absolute, nont-rotated, position of the 4 corners of the simulated area
+        """
+        self.calc_relative_pos_corners()
+        point = self.relative_rttd_pos_to_abs_pos (self.relative_sw_corner)
+        print ('sw_corner pos ={}, {}' .format (point[0], point[1]))
+
+        point = self.relative_rttd_pos_to_abs_pos (self.relative_nw_corner)
+        print ('nw_corner pos ={}, {}' .format (point[0], point[1]))
+
+        point = self.relative_rttd_pos_to_abs_pos (self.relative_se_corner)
+        print ('se_corner pos ={}, {}' .format (point[0], point[1]))
+
+        point = self.relative_rttd_pos_to_abs_pos (self.relative_ne_corner)
+        print ('ne_corner pos ={}, {}' .format (point[0], point[1]))
+     
     def print_lon_lat_corners_of_simulated_area (self):
         
         """
         Print the latitude and longitude of the 4 corners of the simulated area
         """
+        self.calc_relative_pos_corners()
         traci.start (self.mysumoCmd())
-        EPSILON=0.01
-        min_x, min_y = loc2poa_c.MIN_X[self.city] + EPSILON, loc2poa_c.MIN_Y[self.city] + EPSILON
-        max_x, max_y = loc2poa_c.MAX_X[self.city] - EPSILON, loc2poa_c.MAX_Y[self.city] - EPSILON
-        sw_corner = self.relative_pos_to_lon_lat ([min_x, min_y])
-        print ('sw_corner(lat,lon)={}, {}' .format (sw_corner[1], sw_corner[0]))
-        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(sw_corner[0], sw_corner[1])))
+        lon_lat_sw_corner = self.relative_pos_to_lon_lat (self.relative_sw_corner)
+        print ('sw_corner(lat,lon)={}, {}' .format (lon_lat_sw_corner[1], lon_lat_sw_corner[0]))
 
-        nw_corner = self.relative_pos_to_lon_lat ([min_x, max_y])
-        print ('nw_corner(lat,lon)={}, {}' .format (nw_corner[1],nw_corner[0]))
-        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(nw_corner[0], nw_corner[1])))
+        lon_lat_nw_corner = self.relative_pos_to_lon_lat (self.relative_nw_corner)
+        print ('nw_corner(lat,lon)={}, {}' .format (lon_lat_nw_corner[1],lon_lat_nw_corner[0]))
 
-        se_corner = self.relative_pos_to_lon_lat ([max_x, min_y])
-        print ('se_corner(lat,lon)={}, {}' .format (se_corner[1],se_corner[0]))
-        # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(se_corner[0], se_corner[1])))
+        lon_lat_se_corner = self.relative_pos_to_lon_lat (self.relative_se_corner)
+        print ('se_corner(lat,lon)={}, {}' .format (lon_lat_se_corner[1],lon_lat_se_corner[0]))
 
-        ne_corner = self.relative_pos_to_lon_lat ([max_x, max_y])
-        print ('ne_corner(lat,lon)={}, {}' .format (ne_corner[1],ne_corner[0]))
+        lon_lat_ne_corner = self.relative_pos_to_lon_lat (self.relative_ne_corner)
+        print ('ne_corner(lat,lon)={}, {}' .format (lon_lat_ne_corner[1],lon_lat_ne_corner[0]))
         # print ('Check: casting back={}' .format(self.lon_lat_to_relative_pos(ne_corner[0], ne_corner[1])))
         traci.close()
      
@@ -120,7 +151,10 @@ class Traci_runner (object):
             self.providers_mnc = {'post' : '1', 'tango' : '77', 'orange' : '99'}         # Mobile Network Codes of various operators in Luxembourg
         elif (sumo_cfg_file=='myMoST.sumocfg'):
             self.city = 'Monaco'
-            self.providers_mnc = {'Telecom' : '10'}                        
+            self.providers_mnc = {'Telecom' : '10'}
+        else:
+            print ('Error: Tracei_runner init encountered an unknown cfg file')
+            exit ()                        
         
         self.rotate_angle = -math.radians(54) if self.city=='Monaco' else 0 # angle to rotate the points. The requested angle degrees of clcokwise is converted to the radians value of rotating counter-clockwise used by rotate_point.
         self.pivot = [loc2poa_c.GLOBAL_MAX_X[self.city]/2, loc2poa_c.GLOBAL_MAX_Y[self.city]/2] # pivot point, around which the rotating is done
@@ -297,22 +331,45 @@ class Traci_runner (object):
             printf (PoAs_loc_file, '{},{},{}\n' .format (poa_id, poa['x'], poa['y']))
             poa_id += 1
 
-
-    def calc_lane_legnth (self, rectangle):
+    def Poly_of_rect_i_j (self, i, j):
         """
-        Given a rectangle, this function returns the total lengths of lanes in it.
-        input rectangle should be given in order: Top Left, Top Right, Bottom Right, Bottom Left. 
+        Returns the polygon corresponding to the (i,j)-rectangle, when partitioning the simulated area into 4**self.max_power_of_4 * loc2poa_c.NUM_OF_TOP_LVL_SQS rectangles. 
         """
-
-        # mention 4 corners positions of the area of interest as a rectangle.
-        # Position in this order Top Left, Top Right, Bottom Right, Bottom Left, Top Left
-        ROI = Polygon(rectangle)
         
-        edgesOfInterest = []
-        edgesInfo = {}
+        # Position in this order Top Left, Top Right, Bottom Right, Bottom Left, Top Left
+        # ROI = Polygon(rectangle)
 
+
+
+
+    def calc_tot_lane_len_in_all_cells (self, max_power_of_4=0):
+        
+        self.max_power_of_4 = max_power_of_4
         traci.start(self.LaneLengthSumoCmd())
         net = sumolib.net.readNet(netFile[self.city])  # net file
+
+        num_of_rows_in_tile = 2**max_power_of_4
+        num_of_cols_in_tile = num_of_rows_in_tile * loc2poa_c.NUM_OF_TOP_LVL_SQS 
+        
+        tot_len_of_lanes_in_rect = np.empty ([num_of_rows_in_tile, num_of_cols_in_tile])
+        
+        for i in range (num_of_rows_in_tile):
+            for j in range (num_of_cols_in_tile):
+                self.tot_lane_len_in_rect[i][j] = self.tot_lane_len_in_rect (net, self.poly_of_i_j ()) 
+
+                
+            
+        traci.close()
+
+    def tot_lane_len_in_rect (self, net, ROI):
+        """
+        Calculate the total lengths of lanes in it.
+        Input: 
+        net - a net file
+        rectangle - 4 corners, given in order: Top Left, Top Right, Bottom Right, Bottom Left. 
+        The function assumes that a Traci simulation is already running 
+        """
+
         totalLength = 0 # total length of lanes under the region of interest
         
         for edge in traci.edge.getIDList():
@@ -325,36 +382,28 @@ class Traci_runner (object):
             curEdgeBBCoords = curEdge.getBoundingBox()
             # create the bounding box geometrically
             curEdgeBBox = box(*curEdgeBBCoords)
-            # check if the edge is inside the region of interest
-            isInside = ROI.intersects(curEdgeBBox) or ROI.contains(curEdgeBBox)
+
+            # print ('len={:.1f}. num of lanes={}. area={:.1f}' .format (curEdge.getLength(), len(curEdge.getLanes()), curEdgeBBox.area))
             
-            if isInside:
-                # store the valid edges in a list
-                edgesOfInterest.append(edge)
-                # store valid edge informations in a dictionary
-                edgesInfo[edge] = {}
-                edgesInfo[edge]["length"] = curEdge.getLength()
-                # total length based on edge
-                totalLength = totalLength + edgesInfo[edge]["length"]
-                # edge length will be the same as lane length just to check additional info about multiple lanes in the edge
-                lanes = curEdge.getLanes()
-                edgesInfo[edge]["Lanes"] = {}
-                for lane in lanes:
-                    laneIndex = lane.getIndex()
-                    edgesInfo[edge]["Lanes"][f"Lane{laneIndex}"] = {}
-                    edgesInfo[edge]["Lanes"][f"Lane{laneIndex}"]["length"] = lane.getLength()
-        
-        traci.close()
-        print ('totalLength={:.2f}' .format(totalLength))
+            if ROI.contains(curEdgeBBox): # The given polygon contains that edge, so add the edge's length, multiplied by the # of lanes
+
+                totalLength += curEdge.getLength() * len(curEdge.getLanes())
+            
+            # If ROI intersects with this edge then, as a rough estimation of the relevant length to add, divide the intersecting area by the total edge area
+            elif (ROI.intersects(curEdgeBBox)):   
+                
+                totalLength += curEdge.getLength() * (ROI.intersection(curEdgeBBox).area / curEdgeBBox.area) 
+                
         return totalLength
 
 if __name__ == '__main__':
     
-    city = 'Lux'
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMost.cumocfg')
-    my_Traci_runner.calc_lane_legnth (rectangle=loc2poa_c.SIMULATED_AREA_RECT[city])
+    city = 'Monaco'
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
+    my_Traci_runner.tot_lane_len_in_rect (rectangle=loc2poa_c.SIMULATED_AREA_RECT[city])
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
     # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5
     # my_Traci_runner.simulate_to_cnt_vehs_only (warmup_period=(3), sim_length = 3600, len_of_time_slot_in_sec =1, verbose=[])
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
+    # my_Traci_runner.print_abs_pos_corners_of_simulated_area ()

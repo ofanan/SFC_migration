@@ -1,15 +1,12 @@
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 import math, pickle
+import numpy as np, pandas as pd, seaborn as sns, matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
+
+from printf import printf, printmat 
+
 # from matplotlib.co//lors import LogNorm, Normalize
 # from matplotlib.ticker import MaxNLocator
 # import itertools 
-
-# My own format print functions 
-from printf import printf, printar, printmat
 
 # Verbose levels, defining the outputs produced
 VERBOSE_POA              = 1 # Generate ".poa" file, detailing the current Point of Access of each user during the sim.
@@ -27,11 +24,7 @@ GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 
 LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
                     'Monaco' : np.array ([2350, 2050], dtype='int16')} 
 
-# x,y indexes of the south-west corner of the simulated area
-UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
-                    'Monaco' : np.array ([5450, 3050], dtype='int16')} 
-
-# x,y indexes of the south-west corner of the simulated area
+# x,y indexes of the north-east corner of the simulated area
 UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
                     'Monaco' : np.array ([5450, 3050], dtype='int16')} 
 
@@ -39,8 +32,9 @@ UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_
 SIMULATED_AREA_RECT = {'Lux': [ (GLOBAL_MAX_X['Lux']//4, GLOBAL_MAX_Y['Lux']*3//4),
                        UPPER_RIGHT_CORNER['Lux'],
                        (GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']//4),
-                       LOWER_LEFT_CORNER['Lux']
-                       ]} 
+                       LOWER_LEFT_CORNER['Lux']],
+                       'Monaco' : [ (3541, 967), (5363, 3475), (6171, 2887), (4349, 380)]
+                       } 
 
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 MIN_X = {'Lux' : 0, 'Monaco' : 0}
@@ -59,6 +53,9 @@ veh_id_idx = int(1)
 x_pos_idx  = int(2)
 y_pos_idx  = int(3)
 speed_idx  = int(4)
+
+# In Monaco we partition the city area into several horizontal almost-square rectangles before further iteratively partitioning it into squares
+NUM_OF_TOP_LVL_SQS = {'Lux' : 1, 'Monaco' : 3}
 
 HEATMAP_FONT_SIZE = 30 
 
@@ -151,7 +148,7 @@ class loc2poa_c (object):
     # Given the x,y position, return the x,y position within the simulated area (city center) 
     pos_to_relative_pos = lambda self, pos: np.array(pos, dtype='int16') - LOWER_LEFT_CORNER [self.city]
 
-    edges_of_smallest_rect = lambda self : [(self.max_x/self.num_of_top_lvl_sqs) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
+    edges_of_smallest_rect = lambda self : [(self.max_x/NUM_OF_TOP_LVL_SQS[self.city]) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
     
     def gen_heatmap (self, df, vmax=None, pcl_input_file_name=None): 
@@ -235,17 +232,15 @@ class loc2poa_c (object):
         if (self.city=='Monaco' and max_power_of_4 > 3):
             print ('Error: you chose to run Monaco with max_power_of_4={}. We currently run Monaco with max_power_of_4 <= 3' .format (max_power_of_4))
             exit ()
-            
-        self.num_of_top_lvl_sqs = 3 if (self.city=='Monaco') else 1 # in Monaco we partition the city area into several horizontal almost-square rectangles before further iteratively partitioning it into squares
-       
+                  
         self.max_x = MAX_X[self.city]
         self.max_y = MAX_Y[self.city] # borders of the simulated area, in meters
-        self.x_edge_of_squarlet = self.max_x / self.num_of_top_lvl_sqs   
+        self.x_edge_of_squarlet = self.max_x / NUM_OF_TOP_LVL_SQS[self.city]   
         self.usrs              = []
         self.use_rect_PoA_cells   = True if (self.antloc_file_name=='') else False
 
         self.max_power_of_4    = max_power_of_4
-        self.num_of_cells      = 4**max_power_of_4 * self.num_of_top_lvl_sqs
+        self.num_of_cells      = 4**max_power_of_4 * NUM_OF_TOP_LVL_SQS[self.city]
         self.num_of_tiles      = self.num_of_cells
         self.sqrt_num_of_cells = int (math.sqrt (self.num_of_cells))
         self.list_of_PoAs = [] # List of the PoAs. Will be filled only if using antennas locations (and not synthetic rectangular cells).
@@ -268,7 +263,7 @@ class loc2poa_c (object):
             self.left_cell          = [[] for _ in range(self.num_of_cells)] # self.left_cell[i][j] will count the # of clients that left cell i at slot j
             self.joined_poa_sim_via = [[] for _ in range(self.num_of_PoAs)] # self.joined_poa_sim_via[i][j] will count the # of clients that left the sim at slot j, and whose last PoA in the sim was PoA i
             
-            if (self.num_of_top_lvl_sqs==1): # Finding neighbors is currently supported only when there's a single squarlet
+            if (NUM_OF_TOP_LVL_SQS[self.city]==1): # Finding neighbors is currently supported only when there's a single squarlet
                 self.calc_ngbr_rects ()
                 self.left_cell_to = []
                 for _ in range(self.num_of_cells):
@@ -491,14 +486,14 @@ class loc2poa_c (object):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
         """
-        if (self.num_of_top_lvl_sqs==1): # When there's only one squarlet, all the mapping is a single square mat
+        if (NUM_OF_TOP_LVL_SQS[self.city]==1): # When there's only one squarlet, all the mapping is a single square mat
             nrows = self.sqrt_len(vec)
             ncols = nrows
             if (len(vec) != len(self.cell2tile)): # The current mapping of cell2tile doesn't fit the number of rectangles in the given vec --> calculate a cell2tile mapping fitting the required len; currently generating heatmaps of other levels is supported only for lvl=0
                 self.calc_cell2tile (lvl=self.max_power_of_4 - int(math.log2(nrows)))
         else:
             nrows = int (2**self.max_power_of_4)
-            ncols = nrows * self.num_of_top_lvl_sqs
+            ncols = nrows * NUM_OF_TOP_LVL_SQS[self.city]
             if (nrows*ncols != len (self.cell2tile)):
                 print ('Error in calculation. max_p_of_4={}, nrows={}, ncols={}, len(cell2tile)={}' .format(self.max_power_of_4, nrows, ncols, len(self.cell2tile)))
                 exit ()
@@ -601,7 +596,7 @@ class loc2poa_c (object):
         cell2tile_in_squarlet = self.calc_cell2tile_in_squarlet(lvl=0)
         # print ('cell2tile_in_squarlet=\n{}' .format (cell2tile_in_squarlet))
         self.cell2tile = cell2tile_in_squarlet 
-        for sq_num in range (self.num_of_top_lvl_sqs-1): 
+        for sq_num in range (NUM_OF_TOP_LVL_SQS[self.city]-1): 
             self.cell2tile = np.concatenate ((self.cell2tile, (sq_num+1)*4**self.max_power_of_4+cell2tile_in_squarlet), axis=1)
 
         self.cell2tile = np.asarray(self.cell2tile).reshape(-1) 
@@ -618,12 +613,12 @@ class loc2poa_c (object):
         A squarlet is an almost-square area, which is iteratively paritioned into identically-sized squares.
         We assume that the squarlets are located horizontally, along the x axis.
         """
-        max_x = self.max_x // self.num_of_top_lvl_sqs 
+        max_x = self.max_x // NUM_OF_TOP_LVL_SQS[self.city] 
         max_y = self.max_y 
         
         # To calclate the tile, we calculate positions within each cell in the simulated area, and then call self.loc2cell_using_squarlets() to calculate the cell associated with this position. 
         max_power_of_4        = self.max_power_of_4 - lvl
-        n                     = int(math.sqrt ( (self.num_of_cells/self.num_of_top_lvl_sqs)/4**lvl))
+        n                     = int(math.sqrt ( (self.num_of_cells/NUM_OF_TOP_LVL_SQS[self.city])/4**lvl))
         cell2tile_in_squarlet = np.empty (n**2, dtype = 'uint8')
         rect             = 0
         for y in range (max_y // (2*n), max_y, max_y // n): 
@@ -726,7 +721,7 @@ class loc2poa_c (object):
                         #     print ('warning: len=0. t={}, usr.id={}, usr.cur_cell={}' .format (self.t, usr['id'], usr['cur cell']))
                         #     continue
                         self.left_cell [usr['cur cell']][-1]    += 1 # increase the cntr of the usrs that left from the cur cell of that usr at this cycle
-                        if (self.num_of_top_lvl_sqs==1): # Finding neighbors is currently supported only when there's a single squarlet
+                        if (NUM_OF_TOP_LVL_SQS[self.city]==1): # Finding neighbors is currently supported only when there's a single squarlet
                             self.left_cell_to [usr['cur cell']]['out'] += 1 # inc the cntr of the # of veh left this cell to outside the sim (counting along the whole sim, not per cycle)
                 self.usrs = list (filter (lambda usr : (usr['id'] not in ids_of_usrs_that_left_poa), self.usrs)) # Filter-out the users who left from the list of usrs
                 continue
@@ -797,7 +792,7 @@ class loc2poa_c (object):
                                     # self.joined_cell  [nxt_cell][-1] += 1 # inc the # of usrs who joined this cell
                                     self.left_cell    [cur_cell][-1] += 1 # inc the # of usrs who left this cell at this cycleW
                                 
-                                    if (self.num_of_top_lvl_sqs==1): # printing demography map when num_of_top_lvl_sqs>! is currently unsupported
+                                    if (NUM_OF_TOP_LVL_SQS[self.city]==1): # printing demography map when num_of_top_lvl_sqs>! is currently unsupported
                                         direction = self.direction_of_mv (cur_cell, nxt_cell)
                                         if (direction == -1): # error 
                                             printf (self.demography_file, '\\\ Error at t={}. usr_id={}. x={:.0f}, y={:.0f}, cur_cell={}, nxt_poa={}, nxt_cell={}\n' .format(self.t, usr_id, x, y, cur_cell, nxt_poa, nxt_cell))
@@ -828,7 +823,7 @@ class loc2poa_c (object):
         The directions to which a veh can move are 'n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se', and 'out'.
         'out' indicates that a car left the simulated area.
         """
-        if (self.num_of_top_lvl_sqs>1): # Finding neighbors is currently supported only when there's a single squarlet
+        if (NUM_OF_TOP_LVL_SQS[self.city]>1): # Finding neighbors is currently supported only when there's a single squarlet
             print ('Sorry. Currently demography diagram are supported only when num_of_top_lvl_sqs==1')
             return
         printf (self.demography_file, '\\\ Demography diagrams\n')

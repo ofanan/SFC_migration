@@ -1,11 +1,11 @@
 import sumolib
 from sumolib import checkBinary  
 import traci, sys, math, pickle
-import numpy as np
+import numpy as np, matplotlib.pyplot as plt
 from shapely.geometry import Polygon, box
 
 # My own format print functions 
-from printf import printf 
+from printf import printf, printmat 
 from secs2hour import secs2hour
 import loc2poa_c
 
@@ -336,37 +336,66 @@ class Traci_runner (object):
         Returns the polygon corresponding to the (i,j)-rectangle, when partitioning the simulated area into 4**self.max_power_of_4 * loc2poa_c.NUM_OF_TOP_LVL_SQS rectangles. 
         """
         
-        # Position in this order Top Left, Top Right, Bottom Right, Bottom Left, Top Left
-        # ROI = Polygon(rectangle)
+    def calc_tot_lane_len_in_all_cells (self, num_of_lvls=None):
 
-
-
-
-    def calc_tot_lane_len_in_all_cells (self, max_power_of_4=0):
-        
-        self.max_power_of_4 = max_power_of_4
+        txt_output_file_name = '{}_lanes_len.txt' .format (self.city)                
+        lanes_len_output_file = open ('../res/{}' .format(txt_output_file_name), 'a')
+        tot_len_of_lanes = []
         traci.start(self.LaneLengthSumoCmd())
-        net = sumolib.net.readNet(netFile[self.city])  # net file
+        self.net = sumolib.net.readNet(netFile[self.city])  # net file
 
-        num_of_rows_in_tile = 2**max_power_of_4
-        num_of_cols_in_tile = num_of_rows_in_tile * loc2poa_c.NUM_OF_TOP_LVL_SQS 
-        
-        tot_len_of_lanes_in_rect = np.empty ([num_of_rows_in_tile, num_of_cols_in_tile])
-        
-        for i in range (num_of_rows_in_tile):
-            for j in range (num_of_cols_in_tile):
-                self.tot_lane_len_in_rect[i][j] = self.tot_lane_len_in_rect (net, self.poly_of_i_j ()) 
-
-                
+        if (num_of_lvls==None):
+            num_of_lvls = 3 if self.city=='Monaco' else 4
+        else:
+            num_of_lvls=num_of_lvls
+        colors = {'Monaco' : ['black', 'blue', 'red', 'green'], 'Lux' : ['black', 'blue', 'red', 'green', 'cyan']}
+        plt.figure()
+    
+        for max_power_of_4 in range (num_of_lvls+1):
+            num_of_rows_in_tile = 2**max_power_of_4
+            num_of_cols_in_tile = num_of_rows_in_tile * loc2poa_c.NUM_OF_TOP_LVL_SQS[self.city]
+            rect_x_edge = loc2poa_c.X_EDGE[self.city] / num_of_cols_in_tile 
+            rect_y_edge = loc2poa_c.Y_EDGE[self.city] / num_of_rows_in_tile 
+    
+            printf (lanes_len_output_file, '// City={}\n' .format (self.city))                    
+            tot_len_of_lanes_in_rect = np.empty ([num_of_rows_in_tile, num_of_cols_in_tile])
             
+            for row in range (num_of_rows_in_tile):
+                lower_left_corner = loc2poa_c.SIMULATED_AREA_RECT[self.city][loc2poa_c.lower_left_idx] + row * rect_y_edge # the lower left of the next rect to consider is the low leftmost point in this row  
+                for col in range (num_of_cols_in_tile):
+                    # Coordinates (corners) of the current rectangle. To have a closed shape, we go from the lower left clock-wise, and end with the lower-left. 
+                    coord =    [lower_left_corner + rect_y_edge,  
+                                lower_left_corner + rect_x_edge + rect_y_edge,
+                                lower_left_corner + rect_x_edge,
+                                lower_left_corner,
+                                lower_left_corner + rect_y_edge]
+                    tot_len_of_lanes_in_rect[row][col] = self.tot_lane_len_in_rect (Polygon (coord))
+                    # plt.scatter ((lower_left_corner + rect_y_edge)[0], (lower_left_corner + rect_y_edge)[1], c=colors[self.city][max_power_of_4]) 
+                    # plt.scatter ((lower_left_corner + rect_x_edge + rect_y_edge)[0], (lower_left_corner + rect_x_edge + rect_y_edge)[1], c=colors[self.city][max_power_of_4] ) 
+                    # plt.scatter ((lower_left_corner + rect_x_edge + rect_y_edge)[0], (lower_left_corner + rect_x_edge)[1], c=colors[self.city][max_power_of_4]) 
+                    # plt.scatter ((lower_left_corner)[0], (lower_left_corner)[1], c=colors[self.city][max_power_of_4])
+                    # plt.scatter ([lower_left_corner + rect_y_edge][0], [lower_left_corner + rect_y_edge][1]) # lower_left_corner + rect_x_edge + rect_y_edge, lower_left_corner + rect_x_edge,lower_left_corner])
+                    
+                    xs, ys = zip(*coord) #create lists of x and y values
+
+                    plt.plot(xs,ys, c=colors[self.city][max_power_of_4]) 
+                    lower_left_corner += rect_x_edge
+            
+            num_of_cells = num_of_rows_in_tile * num_of_cols_in_tile
+            printf (lanes_len_output_file, '// num_of_cells={}. tot_lane_len_by_this_lvl={:.0f}. per_rect_lanes_len=\n' .format (num_of_cells, np.sum(tot_len_of_lanes_in_rect)))
+            printmat (lanes_len_output_file, tot_len_of_lanes_in_rect/1000, my_precision=2) # Print the total length in kms
+            tot_len_of_lanes.append ({'num_of_cells' : num_of_cells, 'tot_len_of_lanes_in_rect' : tot_len_of_lanes_in_rect})
+        
+        # with open ('../res/' + txt_output_file_name.split('.txt')[0] + '.pcl', 'wb') as pcl_output_file:
+        #     pickle.dump (tot_len_of_lanes, pcl_output_file)
+        plt.show ()
         traci.close()
 
-    def tot_lane_len_in_rect (self, net, ROI):
+    def tot_lane_len_in_rect (self, polygon):
         """
         Calculate the total lengths of lanes in it.
         Input: 
-        net - a net file
-        rectangle - 4 corners, given in order: Top Left, Top Right, Bottom Right, Bottom Left. 
+        polygon - a polygon representation of a rectangle. 
         The function assumes that a Traci simulation is already running 
         """
 
@@ -377,7 +406,7 @@ class Traci_runner (object):
             if edge[0] == ":":
                 # avoiding the junctions
                 continue
-            curEdge = net.getEdge(edge)
+            curEdge = self.net.getEdge(edge)
             # get bounding box of the edge
             curEdgeBBCoords = curEdge.getBoundingBox()
             # create the bounding box geometrically
@@ -385,22 +414,34 @@ class Traci_runner (object):
 
             # print ('len={:.1f}. num of lanes={}. area={:.1f}' .format (curEdge.getLength(), len(curEdge.getLanes()), curEdgeBBox.area))
             
-            if ROI.contains(curEdgeBBox): # The given polygon contains that edge, so add the edge's length, multiplied by the # of lanes
+            if polygon.contains(curEdgeBBox): # The given polygon contains that edge, so add the edge's length, multiplied by the # of lanes
 
                 totalLength += curEdge.getLength() * len(curEdge.getLanes())
             
-            # If ROI intersects with this edge then, as a rough estimation of the relevant length to add, divide the intersecting area by the total edge area
-            elif (ROI.intersects(curEdgeBBox)):   
+            # If polygon intersects with this edge then, as a rough estimation of the relevant length to add, divide the intersecting area by the total edge area
+            elif (polygon.intersects(curEdgeBBox)):   
                 
-                totalLength += curEdge.getLength() * (ROI.intersection(curEdgeBBox).area / curEdgeBBox.area) 
+                totalLength += curEdge.getLength() * len(curEdge.getLanes()) * (polygon.intersection(curEdgeBBox).area / curEdgeBBox.area) 
                 
         return totalLength
 
 if __name__ == '__main__':
     
-    city = 'Monaco'
+    # plt.figure()
+    # coord = [[1,1], [2,1], [2,2], [1,2], [0.5,1.5]]
+    # coord.append(coord[0]) #repeat the first point to create a 'closed loop'   
+    # xs, ys = zip(*coord) #create lists of x and y values
+    # plt.plot(xs,ys)
+    #
+    # coord = [[0,0], [0,1], [1,1], [1,0], [0,0]]
+    # xs, ys = zip(*coord) #create lists of x and y values
+    # plt.plot(xs,ys)
+    #
+    # plt.show ()
+    # exit () 
+    city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.tot_lane_len_in_rect (rectangle=loc2poa_c.SIMULATED_AREA_RECT[city])
+    my_Traci_runner.calc_tot_lane_len_in_all_cells (num_of_lvls=1)
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
     # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5

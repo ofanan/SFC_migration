@@ -48,6 +48,9 @@ class Res_file_parser (object):
     # Understand which city's data are these, based on the input file name 
     parse_city_from_input_file_name = lambda self, input_file_name : input_file_name.split ('_')[0]
 
+    # Parse the len of the time slot simulated, from the given string
+    find_time_slot_len = lambda self, string : int(string.split('secs')[0].split('_')[-1])
+
     def __init__ (self):
         """
         Initialize a Res_file_parser, used to parse result files, and generate plots. 
@@ -208,7 +211,7 @@ class Res_file_parser (object):
         self.city = self.parse_city_from_input_file_name(input_file_name)
         print ('city is ', self.city)
         self.input_file_name = input_file_name
-        self.time_slot_len   = int(self.input_file_name.split('secs')[0].split('_')[-1])
+        self.time_slot_len   = self.find_time_slot_len (self.input_file_name) 
         self.input_file      = open ("../res/" + input_file_name,  "r")
         lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines                = (line for line in lines if line)       # Discard blank lines
@@ -394,7 +397,7 @@ class Res_file_parser (object):
         
         min_t = 30541
         max_t = 30600
-        self.time_slot_len = int(self.input_file_name.split('secs')[0].split('_')[-1])
+        self.time_slot_len = self.find_time_slot_len(self.input_file_name)
         prob = 0.3
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
         self.output_file      = open (self.output_file_name, "w")
@@ -456,7 +459,7 @@ class Res_file_parser (object):
           and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
         
-        if (int(pcl_input_file_name.split('secs')[0].split('_')[-1])!=1):
+        if (self.find_time_slot_len(pcl_input_file_name)!=1):
             print ('Error: currently, plot_cost_vs_rsrcs runs only on slot_len=1 sec')
             return
         
@@ -501,7 +504,7 @@ class Res_file_parser (object):
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
         
         plt.tight_layout()
-        plt.savefig ('../res/cost_vs_rsrc_{}.pdf' .format (pcl_input_file_name), bbox_inches='tight')
+        plt.savefig ('../res/cost_vs_rsrc_{}.pdf' .format (pcl_input_file_name.split('.pcl')[0]), bbox_inches='tight')
 
     def calc_cost_vs_rsrcs (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3):
         """
@@ -585,13 +588,12 @@ if __name__ == '__main__':
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
         
     
-    my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+    # my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     
-    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res'])
-        # 'Lux_0820_0830_1secs_post_p0.3_opt_short.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf_short.res', 'Lux_0820_0830_1secs_post_p0.3_ffit_short.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
-    # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') #'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl') cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl
-    # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3_ourAlg_short.pcl')
-
+    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
+    pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
+    my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
+    
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
     # my_res_file_parser.plot_cost_comp_tikz () 
     

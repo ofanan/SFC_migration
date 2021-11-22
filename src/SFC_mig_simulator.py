@@ -1644,7 +1644,7 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
     """
     
     print ('Running run_cost_vs_rsrc')
-    seeds = [seed] if (seed!=None) else [70 + i for i in range (21)]
+    seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
 
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 

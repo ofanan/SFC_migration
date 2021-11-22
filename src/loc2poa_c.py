@@ -21,21 +21,33 @@ GLOBAL_MAX_X = {'Lux' : int(13622), 'Monaco' : 9976}
 GLOBAL_MAX_Y = {'Lux' : int(11457), 'Monaco' : 6356} # Monaco: min_x_pos_found= 0.0 max_x_pos_found= 9976.0 min_y_pos_found= 143.0 max_y_pos_found= 6356.0            
 
 # x,y indexes of the south-west corner of the simulated area
-LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'), 
-                    'Monaco' : np.array ([2350, 2050], dtype='int16')} 
+LOWER_LEFT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']//4,   GLOBAL_MAX_Y['Lux']//4], dtype='int16'),   # 3405, 2864.25
+                    'Monaco' : np.array ([2350, 2050], dtype='int16')}                  
 
 # x,y indexes of the north-east corner of the simulated area
-UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), 
+UPPER_RIGHT_CORNER = {'Lux'   : np.array ([GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']*3//4], dtype='int16'), # 10216.5, 8593  
                     'Monaco' : np.array ([5450, 3050], dtype='int16')} 
 
-# The 4 corners of the absolute (non-rotated) position of the simulated area
-SIMULATED_AREA_RECT = {'Lux': [ (GLOBAL_MAX_X['Lux']//4, GLOBAL_MAX_Y['Lux']*3//4),
-                       UPPER_RIGHT_CORNER['Lux'],
-                       (GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']//4),
-                       LOWER_LEFT_CORNER['Lux']],
-                       'Monaco' : [ (3541, 967), (5363, 3475), (6171, 2887), (4349, 380)]
-                       } 
+# The 4 corners of the absolute (non-rotated) position of the simulated area. 
+# The order is: upper-left, upper-rigth, lower-right, lower-left
+SIMULATED_AREA_RECT = {'Lux': [ (GLOBAL_MAX_X['Lux']//4, GLOBAL_MAX_Y['Lux']*3//4), # upper-left  corner
+                       UPPER_RIGHT_CORNER['Lux'],                                   # upper-right corner
+                       (GLOBAL_MAX_X['Lux']*3//4, GLOBAL_MAX_Y['Lux']//4),          # lower-right corner
+                       LOWER_LEFT_CORNER['Lux']],                                   # lower-left  corner
+                       'Monaco' : [ (3541, 967),  # upper-left  corner
+                                    (5363, 3475), # upper-right  corner
+                                    (6171, 2887), # lower-right  corner                                     
+                                    (4349, 380)   # lower-left  corner
+                                     ]}
 
+upper_left_idx, upper_right_idx, lower_right_idx, lower_left_idx = 0,1,2,3 # indices for upper-left, upper-right, lower-right, lower-left corners in the simulated area
+
+# vectors for the X, Y edges of the simulated area.
+X_EDGE = {'Lux'    : np.array(SIMULATED_AREA_RECT['Lux']   [lower_right_idx]) - np.array(SIMULATED_AREA_RECT['Lux']   [lower_left_idx]), 
+          'Monaco' : np.array(SIMULATED_AREA_RECT['Monaco'][lower_right_idx]) - np.array(SIMULATED_AREA_RECT['Monaco'][lower_left_idx])}
+Y_EDGE = {'Lux'    : np.array(SIMULATED_AREA_RECT['Lux']   [upper_left_idx])  - np.array(SIMULATED_AREA_RECT['Lux']   [lower_left_idx]), 
+          'Monaco' : np.array(SIMULATED_AREA_RECT['Monaco'][upper_left_idx])  - np.array(SIMULATED_AREA_RECT['Monaco'][lower_left_idx])}
+                                                                                     
 # maximal allowed x,y values for the simulated area (which is possibly only a part of the full city area)
 MIN_X = {'Lux' : 0, 'Monaco' : 0}
 MIN_Y = {'Lux' : 0, 'Monaco' : 0}
@@ -444,7 +456,8 @@ class loc2poa_c (object):
 
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
         
-        printf (open ('../res/demography.txt', 'a'), '{}_{}rects. avg vehs left per rect={:.2f}\n' .format(usrs_loc_file_name, self.num_of_cells, np.average(avg_vehs_left_per_rect)))
+        printf (open ('../res/demography.txt', 'a'), '{}_{}rects. avg vehs left per rect={:.2f}. max vehs left per rect={:.2f}\n' .format(usrs_loc_file_name, self.num_of_cells, np.average(avg_vehs_left_per_rect), np.max(avg_vehs_left_per_rect)))
+        return #$$$$$
          
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
@@ -511,15 +524,20 @@ class loc2poa_c (object):
             exit ()
         self.usrs_loc_file_name = usrs_loc_file_name
     
-    def plot_num_of_vehs_in_cell_heatmaps (self, usrs_loc_file_name=''):
+    def plot_num_of_vehs_in_cell_heatmaps (self, usrs_loc_file_name='', divide_by_lane_len=False):
         """
         Generate a Python heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
-        The heatmaps are plotted for all possible resolutions between 4 cells, and the maximal # of cells simulated.
+        The figure is saved in a file, whose name is based on 
+        the already-set self.usrs_loc_file_name (if exists), or on the argument usrs_locs_file_name (otherwise).
+        If the argument divide_by_lane_len is set, the number of vehicles in each cell is divided by the totatl lanes' length 
+        at that cell, prior to generating the heatmap.
         """        
         
         self.set_usrs_loc_file_name(usrs_loc_file_name)
 
         avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell()
+        # if (divide_by_lane_len):
+        
         plt.figure()       
         heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
         
@@ -1112,9 +1130,9 @@ class loc2poa_c (object):
 
 if __name__ == '__main__':
 
-    max_power_of_4 = 4
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    input_demography_file_name='Lux_demography_0730_0830_1secs_256.txt'
+    max_power_of_4 = 3
+    input_demography_file_name='Monaco_demography_0730_0830_1secs_{}.txt' .format (3 * 4**max_power_of_4)
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
     
     # my_loc2poa.gen_heatmap_series (['num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__48rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__12rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl'])

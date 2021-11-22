@@ -16,10 +16,8 @@ import sumolib
 # %%
 # sumoCmd
 sumoCmd = [r"C:\Program Files (x86)\Eclipse\Sumo\bin\sumo",  # sumo binary
-           "-c",
-           r"C:\PhD_Files\scenarios\LuSTScenario-master\scenario\due.actuated.sumocfg",  # sumo config file
-           "--start",
-           "--quit-on-end"]
+           "-c",r"C:\PhD_Files\scenarios\LuSTScenario-master\scenario\due.actuated.sumocfg",  # sumo config file
+           "--start","--quit-on-end"]
 traci.start(sumoCmd)
 
 net = sumolib.net.readNet(r"C:\PhD_Files\scenarios\LuSTScenario-master\scenario\lust.net.xml")  # net file

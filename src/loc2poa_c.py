@@ -187,22 +187,33 @@ class loc2poa_c (object):
 
         return my_heatmap
 
-    def gen_heatmap_series (self, pcl_input_file_names): 
+    def gen_heatmap_series (self, pcl_input_file_names, pcl_lanes_len_input_file_name=None): 
         """
         Generate a series of 4 heatmaps, using the given pcl input files for the data.
-        Input: pcl_input_file_names - a vector of input pickle file names.
+        Inputs: 
+        pcl_input_file_names - a vector of input pickle file names.
+        pcl_lanes_len_input_file_name - when given, should divide each value read from pcl_input_file_names by the respective value in pcl_lanes_len_input_file_name.
         """
         
         if (len (pcl_input_file_names) != 4):
             print ('Error: gen_heatmap_series needs 4 input pickle file names in pcl_input_file_names')
             return
         
+        # Read the lenghts of lanes in each rectangle from the relevant input .pcl file name, if exists.
+        if (pcl_lanes_len_input_file_name!=None):
+            tot_len_of_lanes = pd.read_pickle (r'../res/{}' .format(pcl_lanes_len_input_file_name))
+        
         fig, axn = plt.subplots(2, 2, sharex=False, sharey=False)
         
         cbar_ax = fig.add_axes([.91, .3, .03, .4])
                 
         for i, ax in enumerate(axn.flat):
-            df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
+            if (pcl_lanes_len_input_file_name==None): # no need to normalize by the lanes' lengths
+                df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
+            else:
+                vec = tot_len_of_lanes[i+1]
+                print (vec) 
+                df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
             my_heatmap = sns.heatmap(df, ax=ax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], 
                         cbar=i == 0, cbar_ax=None if i else cbar_ax)
             my_heatmap.set_aspect("equal") # Keep each rectangle as square 
@@ -529,8 +540,6 @@ class loc2poa_c (object):
         Generate a Python heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
         The figure is saved in a file, whose name is based on 
         the already-set self.usrs_loc_file_name (if exists), or on the argument usrs_locs_file_name (otherwise).
-        If the argument divide_by_lane_len is set, the number of vehicles in each cell is divided by the totatl lanes' length 
-        at that cell, prior to generating the heatmap.
         """        
         
         self.set_usrs_loc_file_name(usrs_loc_file_name)
@@ -940,7 +949,7 @@ class loc2poa_c (object):
             exit ()
         self.slot_len = int (loc_file_names[0].split('secs')[0].split('_')[-1])
         if (VERBOSE_CNT in self.verbose):
-            self.num_of_vehs_output_file_name = '../res/num_of_vehs_{}_{}_{}rects.txt' .format (loc_file_names[0], self.antloc_file_name, self.num_of_cells)
+            self.num_of_vehs_output_file_name = '../res/{}_num_of_vehs_{}rects.txt' .format (loc_file_names[0], self.num_of_cells)
             self.num_of_vehs_output_file = open ('../res/' + self.num_of_vehs_output_file_name, 'w+')
             
         if (VERBOSE_DEMOGRAPHY in self.verbose):
@@ -1133,9 +1142,12 @@ if __name__ == '__main__':
     max_power_of_4 = 3
     input_demography_file_name='Monaco_demography_0730_0830_1secs_{}.txt' .format (3 * 4**max_power_of_4)
     my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
+    # my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
     
-    # my_loc2poa.gen_heatmap_series (['num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__48rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__12rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl'])
+    my_loc2poa.gen_heatmap_series (pcl_input_file_names=['num_of_vehs_Lux_0730_0830_1secs.loc__4rects.txt.pcl', 'num_of_vehs_Lux_0730_0830_1secs.loc__16rects.txt.pcl', 'num_of_vehs_Lux_0730_0830_1secs.loc__64rects.txt.pcl', 'num_of_vehs_Lux_0730_0830_1secs.loc__256rects.txt.pcl'],
+                                   pcl_lanes_len_input_file_name='Lux_lanes_len.pcl')
+    # my_loc2poa.gen_heatmap_series (pcl_input_file_names=['num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__48rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__12rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl'],
+    #                                pcl_lanes_len_input_file_name='Monaco_lanes_len.pcl')
     # plt.savefig('../res/num_of_vehs_Monaco_0730_0830_1secs.loc_w_cbar.pdf', bbox_inches='tight')
     # my_loc2poa.parse_loc_files (['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0830_1secs.loc'])
     
@@ -1148,8 +1160,6 @@ if __name__ == '__main__':
     # my_loc2poa.parse_loc_files (['Lux_0730_0830_16secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
 
     # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_SPEED], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    # my_loc2poa.parse_loc_files (['Lux_0730_0830_16secs']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
-    # my_loc2poa.plot_num_of_vehs_in_cell_heatmaps()
     
     # Post-processing
     # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')

@@ -331,12 +331,11 @@ class Traci_runner (object):
             printf (PoAs_loc_file, '{},{},{}\n' .format (poa_id, poa['x'], poa['y']))
             poa_id += 1
 
-    def Poly_of_rect_i_j (self, i, j):
+    def calc_tot_lane_len_in_all_rects (self, num_of_lvls=None):
         """
-        Returns the polygon corresponding to the (i,j)-rectangle, when partitioning the simulated area into 4**self.max_power_of_4 * loc2poa_c.NUM_OF_TOP_LVL_SQS rectangles. 
+        Calculates the overall length of all lanes within all the rectangles in the simulated area.
+        Prints the results to output .txt and .pcl file, and possibly plots the rectangles, and saves the plots.  
         """
-        
-    def calc_tot_lane_len_in_all_cells (self, num_of_lvls=None):
 
         txt_output_file_name = '{}_lanes_len.txt' .format (self.city)                
         lanes_len_output_file = open ('../res/{}' .format(txt_output_file_name), 'a')
@@ -382,12 +381,12 @@ class Traci_runner (object):
                     lower_left_corner += rect_x_edge
             
             num_of_cells = num_of_rows_in_tile * num_of_cols_in_tile
-            printf (lanes_len_output_file, '// num_of_cells={}. tot_lane_len_by_this_lvl={:.0f}. per_rect_lanes_len=\n' .format (num_of_cells, np.sum(tot_len_of_lanes_in_rect)))
-            printmat (lanes_len_output_file, tot_len_of_lanes_in_rect/1000, my_precision=2) # Print the total length in kms
+            printf (lanes_len_output_file, '// num_of_cells={}. tot_lane_len_by_this_lvl={:.0f}. per_rect_lanes_len=\n' .format (num_of_cells, np.sum(tot_len_of_lanes_in_rect)/1000))
+            printmat (lanes_len_output_file, tot_len_of_lanes_in_rect, my_precision=2) # Print the total length in kms
             tot_len_of_lanes.append ({'num_of_cells' : num_of_cells, 'tot_len_of_lanes_in_rect' : tot_len_of_lanes_in_rect})
         
-        # with open ('../res/' + txt_output_file_name.split('.txt')[0] + '.pcl', 'wb') as pcl_output_file:
-        #     pickle.dump (tot_len_of_lanes, pcl_output_file)
+        with open ('../res/' + txt_output_file_name.split('.txt')[0] + '.pcl', 'wb') as pcl_output_file:
+            pickle.dump (tot_len_of_lanes, pcl_output_file)
         plt.show ()
         traci.close()
 
@@ -396,7 +395,8 @@ class Traci_runner (object):
         Calculate the total lengths of lanes in it.
         Input: 
         polygon - a polygon representation of a rectangle. 
-        The function assumes that a Traci simulation is already running 
+        The function assumes that a Traci simulation is already running
+        Output - the total lengths of lanes within this polygon [km]
         """
 
         totalLength = 0 # total length of lanes under the region of interest
@@ -417,31 +417,18 @@ class Traci_runner (object):
             if polygon.contains(curEdgeBBox): # The given polygon contains that edge, so add the edge's length, multiplied by the # of lanes
 
                 totalLength += curEdge.getLength() * len(curEdge.getLanes())
-            
-            # If polygon intersects with this edge then, as a rough estimation of the relevant length to add, divide the intersecting area by the total edge area
-            elif (polygon.intersects(curEdgeBBox)):   
+                        
+            elif (polygon.intersects(curEdgeBBox)): # If polygon intersects with this edge then, as a rough estimation of the relevant length to add, divide the intersecting area by the total edge area   
                 
                 totalLength += curEdge.getLength() * len(curEdge.getLanes()) * (polygon.intersection(curEdgeBBox).area / curEdgeBBox.area) 
                 
-        return totalLength
+        return totalLength/1000
 
 if __name__ == '__main__':
     
-    # plt.figure()
-    # coord = [[1,1], [2,1], [2,2], [1,2], [0.5,1.5]]
-    # coord.append(coord[0]) #repeat the first point to create a 'closed loop'   
-    # xs, ys = zip(*coord) #create lists of x and y values
-    # plt.plot(xs,ys)
-    #
-    # coord = [[0,0], [0,1], [1,1], [1,0], [0,0]]
-    # xs, ys = zip(*coord) #create lists of x and y values
-    # plt.plot(xs,ys)
-    #
-    # plt.show ()
-    # exit () 
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.calc_tot_lane_len_in_all_cells (num_of_lvls=1)
+    my_Traci_runner.calc_tot_lane_len_in_all_rects ()
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')
     # my_Traci_runner.simulate (warmup_period=(3600*7.5), sim_length = 3600, len_of_time_slot_in_sec = 60, verbose=[VERBOSE_LOC, VERBOSE_SPEED]) #warmup_period = 3600*7.5

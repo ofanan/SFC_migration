@@ -30,6 +30,9 @@ LINE_WIDTH       = 3
 FONT_SIZE        = 20
 LEGEND_FONT_SIZE = 17
 
+# Parse the len of the time slot simulated, from the given string
+find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
+
 class Res_file_parser (object):
     """
     Parse "res" (result) files, and generate plots from them.
@@ -47,9 +50,6 @@ class Res_file_parser (object):
 
     # Understand which city's data are these, based on the input file name 
     parse_city_from_input_file_name = lambda self, input_file_name : input_file_name.split ('_')[0]
-
-    # Parse the len of the time slot simulated, from the given string
-    find_time_slot_len = lambda self, string : int(string.split('secs')[0].split('_')[-1])
 
     def __init__ (self):
         """
@@ -211,7 +211,7 @@ class Res_file_parser (object):
         self.city = self.parse_city_from_input_file_name(input_file_name)
         print ('city is ', self.city)
         self.input_file_name = input_file_name
-        self.time_slot_len   = self.find_time_slot_len (self.input_file_name) 
+        self.time_slot_len   = find_time_slot_len (self.input_file_name) 
         self.input_file      = open ("../res/" + input_file_name,  "r")
         lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines                = (line for line in lines if line)       # Discard blank lines
@@ -397,7 +397,7 @@ class Res_file_parser (object):
         
         min_t = 30541
         max_t = 30600
-        self.time_slot_len = self.find_time_slot_len(self.input_file_name)
+        self.time_slot_len = find_time_slot_len(self.input_file_name)
         prob = 0.3
         self.output_file_name = '../res/{}.dat' .format (self.input_file_name, prob)
         self.output_file      = open (self.output_file_name, "w")
@@ -459,7 +459,7 @@ class Res_file_parser (object):
           and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
         
-        if (self.find_time_slot_len(pcl_input_file_name)!=1):
+        if (find_time_slot_len(pcl_input_file_name)!=1):
             print ('Error: currently, plot_cost_vs_rsrcs runs only on slot_len=1 sec')
             return
         
@@ -591,7 +591,8 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
-    pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
+    pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
+    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
     
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   

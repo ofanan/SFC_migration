@@ -2,7 +2,7 @@ import math, pickle
 import numpy as np, pandas as pd, seaborn as sns, matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-from printf import printf, printmat 
+from printf import printf, printmat, invert_mat_bottom_up
 
 # from matplotlib.co//lors import LogNorm, Normalize
 # from matplotlib.ticker import MaxNLocator
@@ -162,6 +162,8 @@ class loc2poa_c (object):
 
     edges_of_smallest_rect = lambda self : [(self.max_x/NUM_OF_TOP_LVL_SQS[self.city]) / (2**self.max_power_of_4), self.max_y / (2**self.max_power_of_4)]
 
+    # Parse the number of rectangles, given some settings.
+    find_num_of_rects = lambda self, string : int(string.split('rects')[0].split('_')[-1])
     
     def gen_heatmap (self, df, vmax=None, pcl_input_file_name=None): 
         """
@@ -187,47 +189,47 @@ class loc2poa_c (object):
 
         return my_heatmap
 
-    def gen_heatmap_series (self, pcl_input_file_names, pcl_lanes_len_input_file_name=None): 
-        """
-        Generate a series of 4 heatmaps, using the given pcl input files for the data.
-        Inputs: 
-        pcl_input_file_names - a vector of input pickle file names.
-        pcl_lanes_len_input_file_name - when given, should divide each value read from pcl_input_file_names by the respective value in pcl_lanes_len_input_file_name.
-        """
-        
-        if (len (pcl_input_file_names) != 4):
-            print ('Error: gen_heatmap_series needs 4 input pickle file names in pcl_input_file_names')
-            return
-        
-        # Read the lenghts of lanes in each rectangle from the relevant input .pcl file name, if exists.
-        if (pcl_lanes_len_input_file_name!=None):
-            tot_len_of_lanes = pd.read_pickle (r'../res/{}' .format(pcl_lanes_len_input_file_name))
-        
-        fig, axn = plt.subplots(2, 2, sharex=False, sharey=False)
-        
-        cbar_ax = fig.add_axes([.91, .3, .03, .4])
-                
-        for i, ax in enumerate(axn.flat):
-            if (pcl_lanes_len_input_file_name==None): # no need to normalize by the lanes' lengths
-                df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
-            else:
-                vec = tot_len_of_lanes[i+1]
-                print (vec) 
-                df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
-            my_heatmap = sns.heatmap(df, ax=ax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], 
-                        cbar=i == 0, cbar_ax=None if i else cbar_ax)
-            my_heatmap.set_aspect("equal") # Keep each rectangle as square 
-        
-        fig.tight_layout(rect=[0, 0, .9, 1])        
-
-        # plt.rcParams.update({'font.size': HEATMAP_FONT_SIZE})
-        # my_heatmap = sns.heatmap(df, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, heatmap=False) # vmax=df.values.max()
-        # my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
-        #
-        # my_heatmap.set_aspect("equal") # Keep each rectangle 
-        # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
-        #
-        # return my_heatmap
+    # def gen_heatmap_series (self, pcl_input_file_names, pcl_lanes_len_input_file_name=None): 
+    #     """
+    #     Generate a series of 4 heatmaps, using the given pcl input files for the data.
+    #     Inputs: 
+    #     pcl_input_file_names - a vector of input pickle file names.
+    #     pcl_lanes_len_input_file_name - when given, should divide each value read from pcl_input_file_names by the respective value in pcl_lanes_len_input_file_name.
+    #     """
+    #
+    #     if (len (pcl_input_file_names) != 4):
+    #         print ('Error: gen_heatmap_series needs 4 input pickle file names in pcl_input_file_names')
+    #         return
+    #
+    #     # Read the lenghts of lanes in each rectangle from the relevant input .pcl file name, if exists.
+    #     if (pcl_lanes_len_input_file_name!=None):
+    #         tot_len_of_lanes = pd.read_pickle (r'../res/{}' .format(pcl_lanes_len_input_file_name))
+    #
+    #     fig, axn = plt.subplots(2, 2, sharex=False, sharey=False)
+    #
+    #     cbar_ax = fig.add_axes([.91, .3, .03, .4])
+    #
+    #     for i, ax in enumerate(axn.flat):
+    #         if (pcl_lanes_len_input_file_name==None): # no need to normalize by the lanes' lengths
+    #             df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
+    #         else:
+    #             vec = tot_len_of_lanes[i+1]
+    #             print (vec) 
+    #             df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
+    #         my_heatmap = sns.heatmap(df, ax=ax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], 
+    #                     cbar=i == 0, cbar_ax=None if i else cbar_ax)
+    #         my_heatmap.set_aspect("equal") # Keep each rectangle as square 
+    #
+    #     fig.tight_layout(rect=[0, 0, .9, 1])        
+    #
+    #     # plt.rcParams.update({'font.size': HEATMAP_FONT_SIZE})
+    #     # my_heatmap = sns.heatmap(df, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, heatmap=False) # vmax=df.values.max()
+    #     # my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
+    #     #
+    #     # my_heatmap.set_aspect("equal") # Keep each rectangle 
+    #     # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+    #     #
+    #     # return my_heatmap
 
     def __init__(self, max_power_of_4=3, verbose = VERBOSE_POA, antloc_file_name='', city=''):
         """
@@ -472,8 +474,7 @@ class loc2poa_c (object):
          
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        self.gen_heatmap (df=pd.DataFrame (heatmap_vals)) #$$$
-        # self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city]) #$$$
+        self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city]) #$$$
         usrs_loc_file_name = usrs_loc_file_name if (usrs_loc_file_name!=None) else self.usrs_loc_file_name 
         plt.savefig('../res/heatmap_vehs_left_rect{}_{}_tmp.pdf' .format (self.antloc_file_name, usrs_loc_file_name.split('.txt')[0]), bbox_inches='tight')
 
@@ -496,16 +497,6 @@ class loc2poa_c (object):
         plt.savefig('../res/heatmap_vehs_left_sim_via_{}.jpg' .format (file_name_suffix))
         
         
-    def invert_mat_bottom_up (self, mat):
-        """
-        Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
-        Hence, need to swap the matrix upside-down
-        """ 
-        inverted_mat = np.empty (mat.shape)
-        for i in range (mat.shape[0]):
-            inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
-        return inverted_mat        
-
     def vec2heatmap (self, vec):
         """
         Order the values in the given vec so that they appear as in the geographical map of cells.
@@ -525,7 +516,7 @@ class loc2poa_c (object):
         
         # Unfortunately, we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
         # Hence, need to swap the matrix upside-down
-        return self.invert_mat_bottom_up(heatmap_val)
+        return invert_mat_bottom_up(heatmap_val)
 
     def set_usrs_loc_file_name (self, usrs_loc_file_name=''):
         if (hasattr (self, 'usrs_loc_file_name')): # The field self.usrs_loc_file_name is already defined
@@ -535,35 +526,42 @@ class loc2poa_c (object):
             exit ()
         self.usrs_loc_file_name = usrs_loc_file_name
     
-    def plot_num_of_vehs_in_cell_heatmaps (self, usrs_loc_file_name='', divide_by_lane_len=False):
+    def calc_num_of_vehs_in_cell_heatmap (self):
+
+        heatmap_vals = self.vec2heatmap(self.avg_num_of_vehs_per_cell())
+        # Dump the values of the heatmap into a .pcl file
+        with open ('../res/' + self.num_of_vehs_output_file_name.split('.res')[0] + '.pcl', 'wb') as pcl_output_file:
+            pickle.dump (heatmap_vals, pcl_output_file)
+        printmat (self.num_of_vehs_output_file, heatmap_vals, my_precision=0)
+        printf   (self.num_of_vehs_output_file, 'sum of vals in the heatmap={:.0f}, max_val in the heatmap={:.0f}' .format (np.sum(heatmap_vals), np.max(heatmap_vals)))
+            
+    
+    def plot_num_of_vehs_in_cell_heatmap (self, pcl_num_vehs_input_file_names, pcl_lanes_len_input_file_name=None): 
         """
         Generate a Python heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
         The figure is saved in a file, whose name is based on 
         the already-set self.usrs_loc_file_name (if exists), or on the argument usrs_locs_file_name (otherwise).
         """        
         
-        self.set_usrs_loc_file_name(usrs_loc_file_name)
-
-        avg_num_of_vehs_per_cell = self.avg_num_of_vehs_per_cell()
-        # if (divide_by_lane_len):
+        # Read the lenghts of lanes in each rectangle from the relevant input .pcl file name, if exists.
+        if (pcl_lanes_len_input_file_name!=None):
+            if (pcl_lanes_len_input_file_name.split ('_')[0] != self.city):
+                print ('pcl_lanes_len_input_file_name={}, self.city={}' .format(pcl_lanes_len_input_file_name, self.city))
+            tot_len_of_lanes = pd.read_pickle (r'../res/{}' .format(pcl_lanes_len_input_file_name))
         
         plt.figure()       
-        heatmap_vals = self.vec2heatmap (avg_num_of_vehs_per_cell)
         
-        # Dump the values of the heatmap into a .pcl file
-        with open ('../res/' + self.num_of_vehs_output_file_name.split('.res')[0] + '.pcl', 'wb') as pcl_output_file:
-            pickle.dump (heatmap_vals, pcl_output_file)
-        
-        return #$$$ Currently we do not generate the heatmaps here: one may generate all the heatmaps together later, using the .pcl file.
         # Generate a heatmap, and save it into a file
-        self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_NUM_VEHS_VMAX[self.city])
-        plt.savefig('../res/num_vehs{}_{}_{}rects.pdf' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells)), bbox_inches='tight') 
-        # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
+        num_of_rects = self.find_num_of_rects (pcl_num_vehs_input_file_names)
+        if (pcl_lanes_len_input_file_name==None): # No lanes len input file was given --> no need to normalize the hea
+            self.gen_heatmap (df=pd.read_pickle(r'../res/{}' .format (pcl_num_vehs_input_file_names)), vmax=HEATMAP_NUM_VEHS_VMAX[self.city])
+            plt.savefig('../res/{}_num_vehs_{}rects.pdf' .format (self.city, num_of_rects), bbox_inches='tight') 
+        else: 
+            list_of_entry = list (filter (lambda item : item['num_of_rects']==num_of_rects, tot_len_of_lanes)) 
+            df = np.divide (pd.read_pickle(r'../res/{}' .format (pcl_num_vehs_input_file_names)), np.array(list_of_entry[0]['tot_len_of_lanes_in_rect']))
+            self.gen_heatmap (df=df)
+            plt.savefig('../res/{}_lin_density_{}rects.pdf' .format (self.city, num_of_rects), bbox_inches='tight') 
          
-        printmat (self.num_of_vehs_output_file, heatmap_vals, my_precision=0)
-        printf   (self.num_of_vehs_output_file, 'sum of vals in the heatmap={:.0f}, max_val in the heatmap={:.0f}' .format (np.sum(heatmap_vals), np.max(heatmap_vals)))
-        # plt.title ('avg num of vehs per cell')
-
     def aggregate_heatmap_cells (self, vec):
         """
         aggregate the values within a vector in a way that allows using a heatmap with x0.25 the number of rectangles
@@ -900,7 +898,7 @@ class loc2poa_c (object):
             printf(self.poa_file, "\n")   
         if (VERBOSE_CNT in self.verbose):
             # self.plot_num_of_vehs_per_poa_graph ()
-            self.plot_num_of_vehs_in_cell_heatmaps()
+            self.plot_num_of_vehs_in_cell_heatmap()
             # self.plot_num_of_vehs_per_PoA()
         if (VERBOSE_DEMOGRAPHY in self.verbose):
             self.print_demography()
@@ -1140,12 +1138,12 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     max_power_of_4 = 3
-    input_demography_file_name='Monaco_demography_0730_0830_1secs_{}.txt' .format (3 * 4**max_power_of_4)
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    # input_demography_file_name='Monaco_demography_0730_0830_1secs_{}.txt' .format (3 * 4**max_power_of_4)
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
-    
-    my_loc2poa.gen_heatmap_series (pcl_input_file_names=['num_of_vehs_Lux_0730_0830_1secs.loc__4rects.txt.pcl', 'num_of_vehs_Lux_0730_0830_1secs.loc__16rects.txt.pcl', 'num_of_vehs_Lux_0730_0830_1secs.loc__64rects.txt.pcl', 'num_of_vehs_Lux_0730_0830_1secs.loc__256rects.txt.pcl'],
-                                   pcl_lanes_len_input_file_name='Lux_lanes_len.pcl')
+
+    my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_names='num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 
+                                                pcl_lanes_len_input_file_name='Monaco_lanes_len.pcl')
     # my_loc2poa.gen_heatmap_series (pcl_input_file_names=['num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__48rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__12rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl'],
     #                                pcl_lanes_len_input_file_name='Monaco_lanes_len.pcl')
     # plt.savefig('../res/num_of_vehs_Monaco_0730_0830_1secs.loc_w_cbar.pdf', bbox_inches='tight')

@@ -31,3 +31,13 @@ def printmat (output_file, mat, my_precision=0):
         printf (output_file, '\n')
     printf (output_file, '\n')
 
+def invert_mat_bottom_up (mat):
+    """
+    Swap the matrix upside-down. 
+    This is sometimes usefuly, because , we write matrix starting from the smallest value at the top, while plotting maps letting the "y" (north) direction "begin" at bottom, and increase towards the top.
+    """ 
+    inverted_mat = np.empty (mat.shape)
+    for i in range (mat.shape[0]):
+        inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
+    return inverted_mat        
+

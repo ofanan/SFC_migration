@@ -5,7 +5,7 @@ import numpy as np, matplotlib.pyplot as plt
 from shapely.geometry import Polygon, box
 
 # My own format print functions 
-from printf import printf, printmat 
+from printf import printf, printmat, invert_mat_bottom_up
 from secs2hour import secs2hour
 import loc2poa_c
 
@@ -380,10 +380,12 @@ class Traci_runner (object):
                     plt.plot(xs,ys, c=colors[self.city][max_power_of_4]) 
                     lower_left_corner += rect_x_edge
             
-            num_of_cells = num_of_rows_in_tile * num_of_cols_in_tile
-            printf (lanes_len_output_file, '// num_of_cells={}. tot_lane_len_by_this_lvl={:.0f}. per_rect_lanes_len=\n' .format (num_of_cells, np.sum(tot_len_of_lanes_in_rect)/1000))
+            tot_len_of_lanes_in_rect = invert_mat_bottom_up (tot_len_of_lanes_in_rect)
+            num_of_rects = num_of_rows_in_tile * num_of_cols_in_tile
+            printf (lanes_len_output_file, '// num_of_rects={}. per_rect_lanes_len=\n' .format (num_of_rects))
             printmat (lanes_len_output_file, tot_len_of_lanes_in_rect, my_precision=2) # Print the total length in kms
-            tot_len_of_lanes.append ({'num_of_cells' : num_of_cells, 'tot_len_of_lanes_in_rect' : tot_len_of_lanes_in_rect})
+            tot_len_of_lanes.append ({'num_of_rects' : num_of_rects, 'tot_len_of_lanes_in_rect' : tot_len_of_lanes_in_rect})
+            # tot_len_of_lanes.append ({'{}' .format (num_of_rects) : tot_len_of_lanes_in_rect})
         
         with open ('../res/' + txt_output_file_name.split('.txt')[0] + '.pcl', 'wb') as pcl_output_file:
             pickle.dump (tot_len_of_lanes, pcl_output_file)
@@ -426,7 +428,7 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    city = 'Lux'
+    city = 'Monaco'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
     my_Traci_runner.calc_tot_lane_len_in_all_rects ()
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()

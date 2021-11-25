@@ -1678,7 +1678,7 @@ def main ():
     poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' # 'Monaco_0829_0830_20secs_Telecom 
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-    my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, mode='ourAlgC')
+    my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, mode='ffitC')
     # seed = None
     # if (len (sys.argv)>1):
     #     seed=int(sys.argv[1])   

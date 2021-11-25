@@ -1,4 +1,5 @@
 from __future__ import print_function
+import matplotlib.pyplot as plt
 import numpy as np
 
 # This file contains some accessory functions for format-printing.
@@ -41,3 +42,9 @@ def invert_mat_bottom_up (mat):
         inverted_mat[i][:] = mat[mat.shape[0]-1-i][:]
     return inverted_mat        
 
+def printFigToPdf (output_file_name):
+    """
+    Print the current fig to a PDF file
+    """
+    
+    plt.savefig ('../res/{}.pdf' .format (output_file_name), bbox_inches='tight')

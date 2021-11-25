@@ -13,14 +13,16 @@ from printf         import printf ## My own format print functions
 
 # Levels of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
-VERBOSE_RES           = 1 # Write to a file the total cost and rsrc aug. upon every event
-VERBOSE_LOG           = 2 # Write to a ".log" file
-VERBOSE_ADD_LOG       = 3 # Write to a detailed ".log" file
-VERBOSE_ADD2_LOG      = 4
-VERBOSE_MOB           = 5 # Write data about the mobility of usrs, and about the num of migrated chains per slot
-VERBOSE_CALC_RSRC_AUG = 7 # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug. Hence, this way of calculation is good for opt only, as opt searches each time fora solw from sratch.  
-VERBOSE_MOVED_RES     = 8 # calculate the cost incurred by the usrs who moved only 
-VERBOSE_CRITICAL_RES  = 9 # calculate the cost incurred by the usrs who moved only 
+VERBOSE_RES           = 1  # Write to a file the total cost and rsrc aug. upon every event
+VERBOSE_LOG           = 2  # Write to a ".log" file
+VERBOSE_ADD_LOG       = 3  # Write to a detailed ".log" file
+VERBOSE_ADD2_LOG      = 4  # Write ever more details to the detailed ".log" file
+VERBOSE_MOB           = 5  # Write data about the mobility of usrs, and about the num of migrated chains per slot
+VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug. Hence, this way of calculation is good for opt only, as opt searches each time fora solw from sratch.  
+VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
+VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
+VERBOSE_MIG_ONLY_CRIT = 10 # Disallow the mig' of non-critical chains
+ 
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -111,7 +113,7 @@ class SFC_mig_simulator (object):
     
     # Generate a string for the res file name. The sting will express the settings of this particular run, plus a user-requested string, 'mid_str', in which the caller may detail a concrete setting of 
     # this run (e.g. 'critical_usrs_only'). 
-    gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}_{}_sd{}.res' .format (self.poa_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0], self.mode, self.seed)
+    gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}_{}{}_sd{}.res' .format (self.poa_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0], self.mode, self.critical_chains_only_string(), self.seed)
 
     # Returns a vector with the cpu capacities in each lvl of the tree, given the cpu cap at the leaf lvl
     calc_cpu_capacities = lambda self, cpu_cap_at_leaf : [2**(lvl)*cpu_cap_at_leaf for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cap else np.array ([cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
@@ -138,9 +140,12 @@ class SFC_mig_simulator (object):
     calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
 
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
-    settings_str = lambda self : 't{}_{}_cpu{}_p{:.1f}_sd{}_stts{}' .format(
-                              self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.seed, self.stts)
+    settings_str = lambda self : 't{}_{}{}_cpu{}_p{:.1f}_sd{}_stts{}' .format(
+                              self.t, self.mode, self.critical_chains_only_string(), self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.seed, self.stts)
 
+    # Generate an identification, clarifying that this sim allows to migrate critical chains only. 
+    critical_chains_only_string = lambda self : 'C' if VERBOSE_MIG_ONLY_CRIT in self.verbose else ''
+    
     # Print a solution for the problem to the output res file when the solver is an LP solver  
     print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
             self.settings_str(), 
@@ -164,7 +169,7 @@ class SFC_mig_simulator (object):
 
 
     # Generate output file for RT_prob_sim, namely, simulations where we vary the prob' of a usr to be a RT usr, and measure the min' required CPU to find a feasible sol.
-    gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}_3.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
+    gen_RT_prob_sim_output_file = lambda self, poa2cell_file_name, poa_file_name, mode : open ('../res/RT_prob_sim_{}_{}_{}.res' .format (poa2cell_file_name, poa_file_name, mode), 'a')    
 
     # Return the ID of the parent of the server given as input
     prnt_of_srvr = lambda self, s : self.G.nodes[s]['prnt']
@@ -807,7 +812,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode == 'ourAlg'):   
-            self.max_R = 1.05 
+            self.max_R = 1.2 
         else:
             self.max_R = 1.8
 
@@ -1094,6 +1099,8 @@ class SFC_mig_simulator (object):
         """
         for usr in self.cpvnf_sort (self.unplaced_usrs()):
             if (self.cpvnf_place_usr (usr)!= sccs): 
+                if (VERBOSE_MIG_ONLY_CRIT in self.verbose): # Allowed to mig' only critical chains
+                    return fail
                 self.rst_sol()
                 self.reshuffled = True
                 return self.cpvnf_reshuffle()
@@ -1131,6 +1138,8 @@ class SFC_mig_simulator (object):
 
         for usr in self.first_fit_sort (self.unplaced_usrs()): 
             if (self.first_fit_place_usr (usr)!= sccs): # failed to find a feasible sol' when considering only the critical usrs
+                if (VERBOSE_MIG_ONLY_CRIT in self.verbose): # Allowed to mig' only critical chains
+                    return fail
                 self.rst_sol()
                 self.reshuffled = True
                 return self.first_fit_reshuffle() # try again, by reshuffling the whole usrs' placements
@@ -1171,6 +1180,8 @@ class SFC_mig_simulator (object):
         for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1 and usr.nxt_s==-1, unplaced_usrs)), 
                            key = lambda usr : (self.G.nodes[usr.cur_s]['a'], usr.rand_id)): 
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
+                if (VERBOSE_MIG_ONLY_CRIT in self.verbose): # Allowed to mig' only critical chains
+                    return fail
                 self.rst_sol()
                 self.reshuffled = True
                 return self.worst_fit_reshuffle()
@@ -1224,6 +1235,9 @@ class SFC_mig_simulator (object):
         if (self.stts == sccs):
             return sccs
         
+        if (VERBOSE_MIG_ONLY_CRIT in self.verbose): # Allowed to mig' only critical chains. So, if we haven't succeeded by now - return fail.
+            return fail
+
         # Now we know that the first run fail. For all the benchmarks, it means that they also made a reshuffle. 
         # However, bottom-up haven't tried a reshuffle yet. So, we give it a try now.
         if (self.mode in ['ourAlg']):
@@ -1591,9 +1605,13 @@ class SFC_mig_simulator (object):
 
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlg')    
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
-        min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
-                                   'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
-        for seed in [40]: #[40 + delta_sd for delta_sd in range (1) ]:
+        if (VERBOSE_MIG_ONLY_CRIT in self.verbose):
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
+                                       'Monaco' : {0.0 : 936, 0.1 : 936, 0.2 : 972, 0.3 : 961, 0.4 : 1032, 0.5 : 1114, 0.6 : 1317, 0.7 : 1556, 0.8 : 1736, 0.9 : 2000, 1.0 : 2200}} 
+        else:
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
+                                       'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
+        for seed in [40 + delta_sd for delta_sd in range (21) ]:
             for prob_of_target_delay in probabilities:
                 self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
@@ -1666,23 +1684,18 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
                 if (cpu_cap_at_leaf >= MIN_REQ_CPU[my_simulator.city][mode]):
                     my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)   
 
-# my_simulator    = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-# my_simulator.run_prob_of_RT_sim_opt  (0.9)
-# my_simulator.run_prob_of_RT_sim_algs (0.0)
-# my_simulator       = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-# my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=930)
-# for seed in [40 + i for i in range (1) ]:
-# i = 0
-# my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=int(89*(1+0.1*i)))
-
 def main ():
 
-    seed = None
-    if (len (sys.argv)>1):
-        seed=int(sys.argv[1])   
     poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
-    run_cost_vs_rsrc(poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, seed=seed)
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_MIG_ONLY_CRIT], poa2cell_file_name=poa2cell_file_name)
+    my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name)
+    # seed = None
+    # if (len (sys.argv)>1):
+    #     seed=int(sys.argv[1])   
+    # poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
+    # poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
+    # run_cost_vs_rsrc(poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, seed=seed)
 
     # print ('Running cost_vs_rsrc')
 

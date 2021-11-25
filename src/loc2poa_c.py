@@ -2,7 +2,7 @@ import math, pickle
 import numpy as np, pandas as pd, seaborn as sns, matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-from printf import printf, printmat, invert_mat_bottom_up
+from printf import printf, printmat, invert_mat_bottom_up, printFigToPdf
 
 # from matplotlib.co//lors import LogNorm, Normalize
 # from matplotlib.ticker import MaxNLocator
@@ -590,7 +590,7 @@ class loc2poa_c (object):
         for lvl in range (0, self.max_power_of_4):
             self.calc_cell2tile (lvl) # call a function that translates the number as "tile" to the ID of the covering PoA.
             plt.figure()       
-            my_heatmap = self.gen_heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_PoA)))
+            _ = self.gen_heatmap (pd.DataFrame (self.vec2heatmap (avg_num_of_vehs_per_PoA)))
             # my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
             # plt.title ('avg num of vehs per PoA')
             plt.savefig('../res/num_vehs_per_PoA_{}_{}_{}cells.jpg' .format (self.antloc_file_name, self.usrs_loc_file_name, int(self.num_of_cells/(4**lvl))))
@@ -1066,17 +1066,17 @@ class loc2poa_c (object):
 
     def plot_voronoi_diagram (self):
         """
-        Plot a Voronoi diagram of the PoAs in self.list_of_PoAs
+        Plot a Voronoi diagram of the previously parsed .antloc (antennas-locations) files.
+        The Voronoi diagram is saved as a .pdf into ../res/
         """
         points = np.array ([[poa['x'], poa['y']] for poa in self.list_of_PoAs])
         
-        voronoi_plot_2d(Voronoi(points), show_vertices=False)
+        voronoi_plot_2d(Voronoi(points), show_vertices=False, show_points=False) # For showing the points, set show_points. May fix the points' size by point_size
         plt.xlim(0, MAX_X[self.city]); plt.ylim(0, MAX_Y[self.city])
         frame1 = plt.gca()
         frame1.axes.get_xaxis().set_visible(False)
         frame1.axes.get_yaxis().set_visible(False)
-        plt.show()
-        
+        printFigToPdf ('{}_Voronoi' .format (self.city))        
     # def rotate_loc_file (self, loc_file_names, angle=54):
     #     """
     #     Given an input .loc file, generate an output .loc file, where each location is rotated angle degrees clockwise w.r.t. the center of the simulated area.
@@ -1139,11 +1139,11 @@ if __name__ == '__main__':
 
     max_power_of_4 = 3
     # input_demography_file_name='Monaco_demography_0730_0830_1secs_{}.txt' .format (3 * 4**max_power_of_4)
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name)
 
-    my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_names='num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 
-                                                pcl_lanes_len_input_file_name='Monaco_lanes_len.pcl')
+    # my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_names='num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 
+                                                # pcl_lanes_len_input_file_name='Monaco_lanes_len.pcl')
     # my_loc2poa.gen_heatmap_series (pcl_input_file_names=['num_of_vehs_Monaco_0730_0830_1secs.loc__192rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__48rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__12rects.txt.pcl', 'num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.txt.pcl'],
     #                                pcl_lanes_len_input_file_name='Monaco_lanes_len.pcl')
     # plt.savefig('../res/num_of_vehs_Monaco_0730_0830_1secs.loc_w_cbar.pdf', bbox_inches='tight')
@@ -1160,5 +1160,5 @@ if __name__ == '__main__':
     # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_SPEED], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     
     # Post-processing
-    # my_loc2poa.parse_antloc_file ('Monaco.Telecom.antloc')
-    # my_loc2poa.plot_voronoi_diagram()
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = 'Monaco.Telecom.antloc', city='Monaco') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    my_loc2poa.plot_voronoi_diagram()

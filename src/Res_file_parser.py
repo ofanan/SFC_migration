@@ -38,7 +38,7 @@ class Res_file_parser (object):
     Parse "res" (result) files, and generate plots from them.
     """
 
-    # Old (possibly wrong) calculation of the conf' interval
+    # Old (wrong?) calculation of the conf' interval
     # conf_interval = lambda self, avg, std : [avg - 2*std, avg + 2*std] 
     
     # Calculate the confidence interval of an array of values ar, given its avg. Based on 
@@ -297,7 +297,7 @@ class Res_file_parser (object):
         """
         if (not (addplot_str == None)):
             printf (self.output_file, addplot_str)
-        for dict in sorted (list_of_dict, key = lambda i: i[key_to_sort]):
+        for _ in sorted (list_of_dict, key = lambda i: i[key_to_sort]):
             printf (self.output_file, '({:.4f}, {:.4f})' .format (dict[key_to_sort], dict[y_value]))
         printf (self.output_file, self.end_add_plot_str)
         if (not (add_legend_str == None)): # if the caller requested to print an "add legend" str          
@@ -498,7 +498,7 @@ class Res_file_parser (object):
             self.my_plot (ax, x, y, mode)
         
         plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
-        plt.ylabel('Norm Avg. Cost')
+        plt.ylabel('Avg. Cost')
         plt.xlim (1, 3)
         plt.ylim (0, 2000000)
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')

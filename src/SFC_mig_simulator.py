@@ -21,7 +21,6 @@ VERBOSE_MOB           = 5  # Write data about the mobility of usrs, and about th
 VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug. Hence, this way of calculation is good for opt only, as opt searches each time fora solw from sratch.  
 VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
 VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
-VERBOSE_MIG_ONLY_CRIT = 10 # Allowed to migrate only critical chains
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -803,8 +802,6 @@ class SFC_mig_simulator (object):
             self.prob_of_target_delay = [prob_of_target_delay]  
 
         self.mode              = mode
-        if (VERBOSE_MIG_ONLY_CRIT in self.verbose):
-            self.mode += 'C'
         
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
@@ -1591,7 +1588,7 @@ class SFC_mig_simulator (object):
             else: 
                 lb = cpu_cap_at_leaf
     
-    def run_prob_of_RT_sim_algs (self, poa2cell_file_name, poa_file_name, prob=None):
+    def run_prob_of_RT_sim_algs (self, mode, poa2cell_file_name, poa_file_name, prob=None):
         """
         Run a simulation where the probability of a RT application varies. 
         Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
@@ -1601,33 +1598,28 @@ class SFC_mig_simulator (object):
         print ('Running run_prob_of_RT_sim')
         probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
 
-        output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'ourAlgC')    
+        output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
+        
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
-        if (VERBOSE_MIG_ONLY_CRIT in self.verbose):
+        if (mode=='ourAlgC'):
             min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
-                                       'Monaco' : {0.0 : 936, 0.1 : 936, 0.2 : 972, 0.3 : 961, 0.4 : 1032, 0.5 : 1114, 0.6 : 1317, 0.7 : 1556, 0.8 : 1736, 0.9 : 2000, 1.0 : 2200}} 
-        else:
+                                       'Monaco' : {0.0 : 936, 0.1 : 936, 0.2 : 972, 0.3 : 961, 0.4 : 1032, 0.5 : 1114, 0.6 : 1317, 0.7 : 1556, 0.8 : 1736, 0.9 : 1989, 1.0 : 2192}} 
+            for seed in [40 + delta_sd for delta_sd in range (21)]:
+                for prob_of_target_delay in probabilities:
+                    self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
+        elif (mode=='ourAlg'):
             min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
                                        'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}}
-             
-        for seed in [40 + delta_sd for delta_sd in range (21)]:
-            for prob_of_target_delay in probabilities:
-                self.binary_search_algs(output_file=output_file, mode='ourAlg', cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
+            for seed in [40 + delta_sd for delta_sd in range (21)]:
+                for prob_of_target_delay in probabilities:
+                    self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-        # for seed in [40 + i for i in range (21)]:
-        #     mode='ffit'
-        #     output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode=mode)    
-        #     for prob_of_target_delay in [i/10 for i in range (11)]:
-        #         self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
-
-
-        # min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 150, 0.1 : 150, 0.2 : 150, 0.3 : 150, 0.4 : 150, 0.5 : 150, 0.6 : 150, 0.7 : 150, 0.8 : 150, 0.9 : 160, 1.0 : 160},
-        #                            'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1170, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
-        # for seed in [40 + i for i in range (6)]:
-        #     for mode in ['ffit']: 
-        #         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode)    
-        #         for prob_of_target_delay in [i/10 for i in range (11)]:
-        #             self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
+        else:
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 150, 0.1 : 150, 0.2 : 150, 0.3 : 150, 0.4 : 150, 0.5 : 150, 0.6 : 150, 0.7 : 150, 0.8 : 150, 0.9 : 160, 1.0 : 160},
+                                       'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1170, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
+            for seed in [40 + i for i in range (6)]:
+                for prob_of_target_delay in [i/10 for i in range (21)]:
+                    self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
     def run_prob_of_RT_sim_opt (self, poa2cell_file_name, poa_file_name, prob=None):
         """
@@ -1683,10 +1675,10 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
 
 def main ():
 
-    poa_file_name      = 'Monaco_0829_0830_20secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' # 'Monaco_0829_0830_20secs_Telecom 
+    poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' # 'Monaco_0829_0830_20secs_Telecom 
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
-    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_MIG_ONLY_CRIT], poa2cell_file_name=poa2cell_file_name)
-    my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name)
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+    my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, mode='ourAlgC')
     # seed = None
     # if (len (sys.argv)>1):
     #     seed=int(sys.argv[1])   

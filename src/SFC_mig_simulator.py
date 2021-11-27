@@ -809,7 +809,7 @@ class SFC_mig_simulator (object):
         elif (self.mode in ['ourAlg', 'ourAlgC']):   
             self.max_R = 1.5 
         else:
-            self.max_R = 1.6
+            self.max_R = 1.8
 
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
@@ -1621,8 +1621,8 @@ class SFC_mig_simulator (object):
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-        else:
-            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 170, 0.1 : 170, 0.2 : 170, 0.3 : 180, 0.4 : 180, 0.5 : 180, 0.6 : 180, 0.7 : 180, 0.8 : 230, 0.9 : 240, 1.0 : 240},
+        else: # mode is either 'ffitC', or 'cpvnfC'
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 170, 0.1 : 170, 0.2 : 170, 0.3 : 180, 0.4 : 190, 0.5 : 190, 0.6 : 190, 0.7 : 200, 0.8 : 230, 0.9 : 240, 1.0 : 250},
                                        'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1170, 0.6 : 1250, 0.7 : 1400, 0.8 : 1500, 0.9 : 1850, 1.0 : 2000}} 
             for seed in [60 + i for i in range (21)]:
                 for prob_of_target_delay in probabilities:
@@ -1708,7 +1708,7 @@ def run_cost_comp_sim (city):
 
 def main ():
 
-    run_prob_of_RT_sim (city='Monaco', mode='ourAlgC')
+    run_prob_of_RT_sim (city='Lux', mode='ffitC')
     # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):

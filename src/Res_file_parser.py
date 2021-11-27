@@ -81,12 +81,18 @@ class Res_file_parser (object):
         self.color_dict       = {'opt'    : 'green',
                                 'ourAlg'  : 'purple',
                                 'ffit'    : 'blue',
-                                'cpvnf'   : 'black'}
+                                'cpvnf'   : 'black',
+                                'ourAlgC' : 'purple',
+                                'ffitC'   : 'blue',
+                                'cpvnfC'  : 'black'}
         
         self.markers_dict     = {'opt'    : 'x',
                                 'ourAlg'  : 'o',
                                 'ffit'    : '^',
-                                'cpvnf'   : 's'}
+                                'cpvnf'   : 's',
+                                'ourAlgC' : 'h',
+                                'ffit'    : 'v',
+                                'cpvnf'   : 'd'}
         
         matplotlib.rcParams.update({'font.size': FONT_SIZE})
 

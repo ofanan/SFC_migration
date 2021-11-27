@@ -488,7 +488,7 @@ class loc2poa_c (object):
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
         self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city], plot_colorbar=plot_colorbar) 
         usrs_loc_file_name = usrs_loc_file_name if (usrs_loc_file_name!=None) else self.usrs_loc_file_name 
-        plt.savefig('../res/heatmap{}_{}rects.pdf' .format (self.antloc_file_name, usrs_loc_file_name.split('.txt')[0]), bbox_inches='tight')
+        plt.savefig('../res/heatmap_vehs_left_{}rects.pdf' .format (usrs_loc_file_name.split('.txt')[0]), bbox_inches='tight')
 
         return 
         
@@ -1155,21 +1155,21 @@ class loc2poa_c (object):
 if __name__ == '__main__':
 
     city = 'Monaco'
-    max_power_of_4             = 2
+    max_power_of_4             = 0
     if (max_power_of_4==0 and city!='Monaco'):
         print ('Error: max_power_of_4==0 is allowed only for Monaco')
         exit ()
     if (max_power_of_4==4 and city=='Monaco'):
         print ('Error: max_power_of_4==4 is not used for Monaco as this generates too small rectangles')
         exit ()
-    # my_loc2poa                 = loc2poa_c (max_power_of_4 = max_power_of_4, city=city) #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    # input_demography_file_name ='{}_demography_0730_0830_1secs_{}.txt' .format (city, 3 * 4**max_power_of_4 if city=='Monaco' else 4**max_power_of_4)  
-    # my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name, plot_colorbar=False)
+    my_loc2poa                 = loc2poa_c (max_power_of_4 = max_power_of_4, city=city) #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    input_demography_file_name ='{}_demography_0730_0830_1secs_{}.txt' .format (city, 3 * 4**max_power_of_4 if city=='Monaco' else 4**max_power_of_4)  
+    my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name, plot_colorbar=True)
 
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, city=city) #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    pcl_num_vehs_input_file_names='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1))
-    my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_names='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1)), 
-                                                pcl_lanes_len_input_file_name='{}_lanes_len.pcl' .format (city))
+    # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, city=city) #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    # pcl_num_vehs_input_file_names='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1))
+    # my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_names='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1)), 
+    #                                             pcl_lanes_len_input_file_name='{}_lanes_len.pcl' .format (city))
     
     # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # pcl_input_file_name = 'num_of_vehs_Lux_0730_0830_1secs.loc__4rects.pcl'

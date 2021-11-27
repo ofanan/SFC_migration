@@ -1604,7 +1604,7 @@ class SFC_mig_simulator (object):
         if (mode=='ourAlgC'):
             min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 125, 0.1 : 125, 0.2 : 125, 0.3 : 125, 0.4 : 125, 0.5 : 130, 0.6 : 150, 0.7 : 150, 0.8 : 150, 0.9 : 170, 1.0 : 180},
                                        'Monaco' : {0.0 : 1050, 0.1 : 1050, 0.2 : 1050, 0.3 : 1153, 0.4 : 1153, 0.5 : 1153, 0.6 : 1317, 0.7 : 1500, 0.8 : 1736, 0.9 : 1989, 1.0 : 2192}} 
-            for seed in [40 + delta_sd for delta_sd in range (21)]:
+            for seed in [60 + delta_sd for delta_sd in range (21)]:
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
         elif (mode=='ourAlg'):
@@ -1680,7 +1680,7 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
                 if (cpu_cap_at_leaf >= MIN_REQ_CPU[my_simulator.city][mode]):
                     my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)   
 
-def run_prob_of_RT_sim (city, mode, prob):
+def run_prob_of_RT_sim (city, mode, prob=None):
     
     if (city=='Monaco'):
         poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'
@@ -1695,9 +1695,20 @@ def run_prob_of_RT_sim (city, mode, prob):
     else:
         my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
 
+def run_cost_comp_sim (city):
+    if (city=='Monaco'):
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_16secs_Telecom.poa', verbose=[VERBOSE_RES])
+        # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=, ) #$$$
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa',  verbose=[VERBOSE_RES])
+    else:
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0730_16secs_post.poa',       verbose=[VERBOSE_RES])
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0730_1secs_post.poa',        verbose=[VERBOSE_RES])
+
+
+
 def main ():
 
-    run_prob_of_RT_sim (city='Monaco', mode='ourAlgC', prob=0.5)
+    run_prob_of_RT_sim (city='Monaco', mode='ourAlgC')
     # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):

@@ -807,7 +807,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC']):   
-            self.max_R = 1.5 
+            self.max_R = 2 
         else:
             self.max_R = 1.8
 
@@ -1602,7 +1602,7 @@ class SFC_mig_simulator (object):
         
         # To reduce sim' time, lower-bound the required CPU using the values found by sketch pre-runnings 
         if (mode=='ourAlgC'):
-            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 125, 0.1 : 125, 0.2 : 125, 0.3 : 125, 0.4 : 125, 0.5 : 130, 0.6 : 150, 0.7 : 150, 0.8 : 150, 0.9 : 170, 1.0 : 180},
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 160, 0.1 : 160, 0.2 : 160, 0.3 : 160, 0.4 : 160, 0.5 : 160, 0.6 : 170, 0.7 : 170, 0.8 : 180, 0.9 : 180, 1.0 : 190},
                                        'Monaco' : {0.0 : 1050, 0.1 : 1050, 0.2 : 1050, 0.3 : 1153, 0.4 : 1153, 0.5 : 1153, 0.6 : 1317, 0.7 : 1500, 0.8 : 1736, 0.9 : 1989, 1.0 : 2192}} 
             for seed in [60 + delta_sd for delta_sd in range (21)]:
                 for prob_of_target_delay in probabilities:
@@ -1708,7 +1708,7 @@ def run_cost_comp_sim (city):
 
 def main ():
 
-    run_prob_of_RT_sim (city='Lux', mode='ffitC')
+    run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
     # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):

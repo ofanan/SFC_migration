@@ -46,7 +46,10 @@ class Res_file_parser (object):
     conf_interval = lambda self, ar, avg, conf_lvl=0.99 : st.t.interval (conf_lvl, len(ar)-1, loc=avg, scale=st.sem(ar)) if np.std(ar)>0 else [avg, avg]
 
     # Plot a single x, y, python line, with the required settings (colors, markers etc). 
-    my_plot = lambda self, ax, x, y, mode : ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode], mfc='none') #mfc='none' makes the markers empty.
+    my_plot = lambda self, ax, x, y, mode : ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode], mfc='none', linestyle='dashed') if (mode in ['ourAlgC', 'cpvnfC', 'ffitC']) \
+    else ax.plot (x, y, color=self.color_dict[mode], marker=self.markers_dict[mode], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label=self.legend_entry_dict[mode], mfc='none')
+    
+    #mfc='none' makes the markers empty.
 
     # Understand which city's data are these, based on the input file name 
     parse_city_from_input_file_name = lambda self, input_file_name : input_file_name.split ('_')[0]
@@ -73,10 +76,13 @@ class Res_file_parser (object):
                                   'ffit'   : self.add_plot_ffit,
                                   'cpvnf'  : self.add_plot_cpvnf}
 
-        self.legend_entry_dict = {'opt'    :  'LBound', 
-                                  'ourAlg' : 'BUPU', 
-                                  'ffit'   : 'F-Fit', #\\ffit',
-                                  'cpvnf'  : 'CPVNF'} #\cpvnf'}
+        self.legend_entry_dict = {'opt'     :  'LBound', 
+                                  'ourAlg'  : 'BUPU', 
+                                  'ffit'    : 'F-Fit', #\\ffit',
+                                  'cpvnf'   : 'CPVNF', #\cpvnf'}
+                                  'ourAlgC' : 'BUPUmoc', 
+                                  'ffitC'   : 'F-Fitmoc', #\\ffit',
+                                  'cpvnfC'  : 'CPVNFmoc'} #\cpvnf'}
 
         self.color_dict       = {'opt'    : 'green',
                                 'ourAlg'  : 'purple',
@@ -91,8 +97,8 @@ class Res_file_parser (object):
                                 'ffit'    : '^',
                                 'cpvnf'   : 's',
                                 'ourAlgC' : 'h',
-                                'ffit'    : 'v',
-                                'cpvnf'   : 'd'}
+                                'ffitC'   : 'v',
+                                'cpvnfC'  : 'd'}
         
         matplotlib.rcParams.update({'font.size': FONT_SIZE})
 
@@ -361,7 +367,7 @@ class Res_file_parser (object):
             self.parse_file(input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         _, ax = plt.subplots()
-        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlg', 'ourAlgC', 'ffitC', 'cpvnfC']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
         
@@ -384,6 +390,7 @@ class Res_file_parser (object):
                     print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
+                
                 y.append (avg)
             
             self.my_plot (ax, x, y, mode)
@@ -592,14 +599,13 @@ if __name__ == '__main__':
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
     # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
-        
-    
-    # my_res_file_parser.plot_RT_prob_sim_python('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+            
+    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
-    pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
+    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
-    my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
+    # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
     
     # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
     # my_res_file_parser.plot_cost_comp_tikz () 

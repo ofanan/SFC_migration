@@ -149,13 +149,14 @@ class SFC_mig_simulator (object):
                                ,mig_cost  = self.calc_mig_cost_in_slot_opt())))
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {} | num_usrs={} | num_crit_usrs={} \n' .format(
+    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {} | num_usrs={} | num_crit_usrs={} | resh={}\n' .format(
             self.settings_str(), # The settings string, detailing various parameters values used.  
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
                                link_cost = self.calc_link_cost_in_slot_alg(),
                                mig_cost  = self.calc_mig_cost_in_slot_alg()),
             len (self.usrs),
-            len (self.critical_usrs)))
+            len (self.critical_usrs),
+            'T' if self.reshuffled else 'F'))
 
     augmented_cpu_cap_at_leaf = lambda self: self.G.nodes[len (self.G.nodes)-1]['RCs']
 
@@ -1573,6 +1574,7 @@ class SFC_mig_simulator (object):
         res = self.simulate (mode = mode, cpu_cap_at_leaf=ub, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots, seed=seed)
         if (res == None): # found a feasible solution without a binary search 
             print ('Did not find a feasible solution, even with the maximal rsrc aug: cpu_cap_at_leaf={}' .format (ub))
+            printf (output_file, 'Did not find a feasible solution, even with the maximal rsrc aug: cpu_cap_at_leaf={}' .format (ub))
             exit ()
         
         while True:
@@ -1695,20 +1697,30 @@ def run_prob_of_RT_sim (city, mode, prob=None):
     else:
         my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
 
-def run_cost_comp_sim (city):
-    if (city=='Monaco'):
-        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_16secs_Telecom.poa', verbose=[VERBOSE_RES])
-        # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=, ) #$$$
-        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa',  verbose=[VERBOSE_RES])
-    else:
-        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0730_16secs_post.poa',       verbose=[VERBOSE_RES])
-        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0730_1secs_post.poa',        verbose=[VERBOSE_RES])
+# def run_cost_comp_sim (city):
+#     if (city=='Monaco'):
+#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_16secs_Telecom.poa', verbose=[VERBOSE_RES])
+#         # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=, ) #$$$
+#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa',  verbose=[VERBOSE_RES])
+#     else:
+#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_07=830_16secs_post.poa',       verbose=[VERBOSE_RES])
+#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',        verbose=[VERBOSE_RES])
 
+def run_cost_comp_by_rsrc_sim (city, seeds):
+    init_cpu_cap_at_leaf = {'Lux' : 94, 'Monaco' : 842}
+    if (city=='Monaco'):
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
+    else:
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
+    for seed in seeds:
+        for cpu_cap_at_leaf in [inter (init_cpu_cap_at_leaf[city] * (1 + i/10)) for i in range(11)]:
+            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
 
 def main ():
 
-    run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
+    # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
+    run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
     # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):

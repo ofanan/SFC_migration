@@ -28,7 +28,7 @@ cpvnf_idx = 3
 MARKER_SIZE      = 9 
 LINE_WIDTH       = 3 
 FONT_SIZE        = 20
-LEGEND_FONT_SIZE = 17
+LEGEND_FONT_SIZE = 10
 
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
@@ -367,7 +367,7 @@ class Res_file_parser (object):
             self.parse_file(input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         _, ax = plt.subplots()
-        for mode in ['opt', 'ourAlg', 'ourAlgC', 'ffitC', 'cpvnfC']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlgC', 'ffitC', 'cpvnfC']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
         
@@ -600,7 +600,7 @@ if __name__ == '__main__':
     # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
             
-    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])

@@ -599,8 +599,12 @@ if __name__ == '__main__':
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
     # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
-            
-    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+
+    city = 'Lux'
+    if (city=='Lux'):            
+        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    else:
+        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])

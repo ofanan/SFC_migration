@@ -1709,9 +1709,9 @@ def run_prob_of_RT_sim (city, mode, prob=None):
 def run_cost_comp_by_rsrc_sim (city, seeds):
     init_cpu_cap_at_leaf = {'Lux' : 94, 'Monaco' : 842}
     if (city=='Monaco'):
-        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
     else:
-        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0820_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
     for seed in seeds:
         for cpu_cap_at_leaf in [inter (init_cpu_cap_at_leaf[city] * (1 + i/10)) for i in range(11)]:
             my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)

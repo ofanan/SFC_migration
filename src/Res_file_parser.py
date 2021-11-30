@@ -30,6 +30,8 @@ LINE_WIDTH       = 3
 FONT_SIZE        = 20
 LEGEND_FONT_SIZE = 10
 
+UNIFORM_CHAIN_MIG_COST = 600
+
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
 
@@ -127,10 +129,9 @@ class Res_file_parser (object):
         # plt.show ()
 
         plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
-        
+             
       
-      
-    def plot_cost_comp_tikz (self, plot_tikz=False, plot_python=True):
+    def plot_cost_comp (self, plot_tikz=False, plot_python=True, normalize=False):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
         The output plot may be either tikz, and/or python.   
@@ -141,45 +142,59 @@ class Res_file_parser (object):
 
         num_of_periods     = 10 # number of marker points in the plot 
         period_len         = int( (t_max-t_min+1) / num_of_periods) # Each point will be assigned the avg value, where averaging over period of length period_len
-        mig_cost           = np.empty (num_of_periods)
-        ratio_of_crit_usrs = np.empty (num_of_periods)
+        
+        if (normalize):
+            mig_cost, ratio_of_crit_usrs          = np.empty (num_of_periods), np.empty (num_of_periods)
+        else:
+            num_of_crit_chains, num_of_migrations = np.empty (num_of_periods), np.empty (num_of_periods)
         
         for period in range(num_of_periods): # for every considered period
             res_from_this_period        = list (filter (lambda item : item['t'] >= t_min + period*period_len and item['t'] < t_min + (period+1)*period_len, self.list_of_dicts))
             if (period==0): # Remove the results of the first slot, which are distorted, as in this slot there cannot be migrations
                 del(res_from_this_period[0])
-            mig_cost           [period] = np.average ([item['mig_cost']     /(item['num_usrs']*self.time_slot_len) for item in res_from_this_period])
-            ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs']/item['num_usrs']                      for item in res_from_this_period])
-            
+            if (normalize):
+                mig_cost           [period] = np.average ([item['mig_cost']      / (item['num_usrs']*self.time_slot_len) for item in res_from_this_period])
+                ratio_of_crit_usrs [period] = np.average ([item['num_crit_usrs'] / item['num_usrs']                      for item in res_from_this_period])
+            else:
+                num_of_migrations  [period] = np.sum     ([item['mig_cost']                                              for item in res_from_this_period]) / UNIFORM_CHAIN_MIG_COST
+                num_of_crit_chains [period] = np.sum     ([item['num_crit_usrs']                                         for item in res_from_this_period]) 
+                
         x = [period*period_len for period in range (num_of_periods)]
         if (plot_python):
             
-            # Tune maximal values for the Y axes
-            Y_LIM_MIG_COST           = {'Lux' : 260, 'Monaco' : 60}
-            Y_LIM_RATIO_OF_CRIT_USRS = {'Lux' : 0.5, 'Monaco' : 0.1}
-            mig_cost_color           = 'blue'
-            _, ax_mig_cost           = plt.subplots()
-            ax_ratio_of_crit_usrs    = ax_mig_cost.twinx()
+            _, y1_axis = plt.subplots()
+            y2_axis    = y1_axis.twinx()            
+            y1_color   = 'blue'
+            y1_axis.set_xlabel('Time[s]')
+            y2_axis.set_xlabel('Time[s]', color=y1_color)
+            y1_axis.tick_params (axis='y', colors=y1_color)
             
-            ax_mig_cost.     set_xlabel('Time[s]')
-            ax_mig_cost.     set_ylabel('Norm. Mig. Cost', color=mig_cost_color)
-            ax_mig_cost.tick_params (axis='y', colors=mig_cost_color)
-            ax_ratio_of_crit_usrs.set_xlabel('Time[s]', color=mig_cost_color)
-            ax_ratio_of_crit_usrs.set_ylabel('Frac. of Critical Chains', color='black')
-            line1 = ax_mig_cost.plot           (x, mig_cost,           color=mig_cost_color,  marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Norm. Mig. Cost')
-            line2 = ax_ratio_of_crit_usrs.plot (x, ratio_of_crit_usrs, color='black',         marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
+            if (normalize):
+                y1_axis.set_ylabel('Norm. Mig. Cost', color=y1_color)
+                # Tune maximal values for the Y axes
+                Y_LIM_MIG_COST           = {'Lux' : 260, 'Monaco' : 60}
+                Y_LIM_RATIO_OF_CRIT_USRS = {'Lux' : 0.5, 'Monaco' : 0.1}
+                y2_axis.set_ylabel('Frac. of Critical Chains', color='black')
+                line1 = y1_axis.plot (x, mig_cost,           color=y1_color, marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Norm. Mig. Cost')
+                line2 = y2_axis.plot (x, ratio_of_crit_usrs, color='black',  marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
+                y1_axis.          set_ylim (0, Y_LIM_MIG_COST          [self.city])
+                if (self.city=='Monaco'):
+                    y2_axis.set_yscale ('log')
+                    y2_axis.set_ylim (0.001, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+                else:
+                    y2_axis.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+                # y2_axis.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+    
+            else:
+                y1_axis.set_ylabel('# of Migrated Chains', color=y1_color)
+                y2_axis.set_ylabel('# of Critical Chains', color='black')
+                line1 = y1_axis.plot (x, num_of_migrations,  color=y1_color, marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='# of Migrated Chains')
+                line2 = y2_axis.plot (x, num_of_crit_chains, color='black',  marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='# of Critical Chains')
+                
             lines = line1 + line2
             plt.xlim (0)
-            ax_mig_cost.          set_ylim (0, Y_LIM_MIG_COST          [self.city])
             
-            if (self.city=='Monaco'):
-                ax_ratio_of_crit_usrs.set_yscale ('log')
-                ax_ratio_of_crit_usrs.set_ylim (0.001, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
-            else:
-                ax_ratio_of_crit_usrs.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
-            # ax_ratio_of_crit_usrs.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
-
-            plt.legend (lines, [line.get_label() for line in lines], loc='center')
+            plt.legend (lines, [line.get_label() for line in lines], loc='upper center', fontsize=LEGEND_FONT_SIZE)
 
             plt.savefig ('../res/cost_comp_{}.pdf' .format (self.input_file_name), bbox_inches='tight')
             
@@ -262,7 +277,7 @@ class Res_file_parser (object):
 
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
-            "mode"       : splitted_settings      [mode_idx],
+            "mode"      : splitted_settings      [mode_idx],
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
             "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
@@ -280,7 +295,7 @@ class Res_file_parser (object):
         if (parse_num_usrs and len(splitted_line) > num_usrs_idx): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
             self.dict['num_usrs']      = int (splitted_line[num_usrs_idx]     .split("=")[1])
             self.dict['num_crit_usrs'] = int (splitted_line[num_crit_usrs_idx].split("=")[1])
-
+            
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, mode = None, cpu = None, stts = -1):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
@@ -600,19 +615,19 @@ if __name__ == '__main__':
     # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
 
-    city = 'Monaco'
-    if (city=='Lux'):            
-        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
-    else:
-        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+    # city = 'Monaco'
+    # if (city=='Lux'):            
+    #     my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    # else:
+    #     my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
     
-    # my_res_file_parser.parse_file ('Monaco_0730_0830_16secs_Telecom_p0.3_ourAlg.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
-    # my_res_file_parser.plot_cost_comp_tikz () 
+    my_res_file_parser.parse_file ('Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_sd99_cpu926.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
+    my_res_file_parser.plot_cost_comp () 
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 

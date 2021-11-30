@@ -373,9 +373,10 @@ class SFC_mig_simulator (object):
         """
         Print several header lines, indicating the format and so, to an output res file.
         """
-        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cpu_cost=... | link_cost=... | mig_cost=... | cost=... | ratio=[c,l,m] c, where\n// T is the slot cnt (read from the input file)\n')
+        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cpu_cost=... | link_cost=... | mig_cost=... | cost=... | ratio=[c,l,m] c | resh=bin, , where\n// T is the slot cnt (read from the input file)\n')
         printf (res_file, '// Mode is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
-        printf (res_file, '// [c,l,m] are the ratio of the cpu, link, and mig cost out of the total cost, resp.\n\n') 
+        printf (res_file, '// [c,l,m] are the ratio of the cpu, link, and mig cost out of the total cost, resp.\n') 
+        printf (res_file, '// bin is T if the algorithm has reshuffled for finding a solution at this slot, F else.\n\n')
 
     def init_log_file (self, overwrite = True):
         """
@@ -1747,7 +1748,7 @@ def main ():
     city = 'Monaco'
     if (city=='Monaco'):
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-        my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=1320, seed=99)
+        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1020, seed=99)
     else:
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
         my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=250, seed=99)

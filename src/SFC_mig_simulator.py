@@ -1720,7 +1720,7 @@ def run_cost_comp_by_rsrc_sim (city, seeds):
 def main ():
 
     # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
-    run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
+    # run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
     # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):
@@ -1743,6 +1743,14 @@ def main ():
     # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=926, seed=99)
+
+    city = 'Monaco'
+    if (city=='Monaco'):
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
+        my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=1320, seed=99)
+    else:
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
+        my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=250, seed=99)
 
 if __name__ == "__main__":
     main()

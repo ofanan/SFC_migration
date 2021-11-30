@@ -386,7 +386,7 @@ class Res_file_parser (object):
                 
                 [y_lo, y_hi] = self.conf_interval (samples, avg)
                 
-                if (x_val==0.3 and mode in ['ffit', 'cpvnf']):
+                if (x_val==0.3 and mode in ['ffit', 'cpvnf', 'ourAlgC']):
                     print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
@@ -600,7 +600,7 @@ if __name__ == '__main__':
     # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
     #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
 
-    city = 'Lux'
+    city = 'Monaco'
     if (city=='Lux'):            
         my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
     else:

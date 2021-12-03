@@ -1753,15 +1753,13 @@ def main ():
     #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
     #     my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=250, seed=99)
     
-    city = 'Monaco'
+    city = 'Lux'
     if (city=='Monaco'):
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-        for seed in [60 + delta_sd for delta_sd in range (21)]:
-            my_simulator.binary_search_algs(output_file=open ('../res/Monaco_0730_0830_find_min_CPU.res', 'a'), mode='ourAlg', cpu_cap_at_leaf=842, seed=seed)
     else:
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
-        for seed in [60 + delta_sd for delta_sd in range (21)]:
-            my_simulator.binary_search_algs(output_file=open ('../res/Monaco_0730_0830_find_min_CPU.res', 'a'), mode='ourAlg', cpu_cap_at_leaf=94, seed=seed)
+    for seed in [60 + delta_sd for delta_sd in range (21)]:
+        my_simulator.binary_search_algs(output_file=open ('../res/{}_0730_0830_find_min_CPU.res' .format(city), 'a'), mode='ourAlg', cpu_cap_at_leaf=842 if (city=='Monaco') else 94 , seed=seed)
 
 if __name__ == "__main__":
     main()

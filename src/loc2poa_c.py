@@ -594,24 +594,6 @@ class loc2poa_c (object):
             self.gen_heatmap (df=df, plot_colorbar=plot_colorbar)
             plt.savefig('../res/{}_lin_density_{}rects.pdf' .format (self.city, num_of_rects), bbox_inches='tight') 
          
-    def calc_num_vehs_to_slot (self, city):
-        """
-        Calculate for each number of vehicles a list of the time slots having this exact number of vehicles.
-        Input: 
-        city - either 'Lux', or 'Monaco'
-        Output:
-        a .pcl file, holding a list of dictionaries, where for each number of vehicles (key) there exist a list of the time slots having this exact number of vehicles (value). 
-        """
-        
-        num_vehs_in_slot = np.array (pd.read_pickle(r'../res/{}_0730_0830_1secs_num_of_vehs.pcl' .format (city)), dtype='int16')
-
-        num_vehs_in_slot_set = set (num_vehs_in_slot)
-
-        for num_veh in num_vehs_in_slot_set: # for each distinct value of the number of vehicles
-            indices = [i for i, x in enumerate(num_vehs_in_slot) if x == num_veh] 
-            print ('slot of {} are' .format (num_veh))
-            print (indices) 
-         
     def aggregate_heatmap_cells (self, vec):
         """
         aggregate the values within a vector in a way that allows using a heatmap with x0.25 the number of rectangles
@@ -1211,7 +1193,6 @@ if __name__ == '__main__':
 
     city = 'Monaco'
     my_loc2poa = loc2poa_c (max_power_of_4 = 0, city=city, verbose=[]) 
-    my_loc2poa.calc_num_vehs_to_slot (city)
 
     # plot_demography_heatmap (city='Lux', max_power_of_4=1)
 

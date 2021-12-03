@@ -131,13 +131,43 @@ class Res_file_parser (object):
         plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
              
       
+    def plot_cost_comp_by_num_vehs (self, res_file_to_parse):
+        """
+        Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
+        The output plot may be either tikz, and/or python.   
+        """
+
+        self.city = self.parse_city_from_input_file_name (res_file_to_parse)
+        self.parse_file(res_file_to_parse, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
+
+        num_vehs_in_slot     = np.array (pd.read_pickle(r'../res/{}_0730_0830_1secs_num_of_vehs.pcl' .format (self.city)), dtype='int16')
+        num_vehs_in_slot_set = set (num_vehs_in_slot)
+
+        for num_veh in num_vehs_in_slot_set: # for each distinct value of the number of vehicles
+            
+            # relevant_slot will hold all the slots in which the number of vehicles is exactly num_vehs. 
+            # Add 27001 to the slots, as the array read from the pickle begins by 0, while the first simulated slot with mig' is 27001
+            relevant_slots = [(i + 27001) for i, x in enumerate(num_vehs_in_slot) if x == num_veh]  
+            num_vehs_in_slot     = [item  for item in num_vehs_in_slot]
+            res_from_these_slots = list (filter (lambda item : item['t'] in relevant_slots, self.list_of_dicts))
+            
+            avg_num_of_migrations  = np.average ([item['mig_cost']      for item in res_from_these_slots]) / UNIFORM_CHAIN_MIG_COST
+            avg_num_of_crit_chains = np.average ([item['num_crit_usrs'] for item in res_from_these_slots]) 
+            # plt.scatter(num_veh, avg_num_of_migrations, s=MARKER_SIZE, c='black', marker='o')
+            plt.scatter(num_veh, avg_num_of_crit_chains, s=MARKER_SIZE, c='blue', marker='o')
+        
+        plt.xlabel ('# of Vehicles')
+        # plt.ylabel ('Num of Migrated Chains')
+        plt.ylabel ('# of Critical Chains')
+        printFigToPdf ('../res/{}_crit_vs_num_vehs' .format (self.city))
+
     def plot_cost_comp (self, plot_tikz=False, plot_python=True, normalize=False, plot_only_crit=True):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
         The output plot may be either tikz, and/or python.   
         """
 
-        # Generate a vector for the x axis (the t line).
+        # Generate a vector for the x axis (the t line).        
         t_min, t_max          = min ([item['t'] for item in self.list_of_dicts]), max ([item['t'] for item in self.list_of_dicts])
 
         num_of_periods     = 10 # number of marker points in the plot 
@@ -716,7 +746,10 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
-    pcl_output_file_name = my_res_file_parser.calc_mig_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
+    city = 'Lux'
+    res_file_to_parse = 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_sd99_cpu1320.res' if city=='Monaco' else 'Lux_0730_0830_1secs_post_p0.3_ourAlg.res'
+    my_res_file_parser.plot_cost_comp_by_num_vehs (res_file_to_parse=res_file_to_parse)
+    # pcl_output_file_name = my_res_file_parser.calc_mig_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
     
     
     # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
@@ -735,8 +768,8 @@ if __name__ == '__main__':
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
     
-    pcl_file_name = my_res_file_parser.calc_mig_vs_rsrcs(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])   
-    my_res_file_parser.plot_mig_vs_rsrcs (pcl_input_file_name=pcl_file_name) 
+    # pcl_file_name = my_res_file_parser.calc_mig_vs_rsrcs(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])   
+    # my_res_file_parser.plot_mig_vs_rsrcs (pcl_input_file_name=pcl_file_name) 
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 

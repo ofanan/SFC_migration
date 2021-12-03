@@ -809,7 +809,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC']):   
-            self.max_R = 2.2 
+            self.max_R = 1.2 
         else:
             self.max_R = 1.8
 
@@ -1745,13 +1745,23 @@ def main ():
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=926, seed=99)
 
+    # city = 'Monaco'
+    # if (city=='Monaco'):
+    #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
+    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1020, seed=99)
+    # else:
+    #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
+    #     my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=250, seed=99)
+    
     city = 'Monaco'
     if (city=='Monaco'):
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1020, seed=99)
+        for seed in [60 + delta_sd for delta_sd in range (21)]:
+            my_simulator.binary_search_algs(output_file=open ('../res/Monaco_0730_0830_find_min_CPU.res', 'a'), mode='ourAlg', cpu_cap_at_leaf=842, seed=seed)
     else:
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
-        my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=250, seed=99)
+        for seed in [60 + delta_sd for delta_sd in range (21)]:
+            my_simulator.binary_search_algs(output_file=open ('../res/Monaco_0730_0830_find_min_CPU.res', 'a'), mode='ourAlg', cpu_cap_at_leaf=94, seed=seed)
 
 if __name__ == "__main__":
     main()

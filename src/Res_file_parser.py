@@ -5,7 +5,7 @@ from pandas._libs.tslibs import period
 
 # import math
 
-from printf import printf 
+from printf import printf, printFigToPdf 
 import pickle
 
 # Indices of fields indicating the settings in a standard ".res" file
@@ -131,7 +131,7 @@ class Res_file_parser (object):
         plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
              
       
-    def plot_cost_comp (self, plot_tikz=False, plot_python=True, normalize=False):
+    def plot_cost_comp (self, plot_tikz=False, plot_python=True, normalize=False, plot_only_crit=True):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
         The output plot may be either tikz, and/or python.   
@@ -163,35 +163,38 @@ class Res_file_parser (object):
         if (plot_python):
             
             _, y1_axis = plt.subplots()
-            y2_axis    = y1_axis.twinx()            
-            y1_color   = 'blue'
-            y1_axis.set_xlabel('Time[s]')
-            y2_axis.set_xlabel('Time[s]', color=y1_color)
-            y1_axis.tick_params (axis='y', colors=y1_color)
+            if (not (plot_only_crit)):
+                y2_axis    = y1_axis.twinx()            
+                y2_color   = 'blue'
+                y2_axis.set_xlabel('Time[s]')
+                # y1_axis.set_xlabel('Time[s]',  color=y2_color)
+                y2_axis.tick_params (axis='y', colors=y2_color)
             
             if (normalize):
-                y1_axis.set_ylabel('Norm. Mig. Cost', color=y1_color)
                 # Tune maximal values for the Y axes
                 Y_LIM_MIG_COST           = {'Lux' : 260, 'Monaco' : 60}
                 Y_LIM_RATIO_OF_CRIT_USRS = {'Lux' : 0.5, 'Monaco' : 0.1}
-                y2_axis.set_ylabel('Frac. of Critical Chains', color='black')
-                line1 = y1_axis.plot (x, mig_cost,           color=y1_color, marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Norm. Mig. Cost')
-                line2 = y2_axis.plot (x, ratio_of_crit_usrs, color='black',  marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
-                y1_axis.          set_ylim (0, Y_LIM_MIG_COST          [self.city])
+                y1_axis.set_ylabel('Frac. of Critical Chains', color='black')
+                line1 = y1_axis.plot (x, ratio_of_crit_usrs, color=y2_color, marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
+                if (not (plot_only_crit)):
+                    y2_axis.set_ylabel('Norm. Mig. Cost', color=y2_color)
+                    line2 = y2_axis.plot (x, mig_cost,           color='black',  marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Norm. Mig. Cost')
+                    y2_axis.          set_ylim (0, Y_LIM_MIG_COST          [self.city])
                 if (self.city=='Monaco'):
-                    y2_axis.set_yscale ('log')
-                    y2_axis.set_ylim (0.001, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+                    y1_axis.set_yscale ('log')
+                    y1_axis.set_ylim (0.001, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
                 else:
-                    y2_axis.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
-                # y2_axis.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+                    y1_axis.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
+                # y1_axis.set_ylim (0, Y_LIM_RATIO_OF_CRIT_USRS[self.city])
     
             else:
-                y1_axis.set_ylabel('# of Migrated Chains', color=y1_color)
-                y2_axis.set_ylabel('# of Critical Chains', color='black')
-                line1 = y1_axis.plot (x, num_of_migrations,  color=y1_color, marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='# of Migrated Chains')
-                line2 = y2_axis.plot (x, num_of_crit_chains, color='black',  marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='# of Critical Chains')
+                y1_axis.set_ylabel('# of Critical Chains', color='black')
+                line1 = y1_axis.plot (x, num_of_crit_chains, color='black',  marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='# of Critical Chains')
+                if (not (plot_only_crit)):
+                    y2_axis.set_ylabel('# of Migrated Chains', color=y2_color)
+                    line2 = y2_axis.plot (x, num_of_migrations,  color=y2_color, marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='# of Migrated Chains')
                 
-            lines = line1 + line2
+            lines = line1 if (plot_only_crit) else line1 + line2
             plt.xlim (0)
             
             plt.legend (lines, [line.get_label() for line in lines], loc='upper center', fontsize=LEGEND_FONT_SIZE)
@@ -477,6 +480,55 @@ class Res_file_parser (object):
                 printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['cost'])) 
             printf (self.output_file, '\\\\ \\hline \n')
 
+    def plot_mig_vs_rsrcs (self, pcl_input_file_name, normalize_X = True, min_cpu=None):
+        """
+        Plot a Python graph showing the number of mig' as a function of the amount of resources (actually, cpu capacity at leaf):
+        * Read the required pickled data from an input file.
+        * Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf). 
+          Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol. 
+        """
+        
+        if (find_time_slot_len(pcl_input_file_name)!=1):
+            print ('Error: currently, plot_mig_vs_rsrcs runs only on slot_len=1 sec')
+            return
+        
+        mode_list = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+
+        _, ax = plt.subplots()
+
+        cpu_vals = sorted (set ([item['cpu'] for item in mode_list]))
+    
+        # If requested, normalize all cpu values (X axis) by the smallest CPU required by opt for finding a feasible sol.
+        x_norm_factor = min_cpu if (normalize_X) else 1
+        
+        if (x_norm_factor==None):
+            print ('Error: please either set normalize_x to False, or provide a min_cpu value')
+            exit () 
+
+        x = []
+        y = []        
+        for cpu_val in cpu_vals: 
+    
+            list_of_item = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # all items with this cpu value, of this mode (the list should usually include a single item)
+            if (len(list_of_item)!=1):
+                print ('Warning: len(list_of_item)=={}' .format (len(list_of_item)))
+            item  = list_of_item[0]
+            x_val = cpu_val/x_norm_factor
+            x.append (x_val)
+            ax.plot ((x_val, x_val), (item['y_lo'], item['y_hi']), color=self.color_dict['ourAlg']) # Plot the confidence interval 
+            y.append (item['y_avg'])
+    
+        self.my_plot (ax, x, y, mode='ourAlg')
+        
+        plt.xlabel(r'cpu')
+        plt.ylabel('Mig. Cost')
+        # plt.xlim (1, 3)
+        # plt.ylim (0, 2000000)
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
+        
+        plt.tight_layout()
+        printFigToPdf ('cost_vs_rsrc_{}' .format (pcl_input_file_name.split('.pcl')[0]))
+
 
     def plot_cost_vs_rsrcs (self, pcl_input_file_name, normalize_X = True, min_cpu=None):
         """
@@ -605,10 +657,67 @@ class Res_file_parser (object):
             pickle.dump(self.cost_vs_rsrc_data, cost_vs_rsrc_data_file)
         return self.pcl_output_file_name 
 
+    def calc_mig_vs_rsrcs (self, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3, pcl_input_file_name=None):
+        """
+        Calculate the data needed for plotting a graph showing the migration cost / number of migrated chains / number of reshuffles, as a function of the amount of resources (actually, cpu capacity at leaf):
+        * Optional inputs: 
+            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
+            A list of .res files, containing the results of a run.
+            At least one file (either .pcl, or .res file) should be given       
+        * Calculate the average # of migrated chains for each seed during the whole trace for each seed, the confidence intervals, etc. 
+        * Save the (pickled) processed data into self.cost_vs_rsrc_data.pcl.
+        * Returns the file name to which it saved the pickled results. 
+        """
+        
+        self.mig_vs_rsrc_data = []
+        
+        # If the caller provided a .res input file, parse the data from it
+        for file_name in res_input_file_names:
+            self.parse_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=False)
+    
+        mig_vs_rsrc_data = []
+
+        mode_list = sorted (self.gen_filtered_list (self.list_of_dicts, prob=prob, min_t=min_t, max_t=max_t), key = lambda item : item['cpu']) # list of lines with data about this mode
+
+        # Filter-out all results of failed runs 
+        failed_runs = [] # failed_runs will include the cpu and seed values for all runs that fail: we've to filter-out these results while calculating the mean cost
+        for item in [item for item in mode_list if item['stts']!=1 ]:
+            failed_runs.append ({'cpu' : item['cpu'], 'seed' : item['seed']})
+        for failed_run in failed_runs: # Remove all results of this failed_run from the list of relevant results 
+            mode_list = list (filter (lambda item : not (item['cpu']==failed_run['cpu'] and item['seed']==failed_run['seed']), mode_list))
+
+        cpu_vals = sorted (set ([item['cpu'] for item in mode_list]))
+
+        for cpu_val in cpu_vals:  
+            
+            mode_cpu_list = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # list of results of runs for this mode, and cpu value
+            avg_mig_cost_of_each_seed = [] # will hold the avg mig cost of each successful run with a given mode, cpu value, and seed (averaging the cost over all the slots in the trace)
+            for seed in set ([item['seed'] for item in mode_cpu_list]): # list of seeds for which the whole run succeeded with this mode (algorithm), and this cpu val
+                avg_mig_cost_of_each_seed.append (np.average ([item['mig_cost'] for item in mode_cpu_list if item['seed']==seed]))                    
+
+            avg_mig_cost_of_all_seeds = np.average (avg_mig_cost_of_each_seed)
+            [y_lo, y_hi]          = self.conf_interval (ar=avg_mig_cost_of_each_seed, avg=avg_mig_cost_of_all_seeds) # low, high y values for this plotted conf' interval
+            
+            mig_vs_rsrc_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_mig_cost_of_all_seeds,'num_of_seeds' : len(avg_mig_cost_of_each_seed)})
+        
+        # Add this new calculated point to the ds. Avoid duplications of points.
+        for point in sorted (mig_vs_rsrc_data, key = lambda point : point['cpu']):
+            
+            list_of_item = list (filter (lambda item : item['cpu']==cpu_val, self.mig_vs_rsrc_data)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
+            if (point not in self.mig_vs_rsrc_data and len(list_of_item)==0): # insert this new point to the list of points only if it's not already found in self.cost_vs_rsrc_data
+                self.mig_vs_rsrc_data.append (point)
+        
+        # store the data in a '.pcl' file (binary data stream)
+        self.pcl_output_file_name = 'mig_vs_rsrc_{}.pcl' .format (self.input_file_name.split('.res')[0]) 
+        with open('../res/' + self.pcl_output_file_name, 'wb') as mig_vs_rsrc_data_file:
+            pickle.dump(mig_vs_rsrc_data, mig_vs_rsrc_data_file)
+        return self.pcl_output_file_name 
 
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
+    pcl_output_file_name = my_res_file_parser.calc_mig_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
+    
     
     # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
@@ -626,8 +735,8 @@ if __name__ == '__main__':
     # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     # my_res_file_parser.plot_cost_vs_rsrcs (pcl_input_file_name=pcl_output_file_name)
     
-    my_res_file_parser.parse_file ('Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_sd99_cpu926.res', parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)   
-    my_res_file_parser.plot_cost_comp () 
+    pcl_file_name = my_res_file_parser.calc_mig_vs_rsrcs(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])   
+    my_res_file_parser.plot_mig_vs_rsrcs (pcl_input_file_name=pcl_file_name) 
     
     # my_res_file_parser.plot_cost_vs_rsrcs (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 

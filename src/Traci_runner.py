@@ -166,7 +166,7 @@ class Traci_runner (object):
         self.verbose            = verbose
         
         time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
-        print ('Running Traci for the period {}' .format (time_str))
+        print ('Running Traci for the period {} to count vehs only' .format (time_str))
         traci.start(self.mysumoCmd())
         self.cnt_output_file_name = '../res/{}_{}_{}secs_cnt.res' .format (self.city, time_str, len_of_time_slot_in_sec) 
         self.cnt_output_file      = open (self.cnt_output_file_name, 'w')

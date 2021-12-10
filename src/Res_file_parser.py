@@ -106,6 +106,13 @@ class Res_file_parser (object):
 
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
+    def plot_lin_reg (self, x, y, ax):
+        """
+        Plot a linear regression for the given scatter 
+        """
+        m, b = np.polyfit (x, y,  1) # linear reg. parameters: m is the slope, b is the constant
+        ax.plot (x, m*x+b)
+
     def plot_tot_num_of_vehs_per_slot (self, pcl_input_file_names):
         """
         Plots the number of vehicles in the simulated area as a function of time.
@@ -151,6 +158,12 @@ class Res_file_parser (object):
         _, ax = plt.subplots (4)
         num_crit_sctr, ratio_crit_sctr, num_mig_sctr, ratio_mig_sctr = ax[0], ax[1], ax[2], ax[3]
          
+        avg_num_of_migrations    = []    
+        avg_ratio_of_migrations  = [] 
+        avg_num_of_crit_chains   = [] 
+        avg_ratio_of_crit_chains = []
+        x                        = []
+        
         for num_veh in num_vehs_in_slot_set: # for each distinct value of the number of vehicles
             
             # relevant_slot will hold all the slots in which the number of vehicles is exactly num_vehs. 
@@ -160,19 +173,24 @@ class Res_file_parser (object):
             res_from_these_slots = list (filter (lambda item : item['t'] in relevant_slots, self.list_of_dicts))
             if (len (res_from_these_slots)==0): # No results from the relevant slots
                 continue
-            
-            avg_num_of_migrations    = np.average ([item['mig_cost']                       for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST
-            avg_ratio_of_migrations  = np.average ([item['mig_cost']/item['num_usrs']      for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST
-            avg_num_of_crit_chains   = np.average ([item['num_crit_usrs']                  for item in res_from_these_slots])
-            avg_ratio_of_crit_chains = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_these_slots])
-            ratio_crit_sctr.scatter (num_veh, avg_ratio_of_crit_chains, s=MARKER_SIZE, c='red', marker='o')
-            # slope, const = np.polyfit (num_veh, avg_ratio_of_crit_chains,  1) # linear reg. parameters
-            
-            num_crit_sctr.  scatter (num_veh, avg_num_of_crit_chains,   s=MARKER_SIZE, c='blue', marker='o')
-            num_mig_sctr.   scatter (num_veh, avg_num_of_migrations,    s=MARKER_SIZE, c='black', marker='o')
-            ratio_mig_sctr. scatter (num_veh, avg_ratio_of_migrations,  s=MARKER_SIZE, c='black', marker='o')
+
+            x. append (num_veh) # append this num of vehs only now, when we're sure that there exist results for the relevant slots
+            avg_num_of_crit_chains.  append (np.average ([item['num_crit_usrs']                  for item in res_from_these_slots]))
+            avg_ratio_of_crit_chains.append (np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_these_slots]))
+            avg_num_of_migrations.   append (np.average ([item['mig_cost']                       for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST)
+            avg_ratio_of_migrations. append (np.average ([item['mig_cost']/item['num_usrs']      for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST)
         
         # plt
+        num_crit_sctr.  scatter (x, avg_num_of_crit_chains,   s=MARKER_SIZE, c='black', marker='o')
+        ratio_crit_sctr.scatter (x, avg_ratio_of_crit_chains, s=MARKER_SIZE, c='black', marker='o')
+        num_mig_sctr.   scatter (x, avg_num_of_migrations,    s=MARKER_SIZE, c='black', marker='o')
+        ratio_mig_sctr. scatter (x, avg_ratio_of_migrations,  s=MARKER_SIZE, c='black', marker='o')
+        
+        self.plot_lin_reg (x=np.array(x), y=avg_num_of_crit_chains,   ax=num_crit_sctr)
+        self.plot_lin_reg (x=np.array(x), y=avg_ratio_of_crit_chains, ax=ratio_crit_sctr)
+        self.plot_lin_reg (x=np.array(x), y=avg_num_of_migrations,    ax=num_mig_sctr)
+        self.plot_lin_reg (x=np.array(x), y=avg_ratio_of_migrations,  ax=ratio_mig_sctr)
+
         ax[0].set (ylabel='# of Critical Chains')
         ax[1].set (ylabel='Ratio of Critical Chains')
         ax[2].set (ylabel='# of Mig. Chains')
@@ -769,7 +787,7 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
-    city = 'short'
+    city = 'Monaco'
     if city=='Monaco':
         res_file_to_parse = 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res'
     elif city=='short': 

@@ -25,10 +25,10 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE      = 9 
+MARKER_SIZE      = 1 #9 
 LINE_WIDTH       = 3 
-FONT_SIZE        = 20
-LEGEND_FONT_SIZE = 10
+FONT_SIZE        = 5# 20
+LEGEND_FONT_SIZE = 5 #10
 
 UNIFORM_CHAIN_MIG_COST = 600
 
@@ -131,18 +131,26 @@ class Res_file_parser (object):
         plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
              
       
-    def plot_cost_comp_by_num_vehs (self, res_file_to_parse):
+    def plot_cost_comp_by_num_vehs (self, res_file_to_parse, cpu=None):
         """
         Generate a plot of the ratio of critical usrs over time, and of the mig cost over time.
         The output plot may be either tikz, and/or python.   
         """
 
         self.city = self.parse_city_from_input_file_name (res_file_to_parse)
+        
+        if cpu==None:
+            cpu=842 if city=='Monaco' else 94
+        else:
+            cpu = cpu
         self.parse_file(res_file_to_parse, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
 
         num_vehs_in_slot     = np.array (pd.read_pickle(r'../res/{}_0730_0830_1secs_num_of_vehs.pcl' .format (self.city)), dtype='int16')
         num_vehs_in_slot_set = set (num_vehs_in_slot)
 
+        _, ax = plt.subplots (4)
+        num_crit_sctr, ratio_crit_sctr, num_mig_sctr, ratio_mig_sctr = ax[0], ax[1], ax[2], ax[3]
+         
         for num_veh in num_vehs_in_slot_set: # for each distinct value of the number of vehicles
             
             # relevant_slot will hold all the slots in which the number of vehicles is exactly num_vehs. 
@@ -150,16 +158,31 @@ class Res_file_parser (object):
             relevant_slots = [(i + 27001) for i, x in enumerate(num_vehs_in_slot) if x == num_veh]  
             num_vehs_in_slot     = [item  for item in num_vehs_in_slot]
             res_from_these_slots = list (filter (lambda item : item['t'] in relevant_slots, self.list_of_dicts))
+            if (len (res_from_these_slots)==0): # No results from the relevant slots
+                continue
             
-            avg_num_of_migrations  = np.average ([item['mig_cost']      for item in res_from_these_slots]) / UNIFORM_CHAIN_MIG_COST
-            avg_num_of_crit_chains = np.average ([item['num_crit_usrs'] for item in res_from_these_slots]) 
-            # plt.scatter(num_veh, avg_num_of_migrations, s=MARKER_SIZE, c='black', marker='o')
-            plt.scatter(num_veh, avg_num_of_crit_chains, s=MARKER_SIZE, c='blue', marker='o')
+            avg_num_of_migrations    = np.average ([item['mig_cost']                       for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST
+            avg_ratio_of_migrations  = np.average ([item['mig_cost']/item['num_usrs']      for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST
+            avg_num_of_crit_chains   = np.average ([item['num_crit_usrs']                  for item in res_from_these_slots])
+            avg_ratio_of_crit_chains = np.average ([item['num_crit_usrs']/item['num_usrs'] for item in res_from_these_slots])
+            ratio_crit_sctr.scatter (num_veh, avg_ratio_of_crit_chains, s=MARKER_SIZE, c='red', marker='o')
+            # slope, const = np.polyfit (num_veh, avg_ratio_of_crit_chains,  1) # linear reg. parameters
+            
+            num_crit_sctr.  scatter (num_veh, avg_num_of_crit_chains,   s=MARKER_SIZE, c='blue', marker='o')
+            num_mig_sctr.   scatter (num_veh, avg_num_of_migrations,    s=MARKER_SIZE, c='black', marker='o')
+            ratio_mig_sctr. scatter (num_veh, avg_ratio_of_migrations,  s=MARKER_SIZE, c='black', marker='o')
         
-        plt.xlabel ('# of Vehicles')
-        # plt.ylabel ('Num of Migrated Chains')
-        plt.ylabel ('# of Critical Chains')
-        printFigToPdf ('../res/{}_crit_vs_num_vehs' .format (self.city))
+        # plt
+        ax[0].set (ylabel='# of Critical Chains')
+        ax[1].set (ylabel='Ratio of Critical Chains')
+        ax[2].set (ylabel='# of Mig. Chains')
+        ax[3].set (ylabel='# of Mig. Chains / # of Chains')
+        ax[3].set (xlabel='# of Vehicles')
+        # plt.show ()
+        # plt.save
+        # plt_num_mig. savefig ('../mig.jpg')
+        # plt_num_crit.savefig ('../crit.jpg')
+        printFigToPdf ('../res/{}_mig_vs_num_vehs' .format (self.city))
 
     def plot_cost_comp (self, plot_tikz=False, plot_python=True, normalize=False, plot_only_crit=True):
         """
@@ -746,9 +769,15 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
-    city = 'Lux'
-    res_file_to_parse = 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_sd99_cpu1320.res' if city=='Monaco' else 'Lux_0730_0830_1secs_post_p0.3_ourAlg.res'
-    my_res_file_parser.plot_cost_comp_by_num_vehs (res_file_to_parse=res_file_to_parse)
+    city = 'short'
+    if city=='Monaco':
+        res_file_to_parse = 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res'
+    elif city=='short': 
+        res_file_to_parse = 'Monaco_0730_0830_1secs_short.res'
+        city = 'Monsco'
+    else:
+        res_file_to_parse = 'Lux_0730_0830_1secs_post_p0.3_ourAlg.res' #
+    my_res_file_parser.plot_cost_comp_by_num_vehs (res_file_to_parse=res_file_to_parse, cpu=842 if city=='Monaco' else 94)
     # pcl_output_file_name = my_res_file_parser.calc_mig_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
     
     

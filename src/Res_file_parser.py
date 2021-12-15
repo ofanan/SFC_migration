@@ -787,14 +787,19 @@ class Res_file_parser (object):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
-    city = 'Monaco'
+    city = 'Lux'
+    resh = True
     if city=='Monaco':
         res_file_to_parse = 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res'
     elif city=='short': 
         res_file_to_parse = 'Monaco_0730_0830_1secs_short.res'
         city = 'Monsco'
+    else:                    
+        res_file_to_parse = 'Lux_0730_0830_1secs_post_p0.3_ourAlg.res' # 1347
+    if (city in ['Monaco', 'short']):
+        cpu = 842 if resh else 1347
     else:
-        res_file_to_parse = 'Lux_0730_0830_1secs_post_p0.3_ourAlg.res' #
+        cpu = 94
     my_res_file_parser.plot_cost_comp_by_num_vehs (res_file_to_parse=res_file_to_parse, cpu=842 if city=='Monaco' else 94)
     # pcl_output_file_name = my_res_file_parser.calc_mig_vs_rsrcs (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_short.res'])
     

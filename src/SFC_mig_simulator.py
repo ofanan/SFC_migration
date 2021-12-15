@@ -1721,7 +1721,7 @@ def run_cost_comp_by_rsrc_sim (city, seeds):
 def main ():
 
     # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
-    run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
+    run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2, 4)])
     # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):

@@ -1714,7 +1714,7 @@ def run_cost_comp_by_rsrc_sim (city, seeds):
     else:
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0820_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
     for seed in seeds:
-        for cpu_cap_at_leaf in [inter (init_cpu_cap_at_leaf[city] * (1 + i/10)) for i in range(5, 25)]:
+        for cpu_cap_at_leaf in [inter (init_cpu_cap_at_leaf[city] * (1 + i/10)) for i in range(3, 21)]:
             my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
 

@@ -1001,15 +1001,15 @@ def plot_mig_vs_rsrc (city):
          
 if __name__ == '__main__':
 
+    city='Lux'
+    reshuffle=True
+    # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
+    plot_mig_vs_rsrc (city=city)
+    exit ()
+    
     my_res_file_parser = Res_file_parser ()
     pcl_output_file_name = my_res_file_parser.parse_files (['Lux_0730_0830_1secs_post_p0.3_ourAlg_cpu103.res', 'Lux_0730_0830_16secs_post_p0.3_ourAlg.res'])
     my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name=pcl_output_file_name)
-    exit ()
-    
-    city='Lux'
-    reshuffle=False
-    # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
-    plot_mig_vs_rsrc (city=city)
     
     # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))

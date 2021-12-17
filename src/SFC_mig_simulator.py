@@ -1731,10 +1731,6 @@ def run_T_len_sim (city):
 
 def main ():
 
-    run_T_len_sim (city='Monaco')
-    # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
-    # run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2, 4)])
-    # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=)
     # seed = None
     # if (len (sys.argv)>1):
     #     seed=int(sys.argv[1])   
@@ -1772,6 +1768,9 @@ def main ():
     #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
     # for seed in [60 + delta_sd for delta_sd in range (21)]:
     #     my_simulator.binary_search_algs(output_file=open ('../res/{}_0730_0830_find_min_CPU.res' .format(city), 'a'), mode='ourAlg', cpu_cap_at_leaf=842 if (city=='Monaco') else 94 , seed=seed)
+    # run_T_len_sim (city='Monaco')
+    # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
+    run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
 
 if __name__ == "__main__":
     main()

@@ -3,6 +3,7 @@ import numpy as np, pandas as pd, seaborn as sns, matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
 from printf import printf, printmat, invert_mat_bottom_up, printFigToPdf
+from Res_file_parser import parse_city_from_input_file_name
 
 # from matplotlib.co//lors import LogNorm, Normalize
 # from matplotlib.ticker import MaxNLocator
@@ -244,7 +245,7 @@ class loc2poa_c (object):
     #     #
     #     # return my_heatmap
 
-    def __init__(self, max_power_of_4=3, verbose=[], antloc_file_name='', city=''):
+    def __init__(self, max_power_of_4=3, verbose=[], antloc_file_name=None, city=None):
         """
         Init a "loc2poa_c" object.
         A loc2poa_c is used can read ".loc" files (files detailing the location of each veh over time), and output ".poa" files (files detailing the PoA assignment of each veh), and/or statistics 
@@ -255,9 +256,9 @@ class loc2poa_c (object):
         self.debug              = False 
         self.antloc_file_name   = antloc_file_name
         
-        if (antloc_file_name !='' ): 
+        if (antloc_file_name !=None): 
             self.city = antloc_file_name.split('.')[0] # extract the city from the antennas' location file 
-        elif (city != ''):
+        elif (city != None):
             self.city = city
         else:
             print ('Error: nor antenna location file, neither city was specified.')
@@ -1189,10 +1190,23 @@ def plot_demography_heatmap (city, max_power_of_4):
     input_demography_file_name ='{}_demography_0730_0830_1secs_{}.txt' .format (city, 3 * 4**max_power_of_4 if city=='Monaco' else 4**max_power_of_4)  
     my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name, plot_colorbar=True)
 
+def parse_loc_files (list_of_loc_files_to_parse, max_power_of_4=None):
+    """
+    Parse the requested .loc files into .poa files, using the highest rectangles' resolution and real-world antennas locations. 
+    """
+    
+    city=parse_city_from_input_file_name (list_of_loc_files_to_parse[0])
+    if (max_power_of_4==None):
+        max_power_of_4 = 4 if city=='Lux' else 3
+    my_loc2poa = loc2poa_c (max_power_of_4 = max_power_of_4, 
+                            city=city, 
+                            verbose=[VERBOSE_POA], 
+                            antloc_file_name = 'Lux.post.antloc' if city=='Lux' else 'Monaco.Telecom.antloc') 
+    my_loc2poa.parse_loc_files (list_of_loc_files_to_parse) 
+
 if __name__ == '__main__':
 
-    city = 'Monaco'
-    my_loc2poa = loc2poa_c (max_power_of_4 = 0, city=city, verbose=[]) 
+    parse_loc_files (['Monaco_0730_0830_2secs.loc'])
 
     # plot_demography_heatmap (city='Lux', max_power_of_4=1)
 

@@ -1719,7 +1719,6 @@ def run_cost_comp_by_rsrc_sim (city, seeds):
 
 def run_T_len_sim (city):
 
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_2secs_Telecom.poa', verbose=[VERBOSE_RES])
     poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
     
     for T in [2, 4, 8]:
@@ -1728,9 +1727,7 @@ def run_T_len_sim (city):
                                           verbose=[VERBOSE_RES])
         
         my_simulator.simulate (mode = 'ourAlg', 
-                               cpu_cap_at_leaf = 94 if city=='Lux' else 842)
-
-    
+                               cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
 
 def main ():
 

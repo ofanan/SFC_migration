@@ -809,7 +809,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC']):   
-            self.max_R = 1.5 
+            self.max_R = 1.1 
         else:
             self.max_R = 1.8
 
@@ -1776,7 +1776,7 @@ def main ():
 
 if __name__ == "__main__":
 
-    city = 'Lux'    
+    city = 'Monaco'    
     if (city=='Monaco'):
         poa_file_name      = 'Monaco_0730_0830_1secs_Telecom.poa'
         poa2cell_file_name ='Monaco.Telecom.antloc_192cells.poa2cell'

@@ -809,7 +809,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC']):   
-            self.max_R = 1.2 
+            self.max_R = 1.5 
         else:
             self.max_R = 1.8
 
@@ -1686,17 +1686,19 @@ def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
 def run_prob_of_RT_sim (city, mode, prob=None):
     
     if (city=='Monaco'):
-        poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'
-        poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell'
+        poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'
+        poa2cell_file_name ='Monaco.Telecom.antloc_192cells.poa2cell'
     else:
-        poa_file_name='Lux_0820_0830_1secs_post.poa'
-        poa2cell_file_name='Lux.post.antloc_256cells.poa2cell'
+        poa_file_name      = 'Lux_0820_0830_1secs_post.poa' 
+        poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
 
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
     if (mode=='opt'):
         my_simulator.run_prob_of_RT_sim_opt   (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob)
     else:
         my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
+
+
 
 # def run_cost_comp_sim (city):
 #     if (city=='Monaco'):
@@ -1773,5 +1775,19 @@ def main ():
     run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
 
 if __name__ == "__main__":
-    main()
+
+    city = 'Lux'    
+    if (city=='Monaco'):
+        poa_file_name      = 'Monaco_0730_0830_1secs_Telecom.poa'
+        poa2cell_file_name ='Monaco.Telecom.antloc_192cells.poa2cell'
+    else:
+        poa_file_name      = 'Lux_0730_0830_1secs_post.poa' 
+        poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
+
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+    my_simulator.binary_search_algs (output_file=my_simulator.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='ourAlgC'),
+                                     mode='ourAlgC', 
+                                     cpu_cap_at_leaf=160 if city=='Lux' else 1263, 
+                                     prob_of_target_delay=0.3)
+    # main()
     

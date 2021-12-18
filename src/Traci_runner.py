@@ -428,9 +428,10 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    city = 'Monaco'
-    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate (warmup_period=7.5*3600, sim_length=3600, len_of_time_slot_in_sec=2, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    city = 'Lux'
+    for T in [3, 5, 6, 7, 9, 10]:
+        my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
+        my_Traci_runner.simulate (warmup_period=7.5*3600, sim_length=3600, len_of_time_slot_in_sec=T, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.calc_tot_lane_len_in_all_rects ()
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')

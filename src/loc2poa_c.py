@@ -1206,7 +1206,8 @@ def parse_loc_files (list_of_loc_files_to_parse, max_power_of_4=None):
 
 if __name__ == '__main__':
 
-    parse_loc_files (['Monaco_0730_0830_2secs.loc'])
+    for T in [3, 5, 6, 7, 9, 10]:
+        parse_loc_files (['Lux_0730_0830_{}secs.loc' .format (T)])
 
     # plot_demography_heatmap (city='Lux', max_power_of_4=1)
 

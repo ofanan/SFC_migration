@@ -1787,7 +1787,7 @@ if __name__ == "__main__":
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
     my_simulator.binary_search_algs (output_file=my_simulator.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='ourAlgC'),
                                      mode='ourAlgC', 
-                                     cpu_cap_at_leaf=160 if city=='Lux' else 1263, 
+                                     cpu_cap_at_leaf=232 if city=='Lux' else 1300, 
                                      prob_of_target_delay=0.3)
     # main()
     

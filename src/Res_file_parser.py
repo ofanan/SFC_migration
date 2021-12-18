@@ -856,7 +856,7 @@ class Res_file_parser (object):
         for item in mig_vs_rsrc_data:
             ax.plot ( (item['cpu']/10, item['cpu']/10), (item['y_lo']/UNIFORM_CHAIN_MIG_COST, item['y_hi']/UNIFORM_CHAIN_MIG_COST), color=self.color_dict['ourAlg']) # Plot the confidence interval
         ax.plot ( (item['cpu']/10, item['cpu']/10), (item['y_lo']/UNIFORM_CHAIN_MIG_COST, item['y_hi']/UNIFORM_CHAIN_MIG_COST), color=self.color_dict['ourAlg']) # Plot the confidence interval
-        vertical_line_x = 20 if (city=='lux') else 140
+        vertical_line_x = 23.5 if (city=='lux') else 130
         plt.axvline (vertical_line_x, color='black', linestyle='dashed')
         # ax.plot ( (vertical_line_x, vertical_line_x), (0, 1000), color='black')
         printFigToPdf ('{}_num_migs_vs_rsrc' .format (city))
@@ -885,6 +885,10 @@ class Res_file_parser (object):
         return pcl_output_file_name
     
     def plot_crit_n_mig_vs_T (self, pcl_input_file_name):
+        """
+        plot the number of critical chains (on one y-axis), and the migration cost (on the other y-axis), vs. the slot interval, T.
+        Input: pcl_input_file_name - a .pcl file, containing a list_of_dicts, namely, a list of dictionaries with all the results. 
+        """
 
         self.list_of_dicts = pd.read_pickle ('../res/{}' .format (pcl_input_file_name))
         
@@ -916,11 +920,54 @@ class Res_file_parser (object):
         num_crit_axis.set_ylabel  ('Avg. # of Critical chains', fontsize=FONT_SIZE)
         mig_cost_axis.set_ylabel  ('Total Mig. Cost',           fontsize=FONT_SIZE, color=mig_color)
         mig_cost_axis.tick_params (axis='y', colors=mig_color)
-        # plt.ylabel('Min CPU at leaf [GHz]')
-        # ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (1,16)
         self.my_plot (x=x, y=y_num_crit, ax=num_crit_axis,  color='black')
         self.my_plot (x=x, y=y_mig_cost,  ax=mig_cost_axis, color=mig_color)
+
+        plt.show ()        
+
+    def plot_Q (self, pcl_input_file_name):
+        """
+        plot several plots, showing the weighted cost, which considers the "phi" cost objective function, plus a penalty for the # of critical chains - as a function of the slot T. 
+        """
+
+        self.list_of_dicts = pd.read_pickle ('../res/{}' .format (pcl_input_file_name))
+        
+        list_of_Ts = sorted (set ([item['T'] for item in self.list_of_dicts])) # list_of_Ts is the list of all slots for which there're results 
+        
+        matplotlib.rcParams.update({'font.size'       : FONT_SIZE, 
+                                    'legend.fontsize' : LEGEND_FONT_SIZE,
+                                    'xtick.labelsize' : FONT_SIZE,
+                                    'ytick.labelsize' : FONT_SIZE,
+                                    'axes.labelsize'  : FONT_SIZE,
+                                    'axes.titlesize'  : FONT_SIZE})
+        
+        _, y_axis = plt.plot ()
+        
+        list_of_costs_n_num_crits = [] 
+        
+        # First, gather all the data for calculating the plots' values
+        for T in list_of_Ts:
+            list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T] # list_of_dicts_T <-- list of results when simulated with time slot==T.
+            
+            list_of_costs_n_num_crits.append ({'T'                  : T,
+                                               'cost_wo_penalty'    : np.average ([item['cost'] for item in list_of_dicts_T]), # value of the objective func'
+                                               'num_of_crit_chains' : np.average ([item['num_crit_usrs']  for item in list_of_dicts_T])}) 
+                                                                                    
+        for Q in [100]:
+            y_vals = []
+            for T in list_of_Ts:
+                list_of_dict = [item for item in list_of_costs_n_num_crits if item['T']==T]
+                item = list_of_dict[0]
+                y_vals.append (item['cost_wo_penalty'] + Q*item['num_of_cirt_chains'])
+            plt.plot (list_of_Ts, y_vals, color='black')
+                
+        plt.xlabel  ('Time Slot [s]', fontsize=FONT_SIZE)
+        plt.ylabel  ('Cost with Penalty', fontsize=FONT_SIZE)
+        # plt.xlim (1,16)
+        # y_axis.set_xscale  ('log')
+        # y_axis.set_xticks  ( [1, 2, 4, 8, 16])
+        # y_axis.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
 
         plt.show ()        
 
@@ -964,6 +1011,10 @@ def plot_mig_vs_rsrc (city):
          
 if __name__ == '__main__':
 
+    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser.plot_Q (pcl_input_file_name='Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.pcl')
+    exit ()
+    
     city='Monaco'
     reshuffle=True
     # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)

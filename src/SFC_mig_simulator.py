@@ -1723,7 +1723,7 @@ def run_T_len_sim (city):
 
     poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
     
-    for T in [2, 4, 8]:
+    for T in [3, 5, 6, 7, 9, 10]:
         my_simulator = SFC_mig_simulator (poa2cell_file_name=poa2cell_file_name, 
                                           poa_file_name='Lux_0730_0830_{}secs_post.poa' .format (T) if city=='Lux' else 'Monaco_0730_0830_{}secs_Telecom.poa' .format (T), 
                                           verbose=[VERBOSE_RES])
@@ -1731,7 +1731,7 @@ def run_T_len_sim (city):
         my_simulator.simulate (mode = 'ourAlg', 
                                cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
 
-def main ():
+# def main ():
 
     # seed = None
     # if (len (sys.argv)>1):
@@ -1772,22 +1772,23 @@ def main ():
     #     my_simulator.binary_search_algs(output_file=open ('../res/{}_0730_0830_find_min_CPU.res' .format(city), 'a'), mode='ourAlg', cpu_cap_at_leaf=842 if (city=='Monaco') else 94 , seed=seed)
     # run_T_len_sim (city='Monaco')
     # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
-    run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
+    # run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
 
 if __name__ == "__main__":
 
-    city = 'Monaco'    
-    if (city=='Monaco'):
-        poa_file_name      = 'Monaco_0730_0830_1secs_Telecom.poa'
-        poa2cell_file_name ='Monaco.Telecom.antloc_192cells.poa2cell'
-    else:
-        poa_file_name      = 'Lux_0730_0830_1secs_post.poa' 
-        poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
-
-    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-    my_simulator.binary_search_algs (output_file=my_simulator.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='ourAlgC'),
-                                     mode='ourAlgC', 
-                                     cpu_cap_at_leaf=232 if city=='Lux' else 1300, 
-                                     prob_of_target_delay=0.3)
+    run_T_len_sim (city='Lux')
+    # city = 'Monaco'    
+    # if (city=='Monaco'):
+    #     poa_file_name      = 'Monaco_0730_0830_1secs_Telecom.poa'
+    #     poa2cell_file_name ='Monaco.Telecom.antloc_192cells.poa2cell'
+    # else:
+    #     poa_file_name      = 'Lux_0730_0830_1secs_post.poa' 
+    #     poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
+    #
+    # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+    # my_simulator.binary_search_algs (output_file=my_simulator.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='ourAlgC'),
+    #                                  mode='ourAlgC', 
+    #                                  cpu_cap_at_leaf=232 if city=='Lux' else 1300, 
+    #                                  prob_of_target_delay=0.3)
     # main()
     

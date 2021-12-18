@@ -109,8 +109,6 @@ class Res_file_parser (object):
                                 'ffitC'   : 'v',
                                 'cpvnfC'  : 'd'}
         
-        # matplotlib.rcParams.update({'font.size': FONT_SIZE})
-
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
     def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None): 
@@ -892,7 +890,7 @@ class Res_file_parser (object):
 
         self.list_of_dicts = pd.read_pickle ('../res/{}' .format (pcl_input_file_name))
         
-        list_of_Ts = set ([item['T'] for item in self.list_of_dicts]) # list_of_Ts is the list of all slots for which there're results 
+        list_of_Ts = sorted (set ([item['T'] for item in self.list_of_dicts])) # list_of_Ts is the list of all slots for which there're results 
         
         matplotlib.rcParams.update({'font.size'       : FONT_SIZE, 
                                     'legend.fontsize' : LEGEND_FONT_SIZE,
@@ -901,12 +899,14 @@ class Res_file_parser (object):
                                     'axes.labelsize'  : FONT_SIZE,
                                     'axes.titlesize'  : FONT_SIZE})
         
+        city = parse_city_from_input_file_name (pcl_input_file_name)
+        cpu = 103 if city=='Lux' else 926
         _, num_crit_axis = plt.subplots()
         mig_cost_axis = num_crit_axis.twinx ()
         
         x, y_num_crit, y_mig_cost = [], [], []
         for T in list_of_Ts:
-            list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T] # list_of_dicts_T <-- list of results when simulated with time slot==T.
+            list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T and item['cpu']==cpu] # list_of_dicts_T <-- list of results when simulated with time slot==T.
             
             x.append (T) 
             y_num_crit.append (np.average ([item['num_crit_usrs'] for item in list_of_dicts_T]))
@@ -924,7 +924,7 @@ class Res_file_parser (object):
         self.my_plot (x=x, y=y_num_crit, ax=num_crit_axis,  color='black')
         self.my_plot (x=x, y=y_mig_cost,  ax=mig_cost_axis, color=mig_color)
 
-        plt.show ()        
+        printFigToPdf('{}_crit_n_mig_vs_T' .format (city))
 
     def plot_Q (self, pcl_input_file_name):
         """
@@ -942,7 +942,7 @@ class Res_file_parser (object):
                                     'axes.labelsize'  : FONT_SIZE,
                                     'axes.titlesize'  : FONT_SIZE})
         
-        _, y_axis = plt.plot ()
+        # _, y_axis = plt.plot ()
         
         list_of_costs_n_num_crits = [] 
         
@@ -950,17 +950,23 @@ class Res_file_parser (object):
         for T in list_of_Ts:
             list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T] # list_of_dicts_T <-- list of results when simulated with time slot==T.
             
-            list_of_costs_n_num_crits.append ({'T'                  : T,
-                                               'cost_wo_penalty'    : np.average ([item['cost'] for item in list_of_dicts_T]), # value of the objective func'
-                                               'num_of_crit_chains' : np.average ([item['num_crit_usrs']  for item in list_of_dicts_T])}) 
+            # # The lines below calculate the total cost
+            # cost = (np.sum ( [item['link_cost']  for item in list_of_dicts_T] ) + 
+            #         np.sum ( [item['cpu_cost' ]  for item in list_of_dicts_T] ) ) * T + np.sum ( [item['mig_cost'] for item in list_of_dicts_T]) 
+            list_of_costs_n_num_crits.append ({'T'                   : T,
+                                               'mig_cost_wo_penalty' : np.sum ([item['mig_cost' ]  for item in list_of_dicts_T]), # value of the objective func'
+                                               'ratio_of_crit_chains': np.average ([item['num_crit_usrs']/item['num_usrs']  for item in list_of_dicts_T])}) 
                                                                                     
-        for Q in [100]:
+        for Q in [1000000]:
             y_vals = []
             for T in list_of_Ts:
                 list_of_dict = [item for item in list_of_costs_n_num_crits if item['T']==T]
                 item = list_of_dict[0]
-                y_vals.append (item['cost_wo_penalty'] + Q*item['num_of_cirt_chains'])
-            plt.plot (list_of_Ts, y_vals, color='black')
+                print ('cost={:.0f}\t, ratio={:.2f}\t, cost_w_penalty={:.0f}' .format (item['mig_cost_wo_penalty'], item['ratio_of_crit_chains'], item['mig_cost_wo_penalty'] * (1 + Q*item['ratio_of_crit_chains'])))
+                y_vals.append ( item['mig_cost_wo_penalty'] * (1 + Q*item['ratio_of_crit_chains']))
+                # y_vals.append ( item['mig_cost_wo_penalty'])
+                # y_vals.append (item['ratio_of_crit_chains'])
+            plt.plot (list_of_Ts, y_vals)
                 
         plt.xlabel  ('Time Slot [s]', fontsize=FONT_SIZE)
         plt.ylabel  ('Cost with Penalty', fontsize=FONT_SIZE)
@@ -1012,18 +1018,15 @@ def plot_mig_vs_rsrc (city):
 if __name__ == '__main__':
 
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.plot_Q (pcl_input_file_name='Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.pcl')
-    exit ()
+    my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='Lux_vary_T.pcl')
     
-    city='Monaco'
+    city='Lux'
     reshuffle=True
     # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
-    plot_mig_vs_rsrc (city=city)
-    exit ()
+    # plot_mig_vs_rsrc (city=city)
+    # exit ()
     
-    # my_res_file_parser = Res_file_parser ()
-    # pcl_output_file_name = my_res_file_parser.parse_files (['Lux_0730_0830_1secs_post_p0.3_ourAlg_cpu103.res', 'Lux_0730_0830_16secs_post_p0.3_ourAlg.res'])
-    # my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name=pcl_output_file_name)
+    # pcl_output_file_name = my_res_file_parser.parse_files (['Lux_0730_0830_1secs_post_p0.3_ourAlg_cpu103.res', 'Lux_0730_0830_16secs_post_p0.3_ourAlg.res', 'Lux_0730_0830_2secs_post_p0.3_ourAlg_sd42.res', 'Lux_0730_0830_4secs_post_p0.3_ourAlg_sd42.res'])
     
     # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
     # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))

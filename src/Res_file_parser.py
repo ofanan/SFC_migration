@@ -26,13 +26,13 @@ alg_idx   = 1
 ffit_idx  = 2
 cpvnf_idx = 3
 
-MARKER_SIZE             = 1 
+MARKER_SIZE             = 16
 MARKER_SIZE_SMALL       = 1
 LINE_WIDTH              = 3 
 LINE_WIDTH_SMALL        = 1 
 FONT_SIZE               = 20
 FONT_SIZE_SMALL         = 5
-LEGEND_FONT_SIZE        = 10
+LEGEND_FONT_SIZE        = 16
 LEGEND_FONT_SIZE_SMALL  = 5 
 
 UNIFORM_CHAIN_MIG_COST = 600
@@ -40,8 +40,17 @@ UNIFORM_CHAIN_MIG_COST = 600
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
 
-# Understand which city's data are these, based on the input file name 
-parse_city_from_input_file_name = lambda input_file_name : input_file_name.split ('_')[0]
+ 
+
+def parse_city_from_input_file_name (input_file_name): 
+    """
+    Understand which city's data are these, based on the input file name
+    """
+    city = input_file_name.split ('_')[0]
+    
+    if (city=='RT'): # in the special case of RT_prob_sim, this is not the city's file name, so need further parsing
+        city = input_file_name.split ('RT_prob_sim_')[1].split('_')[0].split('.')[0]
+    return city
 
 class Res_file_parser (object):
     """
@@ -63,6 +72,20 @@ class Res_file_parser (object):
     # Find the length of the time slot based on the input file name
     parse_T_from_input_file_name = lambda self, input_file_name : int (input_file_name.split ('secs')[0].split('_')[-1])
 
+    set_plt_params = lambda self, size='large' : matplotlib.rcParams.update({'font.size': FONT_SIZE, 
+                                                                             'legend.fontsize': LEGEND_FONT_SIZE,
+                                                                             'xtick.labelsize':FONT_SIZE,
+                                                                             'ytick.labelsize':FONT_SIZE,
+                                                                             'axes.labelsize': FONT_SIZE,
+                                                                             'axes.titlesize':FONT_SIZE,}) if (size=='large') else matplotlib.rcParams.update({
+                                                                             'font.size': FONT_SIZE_SMALL, 
+                                                                             'legend.fontsize': LEGEND_FONT_SIZE_SMALL,
+                                                                             'xtick.labelsize':FONT_SIZE_SMALL,
+                                                                             'ytick.labelsize':FONT_SIZE_SMALL,
+                                                                             'axes.labelsize': FONT_SIZE_SMALL,
+                                                                             'axes.titlesize':FONT_SIZE_SMALL,
+                                                                             })
+    
     def __init__ (self):
         """
         Initialize a Res_file_parser, used to parse result files, and generate plots. 
@@ -190,13 +213,7 @@ class Res_file_parser (object):
         num_vehs_in_slot     = np.array (pd.read_pickle(r'../res/{}_0730_0830_1secs_num_of_vehs.pcl' .format (self.city)), dtype='int16')
         num_vehs_in_slot_set = set (num_vehs_in_slot)
 
-        matplotlib.rcParams.update({'font.size': FONT_SIZE_SMALL, 
-                                    'legend.fontsize': LEGEND_FONT_SIZE_SMALL,
-                                    'xtick.labelsize':FONT_SIZE_SMALL,
-                                    'ytick.labelsize':FONT_SIZE_SMALL,
-                                    'axes.labelsize': FONT_SIZE_SMALL,
-                                    'axes.titlesize':FONT_SIZE_SMALL,
-                                    })
+        self.set_plt_params (size='small')
         _, ax = plt.subplots (4)
         num_crit_sctr, ratio_crit_sctr, num_mig_sctr, ratio_mig_sctr = ax[0], ax[1], ax[2], ax[3]
          
@@ -482,7 +499,7 @@ class Res_file_parser (object):
     #
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
-    def plot_RT_prob_sim_python (self, input_file_name=None):
+    def plot_RT_prob_sim_python (self, input_file_name=None, reshuffle=True):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         Show the conf' intervals.
@@ -492,9 +509,12 @@ class Res_file_parser (object):
         
         if (input_file_name != None):
             self.parse_file(input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+            city = parse_city_from_input_file_name (input_file_name)
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
+        self.set_plt_params ()
         _, ax = plt.subplots()
-        for mode in ['opt', 'ourAlgC', 'ffitC', 'cpvnfC']: #['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        modes = ['opt', 'ourAlg', 'ffit', 'cpvnf'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
         
@@ -525,6 +545,7 @@ class Res_file_parser (object):
         plt.ylabel('Min CPU at leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
+        plt.ylim (0, 33 if self.city=='Lux' else 230)
             
         plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
 
@@ -603,6 +624,10 @@ class Res_file_parser (object):
             return
         
         self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+        
+        self.set_plt_params ()
+        # print (self.cost_vs_rsrc_data)
+        # exit ()
 
         _, ax = plt.subplots()
 
@@ -840,13 +865,7 @@ class Res_file_parser (object):
 
         city             = parse_city_from_input_file_name(pcl_input_file_name)
         mig_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
-        matplotlib.rcParams.update({'font.size': FONT_SIZE, 
-                                    'legend.fontsize': LEGEND_FONT_SIZE,
-                                    'xtick.labelsize':FONT_SIZE,
-                                    'ytick.labelsize':FONT_SIZE,
-                                    'axes.labelsize': FONT_SIZE,
-                                    'axes.titlesize':FONT_SIZE,
-                                    })
+        self.set_plt_params ()
         _, ax = plt.subplots()
         ax.set_xlabel ('CPU at leaf [GHz]')
         ax.set_ylabel ('# of Mig. Chains')
@@ -854,12 +873,12 @@ class Res_file_parser (object):
         for item in mig_vs_rsrc_data:
             ax.plot ( (item['cpu']/10, item['cpu']/10), (item['y_lo']/UNIFORM_CHAIN_MIG_COST, item['y_hi']/UNIFORM_CHAIN_MIG_COST), color=self.color_dict['ourAlg']) # Plot the confidence interval
         ax.plot ( (item['cpu']/10, item['cpu']/10), (item['y_lo']/UNIFORM_CHAIN_MIG_COST, item['y_hi']/UNIFORM_CHAIN_MIG_COST), color=self.color_dict['ourAlg']) # Plot the confidence interval
-        vertical_line_x = 23.5 if (city=='lux') else 130
+        vertical_line_x = 23.5 if (city=='Lux') else 130
         plt.axvline (vertical_line_x, color='black', linestyle='dashed')
-        # ax.plot ( (vertical_line_x, vertical_line_x), (0, 1000), color='black')
+        plt.xlim (0, np.max ([item['cpu']/10 for item in mig_vs_rsrc_data]))
         printFigToPdf ('{}_num_migs_vs_rsrc' .format (city))
 
-    def parse_files (self, filenames):
+    def parse_files_w_distinct_T (self, filenames):
         """
         Parse each of the given files. Add to its entry in self.list_of_dicts a field, presenting the length of the time slot.
         Save the results in a .pcl file.
@@ -892,12 +911,7 @@ class Res_file_parser (object):
         
         list_of_Ts = sorted (set ([item['T'] for item in self.list_of_dicts])) # list_of_Ts is the list of all slots for which there're results 
         
-        matplotlib.rcParams.update({'font.size'       : FONT_SIZE, 
-                                    'legend.fontsize' : LEGEND_FONT_SIZE,
-                                    'xtick.labelsize' : FONT_SIZE,
-                                    'ytick.labelsize' : FONT_SIZE,
-                                    'axes.labelsize'  : FONT_SIZE,
-                                    'axes.titlesize'  : FONT_SIZE})
+        self.set_plt_params ()
         
         city = parse_city_from_input_file_name (pcl_input_file_name)
         cpu = 103 if city=='Lux' else 926
@@ -914,68 +928,63 @@ class Res_file_parser (object):
                 
         mig_color = 'blue'
         num_crit_axis.set_xlabel  ('Time Slot [s]',             fontsize=FONT_SIZE)
-        num_crit_axis.set_xscale  ('log')
-        num_crit_axis.set_xticks  ( [1, 2, 4, 8, 16])
+        # num_crit_axis.set_xscale  ('log')
+        num_crit_axis.set_xticks  ( [1, 3, 5, 7, 9])
+        plt.xlim (1,10)
         num_crit_axis.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
         num_crit_axis.set_ylabel  ('Avg. # of Critical chains', fontsize=FONT_SIZE)
         mig_cost_axis.set_ylabel  ('Total Mig. Cost',           fontsize=FONT_SIZE, color=mig_color)
         mig_cost_axis.tick_params (axis='y', colors=mig_color)
-        plt.xlim (1,16)
         self.my_plot (x=x, y=y_num_crit, ax=num_crit_axis,  color='black')
         self.my_plot (x=x, y=y_mig_cost,  ax=mig_cost_axis, color=mig_color)
 
         printFigToPdf('{}_crit_n_mig_vs_T' .format (city))
 
-    def plot_Q (self, pcl_input_file_name):
-        """
-        plot several plots, showing the weighted cost, which considers the "phi" cost objective function, plus a penalty for the # of critical chains - as a function of the slot T. 
-        """
-
-        self.list_of_dicts = pd.read_pickle ('../res/{}' .format (pcl_input_file_name))
-        
-        list_of_Ts = sorted (set ([item['T'] for item in self.list_of_dicts])) # list_of_Ts is the list of all slots for which there're results 
-        
-        matplotlib.rcParams.update({'font.size'       : FONT_SIZE, 
-                                    'legend.fontsize' : LEGEND_FONT_SIZE,
-                                    'xtick.labelsize' : FONT_SIZE,
-                                    'ytick.labelsize' : FONT_SIZE,
-                                    'axes.labelsize'  : FONT_SIZE,
-                                    'axes.titlesize'  : FONT_SIZE})
-        
-        # _, y_axis = plt.plot ()
-        
-        list_of_costs_n_num_crits = [] 
-        
-        # First, gather all the data for calculating the plots' values
-        for T in list_of_Ts:
-            list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T] # list_of_dicts_T <-- list of results when simulated with time slot==T.
-            
-            # # The lines below calculate the total cost
-            # cost = (np.sum ( [item['link_cost']  for item in list_of_dicts_T] ) + 
-            #         np.sum ( [item['cpu_cost' ]  for item in list_of_dicts_T] ) ) * T + np.sum ( [item['mig_cost'] for item in list_of_dicts_T]) 
-            list_of_costs_n_num_crits.append ({'T'                   : T,
-                                               'mig_cost_wo_penalty' : np.sum ([item['mig_cost' ]  for item in list_of_dicts_T]), # value of the objective func'
-                                               'ratio_of_crit_chains': np.average ([item['num_crit_usrs']/item['num_usrs']  for item in list_of_dicts_T])}) 
-                                                                                    
-        for Q in [1000000]:
-            y_vals = []
-            for T in list_of_Ts:
-                list_of_dict = [item for item in list_of_costs_n_num_crits if item['T']==T]
-                item = list_of_dict[0]
-                print ('cost={:.0f}\t, ratio={:.2f}\t, cost_w_penalty={:.0f}' .format (item['mig_cost_wo_penalty'], item['ratio_of_crit_chains'], item['mig_cost_wo_penalty'] * (1 + Q*item['ratio_of_crit_chains'])))
-                y_vals.append ( item['mig_cost_wo_penalty'] * (1 + Q*item['ratio_of_crit_chains']))
-                # y_vals.append ( item['mig_cost_wo_penalty'])
-                # y_vals.append (item['ratio_of_crit_chains'])
-            plt.plot (list_of_Ts, y_vals)
-                
-        plt.xlabel  ('Time Slot [s]', fontsize=FONT_SIZE)
-        plt.ylabel  ('Cost with Penalty', fontsize=FONT_SIZE)
-        # plt.xlim (1,16)
-        # y_axis.set_xscale  ('log')
-        # y_axis.set_xticks  ( [1, 2, 4, 8, 16])
-        # y_axis.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-
-        plt.show ()        
+    # def plot_Q (self, pcl_input_file_name):
+    #     """
+    #     Currently unused.
+    #     plot several plots, showing the weighted cost, which considers the "phi" cost objective function, plus a penalty for the # of critical chains - as a function of the slot T. 
+    #     """
+    #
+    #     self.list_of_dicts = pd.read_pickle ('../res/{}' .format (pcl_input_file_name))
+    #
+    #     list_of_Ts = sorted (set ([item['T'] for item in self.list_of_dicts])) # list_of_Ts is the list of all slots for which there're results 
+    #
+    #     self.set_plt_params ()
+    #     # _, y_axis = plt.plot ()
+    #
+    #     list_of_costs_n_num_crits = [] 
+    #
+    #     # First, gather all the data for calculating the plots' values
+    #     for T in list_of_Ts:
+    #         list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T] # list_of_dicts_T <-- list of results when simulated with time slot==T.
+    #
+    #         # # The lines below calculate the total cost
+    #         # cost = (np.sum ( [item['link_cost']  for item in list_of_dicts_T] ) + 
+    #         #         np.sum ( [item['cpu_cost' ]  for item in list_of_dicts_T] ) ) * T + np.sum ( [item['mig_cost'] for item in list_of_dicts_T]) 
+    #         list_of_costs_n_num_crits.append ({'T'                   : T,
+    #                                            'mig_cost_wo_penalty' : np.sum ([item['mig_cost' ]  for item in list_of_dicts_T]), # value of the objective func'
+    #                                            'ratio_of_crit_chains': np.average ([item['num_crit_usrs']/item['num_usrs']  for item in list_of_dicts_T])}) 
+    #
+    #     for Q in [1000000]:
+    #         y_vals = []
+    #         for T in list_of_Ts:
+    #             list_of_dict = [item for item in list_of_costs_n_num_crits if item['T']==T]
+    #             item = list_of_dict[0]
+    #             print ('cost={:.0f}\t, ratio={:.2f}\t, cost_w_penalty={:.0f}' .format (item['mig_cost_wo_penalty'], item['ratio_of_crit_chains'], item['mig_cost_wo_penalty'] * (1 + Q*item['ratio_of_crit_chains'])))
+    #             y_vals.append ( item['mig_cost_wo_penalty'] * (1 + Q*item['ratio_of_crit_chains']))
+    #             # y_vals.append ( item['mig_cost_wo_penalty'])
+    #             # y_vals.append (item['ratio_of_crit_chains'])
+    #         plt.plot (list_of_Ts, y_vals)
+    #
+    #     plt.xlabel  ('Time Slot [s]', fontsize=FONT_SIZE)
+    #     plt.ylabel  ('Cost with Penalty', fontsize=FONT_SIZE)
+    #     # plt.xlim (1,16)
+    #     # y_axis.set_xscale  ('log')
+    #     # y_axis.set_xticks  ( [1, 2, 4, 8, 16])
+    #     # y_axis.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    #
+    #     plt.show ()        
 
 
 def plot_num_crit_n_mig_vs_num_vehs (city, reshuffle):
@@ -1011,38 +1020,60 @@ def plot_mig_vs_rsrc (city):
     """
         
     my_res_file_parser = Res_file_parser ()
-    # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
-    pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name='Lux_0730_0830_1secs_post_p0.3_ourAlg.pcl' if city=='Lux' else 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.pcl')
-    my_res_file_parser.plot_mig_vs_rsrc (pcl_input_file_name = pcl_output_file_name) #'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_num_mig_chains_vs_rsrc.pcl')
+    # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name='Lux_0730_0830_1secs_post_p0.3_ourAlg.pcl' if city=='Lux' else 'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.pcl')
+    # my_res_file_parser.plot_mig_vs_rsrc (pcl_input_file_name = pcl_output_file_name) #'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_num_mig_chains_vs_rsrc.pcl')
+    my_res_file_parser.plot_mig_vs_rsrc (pcl_input_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city))
          
-if __name__ == '__main__':
+def plot_crit_n_mig_vs_T (city):
 
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='Lux_vary_T.pcl')
-    
-    city='Lux'
-    reshuffle=True
-    # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
-    # plot_mig_vs_rsrc (city=city)
-    # exit ()
-    
-    # pcl_output_file_name = my_res_file_parser.parse_files (['Lux_0730_0830_1secs_post_p0.3_ourAlg_cpu103.res', 'Lux_0730_0830_16secs_post_p0.3_ourAlg.res', 'Lux_0730_0830_2secs_post_p0.3_ourAlg_sd42.res', 'Lux_0730_0830_4secs_post_p0.3_ourAlg_sd42.res'])
-    
-    # cost_vs_rsrc_data = pd.read_pickle (r'../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl')
-    # cost_vs_rsrc_data = list (filter (lambda item : item['mode']!='cpvnf', cost_vs_rsrc_data))
-    # with open('../res/cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 'wb') as cost_vs_rsrc_data_file:
-    #     pickle.dump (cost_vs_rsrc_data, cost_vs_rsrc_data_file)
+    files_to_parse = []
+    if (city=='Lux'):
+        for T in range (1, 11):
+            files_to_parse.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
+    else:
+        for T in range (1, 11):
+            files_to_parse.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
+    my_res_file_parser.parse_files_w_distinct_T(files_to_parse)
+    my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city))
 
-    # city = 'Monaco'
-    # if (city=='Lux'):            
-    #     my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
-    # else:
-    #     my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+def plot_RT_prob_sim (city):
+    """
+    Generate a plot of the minimal required resources to find a feasible sol', as a function of the ratio of requests with RT requirements.
+    The plot is saved as a .pdf in the '../res' directory.    
+    """
+    my_res_file_parser = Res_file_parser ()
+    if (city=='Lux'):            
+        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    else:
+        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+
+
+def plot_cost_vs_rsrc (city):
+    """
+    Generate a plot of the cost, as a function of the resources. 
+    """
+
+    my_res_file_parser = Res_file_parser ()
+    if (city=='Monaco'):
+        pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
+    # pcl_input_file_name = 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
+    my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_input_file_name)
     
-    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res', 'Lux_0820_0830_1secs_post_p0.3_cpvnf.res', 'Lux_0820_0830_1secs_post_p0.3_ffit.res', 'Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])
-    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
-    # pcl_output_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
-    # my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_output_file_name)
+if __name__ == '__main__':
+
+    plot_RT_prob_sim (city='Lux')
+    # plot_cost_vs_rsrc (city='Monaco')
+    exit ()
+    
+    # plot_crit_n_mig_vs_T (city)
+    
+    # city='Monaco'
+    # reshuffle=True
+    # plot_mig_vs_rsrc (city=city)
+    # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
+    # exit ()
+        
     
     # pcl_file_name = my_res_file_parser.calc_mig_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])   
     
@@ -1050,3 +1081,4 @@ if __name__ == '__main__':
 
     
     # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
+    # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 

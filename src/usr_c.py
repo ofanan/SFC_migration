@@ -19,6 +19,7 @@ class usr_c (object):
         self.cur_s              = cur_s # current placement (server)
         self.nxt_s              = nxt_s # next (scheduled) server
         self.rand_id            = random.randint (min_rand_id, max_rand_id)
+        self.criticality_duration = int(1) # For how many slots this usr is already critical. Upon init the value is 1, because a new usr is already critical for 1 (smallest) time unit, by definition.
              
     def __lt__ (self, other):
         """

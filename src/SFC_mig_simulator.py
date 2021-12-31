@@ -21,6 +21,7 @@ VERBOSE_MOB           = 5  # Write data about the mobility of usrs, and about th
 VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug. Hence, this way of calculation is good for opt only, as opt searches each time fora solw from sratch.  
 VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
 VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
+VERBOSE_CRIT_LEN      = 10 # Calculate how much time each chain is critical, for the given slot len.
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -882,7 +883,8 @@ class SFC_mig_simulator (object):
             self.final_slot_to_simulate = self.t + self.sim_len_in_slots
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
-        self.critical_usrs = [] # rst the list of usrs who are critical in this time slot
+        if (VERBOSE_CRIT_LEN not in self.verbose):
+            self.critical_usrs = [] # rst the list of usrs who are critical in this time slot
         # self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
 
                     
@@ -978,6 +980,10 @@ class SFC_mig_simulator (object):
         - If the alg' failed to find a feasible sol', even at a single slot, return with self.stts=fail
         """
         
+        if (VERBOSE_CRIT_LEN in self.verbose):
+            # self.crit_usrs_dicts = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
+            self.critical_usrs = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
+        
         # reset Hs     
         if (self.mode in ['ourAlg', 'ourAlgC']):
             for s in self.G.nodes():
@@ -1019,9 +1025,15 @@ class SFC_mig_simulator (object):
                     
                 # solve the prob' using the requested alg'    
                 if   (self.mode in ['ourAlg', 'ourAlgC']):
+                    # if (VERBOSE_CRIT_LEN in self.verbose):
+                    #     self.critical_usrs = [item['usr'] for item in self.crit_usrs_dicts]
+                    if (VERBOSE_CRIT_LEN in self.verbose):
+                        self.report_crit_durations ()
                     self.stts = self.alg_top(self.bottom_up)
                     if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
                         self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
+                    if (VERBOSE_CRIT_LEN in self.verbose):
+                        self.critical_usrs = [] # after the alg' (successfully) run, there should be no crit' chains
                 elif (self.mode in ['ffit', 'ffitC']):
                     self.stts = self.alg_top(self.first_fit)
                 elif (self.mode in ['wfit', 'wfitC']):
@@ -1320,14 +1332,44 @@ class SFC_mig_simulator (object):
                 self.rmv_usr_from_all_Hs(usr) 
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr) # Add the usr only to the 'Hs' (list of usrs that may be hosted on a server) of each of its delay-feasible servers
-                                              
-            # Is it possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget 
-            if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]):  
-                continue # Yep: the delay constraint are satisfied also in the current placement.
+                                               
+            if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Is it possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget?
+                if (VERBOSE_CRIT_LEN in self.verbose):
+                    if (usr in self.critical_usrs): # this usr was critical, but not it isn't critical anymore
+                        usr.criticality_duration = int(0)
+                        self.critical_usrs.remove(usr)
+                        continue
+                    # list_of_item = [item for item in self.crit_usrs_dicts if item['usr']==usr] # list_of_items is a list with all occurrences of this item within the list of current critical usrs
+                    # if (len (list_of_item == 0)):
+                    #     continue # this usr wasn't critical
+                    # elif (len (list_of_item == 1)): # this usr was critical, but now it isn't
+                    #     self.crit_usrs_dicts.remove(item)
+                    #     continue
+                    # else:
+                    #     print ('Error: len(list_of_item) >= 2')
+                    #     exit ()
+                else:
+                    continue # The delay constraint are satisfied also in the current placement
             
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
-            self.critical_usrs.append(usr)
+            if (VERBOSE_CRIT_LEN in self.verbose):
+                if (usr in self.critical_usrs): # this usr was already critical
+                    usr.criticality_duration += 1  
+                else:
+                    self.critical_usrs.append(usr)
+                # list_of_item = [item for item in self.crit_usrs_dicts if item['usr']==usr] # list_of_items is a list with all occurrences of this item within the list of current critical usrs
+                # if (len (list_of_item == 0)):
+                #     self.crit_usrs_dicts.append ({'usr' : usr, 'duration' : int(1)}) # This usr has just became critical --> insert it to the list of dicts of critical usrs
+                # elif (len (list_of_item == 1)): # this usr was already critical, but now it isn't
+                #     item['duration'] += 1
+                #     continue
+                # else:
+                #     print ('Error: len(list_of_item) >= 2, take 2')
+                #     exit ()
+            else:
+                self.critical_usrs.append(usr)
+            
             self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
             usr.lvl   = -1
             usr.nxt_s = -1
@@ -1355,7 +1397,11 @@ class SFC_mig_simulator (object):
                 usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
             
             # self.moved_usrs.append (usr)
-            self.critical_usrs.append(usr)
+            # if (VERBOSE_CRIT_LEN in self.verbose):
+            #     self.crit_usrs_dicts.append ({'usr' : usr, 'duration' : int(1)}) # Insert this new usr to the list of dicts of critical usrs, with criticality duration=1. 
+            # else: 
+            #     self.critical_usrs.append(usr) # Insert this new usr to the list of critical usrs
+            self.critical_usrs.append(usr) # Insert this new usr to the list of critical usrs
 
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr) 
@@ -1654,12 +1700,17 @@ class SFC_mig_simulator (object):
 #######################################################################################################################################
 
 
-def run_cost_vs_rsrc (poa_file_name, poa2cell_file_name, seed=None):
+def run_cost_vs_rsrc (city, seed=None):
     """
     Run a simulation where the amount of resources varies. 
     Output the cost obtained at each time slot.
     """
     
+    if (len (sys.argv)>1):
+        seed=int(sys.argv[1])   
+    poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa' if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa'    
+    poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
+
     print ('Running run_cost_vs_rsrc')
     seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
 
@@ -1698,8 +1749,6 @@ def run_prob_of_RT_sim (city, mode, prob=None):
     else:
         my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
 
-
-
 # def run_cost_comp_sim (city):
 #     if (city=='Monaco'):
 #         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_16secs_Telecom.poa', verbose=[VERBOSE_RES])
@@ -1731,64 +1780,26 @@ def run_T_len_sim (city):
         my_simulator.simulate (mode = 'ourAlg', 
                                cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
 
-# def main ():
 
-    # seed = None
-    # if (len (sys.argv)>1):
-    #     seed=int(sys.argv[1])   
-    # poa_file_name      = 'Monaco_0820_0830_1secs_Telecom.poa'       #'Monaco_0730_0830_16secs_Telecom.poa' #'Monaco_0820_0830_1secs_Telecom.poa' #'Lux_0820_0830_1secs_post.poa' #'Monaco_0820_0830_1secs_Telecom.poa' 
-    # poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell'  #'Lux.post.antloc_256cells.poa2cell' #'Monaco.Telecom.antloc_192cells.poa2cell'
-    # run_cost_vs_rsrc(poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, seed=seed)
-
-    # print ('Running cost_vs_rsrc')
-
-    # seed=int(sys.argv[1])
-    # cpu_cap_at_leaf = inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + seed/10)) 
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-
-    # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-    # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-
-    # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
-    # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=926, seed=99)
-
-    # city = 'Monaco'
-    # if (city=='Monaco'):
-    #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1020, seed=99)
-    # else:
-    #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
-    #     my_simulator.simulate (mode = 'ourAlgC', cpu_cap_at_leaf=250, seed=99)
+def run_crit_len_sim (city, slot_len=1):
+    """
+    Run a simulation for finding how much time each chain is critical, for the given slot len.
+    Inputs: 
+    slot_len = length of the slot between subsequent runs of the placement alg'.
+    Output:
+    A .res file, written to the ../res directory. 
+    """
     
-    # city = 'Lux'
-    # if (city=='Monaco'):
-    #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-    # else:
-    #     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
-    # for seed in [60 + delta_sd for delta_sd in range (21)]:
-    #     my_simulator.binary_search_algs(output_file=open ('../res/{}_0730_0830_find_min_CPU.res' .format(city), 'a'), mode='ourAlg', cpu_cap_at_leaf=842 if (city=='Monaco') else 94 , seed=seed)
-    # run_T_len_sim (city='Monaco')
-    # run_prob_of_RT_sim (city='Lux', mode='ourAlgC')
-    # run_cost_comp_by_rsrc_sim(city='Lux', seeds=[10 + i for i in range (2)])
+    for T in [1]:
+        my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                          poa_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                          verbose=[VERBOSE_RES, VERBOSE_CRIT_LEN])
+        my_simulator.ourAlg_slot_len = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
+        
+        my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
+
 
 if __name__ == "__main__":
 
-    run_T_len_sim (city='Lux')
-    # city = 'Monaco'    
-    # if (city=='Monaco'):
-    #     poa_file_name      = 'Monaco_0730_0830_1secs_Telecom.poa'
-    #     poa2cell_file_name ='Monaco.Telecom.antloc_192cells.poa2cell'
-    # else:
-    #     poa_file_name      = 'Lux_0730_0830_1secs_post.poa' 
-    #     poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
-    #
-    # my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-    # my_simulator.binary_search_algs (output_file=my_simulator.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='ourAlgC'),
-    #                                  mode='ourAlgC', 
-    #                                  cpu_cap_at_leaf=232 if city=='Lux' else 1300, 
-    #                                  prob_of_target_delay=0.3)
-    # main()
-    
+    run_crit_len_sim ()
+    # run_T_len_sim (city='Lux')

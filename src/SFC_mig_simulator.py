@@ -480,7 +480,7 @@ class SFC_mig_simulator (object):
                 n += 1
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up:\n')
-        if (self.t == self.slot_to_dump or self.poa_file_name=='shorter.poa' or self.poa_file_name == 'shorter_t2.poa'): #$$$ 
+        if (self.t == self.slot_to_dump):  
             self.dump_state_to_log_file()  
 
     def CPUAll_single_usr (self, usr): 
@@ -983,6 +983,14 @@ class SFC_mig_simulator (object):
         if (VERBOSE_CRIT_LEN in self.verbose):
             # self.crit_usrs_dicts = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
             self.critical_usrs = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
+            self.crit_len_file_name = '../res/{}_crit_len_T{}.res' .format (self.city, self.ourAlg_slot_len)
+            self.crit_len_file = open (self.crit_len_file_name, 'wb')
+            if Path(self.crit_len_file_name).is_file(): # does this res file already exist?
+                self.crit_len_file =  open (self.crit_len_file_name,  "a")
+            else:
+                self.crit_len_file =  open (self.crit_len_file_name,  "w")
+                printf (self.crit_len_file, '// Format: tX | crit1=C1 | crit2=C2 | ...\n')
+                printf (self.crit_len_file, '// where: X is the number of the time slot, and Ci is the number of chains which are currently critical for i seconds.\n\n') 
         
         # reset Hs     
         if (self.mode in ['ourAlg', 'ourAlgC']):
@@ -1003,6 +1011,9 @@ class SFC_mig_simulator (object):
                 if (self.t >= self.final_slot_to_simulate):
                     self.post_processing ()
                     return
+                if (VERBOSE_CRIT_LEN in self.verbose):
+                    for usr in self.critical_usrs: # By default, we increment the criticality duration of all critical chains. If a critical usr is actually not critical anymore, we'll later fix it 
+                        usr.criticality_duration += 1
                 continue
                 
             elif (splitted_line[0] == "usrs_that_left:"): # Reached a line indicating usrs that left the sim in the ".poa" input file
@@ -1027,13 +1038,20 @@ class SFC_mig_simulator (object):
                 if   (self.mode in ['ourAlg', 'ourAlgC']):
                     # if (VERBOSE_CRIT_LEN in self.verbose):
                     #     self.critical_usrs = [item['usr'] for item in self.crit_usrs_dicts]
-                    if (VERBOSE_CRIT_LEN in self.verbose):
-                        self.report_crit_durations ()
-                    self.stts = self.alg_top(self.bottom_up)
-                    if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
-                        self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
-                    if (VERBOSE_CRIT_LEN in self.verbose):
-                        self.critical_usrs = [] # after the alg' (successfully) run, there should be no crit' chains
+                    if (VERBOSE_CRIT_LEN in self.verbose and (self.is_first_t or (self.t%self.ourAlg_slot_len==0))):
+                        if (not (self.is_first_t)):
+                            printf (self.crit_len_file, self.settings_str())
+                            for T in range (1, self.ourAlg_slot_len+1):
+                                printf (self.crit_len_file, ' | crit{}={}' .format (T, len([item for item in self.critical_usrs if item.criticality_duration==T])))
+                            printf (self.crit_len_file, '\n')
+                        self.stts = self.alg_top(self.bottom_up)
+                        if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
+                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
+                            self.critical_usrs = [] # after the alg' (successfully) run, there should be no crit' chains
+                    else:
+                        self.stts = self.alg_top(self.bottom_up)
+                        if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
+                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
                 elif (self.mode in ['ffit', 'ffitC']):
                     self.stts = self.alg_top(self.first_fit)
                 elif (self.mode in ['wfit', 'wfitC']):
@@ -1044,7 +1062,10 @@ class SFC_mig_simulator (object):
                     print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
                     exit ()
         
-                self.print_sol_to_res_and_log ()
+                if (VERBOSE_CRIT_LEN not in self.verbose):
+                    self.print_sol_to_res_and_log ()
+                elif (self.t%self.ourAlg_slot_len==0):
+                    self.print_sol_to_res_and_log ()
                 if (self.stts!=sccs):
                     return # Once an alg' fails to find a sol even for a single slot, we don't try to further simulate, 
                 
@@ -1271,7 +1292,7 @@ class SFC_mig_simulator (object):
         Looks for a feasible sol'.
         Returns sccs if a feasible sol was found, fail else.
         """      
-        if (self.t == self.slot_to_dump or self.poa_file_name=='shorter.poa' or self.poa_file_name == 'shorter_t2.poa'): #$$$ 
+        if (self.t == self.slot_to_dump):  
             self.dump_state_to_log_file()  
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).v
             lvl = self.G.nodes[s]['lvl']
@@ -1339,34 +1360,15 @@ class SFC_mig_simulator (object):
                         usr.criticality_duration = int(0)
                         self.critical_usrs.remove(usr)
                         continue
-                    # list_of_item = [item for item in self.crit_usrs_dicts if item['usr']==usr] # list_of_items is a list with all occurrences of this item within the list of current critical usrs
-                    # if (len (list_of_item == 0)):
-                    #     continue # this usr wasn't critical
-                    # elif (len (list_of_item == 1)): # this usr was critical, but now it isn't
-                    #     self.crit_usrs_dicts.remove(item)
-                    #     continue
-                    # else:
-                    #     print ('Error: len(list_of_item) >= 2')
-                    #     exit ()
                 else:
                     continue # The delay constraint are satisfied also in the current placement
             
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
             if (VERBOSE_CRIT_LEN in self.verbose):
-                if (usr in self.critical_usrs): # this usr was already critical
-                    usr.criticality_duration += 1  
-                else:
+                if (usr not in self.critical_usrs): # this usr wasn't critical 
+                    usr.criticality_duration = 1
                     self.critical_usrs.append(usr)
-                # list_of_item = [item for item in self.crit_usrs_dicts if item['usr']==usr] # list_of_items is a list with all occurrences of this item within the list of current critical usrs
-                # if (len (list_of_item == 0)):
-                #     self.crit_usrs_dicts.append ({'usr' : usr, 'duration' : int(1)}) # This usr has just became critical --> insert it to the list of dicts of critical usrs
-                # elif (len (list_of_item == 1)): # this usr was already critical, but now it isn't
-                #     item['duration'] += 1
-                #     continue
-                # else:
-                #     print ('Error: len(list_of_item) >= 2, take 2')
-                #     exit ()
             else:
                 self.critical_usrs.append(usr)
             
@@ -1790,9 +1792,10 @@ def run_crit_len_sim (city, slot_len=1):
     A .res file, written to the ../res directory. 
     """
     
-    for T in [1]:
+    for T in range (1, 11):
+        # my_simulator = SFC_mig_simulator (verbose=[VERBOSE_RES, VERBOSE_CRIT_LEN]) # poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-                                          poa_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                          poa_file_name='Monaco_0730_0830_1secs_Telecom.poa' if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
                                           verbose=[VERBOSE_RES, VERBOSE_CRIT_LEN])
         my_simulator.ourAlg_slot_len = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
         
@@ -1801,5 +1804,5 @@ def run_crit_len_sim (city, slot_len=1):
 
 if __name__ == "__main__":
 
-    run_crit_len_sim ()
+    run_crit_len_sim (city='Lux')
     # run_T_len_sim (city='Lux')

@@ -360,8 +360,8 @@ class Res_file_parser (object):
             vec.append (float(item))
         return np.array(vec)
 
-        
-    def parse_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True):
+
+    def parse_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False, time_slot_len=None):
         """
         Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
         """
@@ -369,7 +369,10 @@ class Res_file_parser (object):
         self.city = parse_city_from_input_file_name(input_file_name)
         print ('city is ', self.city)
         self.input_file_name = input_file_name
-        self.time_slot_len   = find_time_slot_len (self.input_file_name) 
+        if (time_slot_len==None):
+            self.time_slot_len   = find_time_slot_len (self.input_file_name)
+        else:
+            self.time_slot_len = time_slot_len 
         self.input_file      = open ("../res/" + input_file_name,  "r")
         lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines                = (line for line in lines if line)       # Discard blank lines
@@ -380,7 +383,7 @@ class Res_file_parser (object):
             if (line.split ("//")[0] == ""):
                 continue
            
-            self.parse_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs)
+            self.parse_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs, parse_crit_len=parse_crit_len)
             if (self.dict==None): # No new data from this line
                 continue
             if (not(self.dict in self.list_of_dicts)):
@@ -389,9 +392,15 @@ class Res_file_parser (object):
         self.input_file.close
 
 
-    def parse_line (self, line, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True):
+    def parse_line (self, line, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False):
         """
-        Parse a line in a result file. Such a line should begin with a string having several fields, detailing the settings.
+        Parse a line in a ".res" result file, and save the parsed data in the dictionary self.dict. 
+        Such a line should begin with a string having several fields, detailing the settings.
+        Inpust:
+        parse_cost - when true, parse and save a field also for the total cost.
+        parse_cost_comp - when true, parse and save a field also for the cost's component (cpu, link, mig).
+        parse_num_usrs - when true, parse and save a field also for the the overall number of the usrs, and the num of crit' usrs.
+        parse_crit_len - when true, increase the relevant counters counting the number of chains with the length of duration of being critical. 
         """
 
         splitted_line = line.split (" | ")
@@ -424,6 +433,10 @@ class Res_file_parser (object):
         if (parse_num_usrs and len(splitted_line) > num_usrs_idx): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
             self.dict['num_usrs']      = int (splitted_line[num_usrs_idx]     .split("=")[1])
             self.dict['num_crit_usrs'] = int (splitted_line[num_crit_usrs_idx].split("=")[1])
+        
+        if (parse_crit_len):
+            for crit_len in range (1, len(splitted_line)):
+                self.crit_len_cnt[crit_len] += int (splitted_line[crit_len].split('=')[1])
             
     def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, mode = None, cpu = None, stts = -1):
         """
@@ -986,7 +999,54 @@ class Res_file_parser (object):
     #
     #     plt.show ()        
 
+    def plot_crit_len (self, city):
+        """
+        Calculate a histogram of the overall # of vehs for each duration of being critical 
+        """
+        list_of_hists = pd.read_pickle ('../res/{}_crit_len.pcl' .format (city)) 
 
+        list_of_Ts = [item['slot_len'] for item in list_of_hists]
+        
+        self.set_plt_params ()
+        _, ax = plt.subplots ()
+        
+        y = []
+        # print ('all hists={}' .format (list_of_hists))
+        for T in list_of_Ts:
+            hist_of_this_T = ([item['hist'] for item in list_of_hists if item['slot_len']==T])[0]
+            t_range =  range(len(hist_of_this_T))
+            y.append (np.sum([hist_of_this_T[t]*t for t in t_range]) / np.sum (hist_of_this_T))
+        
+        
+        ax.plot (list_of_Ts, y, color='black', linewidth=LINE_WIDTH)#, label=self.legend_entry_dict[mode], mfc='none')
+        # ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=self.legend_entry_dict[mode], mfc='none', linestyle='dashed') 
+
+        # self.my_plot(ax=ax, x=list_of_Ts, y=y, color='black')
+        plt.xlim (min(list_of_Ts), max(list_of_Ts))
+        ax.set_xlabel ('Decision Period T [s]')
+        ax.set_ylabel ('Avg Time of Being Critical [s]') 
+
+        printFigToPdf('{}_crit_len' .format (city))
+
+    def calc_crit_len (self, city):
+        """
+        Calculate a histogram of the overall # of vehs for each duration of being critical 
+        """
+    
+        list_of_Ts = range (9, 11)
+        list_of_hists = [] # list of historgrams of the distribution of the durations of each critical chain being critical.  
+        pcl_output_file_name = '{}_crit_len.pcl' .format (city)
+        for T in list_of_Ts:
+            self.crit_len_cnt = np.zeros (T+1) # self.crit_len_cnt[T] will hold the overall # of critical chains that were critical for T seconds. 
+            self.parse_file (input_file_name='{}_crit_len_T{}.res' .format (city, T), parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=True, time_slot_len=T)
+            list_of_hists.append ({'slot_len' : T, 'hist' : self.crit_len_cnt})
+    
+        print (list_of_hists)   
+        with open ('../res/{}' .format (pcl_output_file_name), 'wb') as pcl_file:
+            pickle.dump (list_of_hists, pcl_file)
+            
+        return pcl_output_file_name
+ 
 def plot_num_crit_n_mig_vs_num_vehs (city, reshuffle):
     """
     Generate a plot of the number of critical chains, and number of migrated chains vs. the number of vehs. 
@@ -1026,6 +1086,10 @@ def plot_mig_vs_rsrc (city):
          
 def plot_crit_n_mig_vs_T (city):
 
+    """
+    Plot the number of critical chains and the number of migrations as a function of the time slot, T.
+    """
+    
     my_res_file_parser = Res_file_parser ()
     files_to_parse = []
     if (city=='Lux'):
@@ -1062,9 +1126,12 @@ def plot_cost_vs_rsrc (city):
     
 if __name__ == '__main__':
 
-    plot_RT_prob_sim (city='Lux')
+    my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.calc_crit_len (city='Lux')
+    my_res_file_parser.plot_crit_len (city='Lux')
+    # plot_RT_prob_sim (city='Lux')
     # plot_cost_vs_rsrc (city='Monaco')
-    exit ()
+    # exit ()
     
     # plot_crit_n_mig_vs_T (city)
     

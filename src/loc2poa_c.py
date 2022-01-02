@@ -396,7 +396,7 @@ class loc2poa_c (object):
         #     if (lvl < self.max_power_of_4-1): # if this isn't the last iteration, need to adapt avg_num_of_vehs_per_cell for the next iteration
         #         num_of_poas_per_cell = self.aggregate_heatmap_cells (num_of_poas_per_cell)
         
-        plt.figure()
+        fig, ax = plt.subplot()
         plt.plot([poa['x'] for poa in self.list_of_PoAs], [poa['y'] for poa in self.list_of_PoAs], 'o', color='black');
         plt.axis([0, MAX_X[self.city], 0, MAX_Y[self.city]])
         plt.savefig('../res/{}_poa_points.jpg' .format (self.antloc_file_name))

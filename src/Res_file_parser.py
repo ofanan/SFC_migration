@@ -1,6 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.pylab as pylab
+# import matplotlib.pylab as pylab
 import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 
@@ -20,6 +20,7 @@ num_of_fields = stts_idx+1
 
 num_usrs_idx      = 6
 num_crit_usrs_idx = 7
+reshuffle_idx     = num_crit_usrs_idx+1 
 
 opt_idx   = 0
 alg_idx   = 1
@@ -32,15 +33,19 @@ LINE_WIDTH              = 3
 LINE_WIDTH_SMALL        = 1 
 FONT_SIZE               = 20
 FONT_SIZE_SMALL         = 5
-LEGEND_FONT_SIZE        = 16
+LEGEND_FONT_SIZE        = 14
 LEGEND_FONT_SIZE_SMALL  = 5 
 
 UNIFORM_CHAIN_MIG_COST = 600
 
+avg_new_vehs_per_slot = {'Monaco' : [0,6,11,16,21,25,29,34,38,42,47],
+                         'Lux'    : [0,9,17,25,33,41,49,56,64,71,79]}
+
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
-
  
+# limit the y axis to values between 0 and 1.05 the max y value
+my_y_lim = lambda y : plt.ylim (0, 1.05 * max(y)) 
 
 def parse_city_from_input_file_name (input_file_name): 
     """
@@ -433,7 +438,9 @@ class Res_file_parser (object):
         if (parse_num_usrs and len(splitted_line) > num_usrs_idx): # Is it a longer line, indicating also the # of usrs, and num of critical usrs?
             self.dict['num_usrs']      = int (splitted_line[num_usrs_idx]     .split("=")[1])
             self.dict['num_crit_usrs'] = int (splitted_line[num_crit_usrs_idx].split("=")[1])
-        
+            if (len(splitted_line) > reshuffle_idx):
+                self.dict['resh'] = True if (splitted_line[num_crit_usrs_idx].split("=")[1]=='T') else False
+                
         if (parse_crit_len):
             for crit_len in range (1, len(splitted_line)):
                 self.crit_len_cnt[crit_len] += int (splitted_line[crit_len].split('=')[1])
@@ -808,7 +815,7 @@ class Res_file_parser (object):
                 self.mig_vs_rsrc_data.append (point)
         
         # store the data in a '.pcl' file (binary data stream)
-        pcl_output_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city) 
+        pcl_output_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city=parse_city_from_input_file_name(pcl_input_file_name)) 
         with open('../res/' + pcl_output_file_name, 'wb') as mig_vs_rsrc_data_file:
             pickle.dump(mig_vs_rsrc_data, mig_vs_rsrc_data_file)
         return pcl_output_file_name 
@@ -914,10 +921,17 @@ class Res_file_parser (object):
                 
         return pcl_output_file_name
     
-    def plot_crit_n_mig_vs_T (self, pcl_input_file_name):
+    def plot_crit_n_mig_vs_T (self, pcl_input_file_name, y_axis='num_crit', resh=True, per_slot=True):
         """
         plot the number of critical chains (on one y-axis), and the migration cost (on the other y-axis), vs. the slot interval, T.
-        Input: pcl_input_file_name - a .pcl file, containing a list_of_dicts, namely, a list of dictionaries with all the results. 
+        Inputs: 
+        pcl_input_file_name - a .pcl file, containing a list_of_dicts, namely, a list of dictionaries with all the results.
+        y_axis - can be either:
+            - 'crit_num' --> plot only the # of critical chains.
+            - 'mig_cost' --> plot only the mig' cost.
+            - 'num_crit_n_mig_cost' --> plot both the num of critical chains and the mig' cost on an 2 y axes.
+        resh - when False, consider only mig' cost of critical chains (not of those happened due to reshuffle).
+        per_slot - when True, plot the mig' cost per slot. When False, plot the overall mig' cost in the trace.  
         """
 
         self.list_of_dicts = pd.read_pickle ('../res/{}' .format (pcl_input_file_name))
@@ -928,32 +942,74 @@ class Res_file_parser (object):
         
         city = parse_city_from_input_file_name (pcl_input_file_name)
         cpu = 103 if city=='Lux' else 926
-        _, num_crit_axis = plt.subplots()
-        mig_cost_axis = num_crit_axis.twinx ()
+        if (y_axis=='num_crit_n_mig_cost'):
+            _, num_crit_axis = plt.subplots()
+            x_axis = num_crit_axis 
+            mig_cost_axis = num_crit_axis.twinx ()
+        elif (y_axis=='num_crit'):
+            _, num_crit_axis = plt.subplots()
+            x_axis = num_crit_axis 
+        else: 
+            _, mig_cost_axis = plt.subplots()
+            x_axis = mig_cost_axis
         
-        x, y_num_crit, y_mig_cost = [], [], []
+        x_axis.set_xlabel  ('Decision Period [s]', fontsize=FONT_SIZE)
+        x_axis.set_xticks  ( [1, 3, 5, 7, 9])
+        x_axis.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        
+        x, y_num_crit, y_mig_cost, y_mig_cost_wo_resh, y_avg_mig_cost_per_slot, y_avg_mig_cost_wo_resh_per_slot = [], [], [], [], [], []
         for T in list_of_Ts:
             list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T and item['cpu']==cpu] # list_of_dicts_T <-- list of results when simulated with time slot==T.
             
             x.append (T) 
-            y_num_crit.append (np.average ([item['num_crit_usrs'] for item in list_of_dicts_T]))
-            y_mig_cost .append (sum ([item['mig_cost'] for item in list_of_dicts_T]))
+            avg_num_crit_chains = np.average ([item['num_crit_usrs'] for item in list_of_dicts_T])
+            y_num_crit.append (avg_num_crit_chains)
+            
+            # We calculate the cost of migrations excluding reshuffles as follows:
+            # avg. num of critical chains that are not new per slot * num of slots * per-chain mig' cost 
+            avg_mig_cost_wo_resh_per_slot_T = (avg_num_crit_chains - avg_new_vehs_per_slot[city][T]) * UNIFORM_CHAIN_MIG_COST
+            y_avg_mig_cost_wo_resh_per_slot.append (avg_mig_cost_wo_resh_per_slot_T)
+            y_mig_cost_wo_resh.append (avg_mig_cost_wo_resh_per_slot_T * len (list_of_dicts_T))
+            tot_mig_cost = sum ([item['mig_cost'] for item in list_of_dicts_T])
+            y_mig_cost.append (tot_mig_cost)
+            y_avg_mig_cost_per_slot.append (tot_mig_cost / len (list_of_dicts_T))
                 
-        mig_color = 'blue'
-        num_crit_axis.set_xlabel  ('Time Slot [s]',             fontsize=FONT_SIZE)
-        # num_crit_axis.set_xscale  ('log')
-        num_crit_axis.set_xticks  ( [1, 3, 5, 7, 9])
+        mig_color = 'black'
+        self.set_plt_params ()
         plt.xlim (1,10)
-        num_crit_axis.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-        num_crit_axis.set_ylabel  ('Avg. # of Critical chains', fontsize=FONT_SIZE)
-        mig_cost_axis.set_ylabel  ('Total Mig. Cost',           fontsize=FONT_SIZE, color=mig_color)
-        mig_cost_axis.tick_params (axis='y', colors=mig_color)
-        self.my_plot (x=x, y=y_num_crit, ax=num_crit_axis,  color='black')
-        self.my_plot (x=x, y=y_mig_cost,  ax=mig_cost_axis, color=mig_color)
+        if (y_axis in ['num_crit_n_mig_cost', 'num_crit']):
+            num_crit_axis.set_ylabel  ('Avg. # of Critical Chains', fontsize=FONT_SIZE)
+            self.my_plot (x=x, y=y_num_crit, ax=num_crit_axis,  color='black')
+            my_y_lim (y_num_crit)
+        if (y_axis in ['num_crit_n_mig_cost', 'mig_cost']):
+            mig_cost_axis.set_ylabel  ('Total Mig. Cost',           fontsize=FONT_SIZE, color=mig_color)
+            mig_cost_axis.tick_params (axis='y', colors=mig_color)
+            
+            # if (resh):
+            if (per_slot):
+                plt.ticklabel_format (axis="y", style="sci", scilimits=(5,5))
+            y = y_avg_mig_cost_per_slot if per_slot else y_mig_cost
+            mig_cost_axis.plot (x, y, marker='o', markersize=MARKER_SIZE, label='Total', mfc='none', color='blue')
+            # self.my_plot (x=x, y=y,  ax=mig_cost_axis, label='Total')
+            my_y_lim (y)
+            # else:
+            if (per_slot):
+                plt.ticklabel_format (axis="y", style="sci", scilimits=(5,5))
+            mig_cost_axis.plot (x, y_avg_mig_cost_wo_resh_per_slot if per_slot else y_mig_cost_wo_resh, marker='x', markersize=MARKER_SIZE, label='Only Crit. Chains', mfc='none', linestyle='dashed', color='black')
+            # self.my_plot       (x=x, y=y_avg_mig_cost_wo_resh_per_slot if per_slot else y_mig_cost_wo_resh, ax=mig_cost_axis, color='blue', label=)
+            my_y_lim (y_avg_mig_cost_per_slot if per_slot else y_mig_cost)
+            if (per_slot):
+                plt.ticklabel_format (axis="y", style="sci", scilimits=(5,5))
 
-        printFigToPdf('{}_crit_n_mig_vs_T' .format (city))
+            plt.legend (loc='center', fontsize=LEGEND_FONT_SIZE)
 
-    # def plot_Q (self, pcl_input_file_name):
+        if (y_axis=='num_crit'):
+            printFigToPdf('{}_crit_vs_T' .format (city))
+        elif (y_axis=='mig_cost'):
+            printFigToPdf('{}_mig_cost_{}{}vs_T' .format (city, 'per_slot_' if per_slot else '', '' if resh else 'wo_resh_'))
+        else:
+            printFigToPdf('{}_crit_n_mig_vs_T' .format (city))
+# def plot_Q (self, pcl_input_file_name):
     #     """
     #     Currently unused.
     #     plot several plots, showing the weighted cost, which considers the "phi" cost objective function, plus a penalty for the # of critical chains - as a function of the slot T. 
@@ -1008,25 +1064,28 @@ class Res_file_parser (object):
         list_of_Ts = [item['slot_len'] for item in list_of_hists]
         
         self.set_plt_params ()
-        _, ax = plt.subplots ()
         
-        y = []
+        crit_len, num_of_crit_chains = [], []
         # print ('all hists={}' .format (list_of_hists))
         for T in list_of_Ts:
             hist_of_this_T = ([item['hist'] for item in list_of_hists if item['slot_len']==T])[0]
             t_range =  range(len(hist_of_this_T))
-            y.append (np.sum([hist_of_this_T[t]*t for t in t_range]) / np.sum (hist_of_this_T))
+            num_of_crit_chains.append (np.sum (hist_of_this_T))
+            crit_len.append (np.sum([hist_of_this_T[t]*t for t in t_range]) / np.sum (hist_of_this_T)) 
         
-        
-        ax.plot (list_of_Ts, y, color='black', linewidth=LINE_WIDTH)#, label=self.legend_entry_dict[mode], mfc='none')
-        # ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=self.legend_entry_dict[mode], mfc='none', linestyle='dashed') 
-
-        # self.my_plot(ax=ax, x=list_of_Ts, y=y, color='black')
+        _, ax = plt.subplots ()
+        ax.plot (list_of_Ts, crit_len, color='black', linewidth=LINE_WIDTH)#, label=self.legend_entry_dict[mode], mfc='none')
         plt.xlim (min(list_of_Ts), max(list_of_Ts))
         ax.set_xlabel ('Decision Period T [s]')
-        ax.set_ylabel ('Avg Time of Being Critical [s]') 
-
+        ax.set_ylabel ('Avg. Violation Time [s]') 
         printFigToPdf('{}_crit_len' .format (city))
+
+        _, ax = plt.subplots ()
+        ax.plot (list_of_Ts, num_of_crit_chains, color='black', linewidth=LINE_WIDTH)#, label=self.legend_entry_dict[mode], mfc='none')
+        plt.xlim (min(list_of_Ts), max(list_of_Ts))
+        ax.set_xlabel ('Decision Period T [s]')
+        ax.set_ylabel ('# of Critical Chains') 
+        printFigToPdf('{}_num_crit_chains' .format (city))
 
     def calc_crit_len (self, city):
         """
@@ -1084,22 +1143,24 @@ def plot_mig_vs_rsrc (city):
     # my_res_file_parser.plot_mig_vs_rsrc (pcl_input_file_name = pcl_output_file_name) #'Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_num_mig_chains_vs_rsrc.pcl')
     my_res_file_parser.plot_mig_vs_rsrc (pcl_input_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city))
          
-def plot_crit_n_mig_vs_T (city):
+def plot_crit_n_mig_vs_T (city, y_axis='mig_cost', resh=True, per_slot=True):
 
     """
     Plot the number of critical chains and the number of migrations as a function of the time slot, T.
     """
     
     my_res_file_parser = Res_file_parser ()
-    files_to_parse = []
-    if (city=='Lux'):
-        for T in range (1, 11):
-            files_to_parse.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
-    else:
-        for T in range (1, 11):
-            files_to_parse.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
-    my_res_file_parser.parse_files_w_distinct_T(files_to_parse)
-    my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city))
+    
+    ## The commented-out lines below prepare the .pcl file with the data for this plot. 
+    # files_to_parse = []
+    # if (city=='Lux'):
+    #     for T in range (1, 11):
+    #         files_to_parse.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
+    # else:
+    #     for T in range (1, 11):
+    #         files_to_parse.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
+    # my_res_file_parser.parse_files_w_distinct_T(files_to_parse)
+    my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city), y_axis=y_axis, resh=resh, per_slot=per_slot)
 
 def plot_RT_prob_sim (city):
     """
@@ -1126,14 +1187,17 @@ def plot_cost_vs_rsrc (city):
     
 if __name__ == '__main__':
 
-    my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.calc_crit_len (city='Lux')
-    my_res_file_parser.plot_crit_len (city='Lux')
+    # city = 'Monaco'
+    # for per_slot in [True, False]:
+    #     plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=per_slot)
+    for city in ['Lux', 'Monaco']:
+        my_res_file_parser = Res_file_parser ()
+        my_res_file_parser.calc_crit_len (city=city)
+        my_res_file_parser.plot_crit_len (city=city)
     # plot_RT_prob_sim (city='Lux')
     # plot_cost_vs_rsrc (city='Monaco')
     # exit ()
     
-    # plot_crit_n_mig_vs_T (city)
     
     # city='Monaco'
     # reshuffle=True

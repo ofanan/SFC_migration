@@ -826,7 +826,7 @@ class SFC_mig_simulator (object):
         slot_len_str = self.poa_file_name.split('secs')
         self.slot_len = int(slot_len_str[0].split('_')[-1]) if (len (slot_len_str) > 1) else 1 # By default, slot len is 1
         
-        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC']):
+        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_new_vehs']):
             self.simulate_algs()
         elif (self.mode == 'opt'):
             self.simulate_lp ();
@@ -980,6 +980,10 @@ class SFC_mig_simulator (object):
         - If the alg' failed to find a feasible sol', even at a single slot, return with self.stts=fail
         """
         
+        if (self.mode == 'cnt_new_vehs'):
+            self.num_new_vehs_in_slot     = []
+            self.num_new_vehs_in_cur_slot = 0
+        
         if (VERBOSE_CRIT_LEN in self.verbose):
             # self.crit_usrs_dicts = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
             self.critical_usrs = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
@@ -1018,6 +1022,8 @@ class SFC_mig_simulator (object):
                 
             elif (splitted_line[0] == "usrs_that_left:"): # Reached a line indicating usrs that left the sim in the ".poa" input file
 
+                if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+                    continue 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
                     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
@@ -1028,7 +1034,12 @@ class SFC_mig_simulator (object):
         
             elif (splitted_line[0] == "new_usrs:"): # Reached a line listing the new usrs that joined the sim in the ".poa" input file
                 self.rd_new_usrs_line (splitted_line[1:])
-            elif (splitted_line[0] == "old_usrs:"): # Reached a line listing the 'old', existing usrs that moved, in the ".poa" input file 
+            elif (splitted_line[0] == "old_usrs:"): # Reached a line listing the 'old', existing usrs that moved, in the ".poa" input file
+                
+                if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+                    self.num_new_vehs_in_slot.append (self.num_new_vehs_in_cur_slot) 
+                    self.num_new_vehs_in_cur_slot = 0 # prepare for the next slot
+                    continue 
                 self.rd_old_usrs_line (splitted_line[1:]) # Read the list of old usrs, and collecting their new PoA assignments
                 if (VERBOSE_ADD_LOG in self.verbose):
                     self.last_rt = time.time ()
@@ -1079,6 +1090,16 @@ class SFC_mig_simulator (object):
         """
         Organize, writes and plots the simulation results, after the simulation is done
         """
+        
+        if (self.mode == 'cnt_new_vehs'):
+            self.num_new_vehs_file_name = '../res/{}_avg_new_vehs_per_slot.res' .format (self.city)  
+        
+        if Path(self.num_new_vehs_file_name).is_file(): # does this res file already exist?
+            self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "a")
+        else:
+            self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")
+
+        print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))        
         # if (VERBOSE_MOB in self.verbose):
         #     self.print_mob ()        
         # if (VERBOSE_CALC_RSRC_AUG in self.verbose):
@@ -1389,6 +1410,11 @@ class SFC_mig_simulator (object):
         splitted_line = line[0].split ("\n")[0].split (")")
 
         for usr_entry in splitted_line:
+            
+            if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+                self.num_new_vehs_in_cur_slot += 1
+                continue 
+            
             if (len(usr_entry) <= 1):
                 return
             usr_entry = usr_entry.split("(")[1].split (',')
@@ -1751,14 +1777,6 @@ def run_prob_of_RT_sim (city, mode, prob=None):
     else:
         my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
 
-# def run_cost_comp_sim (city):
-#     if (city=='Monaco'):
-#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_16secs_Telecom.poa', verbose=[VERBOSE_RES])
-#         # my_simulator.simulate(mode='ourAlgC', cpu_cap_at_leaf=, ) #$$$
-#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa',  verbose=[VERBOSE_RES])
-#     else:
-#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_07=830_16secs_post.poa',       verbose=[VERBOSE_RES])
-#         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',        verbose=[VERBOSE_RES])
 
 def run_cost_comp_by_rsrc_sim (city, seeds):
     init_cpu_cap_at_leaf = {'Lux' : 94, 'Monaco' : 842}
@@ -1770,17 +1788,18 @@ def run_cost_comp_by_rsrc_sim (city, seeds):
         for cpu_cap_at_leaf in [inter (init_cpu_cap_at_leaf[city] * (1 + i/10)) for i in range(3, 21)]:
             my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
-def run_T_len_sim (city):
+def run_T_len_sim (city, seed=42):
 
     poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
     
-    for T in [3, 5, 6, 7, 9, 10]:
+    for T in range (1,11):
         my_simulator = SFC_mig_simulator (poa2cell_file_name=poa2cell_file_name, 
                                           poa_file_name='Lux_0730_0830_{}secs_post.poa' .format (T) if city=='Lux' else 'Monaco_0730_0830_{}secs_Telecom.poa' .format (T), 
                                           verbose=[VERBOSE_RES])
         
         my_simulator.simulate (mode = 'ourAlg', 
-                               cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
+                               cpu_cap_at_leaf = 103 if city=='Lux' else 926,
+                               seed=seed)    
 
 
 def run_crit_len_sim (city, slot_len=1):
@@ -1802,7 +1821,21 @@ def run_crit_len_sim (city, slot_len=1):
         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
 
 
+def only_cnt_num_new_vehs_per_slot ():
+    """
+    Merely count the number of new vehs in each slot, for all slot lengths, during the 07:30-08:30 simulation, for the given city
+    """
+    
+    for city in ['Monaco', 'Lux']:
+        print ('city=', city)
+        for T in range (1, 11):
+            my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                              poa_file_name='Monaco_0730_0830_{}secs_Telecom.poa' .format (T) if (city=='Monaco') else 'Lux_0730_0830_{}secs_post.poa' .format (T))
+            
+            my_simulator.simulate (mode = 'cnt_new_vehs')    
+    
+
 if __name__ == "__main__":
 
-    run_crit_len_sim (city='Lux')
-    # run_T_len_sim (city='Lux')
+    # only_cnt_num_new_vehs_per_slot ()
+    run_T_len_sim (city='Monaco', seed=20)

@@ -790,7 +790,9 @@ class loc2poa_c (object):
 
                     splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
                     for my_tuple in splitted_line:  
-                        if (len(my_tuple) <= 1): # no more new vehicles in this list. 
+                        if (len(my_tuple) <= 1): # no more new / moved vehicles in this list.
+                            if (VERBOSE_CNT_NEW_VEHS in self.verbose):
+                                self.num_new_vehs.append (num_new_vehs_in_this_slot) 
                             break
                         my_tuple = my_tuple.split("(")
                         my_tuple   = my_tuple[1].split (',')
@@ -822,6 +824,7 @@ class loc2poa_c (object):
                             #                       'num of smpls' : self.speed[nxt_poa]['num of smpls'] + 1}
                             
                         if (my_tuple[type_idx] == 'n'): # new vehicle
+                            num_new_vehs_in_this_slot += 1
                             self.usrs.append ({'id' : usr_id, 'cur poa' : nxt_poa, 'nxt poa' : nxt_poa, 'nxt cell' : nxt_cell, 'new' : True}) # for a new usr, we mark the cur_poa same as nxt_poa 
                             # if (VERBOSE_DEMOGRAPHY in self.verbose): 
                                 # self.joined_poa_sim_via[nxt_poa][-1] += 1 # inc the # of usrs that joined the sim' via this cell
@@ -1236,4 +1239,5 @@ if __name__ == '__main__':
     # df= [[2481.923888888889, 2954.5575, 1684.8925]]
     # with open ('../res/num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.pcl' , 'wb') as pcl_output_file:
     #     pickle.dump (df, pcl_output_file)
+
 

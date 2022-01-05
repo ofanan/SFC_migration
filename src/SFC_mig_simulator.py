@@ -1094,12 +1094,12 @@ class SFC_mig_simulator (object):
         if (self.mode == 'cnt_new_vehs'):
             self.num_new_vehs_file_name = '../res/{}_avg_new_vehs_per_slot.res' .format (self.city)  
         
-        if Path(self.num_new_vehs_file_name).is_file(): # does this res file already exist?
-            self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "a")
-        else:
-            self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")
-
-        print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))        
+            if Path(self.num_new_vehs_file_name).is_file(): # does this res file already exist?
+                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "a")
+            else:
+                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")
+    
+            print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))        
         # if (VERBOSE_MOB in self.verbose):
         #     self.print_mob ()        
         # if (VERBOSE_CALC_RSRC_AUG in self.verbose):

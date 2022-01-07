@@ -1792,7 +1792,7 @@ def run_T_len_sim (city, seed=42):
 
     poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
     
-    for T in range (1,11):
+    for T in range (2,11):
         my_simulator = SFC_mig_simulator (poa2cell_file_name=poa2cell_file_name, 
                                           poa_file_name='Lux_0730_0830_{}secs_post.poa' .format (T) if city=='Lux' else 'Monaco_0730_0830_{}secs_Telecom.poa' .format (T), 
                                           verbose=[VERBOSE_RES])
@@ -1828,7 +1828,7 @@ def only_cnt_num_new_vehs_per_slot ():
     
     for city in ['Monaco', 'Lux']:
         print ('city=', city)
-        for T in range (1, 11):
+        for T in range (2, 11):
             my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                               poa_file_name='Monaco_0730_0830_{}secs_Telecom.poa' .format (T) if (city=='Monaco') else 'Lux_0730_0830_{}secs_post.poa' .format (T))
             

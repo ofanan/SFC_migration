@@ -8,6 +8,7 @@ from pandas._libs.tslibs import period
 
 from printf import printf, printFigToPdf 
 import pickle
+from pandas.io.pickle import read_pickle
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
@@ -898,14 +899,17 @@ class Res_file_parser (object):
         plt.xlim (0, np.max ([item['cpu']/10 for item in mig_vs_rsrc_data]))
         printFigToPdf ('{}_num_migs_vs_rsrc' .format (city))
 
-    def parse_files_w_distinct_T (self, filenames):
+    def parse_files_w_distinct_T (self, input_res_filenames, input_pcl_file_name=None):
         """
         Parse each of the given files. Add to its entry in self.list_of_dicts a field, presenting the length of the time slot.
         Save the results in a .pcl file.
         """
     
-        full_list_of_dicts = [] # will hold all the dictionary items of the parsed data
-        for filename in filenames:
+        if (input_pcl_file_name==None): # No pcl input file was given --> start the data structure from scratch
+            full_list_of_dicts = [] # will hold all the dictionary items of the parsed data
+        else: # A pcl input file was given --> read it, and incrementally add to it the data parsed from the ".res" input files
+            full_list_of_dicts = pd.read_pickle ('../res/'+ input_pcl_file_name)
+        for filename in input_res_filenames:
             
             self.list_of_dicts = []
             T = self.parse_T_from_input_file_name (filename)
@@ -960,6 +964,18 @@ class Res_file_parser (object):
         x, y_num_crit, y_mig_cost, y_mig_cost_wo_resh, y_avg_mig_cost_per_slot, y_avg_mig_cost_wo_resh_per_slot = [], [], [], [], [], []
         for T in list_of_Ts:
             list_of_dicts_T = [item for item in self.list_of_dicts if item['T']==T and item['cpu']==cpu] # list_of_dicts_T <-- list of results when simulated with time slot==T.
+            
+            seeds = set ([item['seed'] for item in list_of_dicts_T])
+            print ('seeds=', seeds)
+            
+            avg_num_crit_chains_per_sd, avg_mig_cost_wo_resh_per_slot_T_per_sd = [], []
+            for sd in seeds:
+                avg_num_crit_chains_sd = np.average ([item['num_crit_usrs'] for item in list_of_dicts_T if item['seed']==sd])
+                avg_mig_cost_wo_resh_per_slot_T_per_sd.append ((avg_num_crit_chains_sd - avg_new_vehs_per_slot[city][T]) * UNIFORM_CHAIN_MIG_COST)
+                print ('sd={}, avg_mig_cost_wo_resh_per_slot_T_per_sd={}' .format (sd, (avg_num_crit_chains_sd - avg_new_vehs_per_slot[city][T]) * UNIFORM_CHAIN_MIG_COST))
+            # print (avg_num_crit_chains_per_sd)
+            print ('avg_mig_cost_wo_resh_per_slot_T_per_sd=', avg_mig_cost_wo_resh_per_slot_T_per_sd)
+            exit ()
             
             x.append (T) 
             avg_num_crit_chains = np.average ([item['num_crit_usrs'] for item in list_of_dicts_T])
@@ -1076,6 +1092,8 @@ class Res_file_parser (object):
         _, ax = plt.subplots ()
         ax.plot (list_of_Ts, crit_len, color='black', linewidth=LINE_WIDTH)#, label=self.legend_entry_dict[mode], mfc='none')
         plt.xlim (min(list_of_Ts), max(list_of_Ts))
+        plt.ylim (0, max(list_of_Ts)/2+1)
+        ax.set_xticks  ( [1, 3, 5, 7, 9])
         ax.set_xlabel ('Decision Period T [s]')
         ax.set_ylabel ('Avg. Violation Time [s]') 
         printFigToPdf('{}_crit_len' .format (city))
@@ -1092,7 +1110,7 @@ class Res_file_parser (object):
         Calculate a histogram of the overall # of vehs for each duration of being critical 
         """
     
-        list_of_Ts = range (9, 11)
+        list_of_Ts = range (1, 11)
         list_of_hists = [] # list of historgrams of the distribution of the durations of each critical chain being critical.  
         pcl_output_file_name = '{}_crit_len.pcl' .format (city)
         for T in list_of_Ts:
@@ -1100,7 +1118,6 @@ class Res_file_parser (object):
             self.parse_file (input_file_name='{}_crit_len_T{}.res' .format (city, T), parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=True, time_slot_len=T)
             list_of_hists.append ({'slot_len' : T, 'hist' : self.crit_len_cnt})
     
-        print (list_of_hists)   
         with open ('../res/{}' .format (pcl_output_file_name), 'wb') as pcl_file:
             pickle.dump (list_of_hists, pcl_file)
             
@@ -1152,14 +1169,15 @@ def plot_crit_n_mig_vs_T (city, y_axis='mig_cost', resh=True, per_slot=True):
     my_res_file_parser = Res_file_parser ()
     
     ## The commented-out lines below prepare the .pcl file with the data for this plot. 
-    # files_to_parse = []
+    # input_res_filenames = []
     # if (city=='Lux'):
     #     for T in range (1, 11):
-    #         files_to_parse.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
+    #         input_res_filenames.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
     # else:
     #     for T in range (1, 11):
-    #         files_to_parse.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
-    # my_res_file_parser.parse_files_w_distinct_T(files_to_parse)
+    #         input_res_filenames.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
+    # my_res_file_parser.parse_files_w_distinct_T(input_res_filenames)
+    my_res_file_parser.parse_files_w_distinct_T (input_res_filenames=['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg_cpu926.res'], input_pcl_file_name='Monaco_vary_T.pcl')
     my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city), y_axis=y_axis, resh=resh, per_slot=per_slot)
 
 def plot_RT_prob_sim (city):
@@ -1187,13 +1205,14 @@ def plot_cost_vs_rsrc (city):
     
 if __name__ == '__main__':
 
+    plot_crit_n_mig_vs_T (city='Monaco', y_axis='mig_cost', per_slot=True)
     # city = 'Monaco'
     # for per_slot in [True, False]:
     #     plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=per_slot)
-    for city in ['Lux', 'Monaco']:
-        my_res_file_parser = Res_file_parser ()
-        my_res_file_parser.calc_crit_len (city=city)
-        my_res_file_parser.plot_crit_len (city=city)
+    # for city in ['Lux', 'Monaco']:
+    #     my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.calc_crit_len (city=city)
+        # my_res_file_parser.plot_crit_len (city=city)
     # plot_RT_prob_sim (city='Lux')
     # plot_cost_vs_rsrc (city='Monaco')
     # exit ()

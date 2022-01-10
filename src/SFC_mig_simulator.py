@@ -1839,8 +1839,8 @@ if __name__ == "__main__":
 
     # only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=842, seed=842)
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
+    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=209, seed=209)
     # for sd in range (130, 150): 
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1, seed=sd)

@@ -988,7 +988,7 @@ class Res_file_parser (object):
             if (y_axis=='num_crit'):
                 num_crit_axis.plot ((T, T), (avg_num_crit_chains_lo, avg_num_crit_chains_hi), color='black') # Plot the confidence interval
                 print ('T={}, avg_num_crit_chains_lo={}, avg_num_crit_chains_hi={}' .format (T, avg_num_crit_chains_lo, avg_num_crit_chains_hi))
-            elif (y_axis=='mig_cost'): 
+            elif (y_axis=='mig_cost'):  #$$$
                 if (per_slot):
                     mig_cost_axis.plot ((T, T), (tot_mig_cost_lo/ num_of_slots, tot_mig_cost_hi/ num_of_slots), color='blue') # Plot the confidence interval
                     print ('T={}, tot_mig_cost_lo={}, tot_mig_cost_hi={}' .format (T, tot_mig_cost_lo/num_of_slots, tot_mig_cost_hi/num_of_slots))
@@ -1015,15 +1015,15 @@ class Res_file_parser (object):
             print ('y_num_crit={}' .format (y_num_crit))
             my_y_lim (y_num_crit)
         if (y_axis in ['num_crit_n_mig_cost', 'mig_cost']):
-            mig_cost_axis.set_ylabel  ('Total Mig. Cost', fontsize=FONT_SIZE, color=mig_color, labelpad=16.5 if (per_slot and city=='Monaco') else 4)
-            mig_cost_axis.tick_params (axis='y', colors=mig_color)
-            
-            y = y_avg_mig_cost_per_slot if per_slot else y_mig_cost
-            mig_cost_axis.plot (list_of_Ts, y, marker='o', markersize=MARKER_SIZE, label='Total', mfc='none', color='blue')
-            my_y_lim (y)
-            mig_cost_axis.plot (list_of_Ts, y_avg_mig_cost_wo_resh_per_slot if per_slot else y_mig_cost_wo_resh, 
-                                marker='x', markersize=MARKER_SIZE, label='Only Crit. Chains', mfc='none', 
-                                color='black')
+            # mig_cost_axis.set_ylabel  ('Total Mig. Cost', fontsize=FONT_SIZE, color=mig_color, labelpad=16.5 if (per_slot and city=='Monaco') else 4)
+            # mig_cost_axis.tick_params (axis='y', colors=mig_color)
+            #
+            # y = y_avg_mig_cost_per_slot if per_slot else y_mig_cost
+            # mig_cost_axis.plot (list_of_Ts, y, marker='o', markersize=MARKER_SIZE, label='Total', mfc='none', color='blue')
+            # my_y_lim (y)
+            # mig_cost_axis.plot (list_of_Ts, y_avg_mig_cost_wo_resh_per_slot if per_slot else y_mig_cost_wo_resh, 
+            #                     marker='x', markersize=MARKER_SIZE, label='Only Crit. Chains', mfc='none', 
+            #                     color='black')
             if (per_slot):
                 mig_cost_axis.plot (list_of_Ts, y_avg_mig_cost_wo_resh_per_slot[0]*np.array (list_of_Ts), 
                                     label='Lin. slope=1', mfc='none', linestyle='dashed', color='black')
@@ -1142,14 +1142,14 @@ def plot_crit_n_mig_vs_T (city, y_axis='mig_cost', resh=True, per_slot=True):
     my_res_file_parser = Res_file_parser ()
     
     ## The commented-out lines below prepare the .pcl file with the data for this plot. 
-    # input_res_filenames = []
-    # if (city=='Lux'):
-    #     for T in range (1, 11):
-    #         input_res_filenames.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
-    # else:
-    #     for T in range (1, 11):
-    #         input_res_filenames.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
-    # my_res_file_parser.parse_files_w_distinct_T(input_res_filenames)
+    input_res_filenames = []
+    if (city=='Lux'):
+        for T in range (1, 11):
+            input_res_filenames.append ('Lux_0730_0830_{}secs_post_p0.3_ourAlg_cpu103.res' .format (T))
+    else:
+        for T in range (1, 11):
+            input_res_filenames.append ('Monaco_0730_0830_{}secs_Telecom_p0.3_ourAlg_cpu926.res' .format (T))
+    my_res_file_parser.parse_files_w_distinct_T(input_res_filenames)
     my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city), y_axis=y_axis, resh=resh, per_slot=per_slot)
 
 def plot_RT_prob_sim (city):
@@ -1204,6 +1204,6 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
     # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
 
-    # plot_crit_n_mig_vs_T (city='Monaco', y_axis='mig_cost', per_slot=True)
-    my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Lux')
+    plot_crit_n_mig_vs_T (city='Lux', y_axis='mig_cost', per_slot=True)
+    # my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Monaco')

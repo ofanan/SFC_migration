@@ -1763,7 +1763,7 @@ def run_crit_len_sim (city):
     """
     Run a simulation for finding how much time each chain is critical, for the given slot len.
     Inputs: 
-    slot_len = length of the slot between subsequent runs of the placement alg'.
+    cite - which city to simulate.
     Output:
     A .res file, written to the ../res directory. 
     """
@@ -1772,7 +1772,7 @@ def run_crit_len_sim (city):
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                           poa_file_name='Monaco_0730_0830_1secs_Telecom.poa' if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
                                           verbose=[VERBOSE_CRIT_LEN])
-        my_simulator.ourAlg_  = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
+        my_simulator.ourAlg_slot_len = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
         
         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
 

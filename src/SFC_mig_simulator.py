@@ -1759,7 +1759,7 @@ def run_T_len_sim (city, seed=42):
                                seed=seed)    
 
 
-def run_crit_len_sim (city, slot_len=1):
+def run_crit_len_sim (city):
     """
     Run a simulation for finding how much time each chain is critical, for the given slot len.
     Inputs: 
@@ -1769,11 +1769,10 @@ def run_crit_len_sim (city, slot_len=1):
     """
     
     for T in range (1, 11):
-        # my_simulator = SFC_mig_simulator (verbose=[VERBOSE_RES, VERBOSE_CRIT_LEN]) # poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                           poa_file_name='Monaco_0730_0830_1secs_Telecom.poa' if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
                                           verbose=[VERBOSE_CRIT_LEN])
-        my_simulator.ourAlg_slot_len = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
+        my_simulator.ourAlg_  = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
         
         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
 
@@ -1794,8 +1793,8 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    # run_crit_len_sim (city='Lux', slot_len=1)
-    only_cnt_num_new_vehs_per_slot ()
+    run_crit_len_sim (city='Lux')
+    # only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])

@@ -150,13 +150,13 @@ class SFC_mig_simulator (object):
                                ,mig_cost  = self.calc_mig_cost_in_slot_opt())))
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
-    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {} | num_usrs={} | num_crit_usrs={} | resh={}\n' .format(
+    print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {} | num_usrs={} | num_crit_n_new_usrs={} | resh={}\n' .format(
             self.settings_str(), # The settings string, detailing various parameters values used.  
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_alg(),
                                link_cost = self.calc_link_cost_in_slot_alg(),
                                mig_cost  = self.calc_mig_cost_in_slot_alg()),
             len (self.usrs),
-            len (self.critical_usrs),
+            len (self.critical_n_new_usrs),
             'T' if self.reshuffled else 'F'))
 
     augmented_cpu_cap_at_leaf = lambda self: self.G.nodes[len (self.G.nodes)-1]['RCs']
@@ -277,7 +277,7 @@ class SFC_mig_simulator (object):
                 d_var_id += 1
                 # if (VERBOSE_MOVED_RES in self.verbose and not (self.is_first_t) and usr not in self.moved_usrs): 
                 #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who moved 
-                # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_usrs): 
+                # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_n_new_usrs): 
                 #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who are critical
                 obj_func += self.d_var_cost (d_var) * plp_var # add the cost of this decision var to the objective func
             model += (single_place_const == 1) # demand that each chain is placed in a single server
@@ -744,12 +744,6 @@ class SFC_mig_simulator (object):
         # Init output files
         if (VERBOSE_DEBUG in self.verbose):
             self.debug_file = open ('../res/debug.txt', 'w') 
-        # if (VERBOSE_MOB in self.verbose):
-        #     self.num_of_moved_usrs_in_slot         = [] # self.num_of_moved_usrs_in_slot[t] will hold the num of usrs who moved at slot t.   
-        #     self.num_of_migs_in_slot          = [] # self.num_of_migs[t] will hold the num of chains assigned to migrate in slot t.
-        #     self.num_of_critical_usrs_in_slot = [] 
-        #     self.mig_from_to_lvl      = np.zeros ([self.tree_height+1, self.tree_height+1], dtype='int') # self.mig_from_to_lvl[i][j] will hold the num of migrations from server in lvl i to server in lvl j, along the sim
-
         self.poa2cell_file_name = poa2cell_file_name
         
         # poa_file_used_antloc will be True iff the poa file was generated using real antennas' location data.
@@ -884,8 +878,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
         if (VERBOSE_CRIT_LEN not in self.verbose):
-            self.critical_usrs = [] # rst the list of usrs who are critical in this time slot
-        # self.moved_usrs    = [] # rst the list of usrs who moved in this time slot 
+            self.critical_n_new_usrs = [] # rst the list of usrs who are critical in this time slot
 
                     
     def simulate_lp (self):
@@ -983,10 +976,15 @@ class SFC_mig_simulator (object):
         if (self.mode == 'cnt_new_vehs'):
             self.num_new_vehs_in_slot     = []
             self.num_new_vehs_in_cur_slot = 0
+            self.num_new_vehs_file_name = '../res/{}_avg_new_vehs_per_slot.res' .format (self.city)  
+        
+            if Path(self.num_new_vehs_file_name).is_file(): # does this res file already exist?
+                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "a")
+            else:
+                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")
         
         if (VERBOSE_CRIT_LEN in self.verbose):
-            # self.crit_usrs_dicts = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
-            self.critical_usrs = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
+            self.critical_n_new_usrs = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
             self.crit_len_file_name = '../res/{}_crit_len_T{}.res' .format (self.city, self.ourAlg_slot_len)
             self.crit_len_file = open (self.crit_len_file_name, 'wb')
             if Path(self.crit_len_file_name).is_file(): # does this res file already exist?
@@ -1016,7 +1014,7 @@ class SFC_mig_simulator (object):
                     self.post_processing ()
                     return
                 if (VERBOSE_CRIT_LEN in self.verbose):
-                    for usr in self.critical_usrs: # By default, we increment the criticality duration of all critical chains. If a critical usr is actually not critical anymore, we'll later fix it 
+                    for usr in self.critical_n_new_usrs: # By default, we increment the criticality duration of all critical chains. If a critical usr is actually not critical anymore, we'll later fix it 
                         usr.criticality_duration += 1
                 continue
                 
@@ -1037,7 +1035,8 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "old_usrs:"): # Reached a line listing the 'old', existing usrs that moved, in the ".poa" input file
                 
                 if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
-                    self.num_new_vehs_in_slot.append (self.num_new_vehs_in_cur_slot) 
+                    self.num_new_vehs_in_slot.append (self.num_new_vehs_in_cur_slot)
+                    printf (self.num_new_vehs_file, 't{} num_new_vehs={}\n' .format(self.t, self.num_new_vehs_in_cur_slot))  
                     self.num_new_vehs_in_cur_slot = 0 # prepare for the next slot
                     continue 
                 self.rd_old_usrs_line (splitted_line[1:]) # Read the list of old usrs, and collecting their new PoA assignments
@@ -1047,22 +1046,22 @@ class SFC_mig_simulator (object):
                     
                 # solve the prob' using the requested alg'    
                 if   (self.mode in ['ourAlg', 'ourAlgC']):
-                    # if (VERBOSE_CRIT_LEN in self.verbose):
-                    #     self.critical_usrs = [item['usr'] for item in self.crit_usrs_dicts]
                     if (VERBOSE_CRIT_LEN in self.verbose and (self.is_first_t or (self.t%self.ourAlg_slot_len==0))):
                         if (not (self.is_first_t)):
                             printf (self.crit_len_file, self.settings_str())
                             for T in range (1, self.ourAlg_slot_len+1):
-                                printf (self.crit_len_file, ' | crit{}={}' .format (T, len([item for item in self.critical_usrs if item.criticality_duration==T])))
+                                printf (self.crit_len_file, ' | crit{}={}' .format (T, len([item for item in self.critical_n_new_usrs if (item.criticality_duration==T and (not(item.is_new))) ])))
                             printf (self.crit_len_file, '\n')
                         self.stts = self.alg_top(self.bottom_up)
                         if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
-                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
-                            self.critical_usrs = [] # after the alg' (successfully) run, there should be no crit' chains
+                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs) 
+                            self.critical_n_new_usrs = [] # after the alg' (successfully) run, there should be no crit' chains
+                        for usr in self.usrs: # After we ran the alg', all usrs are considered 'old'
+                            usr.is_new = False
                     else:
                         self.stts = self.alg_top(self.bottom_up)
                         if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
-                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_usrs) 
+                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs) 
                 elif (self.mode in ['ffit', 'ffitC']):
                     self.stts = self.alg_top(self.first_fit)
                 elif (self.mode in ['wfit', 'wfitC']):
@@ -1089,49 +1088,10 @@ class SFC_mig_simulator (object):
     def post_processing (self):
         """
         Organize, writes and plots the simulation results, after the simulation is done
-        """
-        
-        if (self.mode == 'cnt_new_vehs'):
-            self.num_new_vehs_file_name = '../res/{}_avg_new_vehs_per_slot.res' .format (self.city)  
-        
-            if Path(self.num_new_vehs_file_name).is_file(): # does this res file already exist?
-                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "a")
-            else:
-                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")
-    
+        """        
+        if (self.mode == 'cnt_new_vehs'):    
             print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))        
-        # if (VERBOSE_MOB in self.verbose):
-        #     self.print_mob ()        
-        # if (VERBOSE_CALC_RSRC_AUG in self.verbose):
-        #     print ('augmented cpu cap at leaf={}' .format (self.augmented_cpu_cap_at_leaf()))
-        #     self.print_sol_res_line (self.rsrc_aug_file)
-    
-    # def print_mob (self):
-    #     """
-    #     print statistics about the number of usrs who moved, and the num of migrations between every two levels in the tree.
-    #     """
-    #
-    #     sim_len = float(self.t - self.first_slot)
-    #     del (self.num_of_migs_in_slot[0]) # remove the mig' recorded in the first slot, which is irrelevant (corner case)
-    #     printf (self.mob_output_file, '// avg num of usrs that moved per slot = {:.0f}\n'   .format (float(sum(self.num_of_moved_usrs_in_slot)) / sim_len))
-    #     printf (self.mob_output_file, '// avg num of usrs who migrated per slot = {:.0f}\n' .format (float(sum(self.num_of_migs_in_slot)) / sim_len))
-    #     avg_num_of_migs_to_from_per_slot = np.divide (self.mig_from_to_lvl, sim_len)
-    #     for lvl_src in range (self.tree_height+1):
-    #         for lvl_dst in range (self.tree_height+1):
-    #             printf (self.mob_output_file, '{:.0f}\t' .format (avg_num_of_migs_to_from_per_slot[lvl_src][lvl_dst]))
-    #         printf (self.mob_output_file, '\n')
-    #     printf (self.mob_output_file, 'moves_in_slot = {}\n' .format (self.num_of_moved_usrs_in_slot))
-    #     printf (self.mob_output_file, 'migs_in_slot = {}\n'  .format (self.num_of_migs_in_slot))
-    #
-    #     # plot the mobility
-    #     plt.figure()
-    #     plt.title ('Migrations and mobility at each slot')
-    #     plt.plot (range(int(sim_len)), self.num_of_moved_usrs_in_slot, label='Total vehicles moved to another cell [number/sec]', linestyle='None',  marker='o', markersize = 4)
-    #     plt.plot (range(int(sim_len)), self.num_of_migs_in_slot, label='Total chains migrated to another server [number/sec]', linestyle='None',  marker='.', markersize = 4)
-    #     plt.xlabel ('time [seconds, starting at 07:30]')
-    #     plt.legend()
-    #     plt.savefig ('../res/{}.mob.jpg' .format(self.poa_file_name.split('.')[0]))
-    #     plt.clf()
+        
         
     def cpvnf_reshuffle (self):
         """
@@ -1142,6 +1102,7 @@ class SFC_mig_simulator (object):
             if (self.cpvnf_place_usr (usr)!= sccs): 
                 return fail
         return sccs
+    
     
     def cpvnf (self):
         """
@@ -1286,12 +1247,14 @@ class SFC_mig_simulator (object):
         if (self.stts == sccs):
             return sccs
         
+        for usr in self.usrs: # After we ran the alg', all usrs are considered 'old'
+            usr.is_new = False
         if (self.mode in ['ourAlgC', 'wfitC', 'ffitC', 'cpvnfC']): # Allowed to mig' only critical chains. So, if we haven't succeeded by now - return fail.
             return fail
 
         # Now we know that the first run fail. For all the benchmarks, it means that they also made a reshuffle. 
         # However, bottom-up haven't tried a reshuffle yet. So, we give it a try now.
-        if (self.mode in ['ourAlg', 'ourAlgC']):
+        if (self.mode == 'ourAlg'):
             self.rst_sol()
             self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
             if (VERBOSE_LOG in self.verbose):
@@ -1377,9 +1340,9 @@ class SFC_mig_simulator (object):
                                                
             if (usr.cur_s in usr.S_u and usr_cur_cpu <= usr.B[usr.lvl]): # Is it possible to comply with the delay constraint of this usr while staying in its cur location and keeping the CPU budget?
                 if (VERBOSE_CRIT_LEN in self.verbose):
-                    if (usr in self.critical_usrs): # this usr was critical, but not it isn't critical anymore
+                    if (usr in self.critical_n_new_usrs): # this usr was critical, but not it isn't critical anymore
                         usr.criticality_duration = int(0)
-                        self.critical_usrs.remove(usr)
+                        self.critical_n_new_usrs.remove(usr)
                         continue
                 else:
                     continue # The delay constraint are satisfied also in the current placement
@@ -1387,11 +1350,11 @@ class SFC_mig_simulator (object):
             # Now we know that this is a critical usr, namely a user that needs more CPU and/or migration for satisfying its target delay constraint 
             # dis-place this user (mark it as having nor assigned level, neither assigned server), and free its assigned CPU
             if (VERBOSE_CRIT_LEN in self.verbose):
-                if (usr not in self.critical_usrs): # this usr wasn't critical 
+                if (usr not in self.critical_n_new_usrs): # this usr wasn't critical 
                     usr.criticality_duration = 1
-                    self.critical_usrs.append(usr)
+                    self.critical_n_new_usrs.append(usr)
             else:
-                self.critical_usrs.append(usr)
+                self.critical_n_new_usrs.append(usr)
             
             self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
             usr.lvl   = -1
@@ -1410,13 +1373,12 @@ class SFC_mig_simulator (object):
         splitted_line = line[0].split ("\n")[0].split (")")
 
         for usr_entry in splitted_line:
-            
+                        
+            if (len(usr_entry) <= 1):
+                return
             if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
                 self.num_new_vehs_in_cur_slot += 1
                 continue 
-            
-            if (len(usr_entry) <= 1):
-                return
             usr_entry = usr_entry.split("(")[1].split (',')
 
             if (self.mode == 'opt'):
@@ -1424,12 +1386,7 @@ class SFC_mig_simulator (object):
             else: 
                 usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
             
-            # self.moved_usrs.append (usr)
-            # if (VERBOSE_CRIT_LEN in self.verbose):
-            #     self.crit_usrs_dicts.append ({'usr' : usr, 'duration' : int(1)}) # Insert this new usr to the list of dicts of critical usrs, with criticality duration=1. 
-            # else: 
-            #     self.critical_usrs.append(usr) # Insert this new usr to the list of critical usrs
-            self.critical_usrs.append(usr) # Insert this new usr to the list of critical usrs
+            self.critical_n_new_usrs.append(usr) # Insert this new usr to the list of critical usrs
 
             self.usrs.append (usr)
             self.CPUAll_single_usr (usr) 
@@ -1815,7 +1772,7 @@ def run_crit_len_sim (city, slot_len=1):
         # my_simulator = SFC_mig_simulator (verbose=[VERBOSE_RES, VERBOSE_CRIT_LEN]) # poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                           poa_file_name='Monaco_0730_0830_1secs_Telecom.poa' if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
-                                          verbose=[VERBOSE_RES, VERBOSE_CRIT_LEN])
+                                          verbose=[VERBOSE_CRIT_LEN])
         my_simulator.ourAlg_slot_len = T # OurAlg will run once in T seconds. In all other slots, the simulator will merely calculate the time of criticality for each crit' chain
         
         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf = 103 if city=='Lux' else 926)    
@@ -1826,9 +1783,9 @@ def only_cnt_num_new_vehs_per_slot ():
     Merely count the number of new vehs in each slot, for all slot lengths, during the 07:30-08:30 simulation, for the given city
     """
     
-    for city in ['Monaco', 'Lux']:
+    for city in ['Lux', 'Monaco']:
         print ('city=', city)
-        for T in range (2, 11):
+        for T in range (1, 11):
             my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                               poa_file_name='Monaco_0730_0830_{}secs_Telecom.poa' .format (T) if (city=='Monaco') else 'Lux_0730_0830_{}secs_post.poa' .format (T))
             
@@ -1837,10 +1794,11 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    # only_cnt_num_new_vehs_per_slot ()
+    # run_crit_len_sim (city='Lux', slot_len=1)
+    only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=209, seed=209)
+    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=209, seed=209)
     # for sd in range (130, 150): 
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1, seed=sd)

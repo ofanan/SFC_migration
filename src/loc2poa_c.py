@@ -1,6 +1,7 @@
 import math, pickle
 import numpy as np, pandas as pd, seaborn as sns, matplotlib.pyplot as plt
 from scipy.spatial import Voronoi, voronoi_plot_2d
+from matplotlib.colors import LogNorm
 
 from printf import printf, printmat, invert_mat_bottom_up, printFigToPdf
 from Res_file_parser import parse_city_from_input_file_name
@@ -59,6 +60,7 @@ MAX_Y = {'Lux'    : UPPER_RIGHT_CORNER['Lux']   [1] - LOWER_LEFT_CORNER['Lux']  
 
 HEATMAP_NUM_VEHS_VMAX  = {'Lux' : 800, 'Monaco' : 3000}
 HEATMAP_VEHS_LEFT_VMAX = {'Lux' : 5.5, 'Monaco' : 2.5}
+HEATMAP_CMAP = 'YlOrRd' #'YlGnBu'
 
 # Indices of the various field within the input '.loc' file 
 type_idx   = int(0) # type of the vehicle: either 'n' (new veh, which has just joined the sim), or 'o' (old veh, that moved). 
@@ -71,6 +73,7 @@ speed_idx  = int(4)
 NUM_OF_TOP_LVL_SQS = {'Lux' : 1, 'Monaco' : 3}
 
 HEATMAP_FONT_SIZE = 17 
+HEATMAP_HUGE_FONT_SIZE = 27 
 
 # # types of vehicles' id
 # new      = 0 # a new (unused before) vehicle's id
@@ -166,7 +169,7 @@ class loc2poa_c (object):
     # Parse the number of rectangles, given some settings.
     find_num_of_rects = lambda self, string : int(string.split('rects')[0].split('_')[-1])
     
-    def gen_heatmap (self, df, vmax=None, pcl_input_file_name=None, plot_colorbar=True): 
+    def gen_heatmap (self, df, vmax=None, pcl_input_file_name=None, plot_colorbar=True, heatmap_font_size=HEATMAP_HUGE_FONT_SIZE, ticks=None): 
         """
         Generate a well-customized sns heatmap from the given data frame.
         Input: df - the data frame for the heatmap.
@@ -177,25 +180,32 @@ class loc2poa_c (object):
         
         if (pcl_input_file_name != None):
             df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
-        plt.rcParams.update({'font.size': HEATMAP_FONT_SIZE})
+        plt.rcParams.update({'font.size': heatmap_font_size})
+        num_of_ticks = 3
+        max_val_in_heat_map = np.amax(np.nan_to_num(np.array(df), nan=0))
+        if (ticks==None):
+            ticks = [int(max_val_in_heat_map*i/num_of_ticks) for i in range (num_of_ticks)]
+        print ('max val in this heatmap={:.0f}, suggested_tick={}' .format (max_val_in_heat_map, ticks))
         if (vmax==None):
             if (plot_colorbar): 
                 if (self.city=='Lux'): 
-                    my_heatmap = sns.heatmap(df, vmin=0, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True)
+                    my_heatmap = sns.heatmap(df, vmin=0, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True)
                 else:
-                    my_heatmap = sns.heatmap(df, vmin=0, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, 
-                                             cbar_kws={"shrink": 0.35, 'aspect' : 10, 'ticks' : [0, 40, 80, 120]}) # vmax=df.values.max()
+                    my_heatmap = sns.heatmap(df, vmin=0, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, #norm=LogNorm(), 
+                                             cbar_kws={"shrink": 0.35, 'aspect' : 10, 'ticks' : ticks})
             else: 
-                my_heatmap = sns.heatmap(df, vmin=0, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=False) 
+                my_heatmap = sns.heatmap(df, vmin=0, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=False, #norm=LogNorm()
+                                         )
         else:
             if (plot_colorbar): 
                 if (self.city=='Lux'): 
-                    my_heatmap = sns.heatmap(df, vmin=0, vmax=vmax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True) 
+                    my_heatmap = sns.heatmap(df, vmin=0, vmax=vmax, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True) 
                 else: 
-                    my_heatmap = sns.heatmap(df, vmin=0, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, 
+                    my_heatmap = sns.heatmap(df, vmin=0, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, #norm=LogNorm(), 
                                              cbar_kws={"shrink": 0.35, 'aspect' : 10, 'ticks' : [0, 1, 2]}) # vmax=df.values.max()
             else: 
-                my_heatmap = sns.heatmap(df, vmin=0, vmax=vmax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=False) 
+                my_heatmap = sns.heatmap(df, vmin=0, vmax=vmax, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=False, #norm=LogNorm()
+                                         ) 
         # my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
 
         my_heatmap.set_aspect("equal") # Keep each rectangle as square 
@@ -230,14 +240,14 @@ class loc2poa_c (object):
     #             vec = tot_len_of_lanes[i+1]
     #             print (vec) 
     #             df = pd.read_pickle(r'../res/{}' .format (pcl_input_file_names[i]))
-    #         my_heatmap = sns.heatmap(df, ax=ax, cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], 
+    #         my_heatmap = sns.heatmap(df, ax=ax, cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], 
     #                     cbar=i == 0, cbar_ax=None if i else cbar_ax)
     #         my_heatmap.set_aspect("equal") # Keep each rectangle as square 
     #
     #     fig.tight_layout(rect=[0, 0, .9, 1])        
     #
     #     # plt.rcParams.update({'font.size': HEATMAP_FONT_SIZE})
-    #     # my_heatmap = sns.heatmap(df, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], cmap="YlGnBu", linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, heatmap=False) # vmax=df.values.max()
+    #     # my_heatmap = sns.heatmap(df, vmin=0, vmax=HEATMAP_NUM_VEHS_VMAX[self.city], cmap=HEATMAP_CMAP, linewidths=0.1, xticklabels=False, yticklabels=False, cbar=True, heatmap=False) # vmax=df.values.max()
     #     # my_heatmap.figure.axes[-1].yaxis.label.set_size(30)
     #     #
     #     # my_heatmap.set_aspect("equal") # Keep each rectangle 
@@ -388,7 +398,7 @@ class loc2poa_c (object):
         # num_of_poas_per_cell = self.calc_num_of_poas_per_cell()
         # for lvl in range (self.max_power_of_4):
         #     plt.figure()       
-        #     my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_poas_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap="YlGnBu")#, norm=LogNorm())
+        #     my_heatmap = sns.heatmap (pd.DataFrame (self.vec2heatmap (num_of_poas_per_cell), columns = self.gen_columns_for_heatmap(lvl)), cmap=HEATMAP_CMAP)#, norm=LogNorm())
         #     my_heatmap.tick_params(left=False, bottom=False) ## other options are right and top
         #     plt.title   ('number of PoAs per cell')
         #     plt.savefig ('../res/heatmap_num_PoAs_per_cell_{}_{}cells.jpg' .format (self.antloc_file_name, int(self.num_of_cells/(4**lvl))))
@@ -485,11 +495,9 @@ class loc2poa_c (object):
 
         avg_vehs_left_per_rect = np.array ([np.average(self.left_cell[cell]) for cell in range(self.num_of_cells)])
         
-        # printf (open ('../res/demography.txt', 'a'), '{}_{}rects. avg vehs left per rect={:.2f}. max vehs left per rect={:.2f}\n' .format(usrs_loc_file_name, self.num_of_cells, np.average(avg_vehs_left_per_rect), np.max(avg_vehs_left_per_rect)))
-         
         self.calc_cell2tile (lvl=0) # call a function that translates the number as "tile" to the ID of the covering PoA.
         heatmap_vals = self.vec2heatmap (avg_vehs_left_per_rect)
-        self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city], plot_colorbar=plot_colorbar) 
+        self.gen_heatmap (df=pd.DataFrame (heatmap_vals), vmax=HEATMAP_VEHS_LEFT_VMAX[self.city], plot_colorbar=plot_colorbar, heatmap_font_size=HEATMAP_HUGE_FONT_SIZE) 
         usrs_loc_file_name = usrs_loc_file_name if (usrs_loc_file_name!=None) else self.usrs_loc_file_name 
         plt.savefig('../res/heatmap_vehs_left_{}rects.pdf' .format (usrs_loc_file_name.split('.txt')[0]), bbox_inches='tight')
 
@@ -502,12 +510,12 @@ class loc2poa_c (object):
 
         columns = self.gen_columns_for_heatmap (lvl=0)
         plt.figure()
-        sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
+        sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.joined_poa_sim_via[poa]) for poa in range(self.num_of_PoAs)])), columns=columns), cmap=HEATMAP_CMAP)
         # plt.title ('avg num of vehs that joined the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_vehs_joined_sim_via_{}.jpg' .format (file_name_suffix))
         
         plt.figure ()
-        sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_poa_sim_via[poa])   for poa in range(self.num_of_PoAs)])), columns=columns), cmap="YlGnBu")
+        sns.heatmap (pd.DataFrame (self.vec2heatmap (np.array ([np.average(self.left_poa_sim_via[poa])   for poa in range(self.num_of_PoAs)])), columns=columns), cmap=HEATMAP_CMAP)
         # plt.title ('avg num of vehs that left the sim every sec in {}' .format (self.time_period_str))
         plt.savefig('../res/heatmap_vehs_left_sim_via_{}.jpg' .format (file_name_suffix))
         
@@ -557,7 +565,7 @@ class loc2poa_c (object):
         printf   (self.num_of_vehs_output_file, 'sum of vals in the heatmap={:.0f}, max_val in the heatmap={:.0f}' .format (np.sum(heatmap_vals), np.max(heatmap_vals)))
             
     
-    def plot_num_of_vehs_in_cell_heatmap (self, pcl_num_vehs_input_file_name, pcl_lanes_len_input_file_name=None, plot_colorbar=True): 
+    def plot_num_of_vehs_in_cell_heatmap (self, pcl_num_vehs_input_file_name, pcl_lanes_len_input_file_name=None, plot_colorbar=True, ticks=None): 
         """
         Generate a Python heatmap, showing at each cell the average number of vehicles found at that cell, along the simulation.
         Inputs:
@@ -583,16 +591,16 @@ class loc2poa_c (object):
         # Generate a heatmap, and save it into a file
         num_of_rects = self.find_num_of_rects (pcl_num_vehs_input_file_name) # Extract the # of rectangles from the input file name 
         if (pcl_lanes_len_input_file_name==None): # No lanes len input file was given --> no need to normalize the hea
-            self.gen_heatmap (df=pd.read_pickle(r'../res/{}' .format (pcl_num_vehs_input_file_name)), vmax=HEATMAP_NUM_VEHS_VMAX[self.city], plot_colorbar=plot_colorbar)
+            self.gen_heatmap (df=pd.read_pickle(r'../res/{}' .format (pcl_num_vehs_input_file_name)), vmax=HEATMAP_NUM_VEHS_VMAX[self.city], plot_colorbar=plot_colorbar, ticks=ticks)
             plt.savefig('../res/{}_num_vehs_{}rects.pdf' .format (self.city, num_of_rects), bbox_inches='tight') 
         else: 
             list_of_entry = list (filter (lambda item : item['num_of_rects']==num_of_rects, tot_len_of_lanes))
             tot_len_of_lanes_at_this_lvl = np.array(list_of_entry[0]['tot_len_of_lanes_in_rect'])
-            df = pd.read_pickle(r'../res/{}' .format (pcl_num_vehs_input_file_name)) #np.empty ( (len(tot_len_of_lanes_at_this_lvl), len(tot_len_of_lanes_at_this_lvl[0])) )
+            df = pd.read_pickle(r'../res/{}' .format (pcl_num_vehs_input_file_name)) 
             for row in range (len (tot_len_of_lanes_at_this_lvl)):
                 for col in range (len (tot_len_of_lanes_at_this_lvl[0])):
                     df[row][col] = df[row][col] / tot_len_of_lanes_at_this_lvl[row][col] if (tot_len_of_lanes_at_this_lvl[row][col]>=0.1) else None 
-            self.gen_heatmap (df=df, plot_colorbar=plot_colorbar)
+            self.gen_heatmap (df=df, plot_colorbar=plot_colorbar, ticks=ticks)
             plt.savefig('../res/{}_lin_density_{}rects.pdf' .format (self.city, num_of_rects), bbox_inches='tight') 
          
     def aggregate_heatmap_cells (self, vec):
@@ -1171,27 +1179,31 @@ class loc2poa_c (object):
         plt.plot ([t for t in range (len(tot_num_of_vehs_in_slot))], tot_num_of_vehs_in_slot)
         plt.show ()
 
-def plot_demography_heatmap (city, max_power_of_4):
+def plot_all_demography_heatmaps ():
     """
-    Plot a demography heatmap, namely, a heatmap showing the avg. # of cars left each rectangle during the simulation. 
-    Inputs: 
-    - city 
-    - max_power_of_4 - details the number of iterative partition of the simulated area into rectangles.
-    Outputs:
-    A heatmap, saved in a .pdf file.
+    Plot all the demography heatmaps, for all the cities.
+    A demography heatmap shows the avg. # of cars left each rectangle during the simulation.
+    The heatmaps are saved in .pdf files.
     """
 
-    city = 'Monaco'
-    max_power_of_4             = 0
-    if (max_power_of_4==0 and city!='Monaco'):
-        print ('Error: max_power_of_4==0 is allowed only for Monaco')
-        exit ()
-    if (max_power_of_4==4 and city=='Monaco'):
-        print ('Error: max_power_of_4==4 is not used for Monaco as this generates too small rectangles')
-        exit ()
-    my_loc2poa                 = loc2poa_c (max_power_of_4 = max_power_of_4, city=city) #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    input_demography_file_name ='{}_demography_0730_0830_1secs_{}.txt' .format (city, 3 * 4**max_power_of_4 if city=='Monaco' else 4**max_power_of_4)  
-    my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, input_demography_file_name=input_demography_file_name, plot_colorbar=True)
+    city='Monaco'
+    for max_power_of_4 in range (4):
+        my_loc2poa = loc2poa_c (max_power_of_4 = max_power_of_4, city=city, antloc_file_name='Monaco.Telecom.antloc')
+        input_demography_file_name='{}_demography_0730_0830_1secs_{}.txt' .format (city, 3 * 4**max_power_of_4)    
+        my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, 
+                                            input_demography_file_name=input_demography_file_name, 
+                                            plot_colorbar=False)
+        plt.cla ()
+
+    city='Lux'
+    for max_power_of_4 in range (1, 5):
+        my_loc2poa = loc2poa_c (max_power_of_4 = max_power_of_4, city=city, antloc_file_name='Lux.post.antloc')
+        input_demography_file_name='{}_demography_0730_0830_1secs_{}.txt' .format (city, 4**max_power_of_4)    
+        my_loc2poa.plot_demography_heatmap (usrs_loc_file_name=input_demography_file_name, 
+                                            input_demography_file_name=input_demography_file_name, 
+                                            plot_colorbar=False)
+        plt.cla ()
+
 
 def parse_loc_files (list_of_loc_files_to_parse, max_power_of_4=None):
     """
@@ -1207,18 +1219,33 @@ def parse_loc_files (list_of_loc_files_to_parse, max_power_of_4=None):
                             antloc_file_name = 'Lux.post.antloc' if city=='Lux' else 'Monaco.Telecom.antloc') 
     my_loc2poa.parse_loc_files (list_of_loc_files_to_parse) 
 
+def plot_lin_density_heatmaps ():
+    """
+    Plot all the heatmaps of the linear density, for all the cities  
+    The heatmaps are saved in .pdf files.
+    """
+    city='Monaco'
+    ticks = {0 : [0, 15, 30],
+             1 : [0, 30, 60],
+             2 : [0, 60, 120],
+             3 : [0, 150, 300]}
+    for max_power_of_4 in range (4):
+        my_loc2poa = loc2poa_c (max_power_of_4 = max_power_of_4, city=city, antloc_file_name='Monaco.Telecom.antloc')  
+        my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_name='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1)), 
+                                                     pcl_lanes_len_input_file_name='{}_lanes_len.pcl' .format (city), ticks=ticks[max_power_of_4])
+        plt.cla ()
+    city='Lux'
+    for max_power_of_4 in range (1, 5):
+        my_loc2poa = loc2poa_c (max_power_of_4 = max_power_of_4, city=city, antloc_file_name='Lux.post.antloc')  
+        my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_name='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1)), 
+                                                     pcl_lanes_len_input_file_name='{}_lanes_len.pcl' .format (city))
+ 
 if __name__ == '__main__':
 
-    for T in [6, 7]:
-        parse_loc_files (['Monaco_0730_0830_{}secs.loc' .format (T)])
+    # plot_lin_density_heatmaps ()
+    plot_all_demography_heatmaps ()
 
-    # plot_demography_heatmap (city='Lux', max_power_of_4=1)
 
-    # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, city=city) #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-    # pcl_num_vehs_input_file_name='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1))
-    # my_loc2poa.plot_num_of_vehs_in_cell_heatmap (pcl_num_vehs_input_file_name='num_of_vehs_{}_0730_0830_1secs.loc__{}rects.pcl' .format (city, 4**max_power_of_4 * (3 if city=='Monaco' else 1)), 
-    #                                             pcl_lanes_len_input_file_name='{}_lanes_len.pcl' .format (city))
-    
     # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # pcl_input_file_name = 'num_of_vehs_Lux_0730_0830_1secs.loc__4rects.pcl'
     # my_loc2poa.gen_heatmap (df=None, pcl_input_file_name=pcl_input_file_name)

@@ -8,4 +8,5 @@ The projects includes:
 - Implementation of several greedy VM placement algorithm, as well as a Linear-Program relaxation for the VM placement problem (which is NP-hard).
 - A wide range of statistics and performance analysis tools.
 
-More details would be provided once an academic paper is accepted for publication. Stay tuned.
+For more details, please see the pre-print paper:
+I. Cohen, C.F. Chiasserini, P. Giaccone, and Gabriel Scalosub, [Characterizing Dynamic Service Provisioning in the Edge-cloud Continuum], (https://arxiv.org/pdf/2202.08903.pdf)

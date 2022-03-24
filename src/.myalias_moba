@@ -1,7 +1,0 @@
-alias .=pwd
-alias py=python
-alias c=clear
-alias l=less
-alias so=source
-alias g=grep
-alias h=history

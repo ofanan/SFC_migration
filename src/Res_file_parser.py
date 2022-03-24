@@ -1,10 +1,12 @@
+import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.ticker
+# import matplotlib.ticker
 # import matplotlib.pylab as pylab
 import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 from printf import printf, printFigToPdf 
 import pickle
+# from pandas.tests.extension.test_external_block import df
 
 # This class allows choosing the order of magnitude in plots that use scientific notation 
 # class OOMFormatter(matplotlib.ticker.ScalarFormatter):
@@ -536,7 +538,6 @@ class Res_file_parser (object):
         
         if (input_file_name != None):
             self.parse_file(input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
-            city = parse_city_from_input_file_name (input_file_name)
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         self.set_plt_params ()
         _, ax = plt.subplots()
@@ -568,8 +569,8 @@ class Res_file_parser (object):
                 y.append (avg)
             
             self.my_plot (ax, x, y, mode)
-        plt.xlabel('Fraction of Users with RT Requirements')
-        plt.ylabel('Min CPU at leaf [GHz]')
+        plt.xlabel('Fraction of RT Chains')
+        plt.ylabel('Min CPU at Leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0,1)
         plt.ylim (0, 33 if self.city=='Lux' else 230)
@@ -775,10 +776,10 @@ class Res_file_parser (object):
         # If the caller provided a .res input file, parse the data from it
         if (res_input_file_names != None):
             for file_name in res_input_file_names:
-                self.parse_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=False)
+                self.parse_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
             self.dump_self_list_of_dicts_to_pcl (res_file_name = res_input_file_names[0])  
         else:
-            self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name)) 
     
         mig_vs_rsrc_data = []
 
@@ -795,15 +796,21 @@ class Res_file_parser (object):
 
         for cpu_val in cpu_vals:  
             
-            mode_cpu_list = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # list of results of runs for this mode, and cpu value
-            avg_mig_cost_of_each_seed        = [] # will hold the avg mig cost of each successful run with a given mode, cpu value, and seed (averaging the cost over all the slots in the trace)
+            mode_cpu_list             = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # list of results of runs for this mode, and cpu value
+            avg_mig_cost_of_each_seed = [] # will hold the avg mig cost of each successful run with a given mode, cpu value, and seed (averaging the cost over all the slots in the trace)
+            avg_num_crit_of_each_seed = [] # will hold the avg num of critical chains of each successful run with a given mode, cpu value, and seed (averaging the cost over all the slots in the trace)
             for seed in set ([item['seed'] for item in mode_cpu_list]): # list of seeds for which the whole run succeeded with this mode (algorithm), and this cpu val
-                avg_mig_cost_of_each_seed.       append (np.average ([item['mig_cost']      for item in mode_cpu_list if item['seed']==seed]))                    
-
-            avg_mig_cost_of_all_seeds        = np.average (avg_mig_cost_of_each_seed)
-            [y_lo, y_hi]          = self.conf_interval (ar=avg_mig_cost_of_each_seed, avg=avg_mig_cost_of_all_seeds) # low, high y values for this plotted conf' interval
+                avg_mig_cost_of_each_seed.append (np.average ([item['mig_cost'     ] for item in mode_cpu_list if item['seed']==seed]))                    
+                avg_num_crit_of_each_seed.append (np.average ([item['num_crit_usrs'] for item in mode_cpu_list if item['seed']==seed]))
+            avg_mig_cost_of_all_seeds = np.average (avg_mig_cost_of_each_seed)
+            [y_lo, y_hi]              = self.conf_interval (ar=avg_mig_cost_of_each_seed, avg=avg_mig_cost_of_all_seeds) # low, high y values for this plotted conf' interval
             
-            mig_vs_rsrc_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_mig_cost_of_all_seeds,'num_of_seeds' : len(avg_mig_cost_of_each_seed)})
+            mig_vs_rsrc_data.append ({'cpu'          : cpu_val, 
+                                      'y_lo'         : y_lo, 
+                                      'y_hi'         : y_hi, 
+                                      'y_avg'        : avg_mig_cost_of_all_seeds,
+                                      'num_of_crit'  : np.average (avg_num_crit_of_each_seed), 
+                                      'num_of_seeds' : len(avg_mig_cost_of_each_seed)})
         
         # Add this new calculated point to the ds. Avoid duplications of points.
         for point in sorted (mig_vs_rsrc_data, key = lambda point : point['cpu']):
@@ -813,7 +820,7 @@ class Res_file_parser (object):
                 self.mig_vs_rsrc_data.append (point)
         
         # store the data in a '.pcl' file (binary data stream)
-        pcl_output_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city=parse_city_from_input_file_name(pcl_input_file_name)) 
+        pcl_output_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city = self.city if pcl_input_file_name==None else parse_city_from_input_file_name (pcl_input_file_name)) 
         with open('../res/' + pcl_output_file_name, 'wb') as mig_vs_rsrc_data_file:
             pickle.dump(mig_vs_rsrc_data, mig_vs_rsrc_data_file)
         return pcl_output_file_name 
@@ -874,6 +881,26 @@ class Res_file_parser (object):
             pickle.dump(mig_vs_rsrc_data, mig_vs_rsrc_data_file)
         return self.pcl_output_file_name 
     
+    def gen_mig_vs_rsrc_tbl (self, city):
+        """
+        Generate a table of the number of the percentage of migrated chains that are non-critical, out of all migrated chains.
+        """
+        
+        mig_vs_rsrc_data = pd.read_pickle(r'../res/{}_mig_cost_vs_rsrc.pcl' .format (city))
+        # NUM_OF_SLOTS = 600
+
+        CPU_VALS_NORM_FACTOR = {'Lux' : 89, 'Monaco' : 840}
+        nomalized_cpu        = [item['cpu']/CPU_VALS_NORM_FACTOR[city] for item in mig_vs_rsrc_data]
+        all_migs_num         = [item['y_avg']/UNIFORM_CHAIN_MIG_COST for item in mig_vs_rsrc_data]
+        averall_mig_cost     = [item['y_avg'] for item in mig_vs_rsrc_data]
+        # crit_migs_num        = np.array ([item['num_crit_usrs']                for item in mig_vs_rsrc_data]) - avg_new_vehs_per_slot[city]
+        # non_crit_percent     = [100*(all_migs_num[i] - crit_migs_num[i])/all_migs_num[i] for i in range(len(all_migs_num))]
+             
+        print ('city is {}' .format (city))
+        for i in range(len(all_migs_num)):
+            print ('{}\t{:.0f}' .format (nomalized_cpu[i], averall_mig_cost[i]))
+            # print ('{}\t{}' .format (nomalized_cpu, non_crit_percent))
+
     def plot_mig_vs_rsrc (self, pcl_input_file_name):
         """
         Generate a plot of the number of migrations vs. the cpu capacity at the leaf, for the given city.
@@ -887,7 +914,11 @@ class Res_file_parser (object):
         _, ax = plt.subplots()
         ax.set_xlabel ('CPU at leaf [GHz]')
         ax.set_ylabel ('# of Mig. Chains')
+        
+        # Plot the avg # of migration as a func' of the rsrc (cpu at leaf) 
         ax.plot ([item['cpu']/10 for item in mig_vs_rsrc_data], [item['y_avg']/UNIFORM_CHAIN_MIG_COST for item in mig_vs_rsrc_data], markersize=MARKER_SIZE, linewidth=LINE_WIDTH)
+
+        # Plot the conf' intervals for the # of migration as a func' of the rsrc (cpu at leaf) 
         for item in mig_vs_rsrc_data:
             ax.plot ( (item['cpu']/10, item['cpu']/10), (item['y_lo']/UNIFORM_CHAIN_MIG_COST, item['y_hi']/UNIFORM_CHAIN_MIG_COST), color=self.color_dict['ourAlg']) # Plot the confidence interval
         ax.plot ( (item['cpu']/10, item['cpu']/10), (item['y_lo']/UNIFORM_CHAIN_MIG_COST, item['y_hi']/UNIFORM_CHAIN_MIG_COST), color=self.color_dict['ourAlg']) # Plot the confidence interval
@@ -1092,11 +1123,11 @@ class Res_file_parser (object):
             plt.tick_params (axis='y')
             
             my_y_lim (y_mig_cost)
-            plt.fill_between (x=list_of_Ts, y1=0,y2=y_mig_cost_wo_resh, color='blue', label='Only Crit. Chains') 
-            plt.fill_between (x=list_of_Ts, y1=y_mig_cost_wo_resh, y2=y_mig_cost, color='deepskyblue', label='All chains')
+            plt.fill_between (x=list_of_Ts, y1=0,y2=y_mig_cost_wo_resh, color='blue', label='Critical chains') 
+            plt.fill_between (x=list_of_Ts, y1=y_mig_cost_wo_resh, y2=y_mig_cost, color='deepskyblue', label='Non-critical chains')
             if (per_slot):
                 plt.plot (list_of_Ts, y_mig_cost_wo_resh[0]*np.array (list_of_Ts),  
-                                    label='Lin. slope=1', mfc='none', color='black')
+                                    label='Pessimistic', mfc='none', color='black')
             my_y_lim (y_mig_cost)
             
             # Force using the desired scientific notation format
@@ -1109,7 +1140,7 @@ class Res_file_parser (object):
         else:
             # plt.ylabel  ('Avg. # of Critical Chains', fontsize=FONT_SIZE)
             plt.fill_between (x=list_of_Ts, y1=0, y2=y_num_crit, color='blue', label='Avg. # of Critical Chains')
-            plt.plot (list_of_Ts, y_num_crit[0]*np.array (list_of_Ts), label='Lin. slope=1', mfc='none', color='black')
+            plt.plot (list_of_Ts, y_num_crit[0]*np.array (list_of_Ts), label='Pessimistic', mfc='none', color='black')
             plt.legend (loc='upper left', fontsize=LEGEND_FONT_SIZE)
             
             plt.ylim (0, (max (max (y_num_crit[0]*np.array (list_of_Ts)), max (y_num_crit)))*1.05)
@@ -1252,6 +1283,16 @@ def plot_cost_vs_rsrc (city):
     
 if __name__ == '__main__':
 
+    # city = 'Lux'
+    # my_res_file_parser = Res_file_parser ()
+    # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
+    # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
+        
+    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg.res'])   
+    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
+    # my_res_file_parser.gen_mig_vs_rsrc_tbl (city)
     # city = 'Monaco'
     # for city in ['Lux', 'Monaco']:
     #     my_res_file_parser = Res_file_parser ()
@@ -1264,7 +1305,6 @@ if __name__ == '__main__':
     # exit ()
         
     
-    # pcl_file_name = my_res_file_parser.calc_mig_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_short.res'])   
     
     # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 
@@ -1272,8 +1312,9 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
     # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
 
-    plot_crit_n_mig_vs_T (city='Lux', y_axis='mig_cost', per_slot=False)
-    plot_crit_n_mig_vs_T (city='Lux', y_axis='mig_cost', per_slot=True)
+    city = 'Monaco'
+    plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_more.res'])
     # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', 

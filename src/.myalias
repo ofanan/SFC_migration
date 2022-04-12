@@ -1,14 +1,17 @@
 alias .="pwd"
-alias py="python"
 alias c="clear"
-alias l="less"
-alias so="source"
-alias ltr="ls -ltr"
-alias ltra="ls -ltra"
-alias la="ls -a"
-alias g="grep"
-alias aliaser="source .myalias"
+alias g='c; grep'
+alias h='c; history'
+alias l='c; less'
+alias la='ls -a'
+alias ltr='c; ls -ltr'
+alias ltra='ls -ltra'
+alias py='python'
 alias h=history
+alias aliaser="source .myalias"
+alias commit='c; git add -A; git commit'
 # alias pusher="git push -f https://github.com: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@github.com/ofanan/SFC_migration.git HEAD:master"
 alias pusher="git push -f https://github.com/ofanan/SFC_migration HEAD:master"
 alias pullres="scp icohen@legionlogin.polito.it:/home/icohen/SFC_migration/res/*.res 'C:/Users/ofana/Google Drive/sharedResults'"
+
+

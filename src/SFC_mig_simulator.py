@@ -588,7 +588,6 @@ class SFC_mig_simulator (object):
                        
         # Add new leaves for the PoAs below each cell. 
         # To keep the IDs of leaves the greatest in the tree, we do that only after we finished removing all the useless cells.
-        self.num_of_srvrs = len(self.G.nodes())
         for poa in [poa for poa in self.PoAs]: #(filter (lambda item : item['cell']==cell, self.PoAs)): # for each poa belonging to this cell
             poa['s'] = len(self.G.nodes())   # We'll shortly add a server for this PoA, so the id of this PoA will be current number of servers+1.
             self.G.add_node (poa['s']) # Add a server co-located with this PoA
@@ -629,7 +628,7 @@ class SFC_mig_simulator (object):
         
         # self.draw_graph()
         
-    def print_tree_topology_to_omnet (self)
+    def print_tree_topology_to_omnet (self):
         """
         Print the tree topology into Omnet++'s .ini and .ned file
         """
@@ -637,8 +636,12 @@ class SFC_mig_simulator (object):
         ini_output_file = open ('../res/{}.ini' .format (self.city), 'w')
         ned_output_file = open ('../res/{}.ned' .format (self.city), 'w')
         
-        printf (ini_output_file, '{}.numDatacenters = {} .format (self.city, self.num_of_srvrs))
+        printf (ini_output_file, '{}.numDatacenters = {}\n' .format (self.city, len(self.G.nodes())))
  #      for s in range (1, self.num_of_srvrs)): # for every non-root server
+ 
+        exit (0)
+
+ 
         
         #Lux.datacenters[0].numParents = 0
 #Lux.datacenters[0..4].numChildren = 4

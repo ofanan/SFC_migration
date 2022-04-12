@@ -636,9 +636,10 @@ class SFC_mig_simulator (object):
         ini_output_file = open ('../res/{}.ini' .format (self.city), 'w')
         ned_output_file = open ('../res/{}.ned' .format (self.city), 'w')
         
-        printf (ini_output_file, '{}.numDatacenters = {}\n' .format (self.city, len(self.G.nodes())))
- #      for s in range (1, self.num_of_srvrs)): # for every non-root server
- 
+        printf (ini_output_file, '{}.numDatacenters = {}\nLux.datacenters[0].numParents = 0\n' .format (self.city, len(self.G.nodes())))
+        
+        for s in range (1, len(self.G.nodes())): # for every non-root server
+            printf (ini_output_file, 'Lux.datacenters[{}].numChildren={}\n' .format (s, self.G.nodes[s]['nChild']))
         exit (0)
 
  

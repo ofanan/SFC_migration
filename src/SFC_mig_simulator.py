@@ -644,16 +644,16 @@ class SFC_mig_simulator (object):
         ini_output_file = open ('../res/{}.ini' .format (self.city), 'w')
         ned_output_file = open ('../res/{}.ned' .format (self.city), 'w')
         
-        printf (ini_output_file, '{}.numDatacenters = {}\nLux.datacenters[0].numParents = 0\n' .format (self.city, len(self.G.nodes())))
+        printf (ini_output_file, '{}.numDatacenters = {}\n{}.datacenters[0].numParents = 0\n' .format (self.city, self.city, len(self.G.nodes())))
         
         num_of_leaves = 0
         for s in range (len(self.G.nodes())): # for every non-root server
             num_of_children_of_s = self.num_of_children_of_srvr(s)
-            printf (ini_output_file, 'Lux.datacenters[{}].numChildren={}\n' .format (s, num_of_children_of_s))
+            printf (ini_output_file, '{}.datacenters[{}].numChildren={}\n' .format (self.city, s, num_of_children_of_s))
             if (num_of_children_of_s==0):
                 num_of_leaves += 1
 
-        printf (ini_output_file, 'Lux.numLeaves = {}\n' .format (num_of_leaves)) 
+        printf (ini_output_file, '{}.numLeaves = {}\n' .format (self.city, num_of_leaves)) 
 
         # we assume here that the leaves are the last in the list of nodes in the graph
         # port_num[s] will hold the next available to-child port of server number s.
@@ -1838,7 +1838,7 @@ if __name__ == "__main__":
     # printf (ned_output_file, '{}')
     # exit ()
     
-    run_crit_len_sim (city='Lux')
+    run_crit_len_sim (city='Monaco')
     # only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])

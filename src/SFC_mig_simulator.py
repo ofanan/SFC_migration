@@ -609,7 +609,7 @@ class SFC_mig_simulator (object):
         self.shortest_path    = nx.shortest_path(self.G)
         self.tree_height = len (self.shortest_path[self.poa2s[0]][root]) - 1
         
-        # self.print_tree_topology_to_omnet ()
+        self.print_tree_topology_to_omnet ()
         
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
@@ -657,16 +657,16 @@ class SFC_mig_simulator (object):
 
         # we assume here that the leaves are the last in the list of nodes in the graph
         # port_num[s] will hold the next available to-child port of server number s.
-        port_num = np.zeros (len(self.G.nodes()) - num_of_leaves, dtype='uint8')
+        port_num = np.ones (len(self.G.nodes()) - num_of_leaves, dtype='uint8') # the children's port numbers typically begin from 1, as port 0 is towards the parent 
+        port_num[0] = 0 # The root is a special case: it doesn't have a parent, and therefore the children's port numbers begin from 0
         for s in range (1, len(self.G.nodes())): # for every non-root server
             prnt = self.shortest_path[s][0][1] # the parent is the hop number 1 on the path from server s to the root (server number 0)
-            printf (ned_output_file, 'datacenters[{}].port[0] <--> '.format(s)) # connect the port number 0 (to-parent) of s to...
+            printf (ned_output_file, '\t\tdatacenters[{}].port[0] <--> '.format(s)) # connect the port number 0 (to-parent) of s to...
             printf (ned_output_file, '{delay=channelDelay; datarate=basicDatarate;}')
-            printf (ned_output_file, ' <--> datacenters[{}].port[{}]\n' .format(prnt, port_num[prnt])) # to the current smallest available port within the to-children ports of s
+            printf (ned_output_file, ' <--> datacenters[{}].port[{}];\n' .format(prnt, port_num[prnt])) # to the current smallest available port within the to-children ports of s
             port_num[prnt] += 1
         
-        # Required syntax for Omnet++ connections is:
-		#datacenters[0].port[0] <--> {delay=channelDelay; datarate=basicDatarate;} <--> datacenters[1].port[0];		
+        printf (ned_output_file, '}\n')
         exit (0)
     
     def draw_graph (self):
@@ -1846,7 +1846,3 @@ if __name__ == "__main__":
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=209, seed=209)
     # for sd in range (130, 150): 
     #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1, seed=sd)
-
-
-# Required syntax for Omnet++ connections is:
-		#datacenters[0].port[0] <--> {delay=channelDelay; datarate=basicDatarate;} <--> datacenters[1].port[0];		

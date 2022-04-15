@@ -643,6 +643,7 @@ class SFC_mig_simulator (object):
         ini_output_file = open ('../res/{}.ini' .format (self.city), 'w')
         ned_output_file = open ('../res/{}.ned' .format (self.city), 'w')
         
+        printf (ini_output_file, '{}.height = {}\n' .format (self.city, self.G.nodes[0]['lvl']+1))
         printf (ini_output_file, '{}.numDatacenters = {}\n{}.datacenters[0].numParents = 0\n' .format (self.city, len(self.G.nodes()), self.city ))
         
         num_of_leaves = 0
@@ -1837,7 +1838,7 @@ if __name__ == "__main__":
     # printf (ned_output_file, '{}')
     # exit ()
     
-    run_crit_len_sim (city='Lux')
+    run_crit_len_sim (city='Monaco')
     # only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])

@@ -608,9 +608,7 @@ class SFC_mig_simulator (object):
         # Recalculate the shortest path, and update the tree's height by the changes made
         self.shortest_path    = nx.shortest_path(self.G)
         self.tree_height = len (self.shortest_path[self.poa2s[0]][root]) - 1
-        
-        self.print_tree_topology_to_omnet ()
-        
+                
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
@@ -633,9 +631,10 @@ class SFC_mig_simulator (object):
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = self.shortest_path[s][root][1]
         
+        self.print_tree_topology_to_omnet ()
         # self.draw_graph()
         del self.shortest_path
-        
+
     def print_tree_topology_to_omnet (self):
         """
         Print the tree topology into Omnet++'s .ini and .ned file, and exit
@@ -644,10 +643,11 @@ class SFC_mig_simulator (object):
         ini_output_file = open ('../res/{}.ini' .format (self.city), 'w')
         ned_output_file = open ('../res/{}.ned' .format (self.city), 'w')
         
-        printf (ini_output_file, '{}.numDatacenters = {}\n{}.datacenters[0].numParents = 0\n' .format (self.city, self.city, len(self.G.nodes())))
+        printf (ini_output_file, '{}.numDatacenters = {}\n{}.datacenters[0].numParents = 0\n' .format (self.city, len(self.G.nodes()), self.city ))
         
         num_of_leaves = 0
         for s in range (len(self.G.nodes())): # for every non-root server
+            printf (ini_output_file, '{}.datacenters[{}].lvl = {}\n'.format(self.city, s, self.G.nodes[s]['lvl'])) # print the level of this datacenter in the tree
             num_of_children_of_s = self.num_of_children_of_srvr(s)
             printf (ini_output_file, '{}.datacenters[{}].numChildren={}\n' .format (self.city, s, num_of_children_of_s))
             if (num_of_children_of_s==0):
@@ -665,7 +665,6 @@ class SFC_mig_simulator (object):
             printf (ned_output_file, '{delay=channelDelay; datarate=basicDatarate;}')
             printf (ned_output_file, ' <--> datacenters[{}].port[{}];\n' .format(prnt, port_num[prnt])) # to the current smallest available port within the to-children ports of s
             port_num[prnt] += 1
-        
         printf (ned_output_file, '}\n')
         exit (0)
     
@@ -1838,7 +1837,7 @@ if __name__ == "__main__":
     # printf (ned_output_file, '{}')
     # exit ()
     
-    run_crit_len_sim (city='Monaco')
+    run_crit_len_sim (city='Lux')
     # only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])

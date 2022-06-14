@@ -22,6 +22,7 @@ VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseourc
 VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
 VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
 VERBOSE_CRIT_LEN      = 10 # Calculate how much time each chain is critical, for the given slot len.
+VERBOSE_LOG_BU_ONLY   = 11 # Log only the reults of BU, disregarding the PU part.
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -631,13 +632,36 @@ class SFC_mig_simulator (object):
         for s in range (1, len(self.G.nodes())):
             self.G.nodes[s]['prnt'] = self.shortest_path[s][root][1]
         
-        self.print_tree_topology_to_omnet ()
+        # self.print_tree_topology_to_omnet ()
         # self.draw_graph()
         del self.shortest_path
 
+    def print_params (self):
+        """
+        print to an output file chains parameters, such as the total cost, and the number of cpu units, associated with placing a chain at each level.
+        """
+        params_output_file = open ('../res/params.res', 'w')
+        printf (params_output_file, 'uniform chain mig cost={}\n' .format (self.uniform_chain_mig_cost))
+        printf (params_output_file, 'RT chains:\n')
+        usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[0], C_u=self.uniform_Cu)
+        self.CPUAll_single_usr (usr)
+
+        printf (params_output_file, 'link+cpu cost at lvl=')
+        for lvl in range (len(usr.B)):
+            printf (params_output_file, '{:.0f}, ' .format (self.link_cost_of_CLP_at_lvl[lvl] + self.cpu_cost_of_usr_at_lvl(usr, lvl)))
+        printf (params_output_file, '\nmu_u={}' .format (usr.B))
+        printf (params_output_file, '\nnon RT chains:\n')
+        usr = usr_c (id=0, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.target_delay[1], C_u=self.uniform_Cu)
+        self.CPUAll_single_usr (usr)        
+        printf (params_output_file, 'link+cpu cost at lvl=')
+        for lvl in range (len(usr.B)):
+            printf (params_output_file, '{:.0f}, ' .format (self.link_cost_of_CLP_at_lvl[lvl] + self.cpu_cost_of_usr_at_lvl(usr, lvl)))
+        printf (params_output_file, '\nmu_u={}' .format (usr.B))
+        printf (params_output_file, '\ncpu capacities from leaf and up = {}' .format (self.cpu_cap_at_lvl))
+
     def print_tree_topology_to_omnet (self):
         """
-        Print the tree topology into Omnet++'s .ini and .ned file, and exit
+        Print the tree topology into Omnet++'s .ini and .ned file
         """
         
         ini_output_file = open ('../res/{}.ini' .format (self.city), 'w')
@@ -743,7 +767,7 @@ class SFC_mig_simulator (object):
                         poa2cell_file_name='', # File detailing the attachment of each PoA to a rectangle. In our hierarchy, the leaves are antennas. The leaves' parents are the lowest-level rectangles.
                                                # If no input is given here, the simulation assumes uses no real-data of antenna location, and each leaf in the tree is co-located with a server, covering a rectangled area. 
                         use_exp_cpu_cost=True, # True iff the cost of the CPU exponentially increase when moving down in the tree (costs are 1,2,4,16, lowest cost is in the root. When False, costs are linear (1, 2, 3.,,,).  
-                        use_exp_cpu_cap=False  # True iff the cpu capacities exponentially increase when moving up in the tree. (costs are 1,2,4,8, ..., ; lowest capacity is in the roots, When False, capacities are linear (1, 2, 3.,,,).
+                        use_exp_cpu_cap=False, # True iff the cpu capacities exponentially increase when moving up in the tree. (costs are 1,2,4,8, ..., ; lowest capacity is in the roots, When False, capacities are linear (1, 2, 3.,,,).
                         ):
         """
         """
@@ -765,11 +789,14 @@ class SFC_mig_simulator (object):
         self.use_exp_cpu_cap            = use_exp_cpu_cap
         
         # Network parameters
-        if (self.poa_file_name=='shorter.poa' or self.poa_file_name=='shorter_t2.poa'):
+        # Tree height is the # of EDGES in the path from a leaf to the root (that is, the # of nodes in this path, minus 1). 
+        if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa']):
+            self.tree_height            = 2
+        elif (self.poa_file_name in ['Tree_shorter.poa']):
             self.tree_height            = 2
         else:
             self.tree_height            = 4 
-        self.children_per_node          = 2 if (self.poa_file_name=='shorter.poa' or self.poa_file_name=='shorter_t2.poa') else children_per_node
+        self.children_per_node          = 2 if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa', 'Tree_shorter.poa']) else children_per_node
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
@@ -803,6 +830,9 @@ class SFC_mig_simulator (object):
                 print ('Error: you specified poa2cell_file_name={}, but the .poa file was not generated using an antloc file.' .format (self.poa2cell_file_name))                
                 exit ()
             self.gen_parameterized_antloc_tree (self.poa2cell_file_name)
+        
+        # self.print_tree_topology_to_omnet ()
+
         self.delay_const_sanity_check()
 
     def delay_const_sanity_check (self):
@@ -816,7 +846,9 @@ class SFC_mig_simulator (object):
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()       
 
-    def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=float('inf'), slot_to_dump=float('inf'), seed=42): 
+    def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=float('inf'), slot_to_dump=float('inf'), seed=42,
+                  print_params=False     # When true, write the chains' parameter to ../res/params.res. 
+                  ): 
         
         """
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
@@ -832,6 +864,9 @@ class SFC_mig_simulator (object):
 
         self.cpu_cap_at_leaf = 30 if self.poa_file_name == 'shorter.poa' else cpu_cap_at_leaf 
         self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+        if (print_params):
+            self.print_params ()
+
         self.set_RCs_and_a  (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
         self.usrs                       = [] 
@@ -1834,11 +1869,14 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
+    # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[])   
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_8secs_post.poa', verbose=[])   
+    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94, print_params=True)    
     # ned_output_file = open ('../res/Lux.ned', 'w')
     # printf (ned_output_file, '{}')
     # exit ()
     
-    run_crit_len_sim (city='Monaco')
     # only_cnt_num_new_vehs_per_slot ()
     # run_T_len_sim (city='Monaco', seed=20)
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])

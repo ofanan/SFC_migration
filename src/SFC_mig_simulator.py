@@ -887,8 +887,8 @@ class SFC_mig_simulator (object):
         self.sim_len_in_slots = sim_len_in_slots
         self.is_first_t = True # Will indicate that this is the first simulated time slot
 
-        self.init_input_and_output_files()        
-                     
+        self.init_input_and_output_files()
+        
         print ('Simulating {}. poa_file = {} cpu_cap_at_leaf={}, prob_of_RT={:.2f}, seed={}' .format (self.mode, self.poa_file_name, self.cpu_cap_at_leaf, self.prob_of_target_delay[0], self.seed))
         self.stts     = sccs
 
@@ -934,7 +934,7 @@ class SFC_mig_simulator (object):
         #     self.init_moved_res_file()
         # if (VERBOSE_CRITICAL_RES in self.verbose):
         #     self.init_critical_res_file()
-        if (VERBOSE_LOG in self.verbose):
+        if (VERBOSE_LOG in self.verbose or VERBOSE_LOG_BU_ONLY in self.verbose):
             self.init_log_file()
         # if (VERBOSE_MOB in self.verbose):
         #     self.mob_file_name   = "../res/" + self.poa_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
@@ -1050,15 +1050,16 @@ class SFC_mig_simulator (object):
         """
         
         if (self.mode == 'cnt_new_vehs'):
-            self.num_new_vehs_in_slot     = []
-            self.num_new_vehs_in_cur_slot = 0
+            self.num_new_vehs_in_cur_slot, self.num_moved_vehs_in_cur_slot = 0, 0
+            self.max_new_vehs_in_slot,     self.max_moved_vehs_in_slot     = 0,0      
+            self.num_new_vehs_in_slot,     self.num_moved_vehs_in_slot     = [], []
             self.num_new_vehs_file_name = '../res/{}_avg_new_vehs_per_slot.res' .format (self.city)  
         
             if Path(self.num_new_vehs_file_name).is_file(): # does this res file already exist?
                 self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "a")
             else:
-                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")
-        
+                self.num_new_vehs_file =  open (self.num_new_vehs_file_name,  "w")        
+                     
         if (VERBOSE_CRIT_LEN in self.verbose):
             self.critical_n_new_usrs = [] # Will hold the list of chains that were / are critical between 2 subsequent runs of ourAlg.
             self.crit_len_file_name = '../res/{}_crit_len_T{}.res' .format (self.city, self.ourAlg_slot_len)
@@ -1110,12 +1111,16 @@ class SFC_mig_simulator (object):
                 self.rd_new_usrs_line (splitted_line[1:])
             elif (splitted_line[0] == "old_usrs:"): # Reached a line listing the 'old', existing usrs that moved, in the ".poa" input file
                 
-                if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
-                    self.num_new_vehs_in_slot.append (self.num_new_vehs_in_cur_slot)
-                    printf (self.num_new_vehs_file, 't{} num_new_vehs={}\n' .format(self.t, self.num_new_vehs_in_cur_slot))  
-                    self.num_new_vehs_in_cur_slot = 0 # prepare for the next slot
-                    continue 
                 self.rd_old_usrs_line (splitted_line[1:]) # Read the list of old usrs, and collecting their new PoA assignments
+                if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+                    self.num_new_vehs_in_slot.  append (self.num_new_vehs_in_cur_slot)
+                    self.num_moved_vehs_in_slot.append (self.num_moved_vehs_in_cur_slot)
+                    printf (self.num_new_vehs_file, 't{} num_new_vehs={}\n' .format(self.t, self.num_new_vehs_in_cur_slot))
+                    self.max_moved_vehs_in_slot = max (self.max_moved_vehs_in_slot, self.num_moved_vehs_in_cur_slot)
+                    if (not (self.is_first_t)):
+                        self.max_new_vehs_in_slot   = max (self.max_new_vehs_in_slot,   self.num_new_vehs_in_cur_slot)
+                    self.num_new_vehs_in_cur_slot, self.num_moved_vehs_in_cur_slot = 0,0 # prepare for the next slot
+                    continue 
                 if (VERBOSE_ADD_LOG in self.verbose):
                     self.last_rt = time.time ()
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
@@ -1136,6 +1141,10 @@ class SFC_mig_simulator (object):
                             usr.is_new = False
                     else:
                         self.stts = self.alg_top(self.bottom_up)
+                        if (self.stts==sccs and VERBOSE_LOG_BU_ONLY in self.verbose):
+                            printf (self.log_output_file, 'After BU:\n')
+                            self.print_sol_res_line (self.log_output_file)
+                            self.print_sol_to_log_alg()
                         if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
                             self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs) 
                 elif (self.mode in ['ffit', 'ffitC']):
@@ -1166,7 +1175,8 @@ class SFC_mig_simulator (object):
         Organize, writes and plots the simulation results, after the simulation is done
         """        
         if (self.mode == 'cnt_new_vehs'):    
-            print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))        
+            print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))
+            print ('max_new_vehs_per_slot={}, max_moved_vehs_per_slot={}' .format (self.max_new_vehs_in_slot, self.max_moved_vehs_in_slot))        
         
         
     def cpvnf_reshuffle (self):
@@ -1399,6 +1409,9 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
+            if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new and moved usrs in each slot.
+                self.num_moved_vehs_in_cur_slot += 1
+                continue
             usr_entry = usr_entry.split("(")[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
@@ -1870,9 +1883,11 @@ def only_cnt_num_new_vehs_per_slot ():
 if __name__ == "__main__":
 
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[])   
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_8secs_post.poa', verbose=[])   
-    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94, print_params=True)    
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_LOG_BU_ONLY])   
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=842)    
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
+    my_simulator.simulate (mode = 'cnt_new_vehs')    
     # ned_output_file = open ('../res/Lux.ned', 'w')
     # printf (ned_output_file, '{}')
     # exit ()

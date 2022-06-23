@@ -11,4 +11,5 @@ alias h=history
 alias aliaser="source .myalias"
 alias commit='c; git add -A; git commit'
 source .alias_pusher.txt
+alias compush='c; commit; pusher'
 #alias pullres='scp icohen@legionlogin.polito.it:/home/icohen/SFC_migration/res/*.res 'C:/Users/ofana/Google Drive/sharedResults'

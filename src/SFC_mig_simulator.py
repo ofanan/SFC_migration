@@ -896,7 +896,7 @@ class SFC_mig_simulator (object):
         slot_len_str = self.poa_file_name.split('secs')
         self.slot_len = int(slot_len_str[0].split('_')[-1]) if (len (slot_len_str) > 1) else 1 # By default, slot len is 1
         
-        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_new_vehs']):
+        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
             self.simulate_algs()
         elif (self.mode == 'opt'):
             self.simulate_lp ();
@@ -1049,7 +1049,7 @@ class SFC_mig_simulator (object):
         - If the alg' failed to find a feasible sol', even at a single slot, return with self.stts=fail
         """
         
-        if (self.mode == 'cnt_new_vehs'):
+        if (self.mode == 'cnt_moved_n_new_vehs'):
             self.num_new_vehs_in_cur_slot, self.num_moved_vehs_in_cur_slot = 0, 0
             self.max_new_vehs_in_slot,     self.max_moved_vehs_in_slot     = 0,0      
             self.num_new_vehs_in_slot,     self.num_moved_vehs_in_slot     = [], []
@@ -1097,7 +1097,7 @@ class SFC_mig_simulator (object):
                 
             elif (splitted_line[0] == "usrs_that_left:"): # Reached a line indicating usrs that left the sim in the ".poa" input file
 
-                if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+                if (self.mode == 'cnt_moved_n_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
                     continue 
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
@@ -1112,7 +1112,7 @@ class SFC_mig_simulator (object):
             elif (splitted_line[0] == "old_usrs:"): # Reached a line listing the 'old', existing usrs that moved, in the ".poa" input file
                 
                 self.rd_old_usrs_line (splitted_line[1:]) # Read the list of old usrs, and collecting their new PoA assignments
-                if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+                if (self.mode == 'cnt_moved_n_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
                     self.num_new_vehs_in_slot.  append (self.num_new_vehs_in_cur_slot)
                     self.num_moved_vehs_in_slot.append (self.num_moved_vehs_in_cur_slot)
                     printf (self.num_new_vehs_file, 't{} num_new_vehs={}\n' .format(self.t, self.num_new_vehs_in_cur_slot))
@@ -1120,6 +1120,7 @@ class SFC_mig_simulator (object):
                     if (not (self.is_first_t)):
                         self.max_new_vehs_in_slot   = max (self.max_new_vehs_in_slot,   self.num_new_vehs_in_cur_slot)
                     self.num_new_vehs_in_cur_slot, self.num_moved_vehs_in_cur_slot = 0,0 # prepare for the next slot
+                    self.is_first_t = False  # The next slot is surely not the first slot
                     continue 
                 if (VERBOSE_ADD_LOG in self.verbose):
                     self.last_rt = time.time ()
@@ -1174,7 +1175,7 @@ class SFC_mig_simulator (object):
         """
         Organize, writes and plots the simulation results, after the simulation is done
         """        
-        if (self.mode == 'cnt_new_vehs'):    
+        if (self.mode == 'cnt_moved_n_new_vehs'):    
             print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))
             print ('max_new_vehs_per_slot={}, max_moved_vehs_per_slot={}' .format (self.max_new_vehs_in_slot, self.max_moved_vehs_in_slot))        
         
@@ -1409,7 +1410,7 @@ class SFC_mig_simulator (object):
         for usr_entry in splitted_line:
             if (len(usr_entry) <= 1):
                 break
-            if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new and moved usrs in each slot.
+            if (self.mode == 'cnt_moved_n_new_vehs'): # This is a dummy simulation, used only for cnt the num of new and moved usrs in each slot.
                 self.num_moved_vehs_in_cur_slot += 1
                 continue
             usr_entry = usr_entry.split("(")[1].split (',')
@@ -1465,7 +1466,7 @@ class SFC_mig_simulator (object):
                         
             if (len(usr_entry) <= 1):
                 return
-            if (self.mode == 'cnt_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
+            if (self.mode == 'cnt_moved_n_new_vehs'): # This is a dummy simulation, used only for cnt the num of new usrs in each slot.
                 self.num_new_vehs_in_cur_slot += 1
                 continue 
             usr_entry = usr_entry.split("(")[1].split (',')
@@ -1877,7 +1878,7 @@ def only_cnt_num_new_vehs_per_slot ():
             my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                               poa_file_name='Monaco_0730_0830_{}secs_Telecom.poa' .format (T) if (city=='Monaco') else 'Lux_0730_0830_{}secs_post.poa' .format (T))
             
-            my_simulator.simulate (mode = 'cnt_new_vehs')    
+            my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
     
 
 if __name__ == "__main__":
@@ -1887,7 +1888,7 @@ if __name__ == "__main__":
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=842)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   
     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
-    my_simulator.simulate (mode = 'cnt_new_vehs')    
+    my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
     # ned_output_file = open ('../res/Lux.ned', 'w')
     # printf (ned_output_file, '{}')
     # exit ()

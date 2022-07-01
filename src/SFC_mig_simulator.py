@@ -469,7 +469,7 @@ class SFC_mig_simulator (object):
 
         while n < len (usrs):
             usr = usrs[n]
-            for lvl in range (len(usr.B)-1, usr.lvl, -1): #
+            for lvl in range (len(usr.B)-1, usr.lvl, -1): 
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previosly-suggested place for this usr  
                     self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
@@ -714,7 +714,10 @@ class SFC_mig_simulator (object):
         
         # Generate a complete balanced tree. If needed, later we will fix it according to the concrete distribution of PoAs.
         self.G                 = nx.generators.classic.balanced_tree (r=self.children_per_node, h=self.tree_height) # Generate a tree of height h where each node has r children.
-        self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
+        if (self.poa_file_name in ['Tree_shorter.poa']): # special toy-example scenarios for debugging
+            self.CPU_cost_at_lvl = [100, 10, 1]
+        else:
+            self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
         self.link_cost_at_lvl  = self.uniform_link_cost * np.ones (self.tree_height) #self.link_cost_at_lvl[i] is the cost of locating a full chain at level i
         self.link_delay_at_lvl = 2 * np.ones (self.tree_height) #self.link_delay_at_lvl[i] is the return delay when locating a full chain at level i 
         
@@ -965,7 +968,7 @@ class SFC_mig_simulator (object):
             self.first_slot     = self.t
             self.final_slot_to_simulate = self.t + self.sim_len_in_slots
         if (VERBOSE_ADD_LOG in self.verbose):
-            printf (self.log_output_file, '\ntime = {}\n**************************************\n' .format (self.t))
+            printf (self.log_output_file, '\nt = {}\n**************************************\n' .format (self.t))
         if (VERBOSE_CRIT_LEN not in self.verbose):
             self.critical_n_new_usrs = [] # rst the list of usrs who are critical in this time slot
 
@@ -1357,8 +1360,6 @@ class SFC_mig_simulator (object):
         if (self.mode == 'ourAlg'):
             self.rst_sol()
             self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
-            if (VERBOSE_LOG in self.verbose and VERBOSE_RES in self.verbose):
-                printf (self.res_file, '// reshuffling\n')
             self.stts = self.bottom_up()
             if (VERBOSE_ADD_LOG in self.verbose):
                 printf (self.log_output_file, 'after reshuffle:\n')

@@ -400,7 +400,7 @@ class SFC_mig_simulator (object):
         print a lp fractional solution to the output log file 
         """
         for s in self.G.nodes():
-            printf (self.log_output_file, 's{} RCs={} used cpu={}\n' .format (s, self.G.nodes[s]['RCs'], self.opt_used_cpu_in (s) ))
+            printf (self.log_output_file, 's{} RCs={:.0f} used cpu={:.0f}\n' .format (s, self.G.nodes[s]['RCs'], self.opt_used_cpu_in (s) ))
 
         if (VERBOSE_ADD_LOG in self.verbose): 
             for d_var in self.d_vars: 
@@ -416,7 +416,7 @@ class SFC_mig_simulator (object):
             used_cpu_in_s = self.alg_used_cpu_in (s)
             chains_in_s   = [usr.id for usr in self.usrs if usr.nxt_s==s]
             if (used_cpu_in_s > 0):  
-                printf (self.log_output_file, 's{} : Rcs={}, a={}, used cpu={:.0f}, num_of_chains={}' .format (
+                printf (self.log_output_file, 's{} : Rcs={:.0f}, a={:.0f}, used cpu={:.0f}, num_of_chains={}' .format (
                         s,
                         self.G.nodes[s]['RCs'],
                         self.G.nodes[s]['a'],
@@ -1897,7 +1897,7 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_RES]) 
+    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES])   
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    

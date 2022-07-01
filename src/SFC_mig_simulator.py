@@ -1379,10 +1379,11 @@ class SFC_mig_simulator (object):
         if (self.t == self.slot_to_dump):  
             self.dump_state_to_log_file()  
         for s in range (len (self.G.nodes())-1, -1, -1): # for each server s, in an increasing order of levels (DFS).v
+
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
             for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id)): # for each chain in Hs, in an increasing order of level ('L')
-                if (self.G.nodes[s]['a'] > usr.B[lvl]):
+                if (self.s_has_sufic_avail_cpu_for_usr (s, usr)):
                     self.place_usr_u_on_srvr_s (usr, s)
                 elif (len (usr.B)-1 == lvl):
                     return fail

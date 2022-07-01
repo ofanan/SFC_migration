@@ -147,7 +147,7 @@ class SFC_mig_simulator (object):
     calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
 
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
-    settings_str = lambda self : 't{}_{}_cpu{}_p{:.1f}_sd{}_stts{}' .format(
+    settings_str = lambda self : 't{}_{}_cpu{:.0f}_p{:.1f}_sd{}_stts{}' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.seed, self.stts)
 
     # Print a solution for the problem to the output res file when the solver is an LP solver  
@@ -499,6 +499,13 @@ class SFC_mig_simulator (object):
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
+        if (self.poa_file_name in ['Tree_shorter.poa']): # special toy-example scenarios for debugging 
+            if (usr.id%2==0):
+                usr.B = [1,1]
+            else: 
+                usr.B = [1,1,1]
+            return
+        
         slack = [usr.target_delay - self.link_delay_of_CLP_at_lvl[lvl] for lvl in range (self.tree_height+1)]
         slack = [slack[lvl] for lvl in range(self.tree_height+1) if slack[lvl] > 0] # trunc all servers with negative slack, which are surely delay-INfeasible
         usr.B = [] # usr.B will hold a list of the budgets required for placing u on each level 
@@ -790,12 +797,11 @@ class SFC_mig_simulator (object):
         
         # Network parameters
         # Tree height is the # of EDGES in the path from a leaf to the root (that is, the # of nodes in this path, minus 1). 
-        if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa']):
-            self.tree_height            = 2
-        elif (self.poa_file_name in ['Tree_shorter.poa']):
-            self.tree_height            = 2
+        if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa', 'Tree_shorter.poa']): # special toy-example scenarios for debugging
+            self.tree_height, self.children_per_node = 2, 2
         else:
             self.tree_height            = 4 
+            self.children_per_node      = children_per_node
         self.children_per_node          = 2 if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa', 'Tree_shorter.poa']) else children_per_node
         self.uniform_vm_mig_cost        = 200
         self.Lmax                       = 0
@@ -861,9 +867,16 @@ class SFC_mig_simulator (object):
         self.usrs                       = []
         self.slot_to_dump               = slot_to_dump
         self.delay_const_sanity_check()
-
-        self.cpu_cap_at_leaf = 30 if self.poa_file_name == 'shorter.poa' else cpu_cap_at_leaf 
-        self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+        if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa']):
+            self.cpu_cap_at_leaf = 30 
+            self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+        elif (self.poa_file_name in ['Tree_shorter.poa']):
+            self.cpu_cap_at_leaf = 1
+            self.cpu_cap_at_lvl  = np.ones (self.tree_height+1) 
+        else:
+            self.cpu_cap_at_leaf = cpu_cap_at_leaf
+            self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
+         
         if (print_params):
             self.print_params ()
 
@@ -1344,7 +1357,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'ourAlg'):
             self.rst_sol()
             self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
-            if (VERBOSE_LOG in self.verbose):
+            if (VERBOSE_LOG in self.verbose and VERBOSE_RES in self.verbose):
                 printf (self.res_file, '// reshuffling\n')
             self.stts = self.bottom_up()
             if (VERBOSE_ADD_LOG in self.verbose):
@@ -1883,12 +1896,19 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
+    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_RES]) 
+    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES])   
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
+
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_LOG_BU_ONLY])   
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=842)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
-    my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[])   
+    # my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
     # ned_output_file = open ('../res/Lux.ned', 'w')
     # printf (ned_output_file, '{}')
     # exit ()

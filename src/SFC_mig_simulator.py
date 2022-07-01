@@ -165,7 +165,7 @@ class SFC_mig_simulator (object):
                                mig_cost  = self.calc_mig_cost_in_slot_alg()),
             len (self.usrs),
             len (self.critical_n_new_usrs),
-            'T' if self.reshuffled else 'F'))
+            ('{}' .format (self.tree_height)) if self.reshuffled else '-1'))
 
     augmented_cpu_cap_at_leaf = lambda self: self.G.nodes[len (self.G.nodes)-1]['RCs']
 

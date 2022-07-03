@@ -382,10 +382,10 @@ class SFC_mig_simulator (object):
         """
         Print several header lines, indicating the format and so, to an output res file.
         """
-        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cpu_cost=... | link_cost=... | mig_cost=... | cost=... | ratio=[c,l,m] c | resh=bin, , where\n// T is the slot cnt (read from the input file)\n')
+        printf (res_file, '// format: t{T}.{Mode}.cpu{C}.stts{s} | cpu_cost=... | link_cost=... | mig_cost=... | cost=... | ratio=[c,l,m] c | resh=lvl, , where\n// T is the slot cnt (read from the input file)\n')
         printf (res_file, '// Mode is the algorithm / solver used.\n// C is the num of CPU units used in the leaf\n')
         printf (res_file, '// [c,l,m] are the ratio of the cpu, link, and mig cost out of the total cost, resp.\n') 
-        printf (res_file, '// bin is T if the algorithm has reshuffled for finding a solution at this slot, F else.\n\n')
+        printf (res_file, '// lvl is the level of the highest reshuffling datacenter if the alg\' has reshuffled for finding a solution at this slot, -1 else.\n\n')
 
     def init_log_file (self, overwrite = True):
         """
@@ -1898,10 +1898,10 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
-    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES])   
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
+    # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES])   
+    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
 
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   

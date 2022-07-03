@@ -504,7 +504,7 @@ class SFC_mig_simulator (object):
  
         for s in range (len (self.G.nodes())): # for each server s, in a decreasing order of levels, namely, begin from the root (id==0), and finish in the leaves (largest IDs). 
             lvl = self.G.nodes[s]['lvl']
-            for usr in [usr for usr in usrs if usr.lvl < lvl]:
+            for usr in [usr for usr in usrs if (len(usr.B)>lvl and usr.lvl < lvl)]:
                 if (self.G.nodes[s]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previously-suggested place for this usr  
                     self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new loc of the pushed-up usr
@@ -1194,8 +1194,11 @@ class SFC_mig_simulator (object):
                             printf (self.log_output_file, 'After BU:\n')
                             self.print_sol_res_line (self.log_output_file)
                             self.print_sol_to_log_alg()
-                        if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
-                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs) 
+                        if (self.stts==sccs): # if the bottom-up succeeded, perform push-up 
+                            if (self.mode=='ourAlgDist'):
+                                self.push_up_dist (self.usrs) if self.reshuffled else self.push_up_dist(self.critical_n_new_usrs) 
+                            else:
+                                self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs)
                 elif (self.mode in ['ffit', 'ffitC']):
                     self.stts = self.alg_top(self.first_fit)
                 elif (self.mode in ['wfit', 'wfitC']):

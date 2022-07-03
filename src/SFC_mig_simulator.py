@@ -471,8 +471,8 @@ class SFC_mig_simulator (object):
             usr = usrs[n]
             for lvl in range (len(usr.B)-1, usr.lvl, -1): 
                 if (self.G.nodes[usr.S_u[lvl]]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
-                    self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previosly-suggested place for this usr  
-                    self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new  loc of the moved usr
+                    self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previously-suggested place for this usr  
+                    self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new loc of the moved usr
                     
                     # update usr.lvl and usr.nxt_s accordingly 
                     usr.lvl      = lvl               
@@ -486,6 +486,35 @@ class SFC_mig_simulator (object):
                     break
             else:
                 n += 1
+        if (VERBOSE_ADD_LOG in self.verbose):
+            printf (self.log_output_file, 'after push-up:\n')
+        if (self.t == self.slot_to_dump):  
+            self.dump_state_to_log_file()  
+
+    def push_up_dist (self, usrs):
+        """
+        Push-up chains in a way that fits a distributed implementation: 
+        given a feasible solution, greedily push each chain as high as possible in the tree.  
+        The push-up is done node-by-node, beginning in the root, in a BFS order, down to the leaves' parents. 
+        The candidate chains for bpush up are sorted in a decreasing order of the # of CPU units they're currently using.
+        """
+        # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
+        # before calling push-up ()
+        heapq._heapify_max(usrs)
+ 
+        for s in range (len (self.G.nodes())): # for each server s, in a decreasing order of levels, namely, begin from the root (id==0), and finish in the leaves (largest IDs). 
+            lvl = self.G.nodes[s]['lvl']
+            for usr in [usr for usr in usrs if usr.lvl < lvl]:
+                if (self.G.nodes[s]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
+                    self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previously-suggested place for this usr  
+                    self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new loc of the pushed-up usr
+                    
+                    # update usr.lvl and usr.nxt_s accordingly 
+                    usr.lvl      = lvl               
+                    usr.nxt_s    = usr.S_u[usr.lvl]    
+                    
+                    # remove the user from the list of usrs to push-up; as this push-up scheme works top-down, each usr can be pushed-up at most once
+                    usrs.remove (usr)
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up:\n')
         if (self.t == self.slot_to_dump):  
@@ -895,7 +924,7 @@ class SFC_mig_simulator (object):
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
             self.max_R = 1.6 
-        elif (self.mode in ['ourAlg', 'ourAlgC']):   
+        elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
         else:
             self.max_R = 1.8
@@ -912,7 +941,7 @@ class SFC_mig_simulator (object):
         slot_len_str = self.poa_file_name.split('secs')
         self.slot_len = int(slot_len_str[0].split('_')[-1]) if (len (slot_len_str) > 1) else 1 # By default, slot len is 1
         
-        if (self.mode in ['ourAlg', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
+        if (self.mode in ['ourAlg', 'ourAlgDist', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
             self.simulate_algs()
         elif (self.mode == 'opt'):
             self.simulate_lp ();
@@ -1088,7 +1117,7 @@ class SFC_mig_simulator (object):
                 printf (self.crit_len_file, '// where: X is the number of the time slot, and Ci is the number of chains which are currently critical for i seconds.\n\n') 
         
         # reset Hs     
-        if (self.mode in ['ourAlg', 'ourAlgC']):
+        if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):
             for s in self.G.nodes():
                 self.G.nodes[s]['Hs']  = set() 
         
@@ -1118,7 +1147,7 @@ class SFC_mig_simulator (object):
                 for usr in list (filter (lambda usr : usr.id in [int(usr_id) for usr_id in splitted_line[1:] if usr_id!=''], self.usrs)):
 
                     self.G.nodes[usr.cur_s]['a'] += usr.B[usr.lvl] # free the CPU units used by the user in the old location
-                    if (self.mode in ['ourAlg', 'ourAlgC']):
+                    if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):
                         self.rmv_usr_from_all_Hs(usr)
                     self.usrs.remove (usr)                    
                 continue
@@ -1143,7 +1172,7 @@ class SFC_mig_simulator (object):
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
                     
                 # solve the prob' using the requested alg'    
-                if   (self.mode in ['ourAlg', 'ourAlgC']):
+                if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):
                     if (VERBOSE_CRIT_LEN in self.verbose and (self.is_first_t or (self.t%self.ourAlg_slot_len==0))):
                         if (not (self.is_first_t)):
                             printf (self.crit_len_file, self.settings_str())
@@ -1151,8 +1180,11 @@ class SFC_mig_simulator (object):
                                 printf (self.crit_len_file, ' | crit{}={}' .format (T, len([item for item in self.critical_n_new_usrs if (item.criticality_duration==T and (not(item.is_new))) ])))
                             printf (self.crit_len_file, '\n')
                         self.stts = self.alg_top(self.bottom_up)
-                        if (self.stts==sccs): # if we bottom-up succeeded, perform push-up 
-                            self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs) 
+                        if (self.stts==sccs): # if the bottom-up succeeded, perform push-up
+                            if (self.mode=='ourAlgDist'): 
+                                self.push_up_dist (self.usrs) if self.reshuffled else self.push_up_dist(self.critical_n_new_usrs) 
+                            else:
+                                self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs) 
                             self.critical_n_new_usrs = [] # after the alg' (successfully) run, there should be no crit' chains
                         for usr in self.usrs: # After we ran the alg', all usrs are considered 'old'
                             usr.is_new = False
@@ -1357,7 +1389,7 @@ class SFC_mig_simulator (object):
 
         # Now we know that the first run fail. For all the benchmarks, it means that they also made a reshuffle. 
         # However, bottom-up haven't tried a reshuffle yet. So, we give it a try now.
-        if (self.mode == 'ourAlg'):
+        if (self.mode in ['ourAlg', 'ourAlgDist']):
             self.rst_sol()
             self.reshuffled = True # In this run, we'll perform a reshuffle (namely, considering all usrs).
             self.stts = self.bottom_up()
@@ -1438,7 +1470,7 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr (usr) # update usr.B by the new requirements of this usr.
             self.update_S_u(usr, poa_id=int(usr_entry[1])) # Add this usr to the Hs of every server to which it belongs in its new location
                         
-            if (self.mode in ['ourAlg', 'ourAlgC']):
+            if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):
                 self.rmv_usr_from_all_Hs(usr) 
                 for s in usr.S_u:
                     self.G.nodes[s]['Hs'].add(usr) # Add the usr only to the 'Hs' (list of usrs that may be hosted on a server) of each of its delay-feasible servers
@@ -1497,7 +1529,7 @@ class SFC_mig_simulator (object):
             self.CPUAll_single_usr (usr) 
             self.update_S_u(usr, poa_id=int(usr_entry[1])) # Update the list of delay-feasible servers for this usr 
 
-            if (self.mode in ['ourAlg', 'ourAlgC']):                
+            if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):                
                 for s in usr.S_u: # Hs is the list of chains that may be located on each server while satisfying the delay constraint. Only some of the algs' use it
                     self.G.nodes[s]['Hs'].add(usr)                       
                     
@@ -1901,7 +1933,7 @@ if __name__ == "__main__":
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
     my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES])   
-    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
+    my_simulator.simulate (mode = 'ourAlgDist', cpu_cap_at_leaf=94)    
 
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   

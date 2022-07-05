@@ -113,7 +113,7 @@ class SFC_mig_simulator (object):
     randomize_target_delay = lambda self : self.target_delay[0] if (random.random() < self.prob_of_target_delay[0]) else self.target_delay[1]
     
     # Generate a new usr
-    gen_new_usr = lambda self, usr_id : usr_c (id=usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay(usr_id), C_u=self.uniform_Cu)
+    gen_new_usr = lambda self, usr_id : usr_c (id=usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay(usr_id), C_u=self.uniform_Cu) if (self.mode != 'ourAlgDist') else usr_c (id=usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay(usr_id), C_u=self.uniform_Cu, rand_id=1) 
 
     # Pseudo-randomize a target delay for a usr, based on its given usr_id
     pseudo_random_target_delay = lambda self, usr_id : self.target_delay[0] if ( ((usr_id % 10)/10) < self.prob_of_target_delay[0]) else self.target_delay[1]
@@ -496,25 +496,30 @@ class SFC_mig_simulator (object):
         Push-up chains in a way that fits a distributed implementation: 
         given a feasible solution, greedily push each chain as high as possible in the tree.  
         The push-up is done node-by-node, beginning in the root, in a BFS order, down to the leaves' parents. 
-        The candidate chains for bpush up are sorted in a decreasing order of the # of CPU units they're currently using.
+        The candidate chains for push up are sorted in a decreasing order of the # of CPU units they're currently using.
+        Break ties by how much CPU each of them will be using if pushed-up to a certain level; usrs that would consume lower cpu when pushed-up, should appear first.
+        This is approximated merely by letting non-RT chains appear first, because for a given level, non-RT chains are likely to consume less cpu than the RT equivalents.
+        Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run before calling push-up ()
         """
-        # Assume here that the available cap' at each server 'a' is already calculated by the alg' that was run 
-        # before calling push-up ()
-        heapq._heapify_max(usrs)
- 
+
         for s in range (len (self.G.nodes())): # for each server s, in a decreasing order of levels, namely, begin from the root (id==0), and finish in the leaves (largest IDs). 
             lvl = self.G.nodes[s]['lvl']
-            for usr in [usr for usr in usrs if (len(usr.B)>lvl and usr.lvl < lvl)]:
+            candidates_for_push_up = [usr for usr in usrs if (usr in self.G.nodes[s]['Hs'] and usr.lvl < lvl and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl))]
+            for usr in sorted (candidates_for_push_up, key = lambda usr: (usr.B[usr.lvl], len(usr.B)), reverse=True): 
                 if (self.G.nodes[s]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previously-suggested place for this usr  
                     self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new loc of the pushed-up usr
                     
                     # update usr.lvl and usr.nxt_s accordingly 
                     usr.lvl      = lvl               
-                    usr.nxt_s    = usr.S_u[usr.lvl]    
+                    usr.nxt_s    = usr.S_u[usr.lvl]
+            
                     
-                    # remove the user from the list of usrs to push-up; as this push-up scheme works top-down, each usr can be pushed-up at most once
-                    usrs.remove (usr)
+        printf (self.log_output_file, 'BUPU results\n' .format (s)) # $$$$$$$$$$$
+        self.verbose = [VERBOSE_ADD2_LOG]
+        self.print_sol_to_log_alg () #$$$$
+        exit ()    
+
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up:\n')
         if (self.t == self.slot_to_dump):  
@@ -869,15 +874,15 @@ class SFC_mig_simulator (object):
                 exit ()
             self.gen_parameterized_antloc_tree (self.poa2cell_file_name)
         
-        # self.print_tree_topology_to_omnet ()
-
         self.delay_const_sanity_check()
 
     def delay_const_sanity_check (self):
         """
         Sanity check for the usr parameters' feasibility.
         """
-        usr = self.gen_new_usr (usr_id=0)
+        usr_id=0
+        usr = usr_c (id=usr_id, theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay(usr_id), C_u=self.uniform_Cu)
+        
         self.CPUAll_single_usr (usr) 
         if (len(usr.B)==0):
             print ('Error: cannot satisfy delay constraints of usr {}, even on a leaf. theta_times_lambda={}, target_delay ={}' .format (
@@ -920,7 +925,7 @@ class SFC_mig_simulator (object):
             self.prob_of_target_delay = [prob_of_target_delay]  
 
         self.mode              = mode
-        
+
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
             self.max_R = 1.6 
@@ -1192,8 +1197,11 @@ class SFC_mig_simulator (object):
                         self.stts = self.alg_top(self.bottom_up)
                         if (self.stts==sccs and VERBOSE_LOG_BU_ONLY in self.verbose):
                             printf (self.log_output_file, 'After BU:\n')
+                            self.verbose.append (VERBOSE_ADD2_LOG)
                             self.print_sol_res_line (self.log_output_file)
                             self.print_sol_to_log_alg()
+                            print ('exiting after printing BU log')
+                            exit ()
                         if (self.stts==sccs): # if the bottom-up succeeded, perform push-up 
                             if (self.mode=='ourAlgDist'):
                                 self.push_up_dist (self.usrs) if self.reshuffled else self.push_up_dist(self.critical_n_new_usrs) 
@@ -1418,7 +1426,7 @@ class SFC_mig_simulator (object):
 
             lvl = self.G.nodes[s]['lvl']
             Hs = [usr for usr in self.G.nodes[s]['Hs'] if (usr.lvl == -1)] # usr.lvl==-1 verifies that this usr wasn't placed yet
-            for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id)): # for each chain in Hs, in an increasing order of level ('L')
+            for usr in sorted (Hs, key = lambda usr : (len(usr.B), usr.rand_id, usr.id)): # for each chain in Hs, in an increasing order of level ('L'). break ties by rand_id. for having deter' results, use max_rand_id=1, and then ties are broken by the usr's id
                 if (self.s_has_sufic_avail_cpu_for_usr (s, usr)):
                     self.place_usr_u_on_srvr_s (usr, s)
                 elif (len (usr.B)-1 == lvl):
@@ -1466,6 +1474,9 @@ class SFC_mig_simulator (object):
             usr_entry = usr_entry.split("(")[1].split (',')
             
             list_of_usr = list(filter (lambda usr : usr.id == int(usr_entry[0]), self.usrs))
+            if (len(list_of_usr)==0):
+                print ("error: didn't find old usr {}" .format (int(usr_entry[0])))
+                exit ()
             usr = list_of_usr[0]
             
             # self.moved_usrs.append (usr)
@@ -1935,7 +1946,7 @@ if __name__ == "__main__":
 
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES])   
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_RES])   
     my_simulator.simulate (mode = 'ourAlgDist', cpu_cap_at_leaf=94)    
 
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   

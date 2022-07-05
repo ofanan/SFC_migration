@@ -22,7 +22,7 @@ VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseourc
 VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
 VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
 VERBOSE_CRIT_LEN      = 10 # Calculate how much time each chain is critical, for the given slot len.
-VERBOSE_LOG_BU_ONLY   = 11 # Log only the reults of BU, disregarding the PU part.
+VERBOSE_LOG_BU   = 11 # Log only the reults of BU, disregarding the PU part.
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -505,7 +505,7 @@ class SFC_mig_simulator (object):
         for s in range (len (self.G.nodes())): # for each server s, in a decreasing order of levels, namely, begin from the root (id==0), and finish in the leaves (largest IDs). 
             lvl = self.G.nodes[s]['lvl']
             candidates_for_push_up = [usr for usr in usrs if (usr in self.G.nodes[s]['Hs'] and usr.lvl < lvl and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl))]
-            for usr in sorted (candidates_for_push_up, key = lambda usr: (usr.B[usr.lvl], len(usr.B)), reverse=True): 
+            for usr in sorted (candidates_for_push_up, key = lambda usr: (usr.B[usr.lvl], len(usr.B), -usr.id), reverse=True): 
                 if (self.G.nodes[s]['a'] >= usr.B[lvl] and self.chain_cost_alg(usr, lvl) < self.chain_cost_alg(usr, usr.lvl)): # if there's enough available space to move u to level lvl, and this would reduce cost
                     self.G.nodes [usr.nxt_s]    ['a'] += usr.B[usr.lvl] # inc the available CPU at the previously-suggested place for this usr  
                     self.G.nodes [usr.S_u[lvl]] ['a'] -= usr.B[lvl]     # dec the available CPU at the new loc of the pushed-up usr
@@ -514,11 +514,10 @@ class SFC_mig_simulator (object):
                     usr.lvl      = lvl               
                     usr.nxt_s    = usr.S_u[usr.lvl]
             
-                    
-        printf (self.log_output_file, 'BUPU results\n' .format (s)) # $$$$$$$$$$$
-        self.verbose = [VERBOSE_ADD2_LOG]
-        self.print_sol_to_log_alg () #$$$$
-        exit ()    
+
+        # printf (self.log_output_file, 't={}, BUPU results\n' .format (self.t)) # $$$$$$$$$$$
+        # self.verbose.append(VERBOSE_ADD2_LOG)
+        # self.print_sol_to_log_alg () #$$$$
 
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up:\n')
@@ -984,7 +983,7 @@ class SFC_mig_simulator (object):
         #     self.init_moved_res_file()
         # if (VERBOSE_CRITICAL_RES in self.verbose):
         #     self.init_critical_res_file()
-        if (VERBOSE_LOG in self.verbose or VERBOSE_LOG_BU_ONLY in self.verbose):
+        if (VERBOSE_LOG in self.verbose or VERBOSE_LOG_BU in self.verbose):
             self.init_log_file()
         # if (VERBOSE_MOB in self.verbose):
         #     self.mob_file_name   = "../res/" + self.poa_file_name.split(".")[0] + '.' + self.mode.split("_")[1] + '.mob.log'  
@@ -1195,14 +1194,12 @@ class SFC_mig_simulator (object):
                             usr.is_new = False
                     else:
                         self.stts = self.alg_top(self.bottom_up)
-                        if (self.stts==sccs and VERBOSE_LOG_BU_ONLY in self.verbose):
-                            printf (self.log_output_file, 'After BU:\n')
-                            self.verbose.append (VERBOSE_ADD2_LOG)
-                            self.print_sol_res_line (self.log_output_file)
-                            self.print_sol_to_log_alg()
-                            print ('exiting after printing BU log')
-                            exit ()
                         if (self.stts==sccs): # if the bottom-up succeeded, perform push-up 
+                            if (VERBOSE_LOG_BU in self.verbose):
+                                printf (self.log_output_file, 'BU results:\n')
+                                self.verbose.append (VERBOSE_ADD2_LOG)
+                                self.print_sol_res_line (self.log_output_file)
+                                self.print_sol_to_log_alg()
                             if (self.mode=='ourAlgDist'):
                                 self.push_up_dist (self.usrs) if self.reshuffled else self.push_up_dist(self.critical_n_new_usrs) 
                             else:
@@ -1946,13 +1943,13 @@ if __name__ == "__main__":
 
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_RES])   
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_RES])   
     my_simulator.simulate (mode = 'ourAlgDist', cpu_cap_at_leaf=94)    
 
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=842)    
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU_ONLY])   
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[])   

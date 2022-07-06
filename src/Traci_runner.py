@@ -43,7 +43,7 @@ class Traci_runner (object):
     gen_time_str = lambda self, start_time, end_time : '{}_{}' .format (secs2hour(start_time), secs2hour(end_time)) 
 
     # My Sumo command, to start a Traci simulation
-    mysumoCmd = lambda self : [checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true']
+    my_sumo_cmd = lambda self, len_of_time_slot_in_sec=1 : [checkBinary('sumo'), '-c', self.sumo_cfg_file, '-W', '-V', 'false', '--no-step-log', 'true', '--step-length', '{:.3f}' .format (len_of_time_slot_in_sec)]
 
     # My Sumo command, to start a dummy Traci simulation, used merely to calculate the total length of lanes within a given rectangle
     LaneLengthSumoCmd = lambda self : [checkBinary('sumo'), '-c', self.sumo_cfg_file, "--start", "--quit-on-end", '-W', '-V', 'false', '--no-step-log', 'true']
@@ -127,7 +127,7 @@ class Traci_runner (object):
         Print the latitude and longitude of the 4 corners of the simulated area
         """
         self.calc_relative_pos_corners()
-        traci.start (self.mysumoCmd())
+        traci.start (self.my_sumo_cmd())
         lon_lat_sw_corner = self.relative_pos_to_lon_lat (self.relative_sw_corner)
         print ('sw_corner(lat,lon)={}, {}' .format (lon_lat_sw_corner[1], lon_lat_sw_corner[0]))
 
@@ -167,7 +167,7 @@ class Traci_runner (object):
         
         time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
         print ('Running Traci for the period {} to count vehs only' .format (time_str))
-        traci.start(self.mysumoCmd())
+        traci.start(self.my_sumo_cmd())
         self.cnt_output_file_name = '../res/{}_{}_{}secs_cnt.res' .format (self.city, time_str, len_of_time_slot_in_sec) 
         self.cnt_output_file      = open (self.cnt_output_file_name, 'w')
                
@@ -216,11 +216,11 @@ class Traci_runner (object):
         self.verbose             = verbose
         
         time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
+        traci.start (self.my_sumo_cmd(len_of_time_slot_in_sec))
         print ('Running Traci for the period {}. Will write res to {} output files' .format (time_str, num_of_output_files))
-        traci.start (self.mysumoCmd())
         
         if (warmup_period > 0):
-            traci.simulationStep (int(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
+            traci.simulationStep (float(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
         for i in range (num_of_output_files):
             
             loc_output_file_name = '../res/loc_files/{}_{}_{}secs{}.loc' .format (self.city, time_str, len_of_time_slot_in_sec, ('_spd' if (VERBOSE_SPEED in self.verbose) else ''))   
@@ -248,7 +248,7 @@ class Traci_runner (object):
                     break
                   
                 cur_list_of_vehs = [{'key' : veh_key, 'pos' : self.get_relative_position(veh_key)} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
-                printf (loc_output_file, '\nt = {:.0f}\n' .format (self.t))
+                printf (loc_output_file, '\nt = {:.2f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
                                                                    veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
@@ -292,7 +292,7 @@ class Traci_runner (object):
         
         antenna_loc_file = open ('../res/Antennas_locs/' + antenna_locs_file_name, 'r')
 
-        traci.start (self.mysumoCmd())
+        traci.start (self.my_sumo_cmd())
 
         self.list_of_antennas = []
     
@@ -428,10 +428,12 @@ class Traci_runner (object):
 
 if __name__ == '__main__':
     
-    city = 'Monaco'
-    for T in [6]: #[3, 5, 6, 7, 9, 10]:
-        my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-        my_Traci_runner.simulate (warmup_period=7.5*3600, sim_length=3600, len_of_time_slot_in_sec=T, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    city = 'Lux'
+    my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
+    my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    # for T in [6]: #[3, 5, 6, 7, 9, 10]:
+    #     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
+    #     my_Traci_runner.simulate (warmup_period=7.5*3600, sim_length=3600, len_of_time_slot_in_sec=T, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.calc_tot_lane_len_in_all_rects ()
     # my_Traci_runner.print_lon_lat_corners_of_simulated_area()
     # my_Traci_runner.gen_antloc_file ('Monaco.txt', provider='Telecom')

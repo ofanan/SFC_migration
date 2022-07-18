@@ -1243,9 +1243,10 @@ def plot_lin_density_heatmaps ():
 if __name__ == '__main__':
 
     # plot_lin_density_heatmaps ()
-    plot_all_demography_heatmaps ()
+    # plot_all_demography_heatmaps ()
 
-    # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    max_power_of_4 = 4
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # pcl_input_file_name = 'num_of_vehs_Lux_0730_0830_1secs.loc__4rects.pcl'
     # my_loc2poa.gen_heatmap (df=None, pcl_input_file_name=pcl_input_file_name)
     # plt.savefig('../res/' + pcl_input_file_name.split('.pcl')[0] + '.pdf', bbox_inches='tight')
@@ -1264,5 +1265,3 @@ if __name__ == '__main__':
     # df= [[2481.923888888889, 2954.5575, 1684.8925]]
     # with open ('../res/num_of_vehs_Monaco_0730_0830_1secs.loc__3rects.pcl' , 'wb') as pcl_output_file:
     #     pickle.dump (df, pcl_output_file)
-
-

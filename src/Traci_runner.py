@@ -295,6 +295,8 @@ class Traci_runner (object):
         """
         """
 
+        self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+        exit ()
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
         vehs_left_in_this_cycle  = []

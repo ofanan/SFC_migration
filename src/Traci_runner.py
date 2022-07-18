@@ -209,10 +209,8 @@ class Traci_runner (object):
         """
 
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
-        # prsn_key2id              = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
         vehs_left_in_this_cycle  = []
-        # prsns_left_in_this_cycle = []
         self.verbose             = verbose
         
         time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
@@ -280,6 +278,79 @@ class Traci_runner (object):
                     elif (VERBOSE_LOC in self.verbose):
                         printf (loc_output_file, "({},{},{},{})" .format (veh_type, veh_id, item['pos'][0], item['pos'][1]))
         
+                sys.stdout.flush()
+                traci.simulationStep (self.t + len_of_time_slot_in_sec)
+        traci.close()
+
+    def post2poa (self, pos):
+        """
+        Given the position of a vehicle (pos[0], pos[1]), returns the poa of a veh found in this position
+        """
+        if (pos==7):
+            return 7
+        return 77;
+
+
+    def simulate_gen_poa_file (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
+        """
+        Simulate Traci, and print-out the POAs of cars, 
+        """
+
+        veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
+        veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
+        vehs_left_in_this_cycle  = []
+        self.verbose             = verbose
+        
+        time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
+        traci.start (self.my_sumo_cmd(len_of_time_slot_in_sec))
+        print ('Running Traci for the period {}. Will write res to {} output files' .format (time_str, num_of_output_files))
+        
+        if (warmup_period > 0):
+            traci.simulationStep (float(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
+        for i in range (num_of_output_files):
+            
+            poa_output_file_name = '../res/poa_files/{}_{}_{}secs.poa' .format (self.city, time_str, len_of_time_slot_in_sec)   
+            with open(poa_output_file_name, 'w') as poa_output_file:
+                poa_output_file.write('')                
+            poa_output_file  = open (poa_output_file_name,  "w")
+
+            while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
+                
+                self.t = traci.simulation.getTime()
+                
+                # Finished the sim. Now, just make some post-processing. 
+                if (self.t >= warmup_period + sim_length*(i+1) / num_of_output_files):
+                    print ('Successfully finished writing to file {}' .format (poa_output_file_name))
+                    break
+                  
+                # By default, the type of each  vechicle is 'u', namely, *Undefined". 
+                cur_list_of_vehs = [{'key' : veh_key, 'veh_type' : 'u', 'poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
+                printf (poa_output_file, '\nt = {:.2f}\n' .format (self.t))
+
+                vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
+                                                                   veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
+                veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
+                printf (poa_output_file, 'usrs_that_left: ')
+                if (len (vehs_left_in_this_cycle) > 0):
+                    for veh in vehs_left_in_this_cycle:
+                        printf (poa_output_file, '{:.0f} ' .format(veh['id']))
+                    veh_ids2recycle = sorted (list (set (veh_ids2recycle) | set([item['id'] for item in vehs_left_in_this_cycle]))) # add to veh_ids2recycle the IDs of the cars that left in this cycle
+                printf (poa_output_file, '\nnew_or_moved: ')
+                for item in cur_list_of_vehs:
+                    filtered_list = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
+                    if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
+                        item['veh_type'] = 'n' # will indicate that this is a new vehicle 
+                        if (len (veh_ids2recycle) > 0): # can recycle an ID of a veh that left
+                            veh_id = veh_ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
+                        else:
+                            veh_id = len (veh_key2id) # pick a new ID
+                        veh_key2id.append({'key' : item['key'], 'id' : veh_id}) # insert the new veh into the db 
+                    else: # already seen this veh_key in the sim' --> extract its id from the hash
+                        if (traci.vehicle.getSpeed(item['key']) == 0): # the veh hasn't moved since the last slot, so it also didn't change its loc and poa association  
+                            continue
+                        item['veh_type'] = 'o' # will indicate that this is a old vehicle 
+                        veh_id = filtered_list[0]['id']
+                    printf (poa_output_file, "({},{},{})" .format (item['veh_type'], veh_id, item['poa']))
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()

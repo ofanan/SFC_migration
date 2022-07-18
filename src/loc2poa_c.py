@@ -799,8 +799,8 @@ class loc2poa_c (object):
                     splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
                     for my_tuple in splitted_line:  
                         if (len(my_tuple) <= 1): # no more new / moved vehicles in this list.
-                            if (VERBOSE_CNT_NEW_VEHS in self.verbose):
-                                self.num_new_vehs.append (num_new_vehs_in_this_slot) 
+                            # if (VERBOSE_CNT_NEW_VEHS in self.verbose):
+                            #     self.num_new_vehs.append (num_new_vehs_in_this_slot) 
                             break
                         my_tuple = my_tuple.split("(")
                         my_tuple   = my_tuple[1].split (',')
@@ -1245,7 +1245,6 @@ if __name__ == '__main__':
     # plot_lin_density_heatmaps ()
     plot_all_demography_heatmaps ()
 
-
     # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     # pcl_input_file_name = 'num_of_vehs_Lux_0730_0830_1secs.loc__4rects.pcl'
     # my_loc2poa.gen_heatmap (df=None, pcl_input_file_name=pcl_input_file_name)
@@ -1255,7 +1254,6 @@ if __name__ == '__main__':
     
     # Processing
     # my_loc2poa.parse_loc_files (['Lux_0730_0830_16secs.loc']) #(['Monaco_0730_0800_1secs_rttd54.loc 'Lux_0829_0830_8secs.loc']) #(['Lux_0730_0740_1secs.loc', 'Lux_0740_0750_1secs.loc', 'Lux_0750_0800_1secs.loc', 'Lux_0800_0810_1secs.loc', 'Lux_0810_0820_1secs.loc', 'Lux_0820_0830_1secs.loc'])
-
     # my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_CNT, VERBOSE_SPEED], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
     
     # # Post-processing

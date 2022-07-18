@@ -312,6 +312,10 @@ class Traci_runner (object):
             with open(poa_output_file_name, 'w') as poa_output_file:
                 poa_output_file.write('')                
             poa_output_file  = open (poa_output_file_name,  "w")
+            printf (poa_output_file, '// File format:\n//for each time slot:\n')
+            printf (poa_output_file, '// "usrs_that_left" is a list of IDs that left at this cycle, separated by spaces.\n')
+            printf (poa_output_file, '//"new_usrs" is a list of the new usrs, and their PoAs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
+            printf (poa_output_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current PoAs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
 
             while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
                 
@@ -323,7 +327,7 @@ class Traci_runner (object):
                     break
                   
                 # By default, the type of each  vechicle is 'u', namely, *Undefined". 
-                cur_list_of_vehs = [{'key' : veh_key, 'veh_type' : 'u', 'nxt_poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
+                cur_list_of_vehs = [{'key' : veh_key, 'type' : 'u', 'nxt_poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
                 printf (poa_output_file, '\nt = {:.2f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
@@ -334,28 +338,32 @@ class Traci_runner (object):
                     for veh in vehs_left_in_this_cycle:
                         printf (poa_output_file, '{:.0f} ' .format(veh['id']))
                     veh_ids2recycle = sorted (list (set (veh_ids2recycle) | set([item['id'] for item in vehs_left_in_this_cycle]))) # add to veh_ids2recycle the IDs of the cars that left in this cycle
-                printf (poa_output_file, '\nnew_or_moved: ')
                 for item in cur_list_of_vehs:
                     filtered_list = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
-                        item['type'] = 'new' # will indicate that this is a new vehicle 
+                        item['type'] = 'new' # this is a new vehicle 
                         if (len (veh_ids2recycle) > 0): # can recycle an ID of a veh that left
-                            veh_id = veh_ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
+                            veh_key2id.append({'key' : item['key'], 'id' : veh_ids2recycle.pop(0)}) # # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle  
                         else:
-                            veh_id = len (veh_key2id) # pick a new ID
-                        veh_key2id.append({'key' : item['key'], 'id' : veh_id}) # insert the new veh into the db 
+                            veh_key2id.append({'key' : item['key'], 'id' : len (veh_key2id)}) # pick a new ID
                     else: # already seen this veh_key in the sim' --> extract its id from the hash
-                        if (traci.vehicle.getSpeed(item['key']) == 0): # the veh hasn't moved since the last slot, so it also didn't change its loc and poa association  
+                        if (traci.vehicle.getSpeed(item['key'])== 0): # the veh hasn't moved since the last slot, so it also didn't change its loc and poa association  
                             continue
                         item['type'] = 'old' # will indicate that this is a old vehicle 
-                        veh_id = filtered_list[0]['id']
+                        item['id'] = filtered_list[0]['id']
 
                 printf (poa_output_file, '\nnew_usrs: ')
                 for veh in list (filter (lambda veh :veh['type']=='new', cur_list_of_vehs)):
-                    list_of_key = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
-                    if (list_of_key==0):
-                        print ("error: didn't find key {} in veh_key2id" .format (veh['key']))
-                    printf (poa_output_file, '({},{}' .format (list_of_key[0], veh['nxt_poa'])) 
+                    list_of_items_in_key2id = list (filter (lambda item_in_veh_key2id : item_in_veh_key2id['key'] == veh['key'], veh_key2id)) # look for this veh in the list of already-known vehs
+                    if (len(list_of_items_in_key2id)!=1):
+                        print ("error: wrong number of items with key {} in veh_key2id" .format (veh['key']))
+                    printf (poa_output_file, '({},{})' .format (list_of_items_in_key2id[0]['id'], veh['nxt_poa'])) 
+                printf (poa_output_file, '\nold_usrs: ')
+                for veh in list (filter (lambda veh :veh['type']=='old', cur_list_of_vehs)):
+                    list_of_items_in_key2id = list (filter (lambda item_in_veh_key2id : item_in_veh_key2id['key'] == veh['key'], veh_key2id)) # look for this veh in the list of already-known vehs
+                    if (len(list_of_items_in_key2id)!=1):
+                        print ("error: wrong number of items with key {} in veh_key2id" .format (veh['key']))
+                    printf (poa_output_file, '({},{})' .format (list_of_items_in_key2id[0]['id'], veh['nxt_poa'])) 
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
@@ -507,6 +515,7 @@ if __name__ == '__main__':
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
     my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    # my_Traci_runner.simulate (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
 
     # for T in [6]: #[3, 5, 6, 7, 9, 10]:

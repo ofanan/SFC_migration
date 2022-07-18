@@ -286,9 +286,7 @@ class Traci_runner (object):
         """
         Given the position of a vehicle (pos[0], pos[1]), returns the poa of a veh found in this position
         """
-        if (pos[0]==1):
-            return 7
-        return 77;
+        return self.my_loc2poa.loc2poa (pos[0], pos[1])
 
 
     def simulate_gen_poa_file (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
@@ -297,8 +295,21 @@ class Traci_runner (object):
 
         self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
         x,y = 100, 100
-        nxt_poa   = self.my_loc2poa.loc2poa (x,y)
-        print ('poa of ({},{}) is {}' .format (x, y, nxt_poa))
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 100, 500
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 500, 100
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 500, 500
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 100, 1000
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 1000, 500
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 500, 1000
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
+        x,y = 500, 2000
+        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
         exit ()
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
@@ -519,8 +530,8 @@ if __name__ == '__main__':
     
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
-    # my_Traci_runner.simulate (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    # my_Traci_runner.simulate (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
 
     # for T in [6]: #[3, 5, 6, 7, 9, 10]:

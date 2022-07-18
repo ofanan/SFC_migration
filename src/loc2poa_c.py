@@ -437,10 +437,10 @@ class loc2poa_c (object):
         Format-prints the users' PoA, as calculated earlier, to the .poa output file
         """
         usrs = list (filter (lambda usr: usr['new'], self.usrs))
-        if (len (usrs) > 0):
-            printf (self.poa_file, 'new_usrs: ')
-            for usr in usrs: # for every new usr
-                self.print_usr_poa (usr)
+        # if (len (usrs) > 0):
+        printf (self.poa_file, 'new_usrs: ')
+        for usr in usrs: # for every new usr
+            self.print_usr_poa (usr)
 
         usrs = list (filter (lambda usr: (usr['new'] == False) and (usr['nxt poa'] != usr['cur poa']), self.usrs))
         printf (self.poa_file, '\nold_usrs: ')
@@ -754,6 +754,7 @@ class loc2poa_c (object):
             splitted_line = line.split (" ")
             
             if (splitted_line[0] == "t"): # reached the next simulation time slot
+                num_new_vehs_in_this_slot = 0
                 if (VERBOSE_POA in self.verbose):
                     printf(self.poa_file, '\n{}\n' .format (line)) # print the header of the current time: "t = ..."
                 self.t = int(splitted_line[2])
@@ -799,8 +800,6 @@ class loc2poa_c (object):
                     splitted_line = splitted_line[0].split (')') # split the line into the data given for each distinct usr
                     for my_tuple in splitted_line:  
                         if (len(my_tuple) <= 1): # no more new / moved vehicles in this list.
-                            # if (VERBOSE_CNT_NEW_VEHS in self.verbose):
-                            #     self.num_new_vehs.append (num_new_vehs_in_this_slot) 
                             break
                         my_tuple = my_tuple.split("(")
                         my_tuple   = my_tuple[1].split (',')
@@ -1246,7 +1245,8 @@ if __name__ == '__main__':
     # plot_all_demography_heatmaps ()
 
     max_power_of_4 = 4
-    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [], antloc_file_name = '', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    my_loc2poa     = loc2poa_c (max_power_of_4 = max_power_of_4, verbose = [VERBOSE_POA], antloc_file_name = 'Lux.post.antloc', city='Lux') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
+    my_loc2poa.parse_loc_files (['Lux_0000_0000_1secs.loc'])
     # pcl_input_file_name = 'num_of_vehs_Lux_0730_0830_1secs.loc__4rects.pcl'
     # my_loc2poa.gen_heatmap (df=None, pcl_input_file_name=pcl_input_file_name)
     # plt.savefig('../res/' + pcl_input_file_name.split('.pcl')[0] + '.pdf', bbox_inches='tight')

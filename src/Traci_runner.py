@@ -324,7 +324,7 @@ class Traci_runner (object):
                     break
                   
                 # By default, the type of each  vechicle is 'u', namely, *Undefined". 
-                cur_list_of_vehs = [{'key' : veh_key, 'veh_type' : 'u', 'poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
+                cur_list_of_vehs = [{'key' : veh_key, 'veh_type' : 'u', 'nxt_poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
                 printf (poa_output_file, '\nt = {:.2f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
@@ -339,7 +339,7 @@ class Traci_runner (object):
                 for item in cur_list_of_vehs:
                     filtered_list = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
-                        item['veh_type'] = 'n' # will indicate that this is a new vehicle 
+                        item['type'] = 'new' # will indicate that this is a new vehicle 
                         if (len (veh_ids2recycle) > 0): # can recycle an ID of a veh that left
                             veh_id = veh_ids2recycle.pop(0) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle
                         else:
@@ -348,9 +348,12 @@ class Traci_runner (object):
                     else: # already seen this veh_key in the sim' --> extract its id from the hash
                         if (traci.vehicle.getSpeed(item['key']) == 0): # the veh hasn't moved since the last slot, so it also didn't change its loc and poa association  
                             continue
-                        item['veh_type'] = 'o' # will indicate that this is a old vehicle 
+                        item['type'] = 'old' # will indicate that this is a old vehicle 
                         veh_id = filtered_list[0]['id']
-                    printf (poa_output_file, "({},{},{})" .format (item['veh_type'], veh_id, item['poa']))
+
+                printf (poa_output_file, '\nnew_usrs: ')
+                for veh in list (filter (lambda veh :veh['type']=='new', cur_list_of_vehs)):
+                    printf (poa_output_file, '({},{}' .format (veh['id'], veh['poa'])) 
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()

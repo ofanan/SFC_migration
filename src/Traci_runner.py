@@ -27,6 +27,10 @@ dist = lambda p1, p2 : math.sqrt( (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
 
 class Traci_runner (object):
 
+
+    #Given the position of a vehicle (pos[0], pos[1]), returns the poa of a veh found in this position
+    pos2poa = lambda self, pos: self.my_loc2poa.loc2poa (pos[0], pos[1])
+
     # Given the x,y position, return the x,y position within the simulated area (city center) 
     relative_to_abs_pos = lambda self, pos: np.array(pos, dtype='int16') + loc2poa_c.LOWER_LEFT_CORNER [self.city]
 
@@ -282,35 +286,11 @@ class Traci_runner (object):
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
 
-    def pos2poa (self, pos):
-        """
-        Given the position of a vehicle (pos[0], pos[1]), returns the poa of a veh found in this position
-        """
-        return self.my_loc2poa.loc2poa (pos[0], pos[1])
-
-
     def simulate_gen_poa_file (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
         """
 
-        self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc') #Monaco.Telecom.antloc', city='Monaco') #'Lux.post.antloc')
-        x,y = 100, 100
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 100, 500
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 500, 100
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 500, 500
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 100, 1000
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 1000, 500
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 500, 1000
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        x,y = 500, 2000
-        print ('poa of ({}, {}) = {}' .format (x, y, self.pos2poa([x,y])))
-        exit ()
+        self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc' if self.city=='Lux' else 'Monaco.Telecom.antloc')
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
         vehs_left_in_this_cycle  = []
@@ -344,7 +324,7 @@ class Traci_runner (object):
                   
                 # By default, the type of each  vechicle is 'u', namely, *Undefined". 
                 cur_list_of_vehs = [{'key' : veh_key, 'type' : 'u', 'nxt_poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
-                printf (poa_output_file, '\nt = {:.2f}\n' .format (self.t))
+                printf (poa_output_file, '\nt = {:.3f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
                                                                    veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 

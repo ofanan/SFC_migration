@@ -324,15 +324,11 @@ class Traci_runner (object):
                   
                 # By default, the type of each  vechicle is 'u', namely, *Undefined". 
                 cur_list_of_vehs = [{'key' : veh_key, 'type' : 'u', 'nxt_poa' : self.pos2poa (self.get_relative_position(veh_key))} for veh_key in traci.vehicle.getIDList() if loc2poa_c.is_in_simulated_area (self.city, self.get_relative_position(veh_key))]            
-                printf (poa_output_file, '\nt = {:.3f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
                                                                    veh['id']  not in (veh_ids2recycle)), known_vehs)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
                 known_vehs = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], known_vehs)) # remove usrs that left from the known_vehs map 
-                printf (poa_output_file, 'usrs_that_left: ')
                 if (len (vehs_left_in_this_cycle) > 0):
-                    for veh in vehs_left_in_this_cycle:
-                        printf (poa_output_file, '{:.0f} ' .format(veh['id']))
                     veh_ids2recycle = sorted (list (set (veh_ids2recycle) | set([item['id'] for item in vehs_left_in_this_cycle]))) # add to veh_ids2recycle the IDs of the cars that left in this cycle
                 for item in cur_list_of_vehs:
                     filtered_list = list (filter (lambda veh : veh['key'] == item['key'], known_vehs)) # look for this veh in the list of already-known vehs
@@ -349,21 +345,35 @@ class Traci_runner (object):
                         item['id'] = filtered_list[0]['id']
                         filtered_list[0]['cur_poa'] = item['nxt_poa'] #prepare for the next cycle, by setting cur_poa <-- nxt_poa
 
-                printf (poa_output_file, '\nnew_usrs: ')
+                new_usrs = [] # will hold a list of pairs of the form (v,p), where v is a new usr, and p is his poa
                 for veh in list (filter (lambda veh :veh['type']=='new', cur_list_of_vehs)):
                     list_of_items_in_known_vehs = list (filter (lambda item_in_known_vehs : item_in_known_vehs['key'] == veh['key'], known_vehs)) # look for this veh in the list of already-known vehs
                     if (len(list_of_items_in_known_vehs)!=1):
                         print ("error: wrong number of items with key {} in known_vehs" .format (veh['key']))
-                    printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
-                printf (poa_output_file, '\nold_usrs: ')
-                # moved_usrs = []
+                        exit ()
+                    new_usrs.append ([list_of_items_in_known_vehs[0]['id'], veh['nxt_poa']])
+                moved_usrs = [] # will hold a list of pairs of the form (v,p), where v is a usr who changed poa, and p is his new poa  
                 for veh in list (filter (lambda veh :veh['type']=='old', cur_list_of_vehs)):
                     list_of_items_in_known_vehs = list (filter (lambda old_veh : old_veh['key'] == veh['key'] and old_veh['cur_poa']!=veh['nxt_poa'], known_vehs)) # look for this veh in the list of already-known vehs
-                    if (len(list_of_items_in_known_vehs)!=1):
+                    if (len(list_of_items_in_known_vehs)!=1): # this usr didn't change poa
                         continue
-                    # if (list_of_items_in_known_vehs[0]['cur_poa']!=veh['nxt_poa']):
-                    # moved_usrs.append ()
-                    printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
+                    moved_usrs.append ([list_of_items_in_known_vehs[0]['id'], veh['nxt_poa']])
+
+                if (len(vehs_left_in_this_cycle)==0 and len(new_usrs)==0 and len(moved_usrs)==0):
+                    traci.simulationStep (self.t + len_of_time_slot_in_sec)
+                    continue # nothing to report at this slot
+                printf (poa_output_file, '\nt = {:.3f}' .format (self.t))
+                if (len(vehs_left_in_this_cycle)>0):
+                    printf (poa_output_file, '\nusrs_that_left: ')
+                    for veh in vehs_left_in_this_cycle:
+                        printf (poa_output_file, '{:.0f} ' .format(veh['id']))
+                if (len(new_usrs)>0):
+                    printf (poa_output_file, '\nnew_usrs: ')
+                    for item in new_usrs:
+                        printf (poa_output_file, '({},{})' .format (item[0],item[1]))
+                printf (poa_output_file, '\nold_usrs: ')
+                for item in moved_usrs:
+                    printf (poa_output_file, '({},{})' .format (item[0],item[1]))
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()

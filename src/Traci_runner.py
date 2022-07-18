@@ -356,12 +356,14 @@ class Traci_runner (object):
                         print ("error: wrong number of items with key {} in known_vehs" .format (veh['key']))
                     printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
                 printf (poa_output_file, '\nold_usrs: ')
+                # moved_usrs = []
                 for veh in list (filter (lambda veh :veh['type']=='old', cur_list_of_vehs)):
-                    list_of_items_in_known_vehs = list (filter (lambda item_in_known_vehs : item_in_known_vehs['key'] == veh['key'], known_vehs)) # look for this veh in the list of already-known vehs
+                    list_of_items_in_known_vehs = list (filter (lambda old_veh : old_veh['key'] == veh['key'] and old_veh['cur_poa']!=veh['nxt_poa'], known_vehs)) # look for this veh in the list of already-known vehs
                     if (len(list_of_items_in_known_vehs)!=1):
-                        print ("error: wrong number of items with key {} in known_vehs" .format (veh['key']))
-                    if (list_of_items_in_known_vehs[0]['cur_poa']!=veh['nxt_poa']):
-                        printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
+                        continue
+                    # if (list_of_items_in_known_vehs[0]['cur_poa']!=veh['nxt_poa']):
+                    # moved_usrs.append ()
+                    printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()

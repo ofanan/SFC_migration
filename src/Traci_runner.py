@@ -282,18 +282,17 @@ class Traci_runner (object):
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
 
-    def post2poa (self, pos):
+    def pos2poa (self, pos):
         """
         Given the position of a vehicle (pos[0], pos[1]), returns the poa of a veh found in this position
         """
-        if (pos==7):
+        if (pos[0]==1):
             return 7
         return 77;
 
 
     def simulate_gen_poa_file (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
-        Simulate Traci, and print-out the POAs of cars, 
         """
 
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
@@ -353,7 +352,10 @@ class Traci_runner (object):
 
                 printf (poa_output_file, '\nnew_usrs: ')
                 for veh in list (filter (lambda veh :veh['type']=='new', cur_list_of_vehs)):
-                    printf (poa_output_file, '({},{}' .format (veh['id'], veh['poa'])) 
+                    list_of_key = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
+                    if (list_of_key==0):
+                        print ("error: didn't find key {} in veh_key2id" .format (veh['key']))
+                    printf (poa_output_file, '({},{}' .format (list_of_key[0], veh['nxt_poa'])) 
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
@@ -504,7 +506,9 @@ if __name__ == '__main__':
     
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
+
     # for T in [6]: #[3, 5, 6, 7, 9, 10]:
     #     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
     #     my_Traci_runner.simulate (warmup_period=7.5*3600, sim_length=3600, len_of_time_slot_in_sec=T, num_of_output_files=1, verbose = [VERBOSE_LOC])

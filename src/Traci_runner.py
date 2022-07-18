@@ -291,7 +291,7 @@ class Traci_runner (object):
         """
 
         self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc' if self.city=='Lux' else 'Monaco.Telecom.antloc')
-        veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
+        known_vehs               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
         vehs_left_in_this_cycle  = []
         self.verbose             = verbose
@@ -327,39 +327,41 @@ class Traci_runner (object):
                 printf (poa_output_file, '\nt = {:.3f}\n' .format (self.t))
 
                 vehs_left_in_this_cycle = list (filter (lambda veh : (veh['key'] not in [item['key'] for item in cur_list_of_vehs] and 
-                                                                   veh['id']  not in (veh_ids2recycle)), veh_key2id)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
-                veh_key2id = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], veh_key2id)) # remove usrs that left from the veh_key2id map 
+                                                                   veh['id']  not in (veh_ids2recycle)), known_vehs)) # The list of vehs left at this cycle includes all vehs that are not in the list of currently-active vehicles, and haven't already been listed as "vehs that left" (i.e., veh ids to recycle). 
+                known_vehs = list (filter (lambda veh : veh['id'] not in [veh['id'] for veh in vehs_left_in_this_cycle], known_vehs)) # remove usrs that left from the known_vehs map 
                 printf (poa_output_file, 'usrs_that_left: ')
                 if (len (vehs_left_in_this_cycle) > 0):
                     for veh in vehs_left_in_this_cycle:
                         printf (poa_output_file, '{:.0f} ' .format(veh['id']))
                     veh_ids2recycle = sorted (list (set (veh_ids2recycle) | set([item['id'] for item in vehs_left_in_this_cycle]))) # add to veh_ids2recycle the IDs of the cars that left in this cycle
                 for item in cur_list_of_vehs:
-                    filtered_list = list (filter (lambda veh : veh['key'] == item['key'], veh_key2id)) # look for this veh in the list of already-known vehs
+                    filtered_list = list (filter (lambda veh : veh['key'] == item['key'], known_vehs)) # look for this veh in the list of already-known vehs
                     if (len(filtered_list) == 0): # first time this veh_key appears in the simulated area
                         item['type'] = 'new' # this is a new vehicle 
                         if (len (veh_ids2recycle) > 0): # can recycle an ID of a veh that left
-                            veh_key2id.append({'key' : item['key'], 'id' : veh_ids2recycle.pop(0)}) # # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle  
+                            known_vehs.append({'key' : item['key'], 'id' : veh_ids2recycle.pop(0), 'cur_poa' : item['nxt_poa']}) # recycle an ID of a veh that left, and remove it from the list of veh IDs to recycle; prepare for the next cycle, by setting known_vehs[cur_poa] <-- nxt_poa  
                         else:
-                            veh_key2id.append({'key' : item['key'], 'id' : len (veh_key2id)}) # pick a new ID
+                            known_vehs.append({'key' : item['key'], 'id' : len (known_vehs), 'cur_poa' : item['nxt_poa']}) # pick a new ID; prepare for the next cycle, by setting known_vehs[cur_poa] <-- nxt_poa
                     else: # already seen this veh_key in the sim' --> extract its id from the hash
                         if (traci.vehicle.getSpeed(item['key'])== 0): # the veh hasn't moved since the last slot, so it also didn't change its loc and poa association  
                             continue
                         item['type'] = 'old' # will indicate that this is a old vehicle 
                         item['id'] = filtered_list[0]['id']
+                        filtered_list[0]['cur_poa'] = item['nxt_poa'] #prepare for the next cycle, by setting cur_poa <-- nxt_poa
 
                 printf (poa_output_file, '\nnew_usrs: ')
                 for veh in list (filter (lambda veh :veh['type']=='new', cur_list_of_vehs)):
-                    list_of_items_in_key2id = list (filter (lambda item_in_veh_key2id : item_in_veh_key2id['key'] == veh['key'], veh_key2id)) # look for this veh in the list of already-known vehs
-                    if (len(list_of_items_in_key2id)!=1):
-                        print ("error: wrong number of items with key {} in veh_key2id" .format (veh['key']))
-                    printf (poa_output_file, '({},{})' .format (list_of_items_in_key2id[0]['id'], veh['nxt_poa'])) 
+                    list_of_items_in_known_vehs = list (filter (lambda item_in_known_vehs : item_in_known_vehs['key'] == veh['key'], known_vehs)) # look for this veh in the list of already-known vehs
+                    if (len(list_of_items_in_known_vehs)!=1):
+                        print ("error: wrong number of items with key {} in known_vehs" .format (veh['key']))
+                    printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
                 printf (poa_output_file, '\nold_usrs: ')
                 for veh in list (filter (lambda veh :veh['type']=='old', cur_list_of_vehs)):
-                    list_of_items_in_key2id = list (filter (lambda item_in_veh_key2id : item_in_veh_key2id['key'] == veh['key'], veh_key2id)) # look for this veh in the list of already-known vehs
-                    if (len(list_of_items_in_key2id)!=1):
-                        print ("error: wrong number of items with key {} in veh_key2id" .format (veh['key']))
-                    printf (poa_output_file, '({},{})' .format (list_of_items_in_key2id[0]['id'], veh['nxt_poa'])) 
+                    list_of_items_in_known_vehs = list (filter (lambda item_in_known_vehs : item_in_known_vehs['key'] == veh['key'], known_vehs)) # look for this veh in the list of already-known vehs
+                    if (len(list_of_items_in_known_vehs)!=1):
+                        print ("error: wrong number of items with key {} in known_vehs" .format (veh['key']))
+                    if (list_of_items_in_known_vehs[0]['cur_poa']!=veh['nxt_poa']):
+                        printf (poa_output_file, '({},{})' .format (list_of_items_in_known_vehs[0]['id'], veh['nxt_poa'])) 
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
@@ -510,7 +512,7 @@ if __name__ == '__main__':
     
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
 

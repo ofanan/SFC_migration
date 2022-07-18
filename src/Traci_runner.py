@@ -343,7 +343,6 @@ class Traci_runner (object):
                             continue
                         item['type'] = 'old' # will indicate that this is a old vehicle 
                         item['id'] = filtered_list[0]['id']
-                        filtered_list[0]['cur_poa'] = item['nxt_poa'] #prepare for the next cycle, by setting cur_poa <-- nxt_poa
 
                 new_usrs = [] # will hold a list of pairs of the form (v,p), where v is a new usr, and p is his poa
                 for veh in list (filter (lambda veh :veh['type']=='new', cur_list_of_vehs)):
@@ -354,10 +353,13 @@ class Traci_runner (object):
                     new_usrs.append ([list_of_items_in_known_vehs[0]['id'], veh['nxt_poa']])
                 moved_usrs = [] # will hold a list of pairs of the form (v,p), where v is a usr who changed poa, and p is his new poa  
                 for veh in list (filter (lambda veh :veh['type']=='old', cur_list_of_vehs)):
-                    list_of_items_in_known_vehs = list (filter (lambda old_veh : old_veh['key'] == veh['key'] and old_veh['cur_poa']!=veh['nxt_poa'], known_vehs)) # look for this veh in the list of already-known vehs
-                    if (len(list_of_items_in_known_vehs)!=1): # this usr didn't change poa
-                        continue
-                    moved_usrs.append ([list_of_items_in_known_vehs[0]['id'], veh['nxt_poa']])
+                    list_of_items_in_known_vehs = list (filter (lambda old_veh : old_veh['key'] == veh['key'], known_vehs)) # look for this veh in the list of already-known vehs
+                    if (len(list_of_items_in_known_vehs)!=1): 
+                        print ("error: wrong number of items with key {} in known_vehs" .format (veh['key']))
+                        exit ()
+                    if (list_of_items_in_known_vehs[0]['cur_poa']!=veh['nxt_poa']):
+                        moved_usrs.append ([list_of_items_in_known_vehs[0]['id'], veh['nxt_poa']])
+                        list_of_items_in_known_vehs[0]['cur_poa'] = veh['nxt_poa']
 
                 if (len(vehs_left_in_this_cycle)==0 and len(new_usrs)==0 and len(moved_usrs)==0):
                     traci.simulationStep (self.t + len_of_time_slot_in_sec)
@@ -524,8 +526,8 @@ if __name__ == '__main__':
     
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
-    # my_Traci_runner.simulate (warmup_period=1, sim_length=2, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=50, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    # my_Traci_runner.simulate (warmup_period=1, sim_length=50, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
 
     # for T in [6]: #[3, 5, 6, 7, 9, 10]:

@@ -32,7 +32,7 @@ fail = 2
 inter = lambda float_num : int (round(float_num))
 
 # Minimum required CPU when prob=0.3, as found by previous runs. Used as a base for run_cost_vs_rsrc
-MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94, 'ffit' : 209, 'cpvnf': 214},     #Old: 'ffit' : 219, 'cpvnf' : 214
+MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'wfit' : 133},     #Old: 'ffit' : 219, 'cpvnf' : 214
                'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
 
 class SFC_mig_simulator (object):
@@ -927,7 +927,7 @@ class SFC_mig_simulator (object):
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
         elif (self.mode in ['wfit']):   
-            self.max_R = 1.8 
+            self.max_R = 1.2 
         else:
             self.max_R = 1.8
 
@@ -1809,9 +1809,9 @@ class SFC_mig_simulator (object):
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
         elif (mode in ['wfit']):
-            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 120, 0.1  :121, 0.2 : 125, 0.3 : 120, 0.4 : 128, 0.5 : 128,  0.6  : 137,  0.7 : 146,  0.8 : 146, 0.9  : 162,  1.0 : 172},
                                        'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
-            for seed in [60 + i for i in range (21)]:
+            for seed in [0 + i for i in range (21)]:
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
@@ -1873,11 +1873,18 @@ def run_cost_vs_rsrc (city, seed=None):
     #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     for seed in seeds:
-        for mode in ['cpvnf', 'ffit']:
-            my_simulator.simulate (mode = mode, cpu_cap_at_leaf=MIN_REQ_CPU[my_simulator.city][mode], seed=seed)
-            for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-                if (cpu_cap_at_leaf >= MIN_REQ_CPU[my_simulator.city][mode]):
-                    my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)   
+        ratios = [1.5, 2, 2.35, 2.4, 2.5] if city=='Lux' else [1.5, 1.58, 2.0, 2.5]
+        for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*ratio) for ratio in ratios]: 
+            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf'], MIN_REQ_CPU[my_simulator.city]['wfit']]:
+            my_simulator.simulate (mode = 'wfit', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+
+    # for seed in seeds:
+    #     for mode in ['cpvnf', 'ffit']:
+    #         my_simulator.simulate (mode = mode, cpu_cap_at_leaf=MIN_REQ_CPU[my_simulator.city][mode], seed=seed)
+    #         for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+    #             if (cpu_cap_at_leaf >= MIN_REQ_CPU[my_simulator.city][mode]):
+    #                 my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)   
 
 def run_prob_of_RT_sim (city, mode, prob=None):
     
@@ -1899,7 +1906,7 @@ def run_cost_comp_by_rsrc_sim (city, seeds):
     init_cpu_cap_at_leaf = {'Lux' : 94, 'Monaco' : 842}
     if (city=='Monaco'):
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-    else:
+    else:   
         my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell',       poa_file_name='Lux_0730_0830_1secs_post.poa',       verbose=[VERBOSE_RES])
     for seed in seeds:
         for cpu_cap_at_leaf in [inter (init_cpu_cap_at_leaf[city] * (1 + i/10)) for i in range(3, 21)]:
@@ -1953,7 +1960,8 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    run_prob_of_RT_sim ('Lux', 'wfit', prob=0.3)
+    # run_prob_of_RT_sim ('Lux', 'wfit', prob=0.2)
+    run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   

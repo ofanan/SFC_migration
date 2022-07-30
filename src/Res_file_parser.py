@@ -126,6 +126,7 @@ class Res_file_parser (object):
                                   'ourAlg'  : 'BUPU', 
                                   'ffit'    : 'F-Fit', #\\ffit',
                                   'cpvnf'   : 'CPVNF', #\cpvnf'}
+                                  'ms'      : 'MultiScaler',
                                   'ourAlgC' : 'BUPUmoc', 
                                   'ffitC'   : 'F-Fitmoc', #\\ffit',
                                   'cpvnfC'  : 'CPVNFmoc'} #\cpvnf'}
@@ -136,7 +137,8 @@ class Res_file_parser (object):
                                 'cpvnf'   : 'black',
                                 'ourAlgC' : 'purple',
                                 'ffitC'   : 'blue',
-                                'cpvnfC'  : 'black'}
+                                'cpvnfC'  : 'black',
+                                'ms'      : 'firebrick'}
         
         self.markers_dict     = {'opt'    : 'x',
                                 'ourAlg'  : 'o',
@@ -144,7 +146,8 @@ class Res_file_parser (object):
                                 'cpvnf'   : 's',
                                 'ourAlgC' : 'h',
                                 'ffitC'   : 'v',
-                                'cpvnfC'  : 'd'}
+                                'cpvnfC'  : 'd',
+                                'ms'      : 'v'}
         
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       

@@ -1333,10 +1333,10 @@ class SFC_mig_simulator (object):
         unplaced_usrs = self.unplaced_usrs () 
         
         # first, handle the old, existing usrs, in an increasing order of the available cpu on the currently-hosting server
-        for usr in list (filter (lambda usr : usr.cur_s!=-1 and usr.nxt_s==-1, unplaced_usrs)).sort (key = lambda usr : 
-                                               (self.G.nodes[usr.cur_s]['a'], # sort by inc.-order of available CPU (which is equivalent to dec.-order of "load") in the currently-placed node
-                                               -usr.B[usr.lvl],              # break ties by dec.-order of currently-used cpu on that machine,     
-                                               usr.rand_id)) or []:                # break further ties randomly
+        for usr in sorted (list (filter (lambda usr : usr.cur_s!=-1, unplaced_usrs)), key = lambda usr : 
+                            (self.G.nodes[usr.cur_s]['a'], # sort by inc.-order of available CPU (which is equivalent to dec.-order of "load") in the currently-placed node
+                            -usr.B[usr.lvl],              # break ties by dec.-order of currently-used cpu on that machine,     
+                            usr.rand_id)):           # break further ties randomly
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 if (self.mode=='wfitC'): # Allowed to mig' only critical chains
                     return fail
@@ -1345,24 +1345,14 @@ class SFC_mig_simulator (object):
                 return self.worst_fit_reshuffle()
                         
         # next, handle the new usrs, namely, that are not currently hosted on any server
-        for usr in list (filter (lambda usr : usr.cur_s==-1 and usr.nxt_s==-1, unplaced_usrs)). sort (key = lambda usr : 
-                                              (len(usr.S_u),  # sort by inc.-order of # of the delay-feasible servers. This is equivalent to prioritize tighter chains (that are likely to need more CPU on the same server)
-                                              usr.rand_id)) or []: # break ties randomly
-                # sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
+        for usr in sorted (list (filter (lambda usr : usr.cur_s==-1, unplaced_usrs)), key = lambda usr : 
+                           (len(usr.S_u),  # sort by inc.-order of # of the delay-feasible servers. This is equivalent to prioritize tighter chains (that are likely to need more CPU on the same server)
+                           usr.rand_id)): # break ties randomly
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()
                 return self.worst_fit_reshuffle()
 
         return sccs
-
-    def write_fail_to_log_n_res (self):
-        """
-        Write to the log and to the res file that the solver (either an algorithm, or an LP solver) did not succeed to place all the usrs
-        """
-        if (VERBOSE_RES in self.verbose):
-            printf (self.res_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
-        if (VERBOSE_LOG in self.verbose):
-            printf (self.log_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
 
     def worst_fit_place_usr (self, usr):
         """
@@ -1371,12 +1361,24 @@ class SFC_mig_simulator (object):
         Returns True if successfully placed the usr.
         """
         delay_feasible_servers = sorted (usr.S_u, key = lambda s : self.G.nodes[s]['a'], reverse=True) # sort the delay-feasible servers in a dec' order of available resources (worst-fit approach)
-        for s in delay_feasible_servers: # for every delay-feasible server 
+        if (VERBOSE_DEBUG in self.verbose and not(delay_feasible_servers)):
+            print ('no delay feasible server for usr {}' .format (usr.id))
+            exit ()
+        for s in delay_feasible_servers: # for every delay-feasible server
+            print (s) 
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
                 self.place_usr_u_on_srvr_s(usr, self.G.nodes[s]['id'] )
                 return True
         return False  
     
+    def write_fail_to_log_n_res (self):
+        """
+        Write to the log and to the res file that the solver (either an algorithm, or an LP solver) did not succeed to place all the usrs
+        """
+        if (VERBOSE_RES in self.verbose):
+            printf (self.res_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
+        if (VERBOSE_LOG in self.verbose):
+            printf (self.log_output_file, 't{:.0f}.{}.stts2' .format (self.t, self.mode))
     
     def alg_top (self, placement_alg):
         """
@@ -1947,7 +1949,7 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_RES])   
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_DEBUG, VERBOSE_RES])   
     my_simulator.simulate (mode = 'wfit', sim_len_in_slots = 2, cpu_cap_at_leaf=94)    
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    

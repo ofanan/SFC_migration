@@ -27,11 +27,14 @@ def TicTocGenerator():
 TicToc = TicTocGenerator() # create an instance of the TicTocGen generator
 
 # This will be the main function through which we define both tic() and toc()
-def toc(tempBool=True):
+def toc(tempBool=True, returnString=False):
     # Prints the time difference yielded by generator instance TicToc
     tempTimeInterval = next(TicToc)
     if tempBool:
-        print( "Elapsed time: %f seconds.\n" %tempTimeInterval )
+        if (returnString):
+            return "{:.3f} seconds" .format (tempTimeInterval)
+        else:
+            print( "Elapsed time: %f seconds.\n" %tempTimeInterval )
 
 def tic():
     # Records a time in TicToc, marks the beginning of a time interval

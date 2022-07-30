@@ -1,4 +1,6 @@
 import sumolib
+from datetime import datetime
+from   tictoc import tic, toc
 from sumolib import checkBinary  
 import traci, sys, math, pickle
 import numpy as np, matplotlib.pyplot as plt
@@ -286,7 +288,7 @@ class Traci_runner (object):
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
 
-    def simulate_gen_poa_file (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
+    def simulate_gen_poa_file (self, warmup_period=0, sim_length_in_sec=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
         """
 
@@ -296,12 +298,14 @@ class Traci_runner (object):
         vehs_left_in_this_cycle  = []
         self.verbose             = verbose
         
-        time_str = self.gen_time_str (warmup_period, warmup_period+sim_length)
+        time_str = self.gen_time_str (warmup_period, warmup_period+sim_length_in_sec)
         traci.start (self.my_sumo_cmd(len_of_time_slot_in_sec))
         print ('Running Traci for the period {}. Will write res to {} output files' .format (time_str, num_of_output_files))
         
         if (warmup_period > 0):
-            traci.simulationStep (float(warmup_period)) # simulate without output until our required time (time starts at 00:00). 
+            tic()
+            traci.simulationStep (float(warmup_period)) # simulate without output until our required time (time starts at 00:00).
+            print ("running warmup period of {} sec took" .format (warmup_period), toc (returnString=True))
         for i in range (num_of_output_files):
             
             poa_output_file_name = '../res/poa_files/{}_{}_{}secs.poa' .format (self.city, time_str, len_of_time_slot_in_sec)   
@@ -313,12 +317,13 @@ class Traci_runner (object):
             printf (poa_output_file, '//"new_usrs" is a list of the new usrs, and their PoAs, e.g.: (0, 2)(1,3) means that new usr 0 is in cell 2, and new usr 1 is in cell 3.\n')
             printf (poa_output_file, '//"old_usrs" is a list of the usrs who moved to another cell in the last time slot, and their current PoAs, e.g.: (0, 2)(1,3) means that old usr 0 is now in cell 2, and old usr 1 is now in cell 3.\n')
 
+            tic()
             while (traci.simulation.getMinExpectedNumber() > 0): # There're still moving vehicles
                 
                 self.t = traci.simulation.getTime()
                 
                 # Finished the sim. Now, just make some post-processing. 
-                if (self.t >= warmup_period + sim_length*(i+1) / num_of_output_files):
+                if (self.t >= warmup_period + sim_length_in_sec*(i+1) / num_of_output_files):
                     print ('Successfully finished writing to file {}' .format (poa_output_file_name))
                     break
                   
@@ -379,6 +384,7 @@ class Traci_runner (object):
                 sys.stdout.flush()
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
+        print ("running {} sec using steps of {} sec took" .format (sim_length_in_sec, len_of_time_slot_in_sec), toc (returnString=True))
 
     def gen_antloc_file (self, antenna_locs_file_name, provider=''):
         """
@@ -523,10 +529,9 @@ class Traci_runner (object):
         return totalLength/1000
 
 if __name__ == '__main__':
-    
     city = 'Lux'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate_gen_poa_file (warmup_period=1, sim_length=50, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    my_Traci_runner.simulate_gen_poa_file (warmup_period=7.5*3600, sim_length_in_sec=3600, len_of_time_slot_in_sec=0.050, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1, sim_length=50, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
 

@@ -1336,7 +1336,7 @@ class SFC_mig_simulator (object):
         for usr in list (filter (lambda usr : usr.cur_s!=-1 and usr.nxt_s==-1, unplaced_usrs)).sort (key = lambda usr : 
                                                (self.G.nodes[usr.cur_s]['a'], # sort by inc.-order of available CPU (which is equivalent to dec.-order of "load") in the currently-placed node
                                                -usr.B[usr.lvl],              # break ties by dec.-order of currently-used cpu on that machine,     
-                                               usr.rand_id)):                # break further ties randomly
+                                               usr.rand_id)) or []:                # break further ties randomly
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 if (self.mode=='wfitC'): # Allowed to mig' only critical chains
                     return fail
@@ -1347,7 +1347,7 @@ class SFC_mig_simulator (object):
         # next, handle the new usrs, namely, that are not currently hosted on any server
         for usr in list (filter (lambda usr : usr.cur_s==-1 and usr.nxt_s==-1, unplaced_usrs)). sort (key = lambda usr : 
                                               (len(usr.S_u),  # sort by inc.-order of # of the delay-feasible servers. This is equivalent to prioritize tighter chains (that are likely to need more CPU on the same server)
-                                              usr.rand_id)): # break ties randomly
+                                              usr.rand_id)) or []: # break ties randomly
                 # sorted (list_of_usrs, key = lambda usr : (usr.B[0], usr.rand_id), reverse=True)
             if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()

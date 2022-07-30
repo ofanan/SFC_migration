@@ -515,10 +515,6 @@ class SFC_mig_simulator (object):
                     usr.nxt_s    = usr.S_u[usr.lvl]
             
 
-        # printf (self.log_output_file, 't={}, BUPU results\n' .format (self.t)) # $$$$$$$$$$$
-        # self.verbose.append(VERBOSE_ADD2_LOG)
-        # self.print_sol_to_log_alg () #$$$$
-
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, 'after push-up:\n')
         if (self.t == self.slot_to_dump):  
@@ -930,6 +926,8 @@ class SFC_mig_simulator (object):
             self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
+        elif (self.mode in ['wfit']):   
+            self.max_R = 1.8 
         else:
             self.max_R = 1.8
 
@@ -1365,7 +1363,6 @@ class SFC_mig_simulator (object):
             print ('no delay feasible server for usr {}' .format (usr.id))
             exit ()
         for s in delay_feasible_servers: # for every delay-feasible server
-            print (s) 
             if (self.s_has_sufic_avail_cpu_for_usr (s, usr)): # if the available cpu at this server > the required cpu for this usr at this lvl...
                 self.place_usr_u_on_srvr_s(usr, self.G.nodes[s]['id'] )
                 return True
@@ -1781,7 +1778,7 @@ class SFC_mig_simulator (object):
     def run_prob_of_RT_sim_algs (self, mode, poa2cell_file_name, poa_file_name, prob=None):
         """
         Run a simulation where the probability of a RT application varies. 
-        Output the minimal resource augmentation required by each alg', and the cost obtained, and the cost obtained at each time slot.
+        Output the minimal resource augmentation required by each alg', and the cost obtained at each time slot.
         """       
 
 
@@ -1805,8 +1802,15 @@ class SFC_mig_simulator (object):
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
         elif (mode in ['ffit', 'cpvnf']):
-            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 150, 0.1 : 150, 0.2 : 150, 0.3 : 150, 0.4 : 150, 0.5 : 150, 0.6 : 150, 0.7 : 150, 0.8 : 150, 0.9 : 160, 1.0 : 160},
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 150,  0.1 : 150,  0.2 : 150,  0.3 : 150,  0.4 : 150,  0.5 : 150,  0.6 : 150,  0.7 : 150,  0.8 : 150,  0.9 : 160,  1.0 : 160},
                                        'Monaco' : {0.0 : 1150, 0.1 : 1150, 0.2 : 1150, 0.3 : 1150, 0.4 : 1150, 0.5 : 1170, 0.6 : 1200, 0.7 : 1400, 0.8 : 1500, 0.9 : 1800, 1.0 : 1800}} 
+            for seed in [60 + i for i in range (21)]:
+                for prob_of_target_delay in probabilities:
+                    self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
+
+        elif (mode in ['wfit']):
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
+                                       'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
             for seed in [60 + i for i in range (21)]:
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
@@ -1949,8 +1953,7 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
 
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_DEBUG, VERBOSE_RES])   
-    my_simulator.simulate (mode = 'wfit', sim_len_in_slots = 2, cpu_cap_at_leaf=94)    
+    run_prob_of_RT_sim ('Lux', 'wfit', prob=0.3)
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   

@@ -1316,7 +1316,7 @@ class SFC_mig_simulator (object):
     
     def worst_fit_reshuffle (self):
         """
-        Run the worst-fit alg' when considering all existing usrs in the system (not only critical usrs).
+        Run an adaptation of "Multi-Scaler" (which is roughly greedy worst-fit) alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
         for usr in sorted (self.usrs, key = lambda usr : (len(usr.S_u),  # sort by inc.-order of # of the delay-feasible servers. This is equivalent to prioritize tighter chains (that are likely to need more CPU on the same server) 
@@ -1327,7 +1327,7 @@ class SFC_mig_simulator (object):
     
     def worst_fit (self):
         """
-        Run the worst-fit alg'.
+        Run an adaptation of "Multi-Scaler" (which is roughly greedy worst-fit) alg' for the critical, and then on new, chains.
         Returns sccs if found a feasible placement, fail otherwise
         """
         unplaced_usrs = self.unplaced_usrs () 
@@ -1365,7 +1365,8 @@ class SFC_mig_simulator (object):
 
     def worst_fit_place_usr (self, usr):
         """
-        Try to place the given usr on a server, chosen in a worst-fit manner.
+        Try to place the given usr on a server.
+        The candidate servers are ordered based on an adaptation of "Multi-Scaler" (which is roughly greedy worst-fit). 
         Returns True if successfully placed the usr.
         """
         delay_feasible_servers = sorted (usr.S_u, key = lambda s : self.G.nodes[s]['a'], reverse=True) # sort the delay-feasible servers in a dec' order of available resources (worst-fit approach)

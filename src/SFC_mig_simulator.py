@@ -312,8 +312,11 @@ class SFC_mig_simulator (object):
             # model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
             # model.solve ()
             # self.stts = sccs if (model.status==1) else fail 
-            model.solve(plp.GUROBI()) 
-            exit ()
+            model.solve(plp.GUROBI())
+            model.solve(plp.GUROBI(options=[("TimeLimit", 1.0)]))
+
+            # model.setParams("TimeLimit", 1.0) 
+            # exit ()
             # self.stts = sccs if (model.status==1) else fail
             # m = gurobipy.model()
             # m.setParam('TimeLimit', 60)       
@@ -1867,7 +1870,7 @@ class SFC_mig_simulator (object):
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
         elif (mode in ['ms']):
-            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 120, 0.1  :121, 0.2 : 125, 0.3 : 120, 0.4 : 128, 0.5 : 128,  0.6  : 137,  0.7 : 146,  0.8 : 146, 0.9  : 162,  1.0 : 172},
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 120, 0.1  :121, 0.2 : 125, 0.3 : 120, 0.4 : 128, 0.5 : 128,  0.6  : 137, 0.7 : 137,  0.8 : 138, 0.9  : 141,  1.0 : 144},
                                        'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
             for seed in [0 + i for i in range (21)]:
                 for prob_of_target_delay in probabilities:
@@ -2022,15 +2025,15 @@ if __name__ == "__main__":
     #     run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
     city = 'Lux'
     T = 1
-    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
-                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
-    
-    my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-    #                                   poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
+    # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
     #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
     #
-    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
+    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                      poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+    
+    my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 
     # run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 

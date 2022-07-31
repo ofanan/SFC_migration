@@ -2023,17 +2023,18 @@ if __name__ == "__main__":
     
     # for prob in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
     #     run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
-    city = 'Lux'
-    T = 1
-    # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
+    print (plp.listSolvers(onlyAvailable=True))
+    # city = 'Lux'
+    # T = 1
+    # # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
+    # #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+    # #
+    # # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+    #                                   poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
     #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
     #
-    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-                                      poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
-                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
-    
-    my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
+    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 
     # run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 

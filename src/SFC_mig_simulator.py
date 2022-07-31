@@ -32,7 +32,7 @@ fail = 2
 inter = lambda float_num : int (round(float_num))
 
 # Minimum required CPU when prob=0.3, as found by previous runs. Used as a base for run_cost_vs_rsrc
-MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'wfit' : 133},     #Old: 'ffit' : 219, 'cpvnf' : 214
+MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'ms' : 133},     #Old: 'ffit' : 219, 'cpvnf' : 214
                'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
 
 class SFC_mig_simulator (object):
@@ -92,7 +92,7 @@ class SFC_mig_simulator (object):
     d_var_link_cost = lambda self, d_var : self.link_cost_of_CLP_at_lvl[d_var.lvl]
     
     # Print a solution for the problem to the output res file  
-    print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode == 'opt') else self.print_sol_res_line_alg (output_file)
+    print_sol_res_line = lambda self, output_file : self.print_sol_res_line_opt (output_file) if (self.mode in ['opt', 'optInt']) else self.print_sol_res_line_alg (output_file)
     
     # parse a line detailing the list of usrs who moved, in an input ".poa" format file
     parse_old_usrs_line = lambda self, line : list (filter (lambda item : item != '', line[0].split ("\n")[0].split (")")))
@@ -356,7 +356,7 @@ class SFC_mig_simulator (object):
         If a res file with the relevant name already exists - open it for appending.
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
-        self.moved_res_file_name = self.gen_res_file_name (mid_str = ('_moved_opt' if self.mode=='opt' else '_moved')) 
+        self.moved_res_file_name = self.gen_res_file_name (mid_str = ('_moved_opt' if self.mode in ['opt', 'optInt'] else '_moved')) 
         
         if Path('../res/' + self.moved_res_file_name).is_file(): # does this res file already exist?
             self.moved_res_file =  open ('../res/' + self.moved_res_file_name,  "a")
@@ -370,7 +370,7 @@ class SFC_mig_simulator (object):
         If a res file with the relevant name already exists - open it for appending.
         Else, open a new res file, and write to it comment header lines, explaining the file's format  
         """
-        self.critical_res_file_name = self.gen_res_file_name (mid_str = ('_critical_opt' if self.mode=='opt' else '_critical')) 
+        self.critical_res_file_name = self.gen_res_file_name (mid_str = ('_critical_opt' if self.mode in ['opt', 'optInt'] else '_critical')) 
         
         if Path('../res/' + self.critical_res_file_name).is_file(): # does this res file already exist?
             self.critical_res_file =  open ('../res/' + self.critical_res_file_name,  "a")
@@ -884,7 +884,8 @@ class SFC_mig_simulator (object):
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()       
 
-    def simulate (self, mode, prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=float('inf'), slot_to_dump=float('inf'), seed=42,
+    def simulate (self, mode,     
+                  prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=float('inf'), slot_to_dump=float('inf'), seed=42,
                   print_params=False     # When true, write the chains' parameter to ../res/params.res. 
                   ): 
         
@@ -892,6 +893,17 @@ class SFC_mig_simulator (object):
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
         Return value: if the simulation succeeded (found a feasible solution for every time slot during the sim') - return the cpu capacity used in a leaf node.
         Else, return None. 
+        Inputs:
+        - mode-the solution technique. Supported options are: 
+            - 'ourAlg' (BUPU), 'cpvnf', 'ffit' (First-Fit)
+            - 'ourAlgC', 'cpvnfC', 'ffitC'- same, but allowing to migrate only critical chains (not "reshuffle"). If no sol' is found without reshuffle, the alg' fails.
+            - 'ms' - MultiScaler
+            - 'opt', 'optInt' - optimal fractional solution, and optimal integer solution.
+        - prob_of_target_delay - a list, detailing the probabilities that a new chain belongs to a certain "target delay" class.
+                                 Currently, we use only RT / non-RT chains, so the input is a vector with only one entry.
+                                 If no value is given, the value used is the default, assigned during __init__.
+        - slot_to_dump - allows specifying a concrete slot for "dumping" the state. Used for debugging.
+        - print_params - when true, write the chains' parameter to ../res/params.res.
         """
         
         self.seed                       = seed
@@ -924,10 +936,12 @@ class SFC_mig_simulator (object):
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
             self.max_R = 1.6 
+        if (self.mode == 'optInt'):
+            self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
-        elif (self.mode in ['wfit']):   
-            self.max_R = 1.2 
+        elif (self.mode in ['ms']):   
+            self.max_R = 1.4 
         else:
             self.max_R = 1.8
 
@@ -943,9 +957,13 @@ class SFC_mig_simulator (object):
         slot_len_str = self.poa_file_name.split('secs')
         self.slot_len = int(slot_len_str[0].split('_')[-1]) if (len (slot_len_str) > 1) else 1 # By default, slot len is 1
         
-        if (self.mode in ['ourAlg', 'ourAlgDist', 'wfit', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
+        if (self.mode in ['ourAlg', 'ourAlgDist', 'ms', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
             self.simulate_algs()
         elif (self.mode == 'opt'):
+            self.category='Continuous'
+            self.simulate_lp ();
+        elif (self.mode == 'optInt'):
+            self.category='Integer'
             self.simulate_lp ();
         else:
             print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
@@ -1204,8 +1222,8 @@ class SFC_mig_simulator (object):
                                 self.push_up (self.usrs) if self.reshuffled else self.push_up(self.critical_n_new_usrs)
                 elif (self.mode in ['ffit', 'ffitC']):
                     self.stts = self.alg_top(self.first_fit)
-                elif (self.mode in ['wfit', 'wfitC']):
-                    self.stts = self.alg_top(self.worst_fit)
+                elif (self.mode in ['ms', 'wfitC']):
+                    self.stts = self.alg_top(self.MultiScaler)
                 elif (self.mode in ['cpvnf', 'cpvnfC']):
                     self.stts = self.alg_top(self.cpvnf)
                 else:
@@ -1312,18 +1330,18 @@ class SFC_mig_simulator (object):
             printf (self.log_output_file, '\nfailed to locate user {} on S_u={}\n' .format (usr.id, usr.S_u)) 
         return fail
     
-    def worst_fit_reshuffle (self):
+    def MultiScaler_reshuffle (self):
         """
         Run an adaptation of "Multi-Scaler" (which is roughly greedy worst-fit) alg' when considering all existing usrs in the system (not only critical usrs).
         Returns sccs if found a feasible placement, fail otherwise
         """
         for usr in sorted (self.usrs, key = lambda usr : (len(usr.S_u),  # sort by inc.-order of # of the delay-feasible servers. This is equivalent to prioritize tighter chains (that are likely to need more CPU on the same server) 
                                                           usr.rand_id)): # break ties randomly
-            if (not (self.worst_fit_place_usr (usr))): 
+            if (not (self.MultiScaler_place_usr (usr))): 
                 return fail
         return sccs
     
-    def worst_fit (self):
+    def MultiScaler (self):
         """
         Run an adaptation of "Multi-Scaler" (which is roughly greedy worst-fit) alg' for the critical, and then on new, chains.
         Returns sccs if found a feasible placement, fail otherwise
@@ -1335,24 +1353,24 @@ class SFC_mig_simulator (object):
                             (self.G.nodes[usr.cur_s]['a'], # sort by inc.-order of available CPU (which is equivalent to dec.-order of "load") in the currently-placed node
                             -usr.B[usr.lvl],              # break ties by dec.-order of currently-used cpu on that machine,     
                             usr.rand_id)):           # break further ties randomly
-            if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
+            if (not(self.MultiScaler_place_usr (usr))) : # Failed to migrate this usr)):
                 if (self.mode=='wfitC'): # Allowed to mig' only critical chains
                     return fail
                 self.rst_sol()
                 self.reshuffled = True
-                return self.worst_fit_reshuffle()
+                return self.MultiScaler_reshuffle()
                         
         # next, handle the new usrs, namely, that are not currently hosted on any server
         for usr in sorted (list (filter (lambda usr : usr.cur_s==-1, unplaced_usrs)), key = lambda usr : 
                            (len(usr.S_u),  # sort by inc.-order of # of the delay-feasible servers. This is equivalent to prioritize tighter chains (that are likely to need more CPU on the same server)
                            usr.rand_id)): # break ties randomly
-            if (not(self.worst_fit_place_usr (usr))) : # Failed to migrate this usr)):
+            if (not(self.MultiScaler_place_usr (usr))) : # Failed to migrate this usr)):
                 self.rst_sol()
-                return self.worst_fit_reshuffle()
+                return self.MultiScaler_reshuffle()
 
         return sccs
 
-    def worst_fit_place_usr (self, usr):
+    def MultiScaler_place_usr (self, usr):
         """
         Try to place the given usr on a server.
         The candidate servers are ordered based on an adaptation of "Multi-Scaler" (which is roughly greedy worst-fit). 
@@ -1384,7 +1402,7 @@ class SFC_mig_simulator (object):
         """
                
         # Try to solve the problem by changing the placement or CPU allocation only for the new / moved users
-        self.reshuffled = True if (self.mode=='opt') else False # In the first run of algs (not Opt), we consider only critical chains. Only if this run fails, we'll try a reshuffle.
+        self.reshuffled = True if (self.mode in ['opt', 'optInt']) else False # In the first run of algs (not Opt), we consider only critical chains. Only if this run fails, we'll try a reshuffle.
 
         self.stts = placement_alg()
         
@@ -1534,7 +1552,7 @@ class SFC_mig_simulator (object):
                 continue 
             usr_entry = usr_entry.split("(")[1].split (',')
 
-            if (self.mode == 'opt'):
+            if (self.mode in ['opt', 'optInt']):
                 usr = usr_lp_c (int(usr_entry[0]), theta_times_lambda=self.uniform_theta_times_lambda, target_delay=self.pseudo_random_target_delay (int(usr_entry[0])), C_u=self.uniform_Cu) # generate a new usr, which is assigned as "un-placed" yet (usr.lvl==-1)
             else: 
                 usr = self.gen_new_usr (usr_id=int(usr_entry[0]))
@@ -1731,7 +1749,7 @@ class SFC_mig_simulator (object):
             splitted_line = line.split ()
             self.PoAs.append ({'poa' : int(splitted_line[0]), 'cell' : int(splitted_line[1])})
     
-    def binary_search_opt (self, output_file, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=float('inf'), seed=42):
+    def binary_search_opt (self, output_file, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=float('inf'), seed=42, mode='opt'):
         """
         Binary-search for the minimal rsrce aug' required by an algorithm (not opt) to find a feasible sol.
         As the results of opt are consistent (namely, If a run succeeds with cpu cap X, then in would succeed also with cpu cap X+1), 
@@ -1739,7 +1757,7 @@ class SFC_mig_simulator (object):
         Returns the lowest cpu cap' at the leaf server which still allows finding a feasible sol. 
         """
         self.verbose.append (VERBOSE_CALC_RSRC_AUG) 
-        return self.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
+        return self.simulate (mode = mode, cpu_cap_at_leaf=cpu_cap_at_leaf, prob_of_target_delay=prob_of_target_delay, sim_len_in_slots=sim_len_in_slots)
 
     def binary_search_algs (self, output_file, mode, cpu_cap_at_leaf=200, prob_of_target_delay=0.3, sim_len_in_slots=float('inf'), seed=42):
         """
@@ -1808,7 +1826,7 @@ class SFC_mig_simulator (object):
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-        elif (mode in ['wfit']):
+        elif (mode in ['ms']):
             min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 120, 0.1  :121, 0.2 : 125, 0.3 : 120, 0.4 : 128, 0.5 : 128,  0.6  : 137,  0.7 : 146,  0.8 : 146, 0.9  : 162,  1.0 : 172},
                                        'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}} 
             for seed in [0 + i for i in range (21)]:
@@ -1822,7 +1840,7 @@ class SFC_mig_simulator (object):
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
-    def run_prob_of_RT_sim_opt (self, poa2cell_file_name, poa_file_name, prob=None):
+    def run_prob_of_RT_sim_opt (self, poa2cell_file_name, poa_file_name, prob=None, mode='opt'):
         """
         Run a simulation where the probability of a RT application varies. 
         If a "prob" input argument is explicitly given, run the simulation with this given prob'
@@ -1831,7 +1849,7 @@ class SFC_mig_simulator (object):
         """       
 
         print ('Running run_prob_of_RT_sim')
-        output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, 'opt')
+        output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='opt')
         min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
                                'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}} 
         probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
@@ -1875,9 +1893,9 @@ def run_cost_vs_rsrc (city, seed=None):
     for seed in seeds:
         ratios = [1.5, 2, 2.35, 2.4, 2.5] if city=='Lux' else [1.5, 1.58, 2.0, 2.5]
         for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*ratio) for ratio in ratios]: 
-            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-        for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf'], MIN_REQ_CPU[my_simulator.city]['wfit']]:
-            my_simulator.simulate (mode = 'wfit', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+            my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf'], MIN_REQ_CPU[my_simulator.city]['ms']]:
+        #     my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     # for seed in seeds:
     #     for mode in ['cpvnf', 'ffit']:
@@ -1896,8 +1914,8 @@ def run_prob_of_RT_sim (city, mode, prob=None):
         poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
 
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
-    if (mode=='opt'):
-        my_simulator.run_prob_of_RT_sim_opt   (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob)
+    if (mode in ['opt', 'optInt']):
+        my_simulator.run_prob_of_RT_sim_opt   (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
     else:
         my_simulator.run_prob_of_RT_sim_algs  (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
 
@@ -1959,9 +1977,10 @@ def only_cnt_num_new_vehs_per_slot ():
     
 
 if __name__ == "__main__":
-
-    # run_prob_of_RT_sim ('Lux', 'wfit', prob=0.2)
-    run_cost_vs_rsrc ('Lux')
+    
+    for prob in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+        run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
+    # run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0730_1secs_post.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   

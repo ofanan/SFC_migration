@@ -278,7 +278,7 @@ class SFC_mig_simulator (object):
             single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
             
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
-                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id))
+                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id), cat=self.category)
                 d_var   = decision_var_c (d_var_id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
                 self.d_vars.append (d_var)
                 single_place_const += plp_var
@@ -1978,8 +1978,15 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
     
-    for prob in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
-        run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
+    # for prob in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+    #     run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
+    city = 'Lux'
+    T = 1
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                      poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa')
+    
+    my_simulator.simulate (mode = 'opt', sim_len_in_slots=1)    
+
     # run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=17, prob_of_target_delay=0.5)    

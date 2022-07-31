@@ -3,6 +3,7 @@ import math, time, heapq, random, sys, os
 import pulp as plp
 import networkx as nx
 import matplotlib.pyplot as plt
+# import gurobiby as grb
 from   pathlib import Path
 
 from usr_c          import usr_c    # class of the users of alg
@@ -22,7 +23,8 @@ VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseourc
 VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
 VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
 VERBOSE_CRIT_LEN      = 10 # Calculate how much time each chain is critical, for the given slot len.
-VERBOSE_LOG_BU   = 11 # Log only the reults of BU, disregarding the PU part.
+VERBOSE_LOG_BU        = 11 # Log only the reults of BU, disregarding the PU part.
+VERBOSE_SOL_TIME      = 12 # Calc and print the sol' time
 
 # Status returned by algorithms solving the prob' 
 sccs = 1
@@ -268,6 +270,9 @@ class SFC_mig_simulator (object):
         Find an optimal fractional solution using Python's pulp LP library.
         pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob'.
         """
+        
+        if (VERBOSE_SOL_TIME in self.verbose):
+            solv_init_time = time.time() 
         model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize) # init a "model" that will hold the problem, objective, and constraints 
         
         # init the decision vars
@@ -299,10 +304,30 @@ class SFC_mig_simulator (object):
             if (cpu_cap_const != []):
                 model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
 
-        # solve the model, using the default settings. 
-        model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC  
+        # solve the model, using the default settings.
+        if (self.mode=='opt'):
+            model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
+            self.stts = sccs if (model.status==1) else fail       
+        else:
+            # model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
+            # model.solve ()
+            # self.stts = sccs if (model.status==1) else fail 
+            model.solve(plp.GUROBI()) 
+            exit ()
+            # self.stts = sccs if (model.status==1) else fail
+            # m = gurobipy.model()
+            # m.setParam('TimeLimit', 60)       
+            # solver = plp.GUROBI() # the available solvers are:
+            # solver.optimize ()
+            # solver.buildSolverModel(model)
+            #
+            # #Modify the solvermodel
+            # solver.solverModel.parameters.timelimit.set(1)
+            #
+            # #Solve P
+            # solver.callSolver(model)
+            # self.stts = solver.findSolutionValues(model)  
         
-        self.stts = sccs if (model.status==1) else fail       
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
             self.print_sol_res_line_opt (output_file=self.res_file)
@@ -331,6 +356,13 @@ class SFC_mig_simulator (object):
             
         # if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
         #     self.print_sol_res_line (output_file=self.moved_res_file)
+        # if (self.mode=='optInt'):
+        if (VERBOSE_SOL_TIME in self.verbose):
+            if (self.stts==fail):
+                print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
+                self.post_processing ()
+                exit ()
+            self.sol_time_at_slot.append (time.time () - solv_init_time)
         return self.stts
 
     def init_res_file (self):
@@ -957,6 +989,9 @@ class SFC_mig_simulator (object):
         slot_len_str = self.poa_file_name.split('secs')
         self.slot_len = int(slot_len_str[0].split('_')[-1]) if (len (slot_len_str) > 1) else 1 # By default, slot len is 1
         
+        if (VERBOSE_SOL_TIME in self.verbose):
+            self.sol_time_at_slot = [] # sol_time_at_slot[T] will hold the time it took to find a feasible sol' at slot T 
+
         if (self.mode in ['ourAlg', 'ourAlgDist', 'ms', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
             self.simulate_algs()
         elif (self.mode == 'opt'):
@@ -1245,11 +1280,13 @@ class SFC_mig_simulator (object):
         
     def post_processing (self):
         """
-        Organize, writes and plots the simulation results, after the simulation is done
+        Organizes, writes and plots the simulation results, after the simulation is done
         """        
         if (self.mode == 'cnt_moved_n_new_vehs'):    
             print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))
-            print ('max_new_vehs_per_slot={}, max_moved_vehs_per_slot={}' .format (self.max_new_vehs_in_slot, self.max_moved_vehs_in_slot))        
+            print ('max_new_vehs_per_slot={}, max_moved_vehs_per_slot={}' .format (self.max_new_vehs_in_slot, self.max_moved_vehs_in_slot))
+        if (VERBOSE_SOL_TIME in self.verbose and self.mode in ['opt', 'optInt']):
+            printf (self.res_file, '\n// avg sol time={}' .format (np.average (self.sol_time_at_slot)))        
         
         
     def cpvnf_reshuffle (self):
@@ -1408,7 +1445,10 @@ class SFC_mig_simulator (object):
         
         if (VERBOSE_LOG in self.verbose):
             self.print_sol_res_line (self.log_output_file)
-            self.print_sol_to_log_alg()
+            if (self.mode in ['opt', 'optInt']):
+                self.print_sol_to_log_opt()
+            else:
+                self.print_sol_to_log_alg()
             
         if (self.stts == sccs):
             return sccs
@@ -1982,10 +2022,15 @@ if __name__ == "__main__":
     #     run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
     city = 'Lux'
     T = 1
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-                                      poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa')
+    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
     
-    my_simulator.simulate (mode = 'opt', sim_len_in_slots=1)    
+    my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+    #                                   poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
+    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+    #
+    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 
     # run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa', verbose=[VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_RES]) 

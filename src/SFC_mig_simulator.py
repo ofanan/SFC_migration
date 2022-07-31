@@ -312,8 +312,13 @@ class SFC_mig_simulator (object):
             # model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
             # model.solve ()
             # self.stts = sccs if (model.status==1) else fail 
-            model.solve(plp.GUROBI())
-            model.solve(plp.GUROBI(options=[("TimeLimit", 1.0)]))
+            model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))
+            exit ()
+
+            # model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))
+            
+                # prob.solve(pulp.GUROBI_CMD(options=[('MIPGap', '0.004'), ("TimeLimit", "300"), ("MIPFocus", "1")]))
+
 
             # model.setParams("TimeLimit", 1.0) 
             # exit ()
@@ -2023,13 +2028,13 @@ if __name__ == "__main__":
     
     # for prob in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]:
     #     run_prob_of_RT_sim ('Lux', 'ms', prob=prob)
-    print (plp.listSolvers(onlyAvailable=True))
+    # print (plp.listSolvers(onlyAvailable=True))
     # city = 'Lux'
-    # T = 1
-    # # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
-    # #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
-    # #
-    # # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
+    T = 1
+    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+    
+    my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
     #                                   poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
     #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])

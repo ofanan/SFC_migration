@@ -544,7 +544,7 @@ class Res_file_parser (object):
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         self.set_plt_params ()
         _, ax = plt.subplots()
-        modes = ['opt', 'ourAlg', 'ffit', 'cpvnf'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        modes = ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -607,9 +607,9 @@ class Res_file_parser (object):
 
         list_of_avg_vals = []        
         
-        printf (self.output_file, 'cpu        & LBound        & BUPU        & F-Fit        & CPVNF')        
+        printf (self.output_file, 'cpu        & LBound        & BUPU        & MS & F-Fit        & CPVNF')        
 
-        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf']:
             
             mode_list = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
             
@@ -627,7 +627,7 @@ class Res_file_parser (object):
         for cpu_val in cpu_vals:
             printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
             print ('normalized={}, abs={}' .format (cpu_val / min_cpu, cpu_val))
-            for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
+            for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf']:
                 list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
                 printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['y_avg'])) 
             printf (self.output_file, '\\\\ \\hline \n')
@@ -718,7 +718,7 @@ class Res_file_parser (object):
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
-        for mode in ['opt', 'ourAlg', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf']:
     
             cost_vs_rsrc_data_of_this_mode = []
     
@@ -1286,12 +1286,12 @@ def plot_cost_vs_rsrc (city):
     
 if __name__ == '__main__':
 
-    # city = 'Lux'
-    # my_res_file_parser = Res_file_parser ()
+    city = 'Lux'
+    my_res_file_parser = Res_file_parser ()
     # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
     # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
         
-    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
     # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg.res'])   
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
@@ -1315,11 +1315,11 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
     # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
 
-    city = 'Monaco'
-    plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+    # city = 'Monaco'
+    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_more.res'])
     # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', 
-    #                                       res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt_sd94.res'])
+    #                                       res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ms.res'])
     # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Lux')

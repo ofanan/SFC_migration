@@ -243,10 +243,6 @@ class SFC_mig_simulator (object):
             if (self.stts != sccs):
                 printf (self.log_output_file, 'Note: the solution above is partial, as the alg did not find a feasible solution\n')
                 return         
-        if (VERBOSE_SOL_TIME in self.verbose):
-            sol_time = time.time () - self.last_rt
-            self.sol_time_at_slot.append (sol_time)
-            printf (self.res_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
         if (VERBOSE_DEBUG in self.verbose and self.stts==sccs and (not (self.mode in ['opt', 'optInt']))): 
             for usr in self.usrs:
                 if (usr.lvl==-1):
@@ -312,8 +308,6 @@ class SFC_mig_simulator (object):
         if (self.stts==sccs):
             for d in self.d_vars:
                 d.val = d.grb_var.x
-        # model.write('../res/model.sol')
-        # model.objVal # val of the sol obtained. # $$$/
 
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
@@ -1153,9 +1147,10 @@ class SFC_mig_simulator (object):
                     self.last_rt = time.time ()
                 self.stts = self.alg_top(self.solve_by_Gurobi if self.use_Gurobi else self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
                 
-                if (VERBOSE_RES in self.verbose or VERBOSE_SOL_TIME in self.verbose or VERBOSE_LOG in self.verbose):
-                    self.print_sol_to_res_and_log ()
-
+                if (VERBOSE_SOL_TIME in self.verbose):
+                    sol_time = time.time () - self.last_rt
+                    self.sol_time_at_slot.append (sol_time)
+                    printf (self.res_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
 
                 if (self.stts!=sccs and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
 

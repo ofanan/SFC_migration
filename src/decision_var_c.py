@@ -20,7 +20,7 @@ class decision_var_c (object):
         """
         if (self.plp_var != None):
             return self.plp_var.value
-        # elif (self.grb_var != None):
-        #     return self.grb_var. #grb_var.getattribute('X')
+        elif (self.grb_var != None):
+            return self.val
         else:
             return 0

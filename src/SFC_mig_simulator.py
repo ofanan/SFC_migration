@@ -281,14 +281,13 @@ class SFC_mig_simulator (object):
         
         # init the decision vars
         self.d_vars  = [] # decision variables  
-        obj_func     = [] # objective function
         d_var_id     = 0  # cntr for the id of the decision variables 
         for usr in self.usrs:
             grb_vars_in_this_single_place_const = [] # will hold all the grb_vars in this constraint assuring that each chain is placed in a single server
             
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
                 d_var   = decision_var_c (d_var_id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl]) # generate a decision var, containing the lp var + details about its meaning 
-                grb_var = model.addVar(vtype=grb.GRB.CONTINUOUS if (self.mode=='opt') else grb.GRB.BINARY, lb=0, ub=1, name='x_{}' .format (d_var_id), obj=1) #$$$self.d_var_cost (d_var))
+                grb_var = model.addVar(vtype=grb.GRB.CONTINUOUS if (self.mode=='opt') else grb.GRB.BINARY, lb=0, ub=1, name='x_{}' .format (d_var_id), obj=self.d_var_cost (d_var))
                 d_var.grb_var = grb_var
                 grb_vars_in_this_single_place_const.append (grb_var)
                 self.d_vars.append (d_var)
@@ -301,55 +300,28 @@ class SFC_mig_simulator (object):
             model.addLConstr (grb.LinExpr([d_var.usr.B[d_var.lvl] for d_var in d_vars_of_this_srvr], [d_var.grb_var for d_var in d_vars_of_this_srvr]), sense=grb.GRB.LESS_EQUAL, rhs=self.G.nodes[s]['RCs'])
         
         if (self.mode=='optInt'): # limit the sol time for the int solution. We don't limit the time of the fractional sol'
-            model.Params.timeLimit = 1.0
+            model.Params.timeLimit = self.opt_time_limit
+        model.setParam('OutputFlag', 0)
         model.optimize()
         grbStts = model.getAttr('Status')
         if (self.mode=='Opt'): # for fractional sol, we accept only optimal sol
             self.stts = sccs if (grbStts==grb.GRB.OPTIMAL) else fail
         else: # int sol
             self.stts = sccs if (grbStts==grb.GRB.OPTIMAL or grbStts==grb.GRB.SUBOPTIMAL) else fail # or (grbStts==grb.GRB.TIME_LIMIT ands )
-        print ('stts={}' .format (self.stts))
         
-        model.write('../res/model.sol')
-        for v in model.getVars():
-            print(v.x)
-        exit ()
+        if (self.stts==sccs):
+            for d in self.d_vars:
+                d.val = d.grb_var.x
+        # model.write('../res/model.sol')
         # model.objVal # val of the sol obtained. # $$$/
-        # # print the solution to the output, according to the desired self.verbose level
-        # if (VERBOSE_RES in self.verbose):
-        #     self.print_sol_res_line_opt (output_file=self.res_file)
-        #     if (model.status != 1):
-        #         printf (self.res_file, '// Status={}\n' .format (plp.LpStatus[model.status]))
-        #
-        #     sol_cost_by_obj_func = model.objective.value()
-        #
-        #     if (VERBOSE_DEBUG in self.verbose): 
-        #         sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
-        #                           sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
-        #                           sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
-        #         if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
-        #             print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
-        #             exit ()
-        #
-        # # print the solution to the output, according to the desired self.verbose level
-        # if (VERBOSE_LOG in self.verbose):
-        #     self.print_sol_res_line_opt (output_file=self.log_output_file)
-        #     printf (self.log_output_file, 'tot_cost = {:.0f}\n' .format (model.objective.value())) 
-        #     self.print_sol_to_log_opt ()
-        #     if (model.status == 1): # successfully solved
-        #         printf (self.log_output_file, '\nSuccessfully solved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
-        #     else:
-        #         printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
-        #
-        # # if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
-        # #     self.print_sol_res_line (output_file=self.moved_res_file)
-        # # if (self.mode=='optInt'):
-        # # if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
-        # #     print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
-        # #     self.post_processing ()
-        # #     exit ()
-        # exit ()
-        # return self.stts
+        sol_cost_by_grb = model.objVal
+        print ('sol cost by grb={}' .format (sol_cost_by_grb))
+
+        if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
+            print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
+            self.post_processing ()
+            exit ()
+        return self.stts
 
     def solve_by_plp (self):
         """
@@ -1008,6 +980,8 @@ class SFC_mig_simulator (object):
         """
         
         self.use_Gurobi  = True # When True, run 'opt' using Gurobi solver
+        self.opt_time_limit = 1.0 # time limit for optimal feasible sol [sec]
+
         self.use_selective_push_up = True # When True, run also the "push-up" alg' after every successful run of the "bottom-up" stage 
         self.seed                       = seed
         random.seed                     (self.seed)  
@@ -1044,7 +1018,7 @@ class SFC_mig_simulator (object):
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
         elif (self.mode in ['ms']):   
-            self.max_R = 1.2
+            self.max_R = 1.12
         else:
             self.max_R = 1.8
 
@@ -1177,7 +1151,6 @@ class SFC_mig_simulator (object):
                             if (self.cpu_cap_at_leaf == self.ub and self.stts==sccs): # we've already successfully run with this cap' no need to try again
                                 break # found a feasible sol for this slot
 
-                            # Need on last run, to verify the value found by binary search, and calculate its cost
                             self.cpu_cap_at_leaf = self.ub
                             self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
                             self.set_RCs_and_a (self.cpu_cap_at_lvl) 
@@ -1932,7 +1905,7 @@ class SFC_mig_simulator (object):
 
         elif (mode in ['ms']):
             min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 120, 0.1  :121, 0.2 : 125, 0.3 : 120, 0.4 : 128, 0.5 : 128,  0.6 : 137,  0.7 : 137,  0.8 : 138,  0.9  : 141,  1.0 : 144},
-                                       'Monaco' : {0.0 : 910, 0.1 : 910, 0.2 : 910, 0.3 : 940, 0.4 : 940, 0.5 : 980,  0.6 : 1120, 0.7 : 1508, 0.8 : 1660, 0.9 : 1800, 1.0 : 2000}} 
+                                       'Monaco' : {0.0 : 910, 0.1 : 910, 0.2 : 910, 0.3 : 940, 0.4 : 940, 0.5 : 980,  0.6 : 1120, 0.7 : 1508, 0.8 : 1660, 0.9 : 1900, 1.0 : 2100}} 
             for seed in [0 + i for i in range (21)]:
                 for prob_of_target_delay in probabilities:
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
@@ -2091,7 +2064,7 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
     
-    # for prob in [0.6, 0.7, 0.8]:
+    # for prob in [0.9, 1.0]:
     #     run_prob_of_RT_sim ('Monaco', 'ms', prob=prob)
     # print (plp.listSolvers(onlyAvailable=True))
     # city = 'Lux'

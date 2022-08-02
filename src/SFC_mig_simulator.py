@@ -247,7 +247,7 @@ class SFC_mig_simulator (object):
             sol_time = time.time () - self.last_rt
             self.sol_time_at_slot.append (sol_time)
             printf (self.res_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
-        if (VERBOSE_DEBUG in self.verbose and self.stts==sccs): 
+        if (VERBOSE_DEBUG in self.verbose and self.stts==sccs and (not (self.mode in ['opt', 'optInt']))): 
             for usr in self.usrs:
                 if (usr.lvl==-1):
                     error_msg = 'Error: t={}. stts={}, but usr {} is not placed\n' .format (self.t, self.stts, usr.id)
@@ -321,16 +321,11 @@ class SFC_mig_simulator (object):
             if (self.stts!=sccs):
                 printf (self.res_file, '// Gurobi status={}\n' .format (grbStts))
     
-            sol_cost_by_grb = model.objVal
-            print ('sol cost by grb={}' .format (sol_cost_by_grb))
+            sol_cost_by_obj_func = model.objVal
+            print ('sol cost by grb={}' .format (sol_cost_by_obj_func))
             
-            if (VERBOSE_DEBUG in self.verbose): 
-                sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.geValue() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_link_cost(d_var) * d_var.geValue() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_mig_cost(d_var)  * d_var.geValue() for d_var in self.d_vars])
-                if (abs (sol_cost_by_grb - sol_cost_direct) > 0.1): 
-                    print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_grb, sol_cost_direct))
-                    exit ()
+        if (VERBOSE_DEBUG in self.verbose): 
+            self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
 
         if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
             print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
@@ -390,13 +385,8 @@ class SFC_mig_simulator (object):
     
             sol_cost_by_obj_func = model.objective.value()
             
-            if (VERBOSE_DEBUG in self.verbose): 
-                sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.getValue() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_link_cost(d_var) * d_var.getValue() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_mig_cost(d_var)  * d_var.getValue() for d_var in self.d_vars])
-                if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
-                    print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
-                    exit ()
+        if (VERBOSE_DEBUG in self.verbose): 
+            self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
             
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_LOG in self.verbose):
@@ -417,6 +407,15 @@ class SFC_mig_simulator (object):
         #     exit ()
         return self.stts
 
+    def compare_obj_func_n_direct_cost (self, sol_cost_by_obj_func):
+        sol_cost_direct = sum ([self.d_var_cpu_cost  (d_var) * d_var.getValue() for d_var in self.d_vars]) + \
+                          sum ([self.d_var_link_cost (d_var) * d_var.getValue() for d_var in self.d_vars]) + \
+                          sum ([self.d_var_mig_cost  (d_var) * d_var.getValue() for d_var in self.d_vars])
+        if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
+            print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
+            exit ()
+
+    
     def init_res_file (self):
         """
         Open the res file for writing, as follows:
@@ -2085,7 +2084,7 @@ if __name__ == "__main__":
     # city = 'Lux'
     # T = 1
     my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
-                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
     
     my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',

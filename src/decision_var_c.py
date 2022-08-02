@@ -12,3 +12,15 @@ class decision_var_c (object):
         self.s        = s
         self.lvl      = lvl
         self.cur_st   = cur_st # value of this decision_var at the current state 
+        
+    def getValue (self):
+        """
+        returns the value associated with this decision var.
+        If no value is associated with this decision var (no value was written to the decision variable yet, e.g., the problem wasn't solved yet), return 0.
+        """
+        if (self.plp_var != None):
+            return self.plp_var.value
+        # elif (self.grb_var != None):
+        #     return self.grb_var. #grb_var.getattribute('X')
+        else:
+            return 0

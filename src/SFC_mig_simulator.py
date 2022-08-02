@@ -34,7 +34,7 @@ fail = 2
 inter = lambda float_num : int (round(float_num))
 
 # Minimum required CPU when prob=0.3, as found by previous runs. Used as a base for run_cost_vs_rsrc
-MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'ms' : 133},     #Old: 'ffit' : 219, 'cpvnf' : 214
+MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'ms' : 137},     #Old: 'ffit' : 219, 'cpvnf' : 214
                'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
 
 class SFC_mig_simulator (object):
@@ -274,118 +274,117 @@ class SFC_mig_simulator (object):
 
     def solve_by_Gurobi (self):
         """
-        Find an optimal fractional solution using Python's pulp LP library, with the defaults solver.
-        pulp library can use commercial tools (e.g., Gurobi, Cplex) to efficiently solve the prob', but it's later hard to get the parameters and attributes.
+        Find an optimal fractional solution using Gurobi optimization tool
         """
         
-        model = plp.LpProblem(name="SFC_mig", sense=plp.LpMinimize) # init a "model" that will hold the problem, objective, and constraints 
+        model = grb.Model (name="SFC_mig") # init a "model" that will hold the problem, objective, and constraints 
         
         # init the decision vars
         self.d_vars  = [] # decision variables  
         obj_func     = [] # objective function
-        d_var_id           = 0  # cntr for the id of the decision variables 
+        d_var_id     = 0  # cntr for the id of the decision variables 
         for usr in self.usrs:
-            single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
+            grb_vars_in_this_single_place_const = [] # will hold all the grb_vars in this constraint assuring that each chain is placed in a single server
             
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
-                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id), cat=self.category)
-                d_var   = decision_var_c (d_var_id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
+                # name='x_{}' .format (d_var_id)
+                grb_var = model.addVar(vtype=grb.GRB.CONTINUOUS if (self.mode=='opt') else grb.GRB.BINARY, lb=0, ub=1,name='x_{}' .format (d_var_id))
+                d_var   = decision_var_c (d_var_id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], grb_var=grb_var) # generate a decision var, containing the lp var + details about its meaning 
+                grb_vars_in_this_single_place_const.append (grb_var)
                 self.d_vars.append (d_var)
-                single_place_const += plp_var
                 d_var_id += 1
-                # if (VERBOSE_MOVED_RES in self.verbose and not (self.is_first_t) and usr not in self.moved_usrs): 
-                #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who moved 
-                # if (VERBOSE_CRITICAL_RES in self.verbose and not (self.is_first_t) and usr not in self.critical_n_new_usrs): 
-                #     continue # In this mode, starting from the 2nd slot, the obj' func' should consider only the users who are critical
-                obj_func += self.d_var_cost (d_var) * plp_var # add the cost of this decision var to the objective func
-            model += (single_place_const == 1) # demand that each chain is placed in a single server
-        model += obj_func
+                
 
-        # Generate CPU capacity constraints
-        for s in self.G.nodes():
-            cpu_cap_const = []
-            for d_var in list (filter (lambda item : item.s == s, self.d_vars)): # for every decision variable meaning placing a chain on this server 
-                cpu_cap_const += (d_var.usr.B[d_var.lvl] * d_var.plp_var) # Add the overall cpu of this chain, if located on s
-            if (cpu_cap_const != []):
-                model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
-
-        # solve the model, using the default settings.
-        if (self.use_Gurobi):
-            if (self.mode=='opt'):
-                self.stts = sccs if (model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))==2) else fail
-            else:
-                self.stts = sccs if (model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))==2) else fail
-                plp.GUROBI.get
-                print ('solCnt={}' .format (model.getAttr("SolCount")))
-                exit ()
-            # model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
-            # model.solve ()
-            # self.stts = sccs if (model.status==1) else fail 
-            self.stts = model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))
-            self.stts = sccs if (model.Status==2) else fail      
-
-            # model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))
-            
-                # prob.solve(pulp.GUROBI_CMD(options=[('MIPGap', '0.004'), ("TimeLimit", "300"), ("MIPFocus", "1")]))
-
-
-            # model.setParams("TimeLimit", 1.0) 
-            # exit ()
-            # self.stts = sccs if (model.status==1) else fail
-            # m = gurobipy.model()
-            # m.setParam('TimeLimit', 60)       
-            # solver = plp.GUROBI() # the available solvers are:
-            # solver.optimize ()
-            # solver.buildSolverModel(model)
-            #
-            # #Modify the solvermodel
-            # solver.solverModel.parameters.timelimit.set(1)
-            #
-            # #Solve P
-            # solver.callSolver(model)
-            # self.stts = solver.findSolutionValues(model)  
-        else: 
-            if (self.mode=='opt'):
-                model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
-                self.stts = sccs if (model.status==1) else fail
-            else:
-                print ('Sorry, optInt is currently not supported without Gurobi solver.')      
-        
-        # print the solution to the output, according to the desired self.verbose level
-        if (VERBOSE_RES in self.verbose):
-            self.print_sol_res_line_opt (output_file=self.res_file)
-            if (model.status != 1):
-                printf (self.res_file, '// Status={}\n' .format (plp.LpStatus[model.status]))
-
-            sol_cost_by_obj_func = model.objective.value()
-            
-            if (VERBOSE_DEBUG in self.verbose): 
-                sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
-                if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
-                    print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
-                    exit ()
-            
-        # print the solution to the output, according to the desired self.verbose level
-        if (VERBOSE_LOG in self.verbose):
-            self.print_sol_res_line_opt (output_file=self.log_output_file)
-            printf (self.log_output_file, 'tot_cost = {:.0f}\n' .format (model.objective.value())) 
-            self.print_sol_to_log_opt ()
-            if (model.status == 1): # successfully solved
-                printf (self.log_output_file, '\nSuccessfully solved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
-            else:
-                printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
-            
-        # if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
-        #     self.print_sol_res_line (output_file=self.moved_res_file)
-        # if (self.mode=='optInt'):
-        # if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
-        #     print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
-        #     self.post_processing ()
-        #     exit ()
+            model.addLConstr (grb.LinExpr(np.ones(len(grb_vars_in_this_single_place_const)), grb_vars_in_this_single_place_const), sense=grb.GRB.EQUAL, rhs=1)
+            # model.addLConstr (lhs=grb.quicksum(1 * grb_var for grb_var in grb_vars_in_this_single_place_const), sense=grb.GRB.EQUAL,rhs=1)
+        # model += obj_func
         exit ()
-        return self.stts
+
+        # # Generate CPU capacity constraints
+        # for s in self.G.nodes():
+        #     cpu_cap_const = []
+        #     for d_var in list (filter (lambda item : item.s == s, self.d_vars)): # for every decision variable meaning placing a chain on this server 
+        #         cpu_cap_const += (d_var.usr.B[d_var.lvl] * d_var.plp_var) # Add the overall cpu of this chain, if located on s
+        #     if (cpu_cap_const != []):
+        #         model += (cpu_cap_const <= self.G.nodes[s]['RCs']) 
+        #
+        # # solve the model, using the default settings.
+        # if (self.use_Gurobi):
+        #     if (self.mode=='opt'):
+        #         self.stts = sccs if (model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))==2) else fail
+        #     else:
+        #         self.stts = sccs if (model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))==2) else fail
+        #         plp.GUROBI.get
+        #         print ('solCnt={}' .format (model.getAttr("SolCount")))
+        #         exit ()
+        #     # model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
+        #     # model.solve ()
+        #     # self.stts = sccs if (model.status==1) else fail 
+        #     self.stts = model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))
+        #     self.stts = sccs if (model.Status==2) else fail      
+        #
+        #     # model.solve(plp.GUROBI(options=[("TimeLimit", 1.0),("IntFeasTol", 0.0001)]))
+        #
+        #         # prob.solve(pulp.GUROBI_CMD(options=[('MIPGap', '0.004'), ("TimeLimit", "300"), ("MIPFocus", "1")]))
+        #
+        #
+        #     # model.setParams("TimeLimit", 1.0) 
+        #     # exit ()
+        #     # self.stts = sccs if (model.status==1) else fail
+        #     # m = gurobipy.model()
+        #     # m.setParam('TimeLimit', 60)       
+        #     # solver = plp.GUROBI() # the available solvers are:
+        #     # solver.optimize ()
+        #     # solver.buildSolverModel(model)
+        #     #
+        #     # #Modify the solvermodel
+        #     # solver.solverModel.parameters.timelimit.set(1)
+        #     #
+        #     # #Solve P
+        #     # solver.callSolver(model)
+        #     # self.stts = solver.findSolutionValues(model)  
+        # else: 
+        #     if (self.mode=='opt'):
+        #         model.solve() if (self.host == 'container') else model.solve(plp.PULP_CBC_CMD(msg=0)) # Suppress plp's output. Unfortunately, suppressing the output this way causes a compilation error 'PULP_CBC_CMD unavailable' while running on Polito's HPC
+        #         self.stts = sccs if (model.status==1) else fail
+        #     else:
+        #         print ('Sorry, optInt is currently not supported without Gurobi solver.')      
+        #
+        # # print the solution to the output, according to the desired self.verbose level
+        # if (VERBOSE_RES in self.verbose):
+        #     self.print_sol_res_line_opt (output_file=self.res_file)
+        #     if (model.status != 1):
+        #         printf (self.res_file, '// Status={}\n' .format (plp.LpStatus[model.status]))
+        #
+        #     sol_cost_by_obj_func = model.objective.value()
+        #
+        #     if (VERBOSE_DEBUG in self.verbose): 
+        #         sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
+        #                           sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
+        #                           sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+        #         if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
+        #             print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
+        #             exit ()
+        #
+        # # print the solution to the output, according to the desired self.verbose level
+        # if (VERBOSE_LOG in self.verbose):
+        #     self.print_sol_res_line_opt (output_file=self.log_output_file)
+        #     printf (self.log_output_file, 'tot_cost = {:.0f}\n' .format (model.objective.value())) 
+        #     self.print_sol_to_log_opt ()
+        #     if (model.status == 1): # successfully solved
+        #         printf (self.log_output_file, '\nSuccessfully solved in {:.3f} [sec]\n' .format (time.time() - self.last_rt))
+        #     else:
+        #         printf (self.log_output_file, 'failed. status={}\n' .format(plp.LpStatus[model.status]))
+        #
+        # # if (VERBOSE_MOVED_RES in self.verbose and not(self.is_first_t)):
+        # #     self.print_sol_res_line (output_file=self.moved_res_file)
+        # # if (self.mode=='optInt'):
+        # # if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
+        # #     print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
+        # #     self.post_processing ()
+        # #     exit ()
+        # exit ()
+        # return self.stts
 
     def solve_by_plp (self):
         """
@@ -1203,7 +1202,7 @@ class SFC_mig_simulator (object):
                 self.rd_old_usrs_line_lp (splitted_line[1:])
                 if (VERBOSE_ADD_LOG in self.verbose or VERBOSE_SOL_TIME in self.verbose):
                     self.last_rt = time.time ()
-                self.stts = self.alg_top(self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
+                self.stts = self.alg_top(self.solve_by_Gurobi if self.use_Gurobi else self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
 
                 if (self.stts!=sccs and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
 
@@ -1217,13 +1216,13 @@ class SFC_mig_simulator (object):
                             self.cpu_cap_at_leaf = self.ub
                             self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
                             self.set_RCs_and_a (self.cpu_cap_at_lvl) 
-                            self.stts = self.alg_top(self.solve_by_plp)
+                            self.stts = self.alg_top(self.solve_by_Gurobi if self.use_Gurobi else self.solve_by_plp)
                             break # found a feasible sol for this slot
             
                         self.cpu_cap_at_leaf = self.avg_up_and_lb(self.ub, self.lb)
                         self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
                         self.set_RCs_and_a (self.cpu_cap_at_lvl) 
-                        self.stts = self.alg_top(self.solve_by_plp)
+                        self.stts = self.alg_top(self.solve_by_Gurobi if self.use_Gurobi else self.solve_by_plp)
                         if (self.stts==sccs): 
                             self.ub = self.cpu_cap_at_leaf
                         else: 
@@ -2038,9 +2037,11 @@ def run_cost_vs_rsrc (city, seed=None):
     #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     for seed in seeds:
-        ratios = [1.5, 2, 2.35, 2.4, 2.5] if city=='Lux' else [1.5, 1.58, 2.0, 2.5]
-        for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*ratio) for ratio in ratios]: 
-            my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
+            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        # ratios = [1.5, 2, 2.35, 2.4, 2.5] if city=='Lux' else [1.5, 1.58, 2.0, 2.5]
+        # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*ratio) for ratio in ratios]: 
+        #     my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
         # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf'], MIN_REQ_CPU[my_simulator.city]['ms']]:
         #     my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
@@ -2125,15 +2126,15 @@ def only_cnt_num_new_vehs_per_slot ():
 
 if __name__ == "__main__":
     
-    for prob in [0.6, 0.7, 0.8]:
-        run_prob_of_RT_sim ('Monaco', 'ms', prob=prob)
+    # for prob in [0.6, 0.7, 0.8]:
+    #     run_prob_of_RT_sim ('Monaco', 'ms', prob=prob)
     # print (plp.listSolvers(onlyAvailable=True))
     # city = 'Lux'
     # T = 1
-    # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
-    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
-    #
-    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
+    my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+    
+    my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2)    
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
     #                                   poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
     #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
@@ -2142,7 +2143,7 @@ if __name__ == "__main__":
 
     # run_cost_vs_rsrc ('Lux')
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])   
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=134)
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=136)
 
     # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   

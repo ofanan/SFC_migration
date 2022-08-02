@@ -84,7 +84,7 @@ class SFC_mig_simulator (object):
     alg_used_cpu_in = lambda self, s: sum ([usr.B[usr.lvl] for usr in self.usrs if usr.nxt_s==s])
 
     # Given a server s, returns the total CPU currently allocated to usrs assigned to server s.  
-    opt_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.plp_var.value() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
+    opt_used_cpu_in = lambda self, s: sum ( np.array ( [d_var.usr.B[self.G.nodes[s]['lvl']] * d_var.getValue() for d_var in list (filter (lambda d_var : d_var.s == s, self.d_vars))]))
     
     # Calculates the cost of a given decision variable, if the decision var is assigned 1.
     # This is when when the current state may be non co-located-placement. That is, distinct VMs (or fractions) of the same chain may be found in several distinct server. 
@@ -143,13 +143,13 @@ class SFC_mig_simulator (object):
     calc_mig_cost_in_slot_alg = lambda self : self.uniform_chain_mig_cost * len(list (filter (lambda usr: usr.cur_s != -1 and usr.cur_s != usr.nxt_s, self.usrs)))
 
     # Returns the total cpu cost in the current time slot, according to the LP solution
-    calc_cpu_cost_in_slot_opt = lambda self : sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+    calc_cpu_cost_in_slot_opt = lambda self : sum ([self.d_var_cpu_cost(d_var)  * d_var.getValue() for d_var in self.d_vars])
     
     # Returns the total link cost in the current time slot, according to the LP solution
-    calc_link_cost_in_slot_opt = lambda self : sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars])
+    calc_link_cost_in_slot_opt = lambda self : sum ([self.d_var_link_cost(d_var) * d_var.getValue() for d_var in self.d_vars])
     
     # Returns the total mig' cost in the current time slot, according to the LP solution
-    calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+    calc_mig_cost_in_slot_opt = lambda self : sum ([self.d_var_mig_cost(d_var)  * d_var.getValue() for d_var in self.d_vars])
 
     # Returns a string, detailing the sim' parameters (time, amount of CPU at leaves, probability of RT app' at leaf, status of the solution)
     settings_str = lambda self : 't{}_{}_cpu{:.0f}_p{:.1f}_sd{}_stts{}' .format(
@@ -246,7 +246,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_SOL_TIME in self.verbose):
             sol_time = time.time () - self.last_rt
             self.sol_time_at_slot.append (sol_time)
-            printf (self.r_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
+            printf (self.res_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
         if (VERBOSE_DEBUG in self.verbose and self.stts==sccs): 
             for usr in self.usrs:
                 if (usr.lvl==-1):
@@ -314,8 +314,23 @@ class SFC_mig_simulator (object):
                 d.val = d.grb_var.x
         # model.write('../res/model.sol')
         # model.objVal # val of the sol obtained. # $$$/
-        sol_cost_by_grb = model.objVal
-        print ('sol cost by grb={}' .format (sol_cost_by_grb))
+
+        # print the solution to the output, according to the desired self.verbose level
+        if (VERBOSE_RES in self.verbose):
+            self.print_sol_res_line_opt (output_file=self.res_file)
+            if (self.stts!=sccs):
+                printf (self.res_file, '// Gurobi status={}\n' .format (grbStts))
+    
+            sol_cost_by_grb = model.objVal
+            print ('sol cost by grb={}' .format (sol_cost_by_grb))
+            
+            if (VERBOSE_DEBUG in self.verbose): 
+                sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.geValue() for d_var in self.d_vars]) + \
+                                  sum ([self.d_var_link_cost(d_var) * d_var.geValue() for d_var in self.d_vars]) + \
+                                  sum ([self.d_var_mig_cost(d_var)  * d_var.geValue() for d_var in self.d_vars])
+                if (abs (sol_cost_by_grb - sol_cost_direct) > 0.1): 
+                    print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_grb, sol_cost_direct))
+                    exit ()
 
         if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
             print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
@@ -339,7 +354,7 @@ class SFC_mig_simulator (object):
             single_place_const = [] # will hold constraint assuring that each chain is placed in a single server
             
             for lvl in range(len(usr.B)): # will check all delay-feasible servers for this user
-                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id), cat=self.category)
+                plp_var = plp.LpVariable (lowBound=0, upBound=1, name='x_{}' .format (d_var_id))
                 d_var   = decision_var_c (d_var_id=d_var_id, usr=usr, lvl=lvl, s=usr.S_u[lvl], plp_var=plp_var) # generate a decision var, containing the lp var + details about its meaning 
                 self.d_vars.append (d_var)
                 single_place_const += plp_var
@@ -376,9 +391,9 @@ class SFC_mig_simulator (object):
             sol_cost_by_obj_func = model.objective.value()
             
             if (VERBOSE_DEBUG in self.verbose): 
-                sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_link_cost(d_var) * d_var.plp_var.value() for d_var in self.d_vars]) + \
-                                  sum ([self.d_var_mig_cost(d_var)  * d_var.plp_var.value() for d_var in self.d_vars])
+                sol_cost_direct = sum ([self.d_var_cpu_cost(d_var)  * d_var.getValue() for d_var in self.d_vars]) + \
+                                  sum ([self.d_var_link_cost(d_var) * d_var.getValue() for d_var in self.d_vars]) + \
+                                  sum ([self.d_var_mig_cost(d_var)  * d_var.getValue() for d_var in self.d_vars])
                 if (abs (sol_cost_by_obj_func - sol_cost_direct) > 0.1): 
                     print ('Error: obj func value of sol={} while sol cost={}' .format (sol_cost_by_obj_func, sol_cost_direct))
                     exit ()
@@ -473,9 +488,9 @@ class SFC_mig_simulator (object):
 
         if (VERBOSE_ADD_LOG in self.verbose): 
             for d_var in self.d_vars: 
-                if d_var.plp_var.value() > 0:
+                if d_var.getValue() > 0:
                     printf (self.log_output_file, '\nu {} lvl {:.0f} s {:.0f} val {:.2f}' .format(
-                           d_var.usr.id, d_var.lvl, d_var.s, d_var.plp_var.value()))            
+                           d_var.usr.id, d_var.lvl, d_var.s, d_var.getValue()))            
 
     def print_sol_to_log_alg (self):
         """
@@ -1039,11 +1054,7 @@ class SFC_mig_simulator (object):
 
         if (self.mode in ['ourAlg', 'ourAlgDist', 'ms', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
             self.simulate_algs()
-        elif (self.mode == 'opt'):
-            self.category='Continuous'
-            self.simulate_lp ();
-        elif (self.mode == 'optInt'):
-            self.category='Integer'
+        elif (self.mode in ['opt', 'optInt']):
             self.simulate_lp ();
         else:
             print ('Sorry, mode {} that you selected is not supported' .format (self.mode))
@@ -1142,6 +1153,10 @@ class SFC_mig_simulator (object):
                 if (VERBOSE_ADD_LOG in self.verbose or VERBOSE_SOL_TIME in self.verbose):
                     self.last_rt = time.time ()
                 self.stts = self.alg_top(self.solve_by_Gurobi if self.use_Gurobi else self.solve_by_plp) # call the top-level alg' that solves the problem, possibly by binary-search, using iterative calls to the given solver (plp LP solver, in our case).
+                
+                if (VERBOSE_RES in self.verbose or VERBOSE_SOL_TIME in self.verbose or VERBOSE_LOG in self.verbose):
+                    self.print_sol_to_res_and_log ()
+
 
                 if (self.stts!=sccs and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
 

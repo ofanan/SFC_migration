@@ -318,10 +318,11 @@ class SFC_mig_simulator (object):
                     self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
         
             else:
+                print  ('// Gurobi status={}\n' .format (grbStts))
                 printf (self.res_file, '// Gurobi status={}\n' .format (grbStts))
     
         if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
-            print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
+            print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting' .format (self.t))
             if (not (self.is_first_t)): # there are previous slots, where Gurobi successfully solved (and measured sol time)
                 self.post_processing ()
             exit ()
@@ -2081,12 +2082,12 @@ if __name__ == "__main__":
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
     #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])    
     # my_simulator.simulate (mode = 'opt')    
-    city = 'Monaco'
+    city = 'Lux'
     my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                       poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
                                       verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
     
-    my_simulator.simulate (mode = 'opt', sim_len_in_slots=1)    
+    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
     #
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 

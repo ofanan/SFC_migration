@@ -1287,11 +1287,11 @@ def plot_cost_vs_rsrc (city):
 if __name__ == '__main__':
 
     # city = 'Lux'
-    # my_res_file_parser = Res_file_parser ()
+    my_res_file_parser = Res_file_parser ()
     # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
     # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
         
-    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg.res'])   
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
@@ -1319,7 +1319,7 @@ if __name__ == '__main__':
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_more.res'])
-    my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', 
     #                                       res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ms.res'])
-    my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Lux')
+    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Lux')

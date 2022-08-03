@@ -35,7 +35,7 @@ inter = lambda float_num : int (round(float_num))
 
 # Minimum required CPU when prob=0.3, as found by previous runs. Used as a base for run_cost_vs_rsrc
 MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'ms' : 137},     #Old: 'ffit' : 219, 'cpvnf' : 214
-               'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
+               'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329, 'ms' : 994}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
 
 class SFC_mig_simulator (object):
     """
@@ -125,7 +125,7 @@ class SFC_mig_simulator (object):
     
     # Generate a string for the res file name. The sting will express the settings of this particular run, plus a user-requested string, 'mid_str', in which the caller may detail a concrete setting of 
     # this run (e.g. 'critical_usrs_only'). 
-    gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}_{}_sd{}.res' .format (self.poa_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0], self.mode, 'G' if self.use_Gurobi else self.seed)
+    gen_res_file_name  = lambda self, mid_str : '../res/{}{}_p{}_{}_sd{}.res' .format (self.poa_file_name.split(".")[0], mid_str, self.prob_of_target_delay[0], self.mode, 'G' if (self.mode in ['opt', 'optInt'] and self.use_Gurobi) else self.seed)
 
     # Returns a vector with the cpu capacities in each lvl of the tree, given the cpu cap at the leaf lvl
     calc_cpu_capacities = lambda self, cpu_cap_at_leaf : [2**(lvl)*cpu_cap_at_leaf for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cap else np.array ([cpu_cap_at_leaf * (lvl+1) for lvl in range (self.tree_height+1)], dtype='uint16')
@@ -311,18 +311,19 @@ class SFC_mig_simulator (object):
 
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
-            self.print_sol_res_line_opt (output_file=self.res_file)
-            if (self.stts!=sccs):
+            if (self.stts==sccs):
+                self.print_sol_res_line_opt (output_file=self.res_file)
+                sol_cost_by_obj_func = model.objVal
+                if (VERBOSE_DEBUG in self.verbose): 
+                    self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
+        
+            else:
                 printf (self.res_file, '// Gurobi status={}\n' .format (grbStts))
     
-            sol_cost_by_obj_func = model.objVal
-            
-        if (VERBOSE_DEBUG in self.verbose): 
-            self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
-
         if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
             print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting')
-            self.post_processing ()
+            if (not (self.is_first_t)): # there are previous slots, where Gurobi successfully solved (and measured sol time)
+                self.post_processing ()
             exit ()
         return self.stts
 
@@ -1983,13 +1984,13 @@ def run_cost_vs_rsrc (city, seed=None):
     #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     for seed in seeds:
-        for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
-            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
+        #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
         # ratios = [1.5, 2, 2.35, 2.4, 2.5] if city=='Lux' else [1.5, 1.58, 2.0, 2.5]
         # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*ratio) for ratio in ratios]: 
         #     my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-        # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf'], MIN_REQ_CPU[my_simulator.city]['ms']]:
-        #     my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
+            my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     # for seed in seeds:
     #     for mode in ['cpvnf', 'ffit']:
@@ -2078,17 +2079,18 @@ if __name__ == "__main__":
     # city = 'Lux'
     # T = 1
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
-    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
-    city = 'Lux'
+    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])    
+    # my_simulator.simulate (mode = 'opt')    
+    city = 'Monaco'
     my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-                                      poa_file_name='Monaco_0730_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0730_0830_1secs_post.poa',
-                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+                                      poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
     
-    my_simulator.simulate (mode = 'opt')    
+    my_simulator.simulate (mode = 'opt', sim_len_in_slots=1)    
     #
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 
-    # run_cost_vs_rsrc ('Lux')
+    # run_cost_vs_rsrc ('Monaco')
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])   
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)
 

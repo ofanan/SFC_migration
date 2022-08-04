@@ -255,6 +255,11 @@ class SFC_mig_simulator (object):
             self.num_of_migs_in_slot.append (len(usrs_who_migrated_at_this_slot))
             for usr in usrs_who_migrated_at_this_slot: 
                 self.mig_from_to_lvl[self.G.nodes[usr.cur_s]['lvl']] [self.G.nodes[usr.nxt_s]['lvl']] += 1
+
+        if (VERBOSE_SOL_TIME in self.verbose):
+            sol_time = time.time () - self.last_rt
+            self.sol_time_at_slot.append (sol_time)
+            printf (self.res_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
             
     def rst_sol (self):
         """
@@ -1279,6 +1284,8 @@ class SFC_mig_simulator (object):
                 if (VERBOSE_ADD_LOG in self.verbose):
                     self.last_rt = time.time ()
                     printf (self.log_output_file, 't={}. beginning alg top\n' .format (self.t))
+                if (VERBOSE_SOL_TIME in self.verbose):
+                    self.last_rt = time.time ()
                     
                 # solve the prob' using the requested alg'    
                 if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):
@@ -2082,13 +2089,21 @@ if __name__ == "__main__":
     # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
     #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])    
     # my_simulator.simulate (mode = 'opt')    
+    # city = 'Lux'
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+    #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
+    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
+    #
+    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
+
+    
     city = 'Lux'
     my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
                                       poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
-                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
     
-    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
-    #
+    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=137, sim_len_in_slots=2)
+#
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 
     # run_cost_vs_rsrc ('Monaco')

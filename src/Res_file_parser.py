@@ -604,7 +604,6 @@ class Res_file_parser (object):
         else:
             X_norm_factor = 1
 
-
         list_of_avg_vals = []        
         
         printf (self.output_file, 'cpu        & LBound        & BUPU        & MS & F-Fit        & CPVNF')        
@@ -1287,11 +1286,11 @@ def plot_cost_vs_rsrc (city):
 if __name__ == '__main__':
 
     # city = 'Lux'
-    my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser = Res_file_parser ()
     # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
     # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
         
-    my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg.res'])   
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
@@ -1315,11 +1314,11 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
     # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
 
-    # city = 'Monaco'
+    city = 'Monaco'
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_more.res'])
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', 
-    #                                       res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ms.res'])
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Lux')
+    my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl' if city=='Lux' else 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 
+    #                                       res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt_sd70.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ms.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_cpu994_only.res'])
+    my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city)

@@ -27,6 +27,7 @@ VERBOSE_LOG_BU        = 11 # Log only the reults of BU, disregarding the PU part
 VERBOSE_SOL_TIME      = 12 # Calc and print the sol' time
 
 # Status returned by algorithms solving the prob' 
+sub_optimal = 0
 sccs = 1
 fail = 2
 
@@ -304,11 +305,16 @@ class SFC_mig_simulator (object):
             model.Params.timeLimit = self.opt_time_limit
         model.setParam('OutputFlag', 0)
         model.optimize()
-        grbStts = model.getAttr('Status')
+        grb_stts = model.getAttr('Status')
         if (self.mode=='Opt'): # for fractional sol, we accept only optimal sol
-            self.stts = sccs if (grbStts==grb.GRB.OPTIMAL) else fail
+            self.stts = sccs if (grb_stts==grb.GRB.OPTIMAL) else fail
         else: # int sol
-            self.stts = sccs if (grbStts==grb.GRB.OPTIMAL or grbStts==grb.GRB.SUBOPTIMAL) else fail # or (grbStts==grb.GRB.TIME_LIMIT ands )
+            if (grb_stts==grb.GRB.OPTIMAL):
+                self.stts = sccs 
+            elif (grb_stts==grb.GRB.SUBOPTIMAL):
+                self.stts = sub_optimal
+            else: 
+                self.stts = fail # or (grb_stts==grb.GRB.TIME_LIMIT ands )
         
         if (self.stts==sccs):
             for d in self.d_vars:
@@ -316,15 +322,16 @@ class SFC_mig_simulator (object):
 
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
-            if (self.stts==sccs):
+            if (self.stts in [sccs, sub_optimal]):
                 self.print_sol_res_line_opt (output_file=self.res_file)
                 sol_cost_by_obj_func = model.objVal
                 if (VERBOSE_DEBUG in self.verbose): 
                     self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
         
             else:
-                print  ('// Gurobi status={}\n' .format (grbStts))
-                printf (self.res_file, '// Gurobi status={}\n' .format (grbStts))
+                print  ('// Gurobi status={}\n' .format (grb_stts))
+                printf (self.res_file, '// Gurobi status={}\n' .format (grb_stts))
+                exit ()
     
         if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
             print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting' .format (self.t))
@@ -994,7 +1001,7 @@ class SFC_mig_simulator (object):
         """
         
         self.use_Gurobi  = True # When True, run 'opt' using Gurobi solver
-        self.opt_time_limit = 1.0 # time limit for optimal feasible sol [sec]
+        self.opt_time_limit = 600.0 # time limit for optimal feasible sol [sec]
 
         self.use_selective_push_up = True # When True, run also the "push-up" alg' after every successful run of the "bottom-up" stage 
         self.seed                       = seed
@@ -1051,7 +1058,7 @@ class SFC_mig_simulator (object):
         if (VERBOSE_SOL_TIME in self.verbose):
             self.sol_time_at_slot = [] # sol_time_at_slot[T] will hold the time it took to find a feasible sol' at slot T 
 
-        if (self.mode in ['ourAlg', 'ourAlgDist', 'ms', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
+        if (self.mode in ['bypass', 'ourAlg', 'ourAlgDist', 'ms', 'ffit', 'cpvnf', 'ourAlgC', 'wfitC', 'ffitC', 'cpvnfC', 'cnt_moved_n_new_vehs']):
             self.simulate_algs()
         elif (self.mode in ['opt', 'optInt']):
             self.simulate_lp ();
@@ -1156,7 +1163,7 @@ class SFC_mig_simulator (object):
                 if (VERBOSE_SOL_TIME in self.verbose):
                     sol_time = time.time () - self.last_rt
                     self.sol_time_at_slot.append (sol_time)
-                    printf (self.res_file, '// Solved in {:.3f} [sec]\n' .format (sol_time)) 
+                    printf (self.res_file, '// Solved in {:.3f}. Avg sol time={:.2f} [sec]\n' .format (sol_time, np.average (self.sol_time_at_slot))) 
 
                 if (self.stts!=sccs and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
 
@@ -1208,6 +1215,8 @@ class SFC_mig_simulator (object):
         - If the alg' failed to find a feasible sol', even at a single slot, return with self.stts=fail
         """
         
+        if (self.mode=='bypass' and VERBOSE_SOL_TIME in self.verbose):
+            self.start_t = time.time ()
         if (self.mode == 'cnt_moved_n_new_vehs'):
             self.num_new_vehs_in_cur_slot, self.num_moved_vehs_in_cur_slot = 0, 0
             self.max_new_vehs_in_slot,     self.max_moved_vehs_in_slot     = 0,0      
@@ -1287,6 +1296,11 @@ class SFC_mig_simulator (object):
                 if (VERBOSE_SOL_TIME in self.verbose):
                     self.last_rt = time.time ()
                     
+                if (self.mode=='bypass'):
+                    self.is_first_t = False  # The next slot is surely not the first slot
+                    for usr in self.usrs:
+                        usr.cur_s = usr.S_u[2]
+                    continue        
                 # solve the prob' using the requested alg'    
                 if (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):
                     if (VERBOSE_CRIT_LEN in self.verbose and (self.is_first_t or (self.t%self.ourAlg_slot_len==0))):
@@ -1346,9 +1360,8 @@ class SFC_mig_simulator (object):
         if (self.mode == 'cnt_moved_n_new_vehs'):    
             print ('T={}, avg_new_vehs_per_slot={:.0f}' .format (self.slot_len, np.average(self.num_new_vehs_in_slot)))
             print ('max_new_vehs_per_slot={}, max_moved_vehs_per_slot={}' .format (self.max_new_vehs_in_slot, self.max_moved_vehs_in_slot))
-        if (VERBOSE_SOL_TIME in self.verbose and self.mode in ['opt', 'optInt']):
-            printf (self.res_file, '\n// avg sol time={}' .format (np.average (self.sol_time_at_slot)))        
-        
+        if (self.mode=='bypass' and VERBOSE_SOL_TIME in self.verbose):
+            print ('run time={}' .format (time.time () - self.start_t))        
         
     def cpvnf_reshuffle (self):
         """
@@ -2102,7 +2115,7 @@ if __name__ == "__main__":
                                       poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
                                       verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
     
-    my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=137, sim_len_in_slots=2)
+    my_simulator.simulate (mode = 'optInt', cpu_cap_at_leaf=94, sim_len_in_slots=2)
 #
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 

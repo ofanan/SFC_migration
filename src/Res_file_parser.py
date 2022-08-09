@@ -33,6 +33,7 @@ num_of_fields = stts_idx+1
 num_usrs_idx      = 6
 num_crit_usrs_idx = 7
 reshuffle_idx     = num_crit_usrs_idx+1 
+blocked_usrs_idx  = num_of_fields+1
 
 opt_idx   = 0
 alg_idx   = 1
@@ -580,7 +581,7 @@ class Res_file_parser (object):
             
         plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
 
-    def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1):
+    def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True):
         """
         Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
@@ -606,9 +607,9 @@ class Res_file_parser (object):
 
         list_of_avg_vals = []        
         
-        printf (self.output_file, 'cpu        & LBound        & BUPU        & MS & F-Fit        & CPVNF')        
+        printf (self.output_file, 'cpu      & LBound      & BUPU     & SyncPartResh & MS        & F-Fit        & CPVNF')        
 
-        for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlg', 'SyncPartResh','ms', 'ffit', 'cpvnf']:
             
             mode_list = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
             
@@ -626,9 +627,17 @@ class Res_file_parser (object):
         for cpu_val in cpu_vals:
             printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
             print ('normalized={}, abs={}' .format (cpu_val / min_cpu, cpu_val))
-            for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf']:
-                list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
-                printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['y_avg'])) 
+            if (normalize_Y):
+                list_of_val_opt = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt' and item['cpu']==cpu_val]
+                if (len(list_of_val_opt)==0):
+                    continue;
+                for mode in ['opt', 'ourAlg', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
+                    list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
+                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.2f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
+            else:
+                for mode in ['opt', 'ourAlg', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
+                    list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
+                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['y_avg'])) 
             printf (self.output_file, '\\\\ \\hline \n')
 
     def plot_cost_vs_rsrc (self, pcl_input_file_name, normalize_X = True, min_cpu=None):
@@ -717,7 +726,7 @@ class Res_file_parser (object):
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
-        for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf']:
+        for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']:
     
             cost_vs_rsrc_data_of_this_mode = []
     
@@ -1320,5 +1329,5 @@ if __name__ == '__main__':
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_ourAlg_more.res'])
     my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl' if city=='Lux' else 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl', 
-    #                                       res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt_sd70.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ms.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg_cpu994_only.res'])
+    #                                       res_input_file_names=['Monaco_0820_0830_1secs_Telecom_SyncPartResh_cpu842.res'])
     my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city)

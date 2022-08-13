@@ -29,5 +29,6 @@ The typical output of the simulation is a .res file, containing data about the s
 Gets as input the output of a simulation run by SFC_mig_simulator.py (typically, a .res file), and generates from it either .pcl files to store all the data in a memory-efficient way, plots, or tables.
 
 # Additional required input files
-To run a SUMO simulation, you need also the relevant configuration files. Here are the configuration files for [LuST](https://github.com/lcodeca/LuSTScenario) (Luxembourg Sumo Traffic project), and for [MoST](https://github.com/lcodeca/MoSTScenario) (Monaco Sumo Traffic project).
+Under /res/ directory of this project you will find antenna_locs files, detailing real-world locations of antennas in Luxembourg and in Monaco, extracted from [OpenCellId](https://opencellid.org), and poa2cell_files, that map the antennas into cells, when assuming that the simulated area is iteratively partitioned into quadrants.
 
+To run a SUMO simulation, you need also the relevant configuration files. Here are the configuration files for [LuST](https://github.com/lcodeca/LuSTScenario) (Luxembourg Sumo Traffic project), and for [MoST](https://github.com/lcodeca/MoSTScenario) (Monaco Sumo Traffic project).

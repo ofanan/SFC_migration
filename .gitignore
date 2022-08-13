@@ -4,6 +4,7 @@ b_*
 /.vscode/*
 /res/*
 !/res/poa2cell_files/
+!/res/antennas_locs
 /old/*
 /src/__pycache*
 /src/sim*

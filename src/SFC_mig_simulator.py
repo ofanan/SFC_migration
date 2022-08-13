@@ -1033,7 +1033,7 @@ class SFC_mig_simulator (object):
 
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
-            self.max_R = 1.6 
+            self.max_R = 1.05 
         if (self.mode == 'optInt'):
             self.max_R = 1.6 
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
@@ -2111,11 +2111,13 @@ if __name__ == "__main__":
 
     
     city = 'Lux'
-    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-                                      poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
-                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
-    
-    my_simulator.simulate (mode = 'optInt', cpu_cap_at_leaf=137)
+    run_prob_of_RT_sim (city=city, mode='optInt', prob=0.3)
+
+    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+    #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
+    #                                   verbose=[VERBOSE_RES])
+    #
+    # my_simulator.simulate (mode = 'optInt', cpu_cap_at_leaf=137)
 #
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 

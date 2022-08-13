@@ -594,11 +594,11 @@ class Res_file_parser (object):
         self.output_file      = open (self.output_file_name, "w")
         
         if (normalize_X):
-            opt_list = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt']  
+            optInt_list = [item for item in self.cost_vs_rsrc_data if item['mode']=='optInt']  
 
-            cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
+            cpu_vals = sorted (list (set([item['cpu'] for item in optInt_list])))
             if (len (cpu_vals)==0):
-                print ('Error: you asked to normalize by opt, but no results of opt exist. Please add first results of opt to the parsed input file.')
+                print ('Error: you asked to normalize by optInt, but no results of optInt exist. Please add first results of optInt to the parsed input file.')
                 return
             X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
         
@@ -607,9 +607,9 @@ class Res_file_parser (object):
 
         list_of_avg_vals = []        
         
-        printf (self.output_file, 'cpu      & LBound      & BUPU     & SyncPartResh & MS        & F-Fit        & CPVNF')        
+        printf (self.output_file, 'cpu      & LBound      & SyncPartResh & MS        & F-Fit        & CPVNF')        
 
-        for mode in ['opt', 'ourAlg', 'SyncPartResh','ms', 'ffit', 'cpvnf']:
+        for mode in ['optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']:
             
             mode_list = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
             
@@ -628,14 +628,14 @@ class Res_file_parser (object):
             printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
             print ('normalized={}, abs={}' .format (cpu_val / min_cpu, cpu_val))
             if (normalize_Y):
-                list_of_val_opt = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt' and item['cpu']==cpu_val]
-                if (len(list_of_val_opt)==0):
+                list_of_val_optInt = [item for item in self.cost_vs_rsrc_data if item['mode']=='optInt' and item['cpu']==cpu_val]
+                if (len(list_of_val_optInt)==0):
                     continue;
-                for mode in ['opt', 'ourAlg', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
+                for mode in ['optInt', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
-                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.2f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
+                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.2f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_optInt[0]['y_avg'])) 
             else:
-                for mode in ['opt', 'ourAlg', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
+                for mode in ['optInt', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
                     printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.0f}\t ' .format (list_of_val[0]['y_avg'])) 
             printf (self.output_file, '\\\\ \\hline \n')
@@ -726,7 +726,7 @@ class Res_file_parser (object):
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
-        for mode in ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']:
+        for mode in ['optInt', 'opt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']:
     
             cost_vs_rsrc_data_of_this_mode = []
     

@@ -1,5 +1,0 @@
-// format: ID,X,Y
-// where X,Y is the position of the antenna in the given SUMO file
-// Parsed antenna location file: Lux.txt
-// SUMO cfg file: myLuST.sumocfg
-0,1,1

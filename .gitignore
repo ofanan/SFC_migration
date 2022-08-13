@@ -3,7 +3,7 @@ b_*
 .project
 /.vscode/*
 /res/*
-!/res/poa2cell_files/*
+!*/res/poa2cell_files/*
 /old/*
 /src/__pycache*
 /src/sim*

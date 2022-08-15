@@ -27,9 +27,11 @@ VERBOSE_LOG_BU        = 11 # Log only the reults of BU, disregarding the PU part
 VERBOSE_SOL_TIME      = 12 # Calc and print the sol' time
 
 # Status returned by algorithms solving the prob' 
-sub_optimal = 0
-sccs = 1
-fail = 2
+sub_optimal           = 0
+sccs                  = 1
+fail                  = 2
+time_limit_infeasible = 3
+time_limit_feasible   = 4
 
 # Round a float, and cast it to int
 inter = lambda float_num : int (round(float_num))
@@ -156,12 +158,14 @@ class SFC_mig_simulator (object):
     settings_str = lambda self : 't{}_{}_cpu{:.0f}_p{:.1f}_sd{}_stts{}' .format(
                               self.t, self.mode, self.G.nodes[len (self.G.nodes)-1]['RCs'], self.prob_of_target_delay[0], self.seed, self.stts)
 
-    # Print a solution for the problem to the output res file when the solver is an LP solver  
-    print_sol_res_line_opt = lambda self, output_file: printf (output_file, '{} | {}\n' .format(
+    # Print a solution for the problem to the output res file when the solver is an LP solver
+    # if the binary input set_zero_costs is True, all the costs are set to zero; such an output is useful for reporting a failed run (so there're no real "solution costs").
+    print_sol_res_line_opt = lambda self, output_file, set_zero_costs=False: printf (output_file, '{} | {}\n' .format(
             self.settings_str(), 
+            0 if set_zero_costs else 
             self.sol_cost_str (cpu_cost  = self.calc_cpu_cost_in_slot_opt(),
-                               link_cost = self.calc_link_cost_in_slot_opt()
-                               ,mig_cost  = self.calc_mig_cost_in_slot_opt())))
+                               link_cost = self.calc_link_cost_in_slot_opt(),
+                               mig_cost  = self.calc_mig_cost_in_slot_opt()))) 
 
     # Print a solution for the problem to the output res file when the solver is an algorithm (not an LP solver)  
     print_sol_res_line_alg = lambda self, output_file: printf (output_file, '{} | {} | num_usrs={} | num_crit_n_new_usrs={} | resh={}\n' .format(
@@ -302,7 +306,7 @@ class SFC_mig_simulator (object):
             model.addLConstr (grb.LinExpr([d_var.usr.B[d_var.lvl] for d_var in d_vars_of_this_srvr], [d_var.grb_var for d_var in d_vars_of_this_srvr]), sense=grb.GRB.LESS_EQUAL, rhs=self.G.nodes[s]['RCs'])
         
         if (self.mode=='optInt'): # limit the sol time for the int solution. We don't limit the time of the fractional sol'
-            model.Params.timeLimit = self.opt_time_limit
+            model.Params.timeLimit = self.max_sol_time
         model.setParam('OutputFlag', 0)
         model.optimize()
         grb_stts = model.getAttr('Status')
@@ -313,31 +317,43 @@ class SFC_mig_simulator (object):
                 self.stts = sccs 
             elif (grb_stts==grb.GRB.SUBOPTIMAL):
                 self.stts = sub_optimal
+            elif (grb_stts==grb.GRB.TIME_LIMIT):
+                if (model.getAttr('solCount')>0):
+                    self.stts = time_limit_feasible
+                else:
+                    self.stts = time_limit_infeasible
             else: 
                 self.stts = fail # or (grb_stts==grb.GRB.TIME_LIMIT ands )
         
-        if (self.stts==sccs):
+        if (self.stts in [sccs, sub_optimal, time_limit_feasible]):
             for d in self.d_vars:
                 d.val = d.grb_var.x
 
         # print the solution to the output, according to the desired self.verbose level
         if (VERBOSE_RES in self.verbose):
-            if (self.stts in [sccs, sub_optimal]):
+            if (self.stts in [sccs, sub_optimal, time_limit_feasible]):
                 self.print_sol_res_line_opt (output_file=self.res_file)
                 sol_cost_by_obj_func = model.objVal
                 if (VERBOSE_DEBUG in self.verbose): 
                     self.compare_obj_func_n_direct_cost (sol_cost_by_obj_func)
         
             else:
-                print  ('// Gurobi status={}\n' .format (grb_stts))
-                printf (self.res_file, '// Gurobi status={}\n' .format (grb_stts))
-                exit ()
+                self.print_sol_res_line_opt (output_file=self.res_file, set_zero_costs=True)
+                if (self.stts==fail):
+                    print  ('no feasible sol')
+                elif (self.stts==time_limit_infeasible):
+                    print ('did not find a feasible sol within time limit of {}s' .format (self.max_sol_time))
+                else:
+                    print ('unknown status. exiting')
+                if (not (VERBOSE_CALC_RSRC_AUG in self.verbose)):
+                    exit ()
     
         if (VERBOSE_SOL_TIME in self.verbose and self.stts==fail):
-            print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time. Writing avg run time so far to .res, and exiting' .format (self.t))
+            print ('t={}. Did not find a feasilbe sol at a run for calculating avg sol time.' .format (self.t))
             if (not (self.is_first_t)): # there are previous slots, where Gurobi successfully solved (and measured sol time)
                 self.post_processing ()
-            exit ()
+            if (not(VERBOSE_CALC_RSRC_AUG in self.verbose)):
+                exit ()
         return self.stts
 
     def solve_by_plp (self):
@@ -1001,7 +1017,7 @@ class SFC_mig_simulator (object):
         """
         
         self.use_Gurobi  = True # When True, run 'opt' using Gurobi solver
-        self.opt_time_limit = 600.0 # time limit for optimal feasible sol [sec]
+        self.max_sol_time = 1 #120 #900.0 #600.0 # time limit for optimal feasible sol [sec]
 
         self.use_selective_push_up = True # When True, run also the "push-up" alg' after every successful run of the "bottom-up" stage 
         self.seed                       = seed
@@ -1033,9 +1049,9 @@ class SFC_mig_simulator (object):
 
         # Set the upper limit of the binary search. Running opt is much slower, and usually doesn't require much rsrc aug', and therefore we may set for it lower value.
         if (self.mode == 'opt'):
-            self.max_R = 1.05 
+            self.max_R = 1.2 
         if (self.mode == 'optInt'):
-            self.max_R = 1.6 
+            self.max_R = 1.01 
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
         elif (self.mode in ['ms']):   
@@ -1165,7 +1181,7 @@ class SFC_mig_simulator (object):
                     self.sol_time_at_slot.append (sol_time)
                     printf (self.res_file, '// Solved in {:.3f}. Avg sol time={:.2f} [sec]\n' .format (sol_time, np.average (self.sol_time_at_slot))) 
 
-                if (self.stts!=sccs and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
+                if (not (self.stts in [sccs, sub_optimal, time_limit_feasible]) and VERBOSE_CALC_RSRC_AUG in self.verbose): # opt failed at this slot, but a binary search was requested. Begin a binary search, to find the lowest cpu cap' that opt needs for finding a feasible sol' for this slot. 
 
                     [self.lb, self.ub] = [self.cpu_cap_at_leaf, self.cpu_cap_at_leaf * self.max_R]
                     while True:
@@ -1964,12 +1980,16 @@ class SFC_mig_simulator (object):
 
         print ('Running run_prob_of_RT_sim')
         output_file = self.gen_RT_prob_sim_output_file (poa2cell_file_name, poa_file_name, mode='opt')
-        min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
-                               'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}} 
+        if (mode=='opt'):
+            min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89, 0.1 : 89, 0.2 : 89, 0.3 : 89, 0.4 : 89, 0.5 : 98, 0.6 : 98, 0.7 : 130, 0.8 : 144, 0.9 : 158, 1.0 : 171},
+                                   'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}} 
+        else:
+            min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89,  0.1 : 89,  0.2 : 89,  0.3 : 93,  0.4 : 89,  0.5 : 98,   0.6 : 98,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
+                                   'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}}             
         probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
-        cpu_cap_at_leaf = min_cpu_cap_at_leaf[self.city][0.0]     
+        cpu_cap_at_leaf = min_cpu_cap_at_leaf[self.city][prob]     
         for prob_of_target_delay in probabilities: 
-            cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=min (cpu_cap_at_leaf, min_cpu_cap_at_leaf[self.city][prob_of_target_delay]), prob_of_target_delay=prob_of_target_delay)
+            cpu_cap_at_leaf = self.binary_search_opt(output_file=output_file, cpu_cap_at_leaf=min (cpu_cap_at_leaf, min_cpu_cap_at_leaf[self.city][prob_of_target_delay]), prob_of_target_delay=prob_of_target_delay, mode=mode)
             self.print_sol_res_line (output_file)
     
 #######################################################################################################################################
@@ -2029,7 +2049,7 @@ def run_prob_of_RT_sim (city, mode, prob=None):
         poa_file_name      = 'Lux_0820_0830_1secs_post.poa' 
         poa2cell_file_name = 'Lux.post.antloc_256cells.poa2cell'
 
-    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[], poa2cell_file_name=poa2cell_file_name)
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES, VERBOSE_SOL_TIME], poa2cell_file_name=poa2cell_file_name)
     if (mode in ['opt', 'optInt']):
         my_simulator.run_prob_of_RT_sim_opt   (poa_file_name=poa_file_name, poa2cell_file_name=poa2cell_file_name, prob=prob, mode=mode)
     else:
@@ -2111,13 +2131,13 @@ if __name__ == "__main__":
 
     
     city = 'Lux'
-    run_prob_of_RT_sim (city=city, mode='optInt', prob=0.3)
+    # run_prob_of_RT_sim (city=city, mode='optInt', prob=0.3)
 
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-    #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
-    #                                   verbose=[VERBOSE_RES])
-    #
-    # my_simulator.simulate (mode = 'optInt', cpu_cap_at_leaf=137)
+    my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+                                      poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
+                                      verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+    
+    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=94, sim_len_in_slots=60)
 #
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 

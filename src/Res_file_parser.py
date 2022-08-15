@@ -431,14 +431,18 @@ class Res_file_parser (object):
             self.dict = None
             return
 
+        stts = int (splitted_settings [stts_idx].split("stts")[1])
         self.dict = {
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
             "mode"      : splitted_settings      [mode_idx],
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
             "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
             "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
-            "stts"      : int   (splitted_settings [stts_idx].split("stts")[1]),
+            "stts"      : stts,
         }
+        
+        if (stts!=1): # if the run failed, the other fields are irrelevant
+            return
 
         if (parse_cost):
             self.dict["cost"] = float (splitted_line[4].split("=")[1])

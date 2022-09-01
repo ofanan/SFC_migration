@@ -2137,7 +2137,7 @@ if __name__ == "__main__":
                                       poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
                                       verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
     
-    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=94, sim_len_in_slots=60)
+    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=94)
 #
     # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
 

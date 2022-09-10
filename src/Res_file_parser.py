@@ -125,6 +125,7 @@ class Res_file_parser (object):
 
         self.legend_entry_dict = {'opt'     :  'LBound', 
                                   'ourAlg'  : 'BUPU', 
+                                  'Async'   : 'Async', 
                                   'ffit'    : 'F-Fit', #\\ffit',
                                   'cpvnf'   : 'CPVNF', #\cpvnf'}
                                   'ms'      : 'MultiScaler',
@@ -134,6 +135,7 @@ class Res_file_parser (object):
 
         self.color_dict       = {'opt'    : 'green',
                                 'ourAlg'  : 'purple',
+                                'Async'   : 'brown',
                                 'ffit'    : 'blue',
                                 'cpvnf'   : 'black',
                                 'ourAlgC' : 'purple',
@@ -143,6 +145,7 @@ class Res_file_parser (object):
         
         self.markers_dict     = {'opt'    : 'x',
                                 'ourAlg'  : 'o',
+                                'Async'   : 'v',
                                 'ffit'    : '^',
                                 'cpvnf'   : 's',
                                 'ourAlgC' : 'h',
@@ -379,9 +382,15 @@ class Res_file_parser (object):
         return np.array(vec)
 
 
-    def parse_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False, time_slot_len=None):
+    def parse_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False, time_slot_len=None, ignore_worse_lines=False):
         """
         Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
+        Inputs:
+        parse_cost - when true, parse and save a field also for the total cost.
+        parse_cost_comp - when true, parse and save a field also for the cost's component (cpu, link, mig).
+        parse_num_usrs - when true, parse and save a field also for the the overall number of the usrs, and the num of crit' usrs.
+        parse_crit_len - when true, increase the relevant counters counting the number of chains with the length of duration of being critical.
+        ignore_worse_lines - when true, ignore a line for which prob=p, seed=sd, and cpu=c if there already exists an entry with prob=p, seed=sd and cpu<c 
         """
         
         self.city = parse_city_from_input_file_name(input_file_name)
@@ -404,9 +413,15 @@ class Res_file_parser (object):
             self.parse_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs, parse_crit_len=parse_crit_len)
             if (self.dict==None): # No new data from this line
                 continue
+            if (ignore_worse_lines):
+                list_of_dict = [item for item in self.list_of_dicts if 
+                                (item['prob']==self.dict['prob'] and item['t']==self.dict['t'] and item['seed']==self.dict['seed'] and item['cpu']<=self.dict['cpu'])]
+                if (len(list_of_dict)>0):
+                    continue
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
 
+        print ('len of list of dicts={}' .format (len(self.list_of_dicts)))
         self.input_file.close
 
 
@@ -414,11 +429,11 @@ class Res_file_parser (object):
         """
         Parse a line in a ".res" result file, and save the parsed data in the dictionary self.dict. 
         Such a line should begin with a string having several fields, detailing the settings.
-        Inpust:
+        Inputs:
         parse_cost - when true, parse and save a field also for the total cost.
         parse_cost_comp - when true, parse and save a field also for the cost's component (cpu, link, mig).
         parse_num_usrs - when true, parse and save a field also for the the overall number of the usrs, and the num of crit' usrs.
-        parse_crit_len - when true, increase the relevant counters counting the number of chains with the length of duration of being critical. 
+        parse_crit_len - when true, increase the relevant counters counting the number of chains with the length of duration of being critical.
         """
 
         splitted_line = line.split (" | ")
@@ -550,7 +565,8 @@ class Res_file_parser (object):
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         self.set_plt_params ()
         _, ax = plt.subplots()
-        modes = ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        modes = ['opt', 'ourAlg', 'Async'] 
+        # modes = ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -1164,14 +1180,6 @@ class Res_file_parser (object):
             
         return pcl_output_file_name
  
-    def gen_RT_prob_sim_res_file (self, t):
-        """
-        Generate a ".res" file which contains, for each RT prob' and seed, a single ".res" line, specifying the minimum cpu required for obtaining a feasible sol' for this prob', for each time slot up to the given time 't' using that seed.
-        """
-        seeds = [item['seed'] for item in self.list_of_dicts]
-        print ('yalla hapoel')
-        
- 
 def plot_num_crit_n_mig_vs_num_vehs (city, reshuffle):
     """
     Generate a plot of the number of critical chains, and number of migrated chains vs. the number of vehs. 
@@ -1250,19 +1258,15 @@ def plot_cost_vs_rsrc (city):
         pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
     # pcl_input_file_name = 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
     my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_input_file_name)
-    
-def shrink_RT_prob_sim_res_file (input_file_name, t=30599):
-    """
-    Receive as input a ".res" file, which may contain times other than t (the last time period in the sim), and results of multiple successful run.
-    Generates an output file, and Writes to it for each seed only the minimal cpu for which this cpu successfully runs over the whole trace.
-    """
-    my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file (input_file_name=input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
-    my_res_file_parser.gen_RT_prob_sim_res_file (t=t)
-     
+       
 if __name__ == '__main__':
 
-    shrink_RT_prob_sim_res_file (input_file_name='RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    city = 'Lux'
+    filename = 'Lux_RtProb_1secs.res'
+    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', ignore_worse_lines=True)
+    my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
+    my_res_file_parser.plot_RT_prob_sim_python ()
     # city = 'Monaco'
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     

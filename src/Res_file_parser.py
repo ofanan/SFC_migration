@@ -536,6 +536,7 @@ class Res_file_parser (object):
     #
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
+     
     def plot_RT_prob_sim_python (self, input_file_name=None, reshuffle=True):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
@@ -1163,6 +1164,14 @@ class Res_file_parser (object):
             
         return pcl_output_file_name
  
+    def gen_RT_prob_sim_res_file (self, t):
+        """
+        Generate a ".res" file which contains, for each RT prob' and seed, a single ".res" line, specifying the minimum cpu required for obtaining a feasible sol' for this prob', for each time slot up to the given time 't' using that seed.
+        """
+        seeds = [item['seed'] for item in self.list_of_dicts]
+        print ('yalla hapoel')
+        
+ 
 def plot_num_crit_n_mig_vs_num_vehs (city, reshuffle):
     """
     Generate a plot of the number of critical chains, and number of migrated chains vs. the number of vehs. 
@@ -1242,10 +1251,20 @@ def plot_cost_vs_rsrc (city):
     # pcl_input_file_name = 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
     my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_input_file_name)
     
+def shrink_RT_prob_sim_res_file (input_file_name, t=30599):
+    """
+    Receive as input a ".res" file, which may contain times other than t (the last time period in the sim), and results of multiple successful run.
+    Generates an output file, and Writes to it for each seed only the minimal cpu for which this cpu successfully runs over the whole trace.
+    """
+    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser.parse_file (input_file_name=input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+    my_res_file_parser.gen_RT_prob_sim_res_file (t=t)
+     
 if __name__ == '__main__':
 
-    city = 'Monaco'
-    plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+    shrink_RT_prob_sim_res_file (input_file_name='RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+    # city = 'Monaco'
+    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     
     # my_res_file_parser = Res_file_parser ()
     # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])

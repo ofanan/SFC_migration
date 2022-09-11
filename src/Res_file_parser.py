@@ -415,8 +415,11 @@ class Res_file_parser (object):
                 continue
             if (ignore_worse_lines):
                 list_of_dict = [item for item in self.list_of_dicts if 
-                                (item['prob']==self.dict['prob'] and item['t']==self.dict['t'] and item['seed']==self.dict['seed'] and item['cpu']<=self.dict['cpu'])]
-                if (len(list_of_dict)>0):
+                                (item['mode']==self.dict['mode'] and item['prob']==self.dict['prob'] and item['t']==self.dict['t'] and item['seed']==self.dict['seed'])]
+                if (len(list_of_dict)>0): # there's already an item with the same mode, prob, t and seed in list_of_dicts
+                    list_of_dict[0]['cpu'] = min (list_of_dict[0]['cpu'], self.dict['cpu'])
+                    # if (self.dict['prob']==0.3 and self.dict['seed']==14):
+                    #     print ('dummy')
                     continue
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
@@ -477,7 +480,7 @@ class Res_file_parser (object):
             for crit_len in range (1, len(splitted_line)):
                 self.crit_len_cnt[crit_len] += int (splitted_line[crit_len].split('=')[1])
             
-    def gen_filtered_list (self, list_to_filter, min_t = -1, max_t = float('inf'), prob=None, mode = None, cpu = None, stts = -1):
+    def gen_filtered_list (self, list_to_filter, min_t=-1, max_t=float('inf'), prob=None, mode=None, cpu=None, stts=-1, seed=None):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
         The function filters by some parameter only if this parameter is given an input value > 0.
@@ -491,6 +494,8 @@ class Res_file_parser (object):
             list_to_filter = list (filter (lambda item : item['prob'] == prob, list_to_filter))    
         if (stts != -1):
             list_to_filter = list (filter (lambda item : item['stts'] == stts, list_to_filter))
+        if (seed != None):
+            list_to_filter = list (filter (lambda item : item['seed'] == seed, list_to_filter))
         return list_to_filter
 
     def print_single_tikz_plot (self, list_of_dict, key_to_sort, addplot_str = None, add_legend_str = None, legend_entry = None, y_value = 'cost'):
@@ -582,12 +587,17 @@ class Res_file_parser (object):
             for x_val in x: # for each concrete value in the x vector
                 
                 samples = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
+                if (mode not in ['opt', 'ourAlg', 'ourAlgC'] and len(samples)<20):
+                    print ('Note: mode={}, x={}, num of samples is only {}' .format (mode, x_val, len(samples)))
                 avg = np.average(samples)
                 
                 [y_lo, y_hi] = self.conf_interval (samples, avg)
                 
                 if (x_val==0.3 and mode in ['ffit', 'cpvnf', 'ms', 'ourAlgC']):
                     print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
+
+                if (mode in ['Async']):
+                    print ('x={}, y_lo={:.1f}, y_hi={:.1f}' .format (x_val, y_lo, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 

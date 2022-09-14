@@ -13,3 +13,4 @@ alias commit='c; git add -A; git commit'
 source .alias_pusher.txt
 alias compush='c; commit; pusher'
 #alias pullres='scp icohen@legionlogin.polito.it:/home/icohen/SFC_migration/res/*.res 'C:/Users/ofana/Google Drive/sharedResults'
+alias gitter='git stash; git pull https://github.com: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@github.com/ofanan/SFC_migration.git HEAD:main'

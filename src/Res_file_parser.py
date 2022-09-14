@@ -124,7 +124,8 @@ class Res_file_parser (object):
                                   'cpvnf'  : self.add_plot_cpvnf}
 
         self.legend_entry_dict = {'opt'     :  'LBound', 
-                                  'ourAlg'  : 'BUPU', 
+                                  'ourAlg'  : 'BUPUfullOld', 
+                                  'SyncPartResh' : 'BUPU',
                                   'Async'   : 'Async', 
                                   'ffit'    : 'F-Fit', #\\ffit',
                                   'cpvnf'   : 'CPVNF', #\cpvnf'}
@@ -134,7 +135,8 @@ class Res_file_parser (object):
                                   'cpvnfC'  : 'CPVNFmoc'} #\cpvnf'}
 
         self.color_dict       = {'opt'    : 'green',
-                                'ourAlg'  : 'purple',
+                                'ourAlg'  : 'yellow',
+                                'SyncPartResh' : 'purple',
                                 'Async'   : 'brown',
                                 'ffit'    : 'blue',
                                 'cpvnf'   : 'black',
@@ -145,6 +147,7 @@ class Res_file_parser (object):
         
         self.markers_dict     = {'opt'    : 'x',
                                 'ourAlg'  : 'o',
+                                'SyncPartResh' : 'o',
                                 'Async'   : 'v',
                                 'ffit'    : '^',
                                 'cpvnf'   : 's',
@@ -570,8 +573,8 @@ class Res_file_parser (object):
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         self.set_plt_params ()
         _, ax = plt.subplots()
-        modes = ['opt', 'ourAlg', 'Async'] 
-        # modes = ['opt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        # modes = ['opt', 'ourAlg', 'Async', 'SyncPartResh'] 
+        modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -587,17 +590,17 @@ class Res_file_parser (object):
             for x_val in x: # for each concrete value in the x vector
                 
                 samples = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
-                if (mode not in ['opt', 'ourAlg', 'ourAlgC'] and len(samples)<20):
-                    print ('Note: mode={}, x={}, num of samples is only {}' .format (mode, x_val, len(samples)))
+                # if (mode not in ['opt', 'ourAlg', 'ourAlgC'] and len(samples)<20):
+                    # print ('Note: mode={}, x={}, num of seeds is only {}. seeds are: {}' .format (mode, x_val, len(samples), [item['seed'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]))
                 avg = np.average(samples)
                 
                 [y_lo, y_hi] = self.conf_interval (samples, avg)
                 
-                if (x_val==0.3 and mode in ['ffit', 'cpvnf', 'ms', 'ourAlgC']):
-                    print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
+                # if (x_val==0.3 and mode in ['ffit', 'cpvnf', 'ms', 'ourAlgC']):
+                #     print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
 
-                if (mode in ['Async']):
-                    print ('x={}, y_lo={:.1f}, y_hi={:.1f}' .format (x_val, y_lo, y_hi))
+                if (mode in ['SyncPartResh', 'Async']):
+                    print ('mode={}. x={}, y_lo={:.1f}, y_hi={:.1f}' .format (mode, x_val, y_lo, y_hi))
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 
@@ -607,7 +610,7 @@ class Res_file_parser (object):
         plt.xlabel('Fraction of RT Chains')
         plt.ylabel('Min CPU at Leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
-        plt.xlim (0,1)
+        plt.xlim (0, 1) #(-0.04,1.04)
         plt.ylim (0, 33 if self.city=='Lux' else 230)
             
         plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
@@ -1271,10 +1274,11 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Lux'
-    filename = 'Lux_RtProb_1secs.res'
+    city = 'Monaco'
+    filename = '{}_RtProb_1secs.res' .format (city) 
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', ignore_worse_lines=True)
+    # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', ignore_worse_lines=True)
+    my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', ignore_worse_lines=True)
     my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
     my_res_file_parser.plot_RT_prob_sim_python ()
     # city = 'Monaco'

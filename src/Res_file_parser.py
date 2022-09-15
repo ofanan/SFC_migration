@@ -1280,7 +1280,7 @@ if __name__ == '__main__':
 
     city = 'Lux'
     # filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
-    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city) 
+    pcl_input_file_name = 'pcl_files/{}_RtProb_0820_0830_1secs.pcl' .format (city) 
     my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
     # my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)

@@ -3,9 +3,9 @@
 This project simulates deployment and migration of Service Function Chains (SFC) in data-centers.
 The projects includes:
 - Parsing of real-world antenna location files. 
-- Simulating users mobility of using SUMO.
+- Simulating users mobility using [SUMO](https://sumo.dlr.de/docs/index.html).
 - Implementation of a provably-optimal CPU allocation algorithm.
-- Implementation of several greedy VM placement algorithm, as well as a Linear-Program relaxation for the VM placement problem (which is NP-hard).
+- Implementation of several greedy VM placement algorithms, as well as a Linear-Program relaxation for the VM placement problem (which is NP-hard).
 - A wide range of statistics and performance analysis tools.
 
 For more details, please see the pre-print paper:

@@ -1950,9 +1950,9 @@ class SFC_mig_simulator (object):
                     self.binary_search_algs(output_file=output_file, mode=mode, cpu_cap_at_leaf=min_cpu_cap_at_leaf_alg[self.city][prob_of_target_delay], prob_of_target_delay=prob_of_target_delay, seed=seed)
 
         elif (mode=='SyncPartResh'):
-            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 103, 0.6 : 137, 0.7 : 146, 0.8 : 146, 0.9 : 162, 1.0 : 172},
-                                       'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 868, 0.5 : 1063, 0.6 : 1283, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}}
-            print ('Sorry, mode SyncPartResh is currently supported only by Omnet.')
+            min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 94, 0.1 : 94, 0.2 : 94, 0.3 : 94, 0.4 : 94, 0.5 : 102, 0.6 : 111, 0.7 : 136, 0.8 : 146, 0.9 : 162, 1.0 : 171},
+                                       'Monaco' : {0.0 : 838, 0.1 : 838, 0.2 : 838, 0.3 : 842, 0.4 : 867, 0.5 : 1063, 0.6 : 1292, 0.7 : 1508, 0.8 : 1709, 0.9 : 1989, 1.0 : 2192}}
+            print ('Sorry, mode SyncPartResh is currently supported only by Omnet. You may see here the min_cpu values')
 
         elif (mode in ['ms']):
             min_cpu_cap_at_leaf_alg = {'Lux'    : {0.0 : 120, 0.1  :121, 0.2 : 125, 0.3 : 120, 0.4 : 128, 0.5 : 128,  0.6 : 137,  0.7 : 137,  0.8 : 138,  0.9  : 141,  1.0 : 144},

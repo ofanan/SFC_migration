@@ -427,7 +427,6 @@ class Res_file_parser (object):
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
 
-        print ('len of list of dicts={}' .format (len(self.list_of_dicts)))
         self.input_file.close
 
 
@@ -560,7 +559,7 @@ class Res_file_parser (object):
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
      
-    def plot_RT_prob_sim_python (self, input_file_name=None, reshuffle=True):
+    def plot_RT_prob_sim_python (self, pcl_input_file_name=None, res_input_file_name=None, reshuffle=True):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         Show the conf' intervals.
@@ -568,8 +567,13 @@ class Res_file_parser (object):
         If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
         """
         
-        if (input_file_name != None):
-            self.parse_file(input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+        if (pcl_input_file_name != None):
+            self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            self.city = parse_city_from_input_file_name (pcl_input_file_name)
+            input_file_name = pcl_input_file_name.split('.pcl')[0]            
+        if (res_input_file_name != None):
+            self.parse_file(res_input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+            input_file_name = res_input_file_name.split('.res')[0]            
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         self.set_plt_params ()
         _, ax = plt.subplots()
@@ -1274,14 +1278,13 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Monaco'
-    filename = '{}_RtProb_1secs.res' .format (city) 
+    city = 'Lux'
+    # filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
+    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city) 
     my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.parse_file ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', ignore_worse_lines=True)
-    my_res_file_parser.parse_file ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', ignore_worse_lines=True)
-    my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
-    my_res_file_parser.plot_RT_prob_sim_python ()
-    # city = 'Monaco'
+    # my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
+    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)
+    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     
     # my_res_file_parser = Res_file_parser ()

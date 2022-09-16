@@ -143,12 +143,12 @@ class Res_file_parser (object):
                                 'ourAlgC' : 'purple',
                                 'ffitC'   : 'blue',
                                 'cpvnfC'  : 'black',
-                                'ms'      : 'firebrick'}
+                                'ms'      : 'yellow'}
         
         self.markers_dict     = {'opt'    : 'x',
-                                'ourAlg'  : 'o',
+                                'ourAlg'  : 'v',
                                 'SyncPartResh' : 'o',
-                                'Async'   : 'v',
+                                'Async'   : '*',
                                 'ffit'    : '^',
                                 'cpvnf'   : 's',
                                 'ourAlgC' : 'h',
@@ -204,12 +204,17 @@ class Res_file_parser (object):
 
         plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
 
-    def dump_self_list_of_dicts_to_pcl (self, res_file_name):
+    def dump_self_list_of_dicts_to_pcl (self, res_file_name=None):
         """
-        Dump all the data within self.list_of_dicts into a .pcl file, whose name (excluding extenstion) is the same as the given res_file_name
-        """             
-        with open('../res/{}.pcl' .format (res_file_name.split('.res')[0]), 'wb') as pcl_file:
+        1. Parse the given res_file_name.
+        2. Dump all the data within self.list_of_dicts into a .pcl file, whose name (excluding extenstion) is the same as the given res_file_name
+        """
+        if (res_file_name==None):
+            res_file_name = self.input_file_name
+        pcl_full_path_file_name = '../res/pcl_files/{}.pcl' .format (res_file_name.split('.res')[0])
+        with open(pcl_full_path_file_name, 'wb') as pcl_file:
             pickle.dump(self.list_of_dicts, pcl_file)
+        return pcl_full_path_file_name
       
     def plot_num_crit_n_mig_vs_num_vehs (self, cpu, reshuffle, res_file_to_parse=None, pcl_input_file_name=None):
         """
@@ -577,8 +582,8 @@ class Res_file_parser (object):
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         self.set_plt_params ()
         _, ax = plt.subplots()
-        # modes = ['opt', 'ourAlg', 'Async', 'SyncPartResh'] 
-        modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        modes = ['opt', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -1279,12 +1284,12 @@ def plot_cost_vs_rsrc (city):
 if __name__ == '__main__':
 
     city = 'Monaco'
-    # filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
-    pcl_input_file_name = 'pcl_files/{}_RtProb_0820_0830_1secs.pcl' .format (city) 
+    filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
+    # pcl_input_file_name = 'pcl_files/{}_RtProb_0820_0830_1secs.pcl' .format (city) 
     my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
-    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name)
+    my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
+    pcl_file_name = my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)
+    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_file_name)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     
     # my_res_file_parser = Res_file_parser ()

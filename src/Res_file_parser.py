@@ -123,39 +123,61 @@ class Res_file_parser (object):
                                   'ffit'   : self.add_plot_ffit,
                                   'cpvnf'  : self.add_plot_cpvnf}
 
-        self.legend_entry_dict = {'opt'     :  'LBound', 
-                                  'ourAlg'  : 'BUPUfullOld', 
-                                  'SyncPartResh' : 'BUPU',
-                                  'Async'   : 'Async', 
-                                  'ffit'    : 'F-Fit', #\\ffit',
-                                  'cpvnf'   : 'CPVNF', #\cpvnf'}
-                                  'ms'      : 'MultiScaler',
-                                  'ourAlgC' : 'BUPUmoc', 
-                                  'ffitC'   : 'F-Fitmoc', #\\ffit',
-                                  'cpvnfC'  : 'CPVNFmoc'} #\cpvnf'}
+        # # List of algorithms' names, used in the plots' legend, for the centralized case
+        # self.legend_entry_dict = {'opt'     :  'LBound', 
+                                  # 'ourAlg'  : 'BUPUfullOld', 
+                                  # 'SyncPartResh' : 'BUPU',
+                                  # 'ffit'    : 'F-Fit', 
+                                  # 'cpvnf'   : 'CPVNF', 
+                                  # 'ms'      : 'MultiScaler',
+                                  # 'ourAlgC' : 'BUPUmoc', 
+                                  # 'ffitC'   : 'F-Fitmoc', 
+                                  # 'cpvnfC'  : 'CPVNFmoc'} 
 
+        # List of algorithms' names, used in the plots' legend, for the dist' case
+        self.legend_entry_dict = {'opt'     :  'LBound', 
+                                  'SyncPartResh' : 'Centralized',
+                                  'Async'   : 'Distributed', 
+                                  'ffit'    : 'F-Fit',
+                                  'cpvnf'   : 'CPVNF',
+                                  'ms'      : 'MultiScaler'}
+
+        # # The colors used for each alg's plot, in the centralized case
+        # self.color_dict       = {'opt'    : 'green',
+                                # 'ourAlg'  : 'yellow',
+                                # 'SyncPartResh' : 'purple',
+                                # 'ffit'    : 'blue',
+                                # 'cpvnf'   : 'black',
+                                # 'ourAlgC' : 'purple',
+                                # 'ffitC'   : 'blue',
+                                # 'cpvnfC'  : 'black',
+                                # 'ms'      : 'yellow'}
+        
+        # The colors used for each alg's plot, in the dist' case
         self.color_dict       = {'opt'    : 'green',
-                                'ourAlg'  : 'yellow',
                                 'SyncPartResh' : 'purple',
                                 'Async'   : 'brown',
                                 'ffit'    : 'blue',
-                                'cpvnf'   : 'black',
-                                'ourAlgC' : 'purple',
-                                'ffitC'   : 'blue',
-                                'cpvnfC'  : 'black',
-                                'ms'      : 'yellow'}
+                                'cpvnf'   : 'black'}
+
+        # # The markers used for each alg', in the centralized case
+        # self.markers_dict     = {'opt'    : 'x',
+                                # 'ourAlg'  : 'v',
+                                # 'SyncPartResh' : 'o',
+                                # 'ffit'    : '^',
+                                # 'cpvnf'   : 's',
+                                # 'ourAlgC' : 'h',
+                                # 'ffitC'   : 'v',
+                                # 'cpvnfC'  : 'd',
+                                # 'ms'      : 'v'}
         
+        # The markers used for each alg', in the dist' case
         self.markers_dict     = {'opt'    : 'x',
-                                'ourAlg'  : 'v',
                                 'SyncPartResh' : 'o',
-                                'Async'   : '*',
+                                'Async'   : 'v',
                                 'ffit'    : '^',
                                 'cpvnf'   : 's',
-                                'ourAlgC' : 'h',
-                                'ffitC'   : 'v',
-                                'cpvnfC'  : 'd',
                                 'ms'      : 'v'}
-        
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
     def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None): 

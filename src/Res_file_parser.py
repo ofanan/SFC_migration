@@ -658,6 +658,7 @@ class Res_file_parser (object):
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
         and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
+        modes = ['opt', 'SyncPartResh', 'Async'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
         if (pcl_input_file_name==None):
             pcl_input_file_name='{}_{}cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city, 'dist_' if dist else '')
 
@@ -679,13 +680,10 @@ class Res_file_parser (object):
             X_norm_factor = 1
 
         list_of_avg_vals = []        
-        
-        if (dist):
-            printf (self.output_file, 'cpu   &opt & SyncPartResh & Async')        
-        else:
-            printf (self.output_file, 'cpu   &opt &optG & optInt   & SyncPartResh & MS        & F-Fit        & CPVNF')        
+
+        title = 'cpu   &opt & SyncPartResh & Async' if dist else 'cpu   &opt &optG & optInt   & SyncPartResh & MS        & F-Fit        & CPVNF' 
+        printf (self.output_file, title)         
             
-        modes = ['opt', 'SyncPartResh', 'Async'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
         for mode in modes:
             
             mode_list = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
@@ -1330,10 +1328,11 @@ if __name__ == '__main__':
 
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
-    res_input_file_name='{}_dist_0820_0830_1secs_p0.3.res' .format (city)
+    res_input_file_name = '{}_dist_0820_0830_1secs_p0.3_Async.res' .format (city)
+    pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
     my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
     # pcl_input_file_name='{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
+    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=[res_input_file_name])
     my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
     # my_res_file_parser = Res_file_parser ()
     # # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)

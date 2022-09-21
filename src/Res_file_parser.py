@@ -233,10 +233,11 @@ class Res_file_parser (object):
         """
         if (res_file_name==None):
             res_file_name = self.input_file_name
-        pcl_full_path_file_name = '../res/pcl_files/{}.pcl' .format (res_file_name.split('.res')[0])
+        pcl_output_file_name = '{}.pcl' .format (res_file_name.split('.res')[0])
+        pcl_full_path_file_name = '../res/pcl_files/{}' .format (pcl_output_file_name)
         with open(pcl_full_path_file_name, 'wb') as pcl_file:
             pickle.dump(self.list_of_dicts, pcl_file)
-        return pcl_full_path_file_name
+        return pcl_output_file_name
       
     def plot_num_crit_n_mig_vs_num_vehs (self, cpu, reshuffle, res_file_to_parse=None, pcl_input_file_name=None):
         """
@@ -246,7 +247,7 @@ class Res_file_parser (object):
         cpu - the plot will consider only result obtained using this cpu value at leaf servers.
         reshuffle - a binary variable. If true, the suffix of the generated output file is 'resh.pdf'. Else, the suffix is 'MOC.pdf' (MOC=Migrate Only Critical chains).
         res_file_to_parse - when given, the function parses this '.res' file, and then used the data for the plot.
-        pcl_input_File_name - if no res_file_to_parse is given, the function reads the input from this file name.   
+        pcl_input_file_name - if no res_file_to_parse is given, the function reads the input from this file name.   
         """
         
         if (res_file_to_parse != None):
@@ -586,16 +587,17 @@ class Res_file_parser (object):
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
      
-    def plot_RT_prob_sim_python (self, pcl_input_file_name=None, res_input_file_name=None, reshuffle=True):
+    def plot_RT_prob_sim_python (self, pcl_input_file_name=None, res_input_file_name=None, reshuffle=True, dist=False):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         Show the conf' intervals.
         When given an input file name, parse it first.
         If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
+        when 'dist' is True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project.
         """
         
         if (pcl_input_file_name != None):
-            self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            self.list_of_dicts = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
             self.city = parse_city_from_input_file_name (pcl_input_file_name)
             input_file_name = pcl_input_file_name.split('.pcl')[0]            
         if (res_input_file_name != None):
@@ -642,20 +644,26 @@ class Res_file_parser (object):
         plt.ylabel('Min CPU at Leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0, 1) #(-0.04,1.04)
-        plt.ylim (0, 33 if self.city=='Lux' else 230)
-            
-        plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
+        print ('self.city={}' .format (self.city))
+        if (dist):
+            plt.ylim (0, 18 if self.city=='Lux' else 230)
+            plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
+        else:
+            plt.ylim (0, 33 if self.city=='Lux' else 230)
+            plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
 
-    def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True):
+    def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=False, pcl_input_file_name=None):
         """
         Plot the cost as a function of the amount of resources (actually, cpu capacity at leaf).
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
         and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
-        
-        self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format ('cost_vs_rsrc_{}_0820_0830_1secs_{}_p0.3.pcl' .format (city, ISP[city])))
+        if (pcl_input_file_name==None):
+            pcl_input_file_name='{}_{}cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city, 'dist_' if dist else '')
 
-        self.output_file_name = '../res/{}_cost_vs_rsrc.dat' .format (city)
+
+        self.cost_vs_rsrc_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
+        self.output_file_name = '../res/{}_{}cost_vs_rsrc.dat' .format (city, 'dist_' if dist else '')
         self.output_file      = open (self.output_file_name, "w")
         
         if (normalize_X):
@@ -663,7 +671,7 @@ class Res_file_parser (object):
 
             cpu_vals = sorted (list (set([item['cpu'] for item in opt_list])))
             if (len (cpu_vals)==0):
-                print ('Error: you asked to normalize by optInt, but no results of optInt exist. Please add first results of optInt to the parsed input file.')
+                print ('Error: you asked to normalize by opt, but no results of opt exist. Please add first results of optInt to the parsed input file.')
                 return
             X_norm_factor = cpu_vals[0] # normalize X axis by the minimum cpu
         
@@ -672,9 +680,13 @@ class Res_file_parser (object):
 
         list_of_avg_vals = []        
         
-        printf (self.output_file, 'cpu   &opt &optG & optInt   & SyncPartResh & MS        & F-Fit        & CPVNF')        
-
-        for mode in ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']:
+        if (dist):
+            printf (self.output_file, 'cpu   &opt & SyncPartResh & Async')        
+        else:
+            printf (self.output_file, 'cpu   &opt &optG & optInt   & SyncPartResh & MS        & F-Fit        & CPVNF')        
+            
+        modes = ['opt', 'SyncPartResh', 'Async'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
+        for mode in modes:
             
             mode_list = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
             
@@ -696,11 +708,11 @@ class Res_file_parser (object):
                 list_of_val_opt = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt' and item['cpu']==cpu_val]
                 if (len(list_of_val_opt)==0):
                     continue;
-                for mode in ['optG', 'optInt', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
+                for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
                     printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
             else:
-                for mode in ['opt', 'optG', 'optInt', 'SyncPartResh', 'ms', 'ffit', 'cpvnf']:
+                for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
                     printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg'])) 
             printf (self.output_file, '\\\\ \\hline \n')
@@ -764,7 +776,7 @@ class Res_file_parser (object):
         plt.tight_layout()
         plt.savefig ('../res/cost_vs_rsrc_{}.pdf' .format (pcl_input_file_name.split('.pcl')[0]), bbox_inches='tight')
 
-    def print_cost_vs_rsrc (self, res_input_file_names=None, min_t=30001, max_t=30060, prob=0.3):
+    def print_cost_vs_rsrc (self, res_input_file_names=None, min_t=30001, max_t=30060, prob=0.3, dist=True):
         """
         print (to the screen) data about the cost as a function of the amount of resources (actually, cpu capacity at leaf), for various modes.
         * Optional inputs: 
@@ -776,7 +788,8 @@ class Res_file_parser (object):
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
-        for mode in ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']:
+        modes = ['opt', 'Async', 'SyncPartResh'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']
+        for mode in modes:
     
             cost_vs_rsrc_data_of_this_mode = []
     
@@ -794,7 +807,6 @@ class Res_file_parser (object):
     
             cpu_vals = sorted (set ([item['cpu'] for item in mode_list]))
     
-            cpu_vals = [94] if city=='Lux' else [842]
             for cpu_val in cpu_vals:  
                 
                 mode_cpu_list = list (filter (lambda item : item['cpu']==cpu_val, mode_list)) # list of results of runs for this mode, and cpu value
@@ -814,7 +826,7 @@ class Res_file_parser (object):
             #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val, cost_vs_rsrc_data_of_this_mode)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
             #     print ('cpu={}, mode={}', 'avg_cost={}' .format (list_of_item[0]['cpu'], mode, point['y_avg'])) 
 
-    def calc_cost_vs_rsrc (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3):
+    def calc_cost_vs_rsrc (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3, dist=True):
         """
         Calculate the data needed for plotting a graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Optional inputs: 
@@ -835,13 +847,14 @@ class Res_file_parser (object):
         if (pcl_input_file_name==None):
             self.cost_vs_rsrc_data = []
         else:
-            self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            self.cost_vs_rsrc_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
     
         # If the caller provided a .res input file, parse the data from it
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
-    
-        for mode in ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']:
+
+        modes = ['opt', 'Async', 'SyncPartResh'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']   
+        for mode in modes:
     
             cost_vs_rsrc_data_of_this_mode = []
     
@@ -881,7 +894,7 @@ class Res_file_parser (object):
         
         # store the data as binary data stream
         self.pcl_output_file_name = 'cost_vs_rsrc_{}.pcl' .format (self.input_file_name.split('.res')[0]) if (pcl_input_file_name==None) else pcl_input_file_name 
-        with open('../res/' + self.pcl_output_file_name, 'wb') as cost_vs_rsrc_data_file:
+        with open('../res/pcl_files/' + self.pcl_output_file_name, 'wb') as cost_vs_rsrc_data_file:
             pickle.dump(self.cost_vs_rsrc_data, cost_vs_rsrc_data_file)
         return self.pcl_output_file_name 
 
@@ -1007,14 +1020,24 @@ class Res_file_parser (object):
             pickle.dump(mig_vs_rsrc_data, mig_vs_rsrc_data_file)
         return self.pcl_output_file_name 
     
-    def gen_mig_vs_rsrc_tbl (self, city):
+    def gen_mig_vs_rsrc_tbl (self, city=None, pcl_file_name=None):
         """
         Generate a table of the number of the percentage of migrated chains that are non-critical, out of all migrated chains.
+        Input is either the city (and then, a default pcl file name is saerhced); or the pcl_file_name (in which case, the city's
+        name is parsed from the pcl_file_name).
         """
         
-        mig_vs_rsrc_data = pd.read_pickle(r'../res/{}_mig_cost_vs_rsrc.pcl' .format (city))
+        if (city==None and pcl_file_name==None):
+            print ("error: plz specify either a city and/or a pcl file name.")
+            exit ()
+        if (pcl_file_name==None):
+            pcl_file_name = '{}_mig_cost_vs_rsrc.pcl' .format (city)
+        else:
+            city = self.parse_city_from_input_file_name (pcl_file_name)
+        
+        mig_vs_rsrc_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_file_name))
+        
         # NUM_OF_SLOTS = 600
-
         CPU_VALS_NORM_FACTOR = {'Lux' : 89, 'Monaco' : 840}
         nomalized_cpu        = [item['cpu']/CPU_VALS_NORM_FACTOR[city] for item in mig_vs_rsrc_data]
         all_migs_num         = [item['y_avg']/UNIFORM_CHAIN_MIG_COST for item in mig_vs_rsrc_data]
@@ -1299,19 +1322,33 @@ def plot_cost_vs_rsrc (city):
 
     my_res_file_parser = Res_file_parser ()
     if (city=='Monaco'):
-        pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_cpvnf.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ffit.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])
-    # pcl_input_file_name = 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
+        pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res']), 
+    pcl_input_file_name = 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
     my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_input_file_name)
        
 if __name__ == '__main__':
 
     city = 'Monaco'
-    filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
-    # pcl_input_file_name = 'pcl_files/{}_RtProb_0820_0830_1secs.pcl' .format (city) 
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
-    pcl_file_name = my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_file_name)
+    res_input_file_name='{}_dist_0820_0830_1secs_p0.3.res' .format (city)
+    my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
+    # pcl_input_file_name='{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
+    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
+    my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
+    # my_res_file_parser = Res_file_parser ()
+    # # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
+
+    
+    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
+    # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
+    # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
+
+    # filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
+    # pcl_input_file_name = 'pcl_files/{}_RtProb_0820_0830_1secs.pcl' .format (city) 
+    # my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
+    # pcl_file_name = my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)
+    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name='{}_RtProb_0820_0830_1secs.pcl' .format(city), dist=True)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     
     # my_res_file_parser = Res_file_parser ()
@@ -1321,7 +1358,7 @@ if __name__ == '__main__':
     # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
     # my_res_file_parser.city = 'Lux'
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0730_0830_1secs_Telecom_SyncPartResh_mig_vs_rsrc.res'])   
+    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0730_0830_1secs_Telecom_SyncPartResh_mig_vs_rsrc.res'])   
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
     # my_res_file_parser.gen_mig_vs_rsrc_tbl (city)
     # city = 'Monaco'

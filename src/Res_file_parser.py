@@ -19,7 +19,7 @@ import pickle
 #     def _set_format(self, vmin=None, vmax=None):
 #         self.format = self.fformat
 #         if self._useMathText:
-#             self.format = r'$\mathdefault{}$' .format (self.format) 
+#             self.format = r'$\mathdefault{}$' .format (s elf.format) 
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
@@ -226,18 +226,41 @@ class Res_file_parser (object):
 
         plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
 
-    def dump_self_list_of_dicts_to_pcl (self, res_file_name=None):
+    def dump_self_list_of_dicts_to_pcl (self, pcl_input_file_name=None, res_file_name=None):
         """
-        1. Parse the given res_file_name.
-        2. Dump all the data within self.list_of_dicts into a .pcl file, whose name (excluding extenstion) is the same as the given res_file_name
+        1. Read the given .pcl file (if given)
+        2. Parse the given res_file_name.
+        3. Dump all the data within self.list_of_dicts into the a .pcl name.
+        The name of the output .pcl file is:
+        - If a res_file is given in the input: the same name as the given res_file_name.
+        - Else: the same name as the given res_file_name, but with '.pcl' instead of 'res' as an extenstion.
         """
-        if (res_file_name==None):
-            res_file_name = self.input_file_name
-        pcl_output_file_name = '{}.pcl' .format (res_file_name.split('.res')[0])
-        pcl_full_path_file_name = '../res/pcl_files/{}' .format (pcl_output_file_name)
+        
+        if (pcl_input_file_name==None and res_file_name==None):
+            print ('error: please specify either a pcl_input_file_name and/or res_file_name.')
+            exit ()
+    
+        if (pcl_input_file_name!=None and res_file_name!=None):
+            self.city = parse_city_from_input_file_name (pcl_input_file_name)
+            res_file_city = parse_city_from_input_file_name (res_file_name)
+            if (res_file_city != self.city):
+                print ('err: res_file_name={} while input_pcl_file_name={}. However, they should belong to the same city' .format (pcl_input_file_name, res_file_name))
+                exit ()
+        
+        if (pcl_input_file_name != None):
+            self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            self.city = parse_city_from_input_file_name (pcl_input_file_name)
+        
+        if (res_file_name!=None):
+            self.parse_file (input_file_name=res_file_name)
+            if (pcl_input_file_name==None):
+                pcl_full_path_file_name = '../res/pcl_files/{}.pcl' .format (res_input_file_name.split('.res')[0])
+            else:
+                pcl_full_path_file_name = '../res/pcl_files/{}' .format (pcl_input_file_name)
+                
         with open(pcl_full_path_file_name, 'wb') as pcl_file:
             pickle.dump(self.list_of_dicts, pcl_file)
-        return pcl_output_file_name
+        return pcl_input_file_name
       
     def plot_num_crit_n_mig_vs_num_vehs (self, cpu, reshuffle, res_file_to_parse=None, pcl_input_file_name=None):
         """
@@ -1245,6 +1268,19 @@ class Res_file_parser (object):
             
         return pcl_output_file_name
  
+    def erase_from_pcl (self, pcl_input_file_name, mode_to_erase='Async'):
+        """
+        Read a .pcl file, erase all the entries of a given mode, and over-write into the same .pcl file
+        """
+        
+        pcl_full_path_file_name = '../res/pcl_files/{}' .format (pcl_input_file_name)
+        self.list_of_dicts = pd.read_pickle(r'{}' .format (pcl_full_path_file_name))
+        
+        self.list_of_dicts = [item for item in self.list_of_dicts if item['mode']!='Async']
+        with open(pcl_full_path_file_name, 'wb') as pcl_file:
+            pickle.dump(self.list_of_dicts, pcl_file)
+
+
 def plot_num_crit_n_mig_vs_num_vehs (city, reshuffle):
     """
     Generate a plot of the number of critical chains, and number of migrated chains vs. the number of vehs. 
@@ -1328,26 +1364,27 @@ if __name__ == '__main__':
 
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
-    res_input_file_name = '{}_dist_0820_0830_1secs_p0.3_Async.res' .format (city)
-    pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
+    my_res_file_parser.erase_from_pcl(pcl_input_file_name='cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3.pcl')
+    
+    # res_input_file_name = '{}_0820_0830_1secs_p0.3_Async.res' .format (city)
+    # pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
+    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
     # pcl_input_file_name='{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=[res_input_file_name])
-    my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
+    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=[res_input_file_name])
+    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
     # my_res_file_parser = Res_file_parser ()
-    # # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
+    # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 
     
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
     # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
     # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
 
-    # filename = '{}_RtProb_0820_0830_1secs.res' .format (city)
-    # pcl_input_file_name = 'pcl_files/{}_RtProb_0820_0830_1secs.pcl' .format (city) 
+    # city = 'Lux'
     # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.parse_file (filename, ignore_worse_lines=True)
-    # pcl_file_name = my_res_file_parser.dump_self_list_of_dicts_to_pcl (filename)
-    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name='{}_RtProb_0820_0830_1secs.pcl' .format(city), dist=True)
+    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Lux_RtProb_0820_0830_1secs_Async.res') 
+    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     
     # my_res_file_parser = Res_file_parser ()

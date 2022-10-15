@@ -1,7 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
-# import matplotlib.ticker
-# import matplotlib.pylab as pylab
+import matplotlib.ticker
+import matplotlib.pylab as pylab
 import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 from printf import printf, printFigToPdf 
@@ -944,6 +944,7 @@ class Res_file_parser (object):
         # store the data as binary data stream
         with open('../res/pcl_files/' + pcl_output_file_name, 'wb') as comoh_data_file:
             pickle.dump(self.comoh_data, comoh_data_file)
+        
 
     
     def plot_comoh (self, pcl_input_file_name):
@@ -952,20 +953,29 @@ class Res_file_parser (object):
         """
         self.comoh_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
         
-        cpu_vals = set ([item['cpu'] for item in self.comoh_data])
+        cpu_vals = list (set ([item['cpu'] for item in self.comoh_data]))
 
         overall_nPkts = []
         for cpu_val in cpu_vals:
             cpu_val_list = [item for item in self.comoh_data if item['cpu']==cpu_val]
             nPkts_list   = [item for item in cpu_val_list if item['type']=='nPkts']
-            overall_nPkts.append (sum (item['y_avg'] for item in nPkts_list)) 
+            overall_nPkts.append (sum (item['y_avg'] for item in nPkts_list))
+
+        cpu_norm_factor = 89 if self.city=='Lux' else 840   
+        # print (cpu_vals/2)      
+        ax = plt.gca()
+        self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
+
+        # ax.plot (cpu_vals, overall_nPkts)#, color = 'black') #, marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
+ 
             # print ('overall_nPkts={}' .format (overall_nPkts))
             
-        # ax.plot (cpu_vals, overall_nPkts, color = 'black') #, marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
+        # my_plot (ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None): 
+        # ax.plot (x, m*x+b, linewidth=LINE_WIDTH_SMALL)
         # plt.xlim (0, 3600)
         # plt.ylim (0)
         # ax.legend (fontsize=22, loc='center') 
-        # plt.show ()
+        plt.show ()
 
         # plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
 

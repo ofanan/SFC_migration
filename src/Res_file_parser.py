@@ -64,7 +64,7 @@ ISP = {'Lux' : 'post', 'Monaco' : 'Telecom'}
 
 def parse_city_from_input_file_name (input_file_name): 
     """
-    Understand which city's data are these, based on the input file name
+    Find which city's data are these, based on the input file name
     """
     city = input_file_name.split ('_')[0]
     
@@ -533,6 +533,62 @@ class Res_file_parser (object):
             for crit_len in range (1, len(splitted_line)):
                 self.crit_len_cnt[crit_len] += int (splitted_line[crit_len].split('=')[1])
             
+    def parse_comoh_file (self, input_file_name, city=None, numDirections=10):
+        """
+        Parse a .comoh file (files which details the communication overhead - e.g., number and overall size of packets).
+        Inputs:
+        numDirections - the number of directions in which packets may be sent.
+        Assuming a tree whose highest level is lvlOfRoot, the directions are:
+        directions 0, 1, ..., lvlOfRoot-1 --> pkts from lvl 0, 1, ..., lvlOfRoot-1 to the level above.
+        directions lvlOfRoot, .., 2*lvlOfRoot-1--> pkts from lvl=2*lvlOfRoot-1, ..., lvlOfRoot to the level below.
+        """
+        
+        self.city = parse_city_from_input_file_name(input_file_name) if (city==None) else city 
+        print ('city is ', self.city)
+        self.input_file_name = input_file_name
+        self.input_file      = open ("../res/" + input_file_name,  "r")
+        lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
+        lines                = (line for line in lines if line)       # Discard blank lines
+        
+        for line in lines:
+        
+            # Discard lines with comments / verbose data
+            if (line.split ("//")[0] == ""):
+                continue
+           
+            splitted_line = line.split (" | ")
+             
+            settings          = splitted_line[0]
+            splitted_settings = settings.split ("_")
+    
+            if len (splitted_settings) != num_of_fields:
+                print ("encountered a forma  t error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
+                self.dict = None
+                return
+    
+            stts = int (splitted_settings [stts_idx].split("stts")[1])
+            self.dict = {
+                "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
+                "mode"      : splitted_settings      [mode_idx],
+                "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
+                "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
+                "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
+                "stts"      : stts,
+            }
+            
+            if (stts!=1): # if the run failed, the other fields are irrelevant
+                continue
+    
+            for direction  in range (numDirections): 
+                self.dict['nPkts{}'  .format (direction)] = int (splitted_line[direction+1].split("=")[1])
+                self.dict['nBytes{}' .format (direction)] = int (splitted_line[numDirections+direction+1].split("=")[1])
+
+            if (not(self.dict in self.list_of_dicts)):
+                self.list_of_dicts.append(self.dict)                
+
+        self.input_file.close
+
+
     def gen_filtered_list (self, list_to_filter, min_t=-1, max_t=float('inf'), prob=None, mode=None, cpu=None, stts=-1, seed=None):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
@@ -1364,7 +1420,12 @@ if __name__ == '__main__':
 
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.erase_from_pcl(pcl_input_file_name='cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3.pcl')
+    comoh_file = '{}.comoh' .format (city)
+    my_res_file_parser.parse_comoh_file (comoh_file, city=city)
+
+    # city = 'Monaco'
+    # my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.erase_from_pcl(pcl_input_file_name='cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3')
     
     # res_input_file_name = '{}_0820_0830_1secs_p0.3_Async.res' .format (city)
     # pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
@@ -1380,10 +1441,10 @@ if __name__ == '__main__':
     # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
     # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
 
-    # city = 'Lux'
+    # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()
     # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Lux_RtProb_0820_0830_1secs_Async.res') 
+    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Monaco_Rt_Prob_1secs.res') 
     # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     

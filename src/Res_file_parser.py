@@ -579,13 +579,14 @@ class Res_file_parser (object):
             if (stts!=1): # if the run failed, the other fields are irrelevant
                 continue
     
-            for direction  in range (numDirections): 
+            for direction in range (numDirections): 
                 self.dict['nPkts{}'  .format (direction)] = int (splitted_line[direction+1].split("=")[1])
                 self.dict['nBytes{}' .format (direction)] = int (splitted_line[numDirections+direction+1].split("=")[1])
 
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
 
+        # self.numDirections = numDirections
         self.input_file.close
 
 
@@ -903,6 +904,63 @@ class Res_file_parser (object):
             #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val, cost_vs_rsrc_data_of_this_mode)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
             #     print ('cpu={}, mode={}', 'avg_cost={}' .format (list_of_item[0]['cpu'], mode, point['y_avg'])) 
 
+    def calc_comoh (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=10):
+        """
+        Calculate the data needed for plotting a graph showing the communication overhead.
+        * Optional inputs: 
+            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
+            A list of .res files, containing the results of a run.
+            At least one file (either .pcl, or .res file) should be given       
+        * Calculate the average cost for setting. 
+        * Save the (pickled) processed data into pcl_output_file_name..
+         """
+        if (pcl_input_file_name==None and res_input_file_names==None):
+            print ('Error: calc_cost_vs_rsrc must be called with at least one input file - either a .pcl file, or a .res file')
+            return
+    
+        # If the caller provided a .pcl input file, read the data from it
+        if (pcl_input_file_name==None):
+            self.comoh_data = []
+        else:
+            self.comoh_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
+    
+        # If the caller provided a .res input file, parse the data from it
+        for file_name in res_input_file_names:
+            self.parse_comoh_file (file_name, city=city)
+
+        cpu_vals = sorted (set ([item['cpu'] for item in self.list_of_dicts]))
+
+        for cpu_val in cpu_vals:  
+            
+            res_of_this_cpu = list (filter (lambda item : item['cpu']==cpu_val, self.list_of_dicts)) #list of results of runs for this cpu value
+            
+            for direction in range(numDirections):
+                for type in ['nPkts', 'nBytes']:
+                    data_of_this_cpu_and_dir = [item['{}{}' .format (type, direction)] for item in res_of_this_cpu]
+                    cur_avg = int (round (np.average (data_of_this_cpu_and_dir)))
+                    [y_lo, y_hi] = (self.conf_interval (ar=data_of_this_cpu_and_dir, avg=cur_avg)) # low, high y values for this plotted conf' interval
+                    self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg,'num_of_seeds' : len(data_of_this_cpu_and_dir), 'type' : type, 'dir' : direction })
+                    print (self.comoh_data)
+                    exit ()
+            print (res_of_this_cpu)
+            exit ()
+            avg_cost_of_this_cpu = np.average (res_of_this_cpu)
+            [y_lo, y_hi]         = self.conf_interval (ar=res_of_this_cpu, avg=avg_cost_of_this_cpu) # low, high y values for this plotted conf' interval
+            
+            self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cost_of_this_cpu,'num_of_seeds' : len(res_of_this_cpu)})
+            print (cpu_val)
+            exit ()
+        
+        # # Add this new calculated point to the ds. Avoid duplications of points.
+        # for point in sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu']):
+        #
+        #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, self.cost_vs_rsrc_data)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
+        #     if (point not in self.cost_vs_rsrc_data and len(list_of_item)==0): # insert this new point to the list of points only if it's not already found in self.cost_vs_rsrc_data
+        #         self.cost_vs_rsrc_data.append (point)
+        #         point['mode'] = mode
+         
+
+    
     def calc_cost_vs_rsrc (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3, dist=True):
         """
         Calculate the data needed for plotting a graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
@@ -1422,6 +1480,7 @@ if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
     my_res_file_parser.parse_comoh_file (comoh_file, city=city)
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl', pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()

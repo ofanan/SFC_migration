@@ -939,7 +939,14 @@ class Res_file_parser (object):
                 for seed in seeds:
                     overall_of_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
                 avg_overall_of_this_cpu_n_type = np.average(overall_of_this_cpu_n_type)
-                print ('cpu={}, type={}, avg_overall={:.0f}' .format (cpu_val, type, avg_overall_of_this_cpu_n_type))
+                [y_lo, y_hi] = (self.conf_interval (ar=avg_overall_of_this_cpu_n_type, avg=avg_overall_of_this_cpu_n_type ))
+                self.comoh_data.append ({'cpu' : cpu_val, 
+                                         'y_lo' : y_lo, 
+                                         'y_hi' : y_hi, 
+                                         'y_avg' : avg_overall_of_this_cpu_n_type, 
+                                         'num_of_seeds' : len(seeds), 
+                                         'type' : type, 
+                                         'dir' : -1 })
             
         exit ()
             # for direction in range(numDirections):

@@ -180,18 +180,19 @@ class Res_file_parser (object):
                                 'ms'      : 'v'}
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
-    def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None): 
+    def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label=None): 
         
         """
         Plot a single x, y, python line, with the required settings (colors, markers etc).
         """ 
     
         color = self.color_dict[mode] if (color==None) else color  
+        label=self.legend_entry_dict[mode] if (label==None) else label
     
         if (mode in ['ourAlgC', 'cpvnfC', 'ffitC']):
-            ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=self.legend_entry_dict[mode], mfc='none', linestyle='dashed') 
+            ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=label, mfc='none', linestyle='dashed') 
         else:
-            ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=self.legend_entry_dict[mode], mfc='none')
+            ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=label, mfc='none')
 
 
     
@@ -966,6 +967,7 @@ class Res_file_parser (object):
         """
         Plot the comm' o/h (num of pkts / num of bytes), as a function of the cpu.
         """
+        self.set_plt_params ()
         self.comoh_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
         ax = plt.gca()
         
@@ -985,11 +987,12 @@ class Res_file_parser (object):
             ax.plot ((normalized_cpu_val ,normalized_cpu_val), (item['y_lo'], item['y_hi']), color=self.color_dict['Async']) # Plot the confidence interval
             overall_nPkts.append (item['y_avg'])
         print ('cpu_val={}, overall_nPkts={}' .format (cpu_vals, overall_nPkts))
-        self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
+        self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall # Packets') 
         plt.xlim (1, 3)
         plt.ylim (0, 3)
         plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
-        plt.ylabel('nPkts')
+        plt.ylabel('# Packets')
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
         # ax.legend (fontsize=22, loc='center') 
         plt.show ()
 

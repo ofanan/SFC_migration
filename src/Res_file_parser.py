@@ -940,26 +940,36 @@ class Res_file_parser (object):
                     cur_avg = int (round (np.average (data_of_this_cpu_and_dir)))
                     [y_lo, y_hi] = (self.conf_interval (ar=data_of_this_cpu_and_dir, avg=cur_avg)) # low, high y values for this plotted conf' interval
                     self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg,'num_of_seeds' : len(data_of_this_cpu_and_dir), 'type' : type, 'dir' : direction })
-                    print (self.comoh_data)
-                    exit ()
-            print (res_of_this_cpu)
-            exit ()
-            avg_cost_of_this_cpu = np.average (res_of_this_cpu)
-            [y_lo, y_hi]         = self.conf_interval (ar=res_of_this_cpu, avg=avg_cost_of_this_cpu) # low, high y values for this plotted conf' interval
-            
-            self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cost_of_this_cpu,'num_of_seeds' : len(res_of_this_cpu)})
-            print (cpu_val)
-            exit ()
-        
-        # # Add this new calculated point to the ds. Avoid duplications of points.
-        # for point in sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu']):
-        #
-        #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val and item['mode']==mode, self.cost_vs_rsrc_data)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
-        #     if (point not in self.cost_vs_rsrc_data and len(list_of_item)==0): # insert this new point to the list of points only if it's not already found in self.cost_vs_rsrc_data
-        #         self.cost_vs_rsrc_data.append (point)
-        #         point['mode'] = mode
-         
 
+        # store the data as binary data stream
+        with open('../res/pcl_files/' + pcl_output_file_name, 'wb') as comoh_data_file:
+            pickle.dump(self.comoh_data, comoh_data_file)
+
+    
+    def plot_comoh (self, pcl_input_file_name):
+        """
+        Plot the comm' o/h (num of pkts / num of bytes), as a function of the cpu.
+        """
+        self.comoh_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
+        
+        cpu_vals = set ([item['cpu'] for item in self.comoh_data])
+
+        overall_nPkts = []
+        for cpu_val in cpu_vals:
+            cpu_val_list = [item for item in self.comoh_data if item['cpu']==cpu_val]
+            nPkts_list   = [item for item in cpu_val_list if item['type']=='nPkts']
+            overall_nPkts.append (sum (item['y_avg'] for item in nPkts_list)) 
+            # print ('overall_nPkts={}' .format (overall_nPkts))
+            
+        # ax.plot (cpu_vals, overall_nPkts, color = 'black') #, marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
+        # plt.xlim (0, 3600)
+        # plt.ylim (0)
+        # ax.legend (fontsize=22, loc='center') 
+        # plt.show ()
+
+        # plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
+
+    
     
     def calc_cost_vs_rsrc (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3, dist=True):
         """
@@ -1480,7 +1490,8 @@ if __name__ == '__main__':
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
     my_res_file_parser.parse_comoh_file (comoh_file, city=city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl', pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)
+    my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()

@@ -934,11 +934,13 @@ class Res_file_parser (object):
             
             data_of_this_cpu = list (filter (lambda item : item['cpu']==cpu_val, self.list_of_dicts)) #list of results of runs for this cpu value
             seeds = [item['seed'] for item in data_of_this_cpu]
-            for seed in seeds:
-                for type in ['nPkts', 'nBytes']:
-                    overall_of_this_cpu_seed_type = sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed])
-                    print ('cpu={}, type={}, seed={}, overall={}' .format (cpu_val, type, seed, overall_of_this_cpu_seed_type))
-                
+            for type in ['nPkts', 'nBytes']:
+                overall_of_this_cpu_n_type = []
+                for seed in seeds:
+                    overall_of_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
+                avg_overall_of_this_cpu_n_type = np.average(overall_of_this_cpu_n_type)
+                print ('cpu={}, type={}, avg_overall={:.0f}' .format (cpu_val, type, avg_overall_of_this_cpu_n_type))
+            
         exit ()
             # for direction in range(numDirections):
             #     for type in ['nPkts', 'nBytes']:

@@ -926,24 +926,31 @@ class Res_file_parser (object):
     
         # If the caller provided a .res input file, parse the data from it
         for file_name in res_input_file_names:
-            self.parse_comoh_file (file_name, city=city)
+            self.parse_comoh_file (file_name, city=city, numDirections=numDirections)
 
         cpu_vals = sorted (set ([item['cpu'] for item in self.list_of_dicts]))
 
         for cpu_val in cpu_vals:  
             
-            res_of_this_cpu = list (filter (lambda item : item['cpu']==cpu_val, self.list_of_dicts)) #list of results of runs for this cpu value
-            
-            for direction in range(numDirections):
+            data_of_this_cpu = list (filter (lambda item : item['cpu']==cpu_val, self.list_of_dicts)) #list of results of runs for this cpu value
+            seeds = [item['seed'] for item in data_of_this_cpu]
+            for seed in seeds:
                 for type in ['nPkts', 'nBytes']:
-                    data_of_this_cpu_and_dir = [item['{}{}' .format (type, direction)] for item in res_of_this_cpu]
-                    cur_avg = int (round (np.average (data_of_this_cpu_and_dir)))
-                    [y_lo, y_hi] = (self.conf_interval (ar=data_of_this_cpu_and_dir, avg=cur_avg)) # low, high y values for this plotted conf' interval
-                    self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg,'num_of_seeds' : len(data_of_this_cpu_and_dir), 'type' : type, 'dir' : direction })
+                    overall_of_this_cpu_seed_type = sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed])
+                    print ('cpu={}, type={}, seed={}, overall={}' .format (cpu_val, type, seed, overall_of_this_cpu_seed_type))
+                
+        exit ()
+            # for direction in range(numDirections):
+            #     for type in ['nPkts', 'nBytes']:
+            #         data_of_this_cpu_and_dir = [item['{}{}' .format (type, direction)] for item in data_of_this_cpu]
+            #         cur_avg = int (round (np.average (data_of_this_cpu_and_dir)))
+            #         [y_lo, y_hi] = (self.conf_interval (ar=data_of_this_cpu_and_dir, avg=cur_avg)) # low, high y values for this plotted conf' interval
+            #         self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(data_of_this_cpu_and_dir), 'type' : type, 'dir' : direction })
 
         # store the data as binary data stream
-        with open('../res/pcl_files/' + pcl_output_file_name, 'wb') as comoh_data_file:
-            pickle.dump(self.comoh_data, comoh_data_file)
+        # print (self.comoh_data)
+        # with open('../res/pcl_files/' + pcl_output_file_name, 'wb') as comoh_data_file:
+        #     pickle.dump(self.comoh_data, comoh_data_file)
         
 
     
@@ -955,6 +962,7 @@ class Res_file_parser (object):
         
         cpu_vals = list (set ([item['cpu'] for item in self.comoh_data]))
 
+        ax = plt.gca()
         overall_nPkts = []
         for cpu_val in cpu_vals:
             cpu_val_list = [item for item in self.comoh_data if item['cpu']==cpu_val]
@@ -962,8 +970,6 @@ class Res_file_parser (object):
             overall_nPkts.append (sum (item['y_avg'] for item in nPkts_list))
 
         cpu_norm_factor = 89 if self.city=='Lux' else 840   
-        # print (cpu_vals/2)      
-        ax = plt.gca()
         self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
 
         # ax.plot (cpu_vals, overall_nPkts)#, color = 'black') #, marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
@@ -975,6 +981,7 @@ class Res_file_parser (object):
         # plt.xlim (0, 3600)
         # plt.ylim (0)
         # ax.legend (fontsize=22, loc='center') 
+        ax.plot ((cpu_val ,cpu_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
         plt.show ()
 
         # plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
@@ -1499,9 +1506,8 @@ if __name__ == '__main__':
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
-    my_res_file_parser.parse_comoh_file (comoh_file, city=city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)
-    my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3, numDirections=2)
+    # my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()

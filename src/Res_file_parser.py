@@ -587,7 +587,7 @@ class Res_file_parser (object):
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
 
-        # self.numDirections = numDirections
+            self.dict['critNNewNonRtUsrs'] = int (splitted_line[-1].split("=")[1])
         self.input_file.close
 
 
@@ -958,7 +958,6 @@ class Res_file_parser (object):
         
         
         # store the data as binary data stream
-        print (self.comoh_data)
         with open('../res/pcl_files/' + pcl_output_file_name, 'wb') as comoh_data_file:
             pickle.dump(self.comoh_data, comoh_data_file)       
 
@@ -975,27 +974,33 @@ class Res_file_parser (object):
         cpu_vals = sorted (list (set ([item['cpu'] for item in self.comoh_data]))) # list of cpu vals for which there exist data
         normalized_cpu_vals, overall_nPkts, overall_nBytes = [], [], []
 
+        type = 'nPkts'
+        overall = []
+        for type in ['nPkts', 'nBytes']:
+            overall.append ({type : 0})
+        print (overall)
+        exit ()
         for cpu_val in cpu_vals:
             cpu_val_data = [item for item in self.comoh_data if item['cpu']==cpu_val] 
             normalized_cpu_val = cpu_val/cpu_norm_factor
             normalized_cpu_vals.append (normalized_cpu_val)
-            list_of_item = [item for item in cpu_val_data if item['type']=='nPkts' and item['dir']==-1]
+            list_of_item = [item for item in cpu_val_data if item['type']==type and item['dir']==-1]
             if (len(list_of_item)<1):
                 print ('error in plot_comoh list_of_item')
                 exit () 
             item = list_of_item[0]
             ax.plot ((normalized_cpu_val ,normalized_cpu_val), (item['y_lo'], item['y_hi']), color=self.color_dict['Async']) # Plot the confidence interval
             overall_nPkts.append (item['y_avg'])
-        print ('cpu_val={}, overall_nPkts={}' .format (cpu_vals, overall_nPkts))
+        print ('cpu_val={}, overall_{}={}' .format (cpu_vals, type, overall_nPkts))
         self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall # Packets') 
         plt.xlim (1, 2.5)
         plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
-        plt.ylabel('# Packets')
+        plt.ylabel('{}' .format (type))
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
         # ax.legend (fontsize=22, loc='center') 
-        plt.show ()
+        # plt.show ()
 
-        # plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
+        plt.savefig ('../res/Lux_p0.0_hdr0B_NonRt20B_nPkts.pdf', bbox_inches='tight')
 
     
     
@@ -1517,9 +1522,10 @@ if __name__ == '__main__':
     city = 'Lux'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
-    res_input_file_name = '{}.comoh' .format (city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3, numDirections=2)
-    my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
+    res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
+    pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
+    my_res_file_parser.plot_comoh (pcl_input_file_name=pcl_output_file_name)
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()

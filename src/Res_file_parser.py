@@ -972,7 +972,7 @@ class Res_file_parser (object):
         ax = plt.gca()
         
         cpu_norm_factor = 89 if self.city=='Lux' else 840 # normalization factor for x axis: the minimal cpu for which opt finds a feasible sol
-        cpu_vals = list (set ([item['cpu'] for item in self.comoh_data])) # list of cpu vals for which there exist data
+        cpu_vals = sorted (list (set ([item['cpu'] for item in self.comoh_data]))) # list of cpu vals for which there exist data
         normalized_cpu_vals, overall_nPkts, overall_nBytes = [], [], []
 
         for cpu_val in cpu_vals:
@@ -988,8 +988,7 @@ class Res_file_parser (object):
             overall_nPkts.append (item['y_avg'])
         print ('cpu_val={}, overall_nPkts={}' .format (cpu_vals, overall_nPkts))
         self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall # Packets') 
-        plt.xlim (1, 3)
-        plt.ylim (0, 3)
+        plt.xlim (1, 2.5)
         plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
         plt.ylabel('# Packets')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
@@ -1515,10 +1514,11 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Monaco'
+    city = 'Lux'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3, numDirections=2)
+    res_input_file_name = '{}.comoh' .format (city)
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3, numDirections=2)
     my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'

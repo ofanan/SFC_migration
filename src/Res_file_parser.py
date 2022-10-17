@@ -980,24 +980,32 @@ class Res_file_parser (object):
         cpu_vals = sorted (list (set ([item['cpu'] for item in self.comoh_data]))) # list of cpu vals for which there exist data
         normalized_cpu_vals, overall_nPkts, overall_nBytes = [], [], []
 
-        plot_types = ['nPkts', 'nBytes']
-        overall = {plot_types[0] : [], plot_types[1] : []}
+
+        # self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(critNNewNonRtUsrs_of_this_cpu), 'type' : 'critNNewNonRtUsrs'})
+
+        plot_types = ['nPkts', 'nBytes', 'critNNewNonRtUsrs']
+        overall = {plot_types[0] : [], plot_types[1] : [], plot_types[2] : []}
         for cpu_val in cpu_vals:
             cpu_val_data = [item for item in self.comoh_data if item['cpu']==cpu_val] 
             normalized_cpu_val = cpu_val/cpu_norm_factor
             normalized_cpu_vals.append (normalized_cpu_val)
             for type in plot_types: 
-                list_of_item = [item for item in cpu_val_data if item['type']==type and item['dir']==-1]
+                list_of_item = [item for item in cpu_val_data if item['type']==type]
+                if (type in ['nPkts', 'nBytes']):
+                    list_of_item = [item for item in list_of_item if item['dir']==1]
                 if (len(list_of_item)<1):
                     print ('error in plot_comoh: could not find entry for overall {}' .format (type))
                     exit () 
                 item = list_of_item[0]
                 overall[type].append(item['y_avg'])
-                
-        for type in plot_types:
+
+        nonRtUsrChainOh = 20 
+        for type in ['nPkts', 'nBytes']:
             self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall {}' .format (type))
             ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
             plt.ylabel('{}' .format (type))
+            if (type=='nBytes'):
+                self.my_plot (ax=ax, x=normalized_cpu_vals, y=[item*nonRtUsrChainOh for item in overall['critNNewNonRtUsrs']], mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='Intuitive LBound' .format (type))
             plt.savefig ('../res/Lux_p0.0_hdr0B_NonRt20B_{}.pdf' .format (type), bbox_inches='tight')
             plt.cla()
     

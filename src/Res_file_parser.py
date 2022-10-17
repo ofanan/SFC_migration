@@ -21,6 +21,10 @@ import pickle
 #         if self._useMathText:
 #             self.format = r'$\mathdefault{}$' .format (s elf.format) 
 
+NUM_DIRECTIONS = 10
+OVERALL_DIR    = -1
+
+
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx         = 0
 mode_idx      = 1
@@ -848,7 +852,7 @@ class Res_file_parser (object):
             #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val, cost_vs_rsrc_data_of_this_mode)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
             #     print ('cpu={}, mode={}', 'avg_cost={}' .format (list_of_item[0]['cpu'], mode, point['y_avg'])) 
 
-    def parse_comoh_file (self, input_file_name, city=None, numDirections=10):
+    def parse_comoh_file (self, input_file_name, city=None, numDirections=NUM_DIRECTIONS):
         """
         Parse a .comoh file (files which details the communication overhead - e.g., number and overall size of packets).
         Inputs:
@@ -905,7 +909,7 @@ class Res_file_parser (object):
         self.input_file.close
 
 
-    def calc_comoh (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=10):
+    def calc_comoh (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
         """
         Calculate the data needed for plotting a graph showing the communication overhead.
         * Optional inputs: 
@@ -941,13 +945,15 @@ class Res_file_parser (object):
                     overall_of_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
                 avg_overall_of_this_cpu_n_type = np.average(overall_of_this_cpu_n_type)
                 [y_lo, y_hi] = (self.conf_interval (ar=overall_of_this_cpu_n_type, avg=avg_overall_of_this_cpu_n_type ))
+                # if (type=='nBytes'): #$$$
+                #     print ('cpu={}, y_avg={}' .format (cpu_val, avg_overall_of_this_cpu_n_type))
                 self.comoh_data.append ({'cpu' : cpu_val, 
+                                         'type' : type,
+                                         'y_avg' : avg_overall_of_this_cpu_n_type, 
                                          'y_lo' : y_lo, 
                                          'y_hi' : y_hi, 
-                                         'y_avg' : avg_overall_of_this_cpu_n_type, 
                                          'num_of_seeds' : len(seeds), 
-                                         'type' : type, 
-                                         'dir' : -1 })
+                                         'dir' : OVERALL_DIR})
 
 
             critNNewNonRtUsrs_of_this_cpu = [item['critNNewNonRtUsrs'] for item in data_of_this_cpu]
@@ -992,7 +998,7 @@ class Res_file_parser (object):
             for type in plot_types: 
                 list_of_item = [item for item in cpu_val_data if item['type']==type]
                 if (type in ['nPkts', 'nBytes']):
-                    list_of_item = [item for item in list_of_item if item['dir']==1]
+                    list_of_item = [item for item in list_of_item if item['dir']==OVERALL_DIR]
                 if (len(list_of_item)<1):
                     print ('error in plot_comoh: could not find entry for overall {}' .format (type))
                     exit () 
@@ -1005,7 +1011,9 @@ class Res_file_parser (object):
             ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
             plt.ylabel('{}' .format (type))
             if (type=='nBytes'):
-                self.my_plot (ax=ax, x=normalized_cpu_vals, y=[item*nonRtUsrChainOh for item in overall['critNNewNonRtUsrs']], mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='Intuitive LBound' .format (type))
+                ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*NUM_DIRECTIONS for item in overall['critNNewNonRtUsrs']], color=self.color_dict['opt'], marker=self.markers_dict['opt'], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive LBound')
+
+            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
             plt.savefig ('../res/Lux_p0.0_hdr0B_NonRt20B_{}.pdf' .format (type), bbox_inches='tight')
             plt.cla()
     

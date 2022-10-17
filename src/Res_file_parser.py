@@ -974,34 +974,26 @@ class Res_file_parser (object):
         cpu_vals = sorted (list (set ([item['cpu'] for item in self.comoh_data]))) # list of cpu vals for which there exist data
         normalized_cpu_vals, overall_nPkts, overall_nBytes = [], [], []
 
-        type = 'nPkts'
-        overall = []
-        for type in ['nPkts', 'nBytes']:
-            overall.append ({type : 0})
-        print (overall)
-        exit ()
+        plot_types = ['nPkts', 'nBytes']
+        overall = {plot_types[0] : [], plot_types[1] : []}
         for cpu_val in cpu_vals:
             cpu_val_data = [item for item in self.comoh_data if item['cpu']==cpu_val] 
             normalized_cpu_val = cpu_val/cpu_norm_factor
             normalized_cpu_vals.append (normalized_cpu_val)
-            list_of_item = [item for item in cpu_val_data if item['type']==type and item['dir']==-1]
-            if (len(list_of_item)<1):
-                print ('error in plot_comoh list_of_item')
-                exit () 
-            item = list_of_item[0]
-            ax.plot ((normalized_cpu_val ,normalized_cpu_val), (item['y_lo'], item['y_hi']), color=self.color_dict['Async']) # Plot the confidence interval
-            overall_nPkts.append (item['y_avg'])
-        print ('cpu_val={}, overall_{}={}' .format (cpu_vals, type, overall_nPkts))
-        self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall # Packets') 
-        plt.xlim (1, 2.5)
-        plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
-        plt.ylabel('{}' .format (type))
-        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
-        # ax.legend (fontsize=22, loc='center') 
-        # plt.show ()
-
-        plt.savefig ('../res/Lux_p0.0_hdr0B_NonRt20B_nPkts.pdf', bbox_inches='tight')
-
+            for type in plot_types: 
+                list_of_item = [item for item in cpu_val_data if item['type']==type and item['dir']==-1]
+                if (len(list_of_item)<1):
+                    print ('error in plot_comoh: could not find entry for overall {}' .format (type))
+                    exit () 
+                item = list_of_item[0]
+                overall[type].append(item['y_avg'])
+                
+        for type in plot_types:
+            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall {}' .format (type))
+            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
+            plt.ylabel('{}' .format (type))
+            plt.savefig ('../res/Lux_p0.0_hdr0B_NonRt20B_{}.pdf' .format (type), bbox_inches='tight')
+            plt.cla()
     
     
     def calc_cost_vs_rsrc (self, pcl_input_file_name=None, res_input_file_names=None, min_t=30001, max_t=30600, prob=0.3, dist=True):

@@ -534,63 +534,6 @@ class Res_file_parser (object):
             for crit_len in range (1, len(splitted_line)):
                 self.crit_len_cnt[crit_len] += int (splitted_line[crit_len].split('=')[1])
             
-    def parse_comoh_file (self, input_file_name, city=None, numDirections=10):
-        """
-        Parse a .comoh file (files which details the communication overhead - e.g., number and overall size of packets).
-        Inputs:
-        numDirections - the number of directions in which packets may be sent.
-        Assuming a tree whose highest level is lvlOfRoot, the directions are:
-        directions 0, 1, ..., lvlOfRoot-1 --> pkts from lvl 0, 1, ..., lvlOfRoot-1 to the level above.
-        directions lvlOfRoot, .., 2*lvlOfRoot-1--> pkts from lvl=2*lvlOfRoot-1, ..., lvlOfRoot to the level below.
-        """
-        
-        self.city = parse_city_from_input_file_name(input_file_name) if (city==None) else city 
-        print ('city is ', self.city)
-        self.input_file_name = input_file_name
-        self.input_file      = open ("../res/" + input_file_name,  "r")
-        lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
-        lines                = (line for line in lines if line)       # Discard blank lines
-        
-        for line in lines:
-        
-            # Discard lines with comments / verbose data
-            if (line.split ("//")[0] == ""):
-                continue
-           
-            splitted_line = line.split (" | ")
-             
-            settings          = splitted_line[0]
-            splitted_settings = settings.split ("_")
-    
-            if len (splitted_settings) != num_of_fields:
-                print ("encountered a forma  t error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
-                self.dict = None
-                return
-    
-            stts = int (splitted_settings [stts_idx].split("stts")[1])
-            self.dict = {
-                "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
-                "mode"      : splitted_settings      [mode_idx],
-                "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
-                "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
-                "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
-                "stts"      : stts,
-            }
-            
-            if (stts!=1): # if the run failed, the other fields are irrelevant
-                continue
-    
-            for direction in range (numDirections): 
-                self.dict['nPkts{}'  .format (direction)] = int (splitted_line[direction+1].split("=")[1])
-                self.dict['nBytes{}' .format (direction)] = int (splitted_line[numDirections+direction+1].split("=")[1])
-
-            if (not(self.dict in self.list_of_dicts)):
-                self.list_of_dicts.append(self.dict)                
-
-            self.dict['critNNewNonRtUsrs'] = int (splitted_line[-1].split("=")[1])
-        self.input_file.close
-
-
     def gen_filtered_list (self, list_to_filter, min_t=-1, max_t=float('inf'), prob=None, mode=None, cpu=None, stts=-1, seed=None):
         """
         filters and takes from all the items in a given list (that was read from the res file) only those with the desired parameters value
@@ -905,6 +848,63 @@ class Res_file_parser (object):
             #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val, cost_vs_rsrc_data_of_this_mode)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
             #     print ('cpu={}, mode={}', 'avg_cost={}' .format (list_of_item[0]['cpu'], mode, point['y_avg'])) 
 
+    def parse_comoh_file (self, input_file_name, city=None, numDirections=10):
+        """
+        Parse a .comoh file (files which details the communication overhead - e.g., number and overall size of packets).
+        Inputs:
+        numDirections - the number of directions in which packets may be sent.
+        Assuming a tree whose highest level is lvlOfRoot, the directions are:
+        directions 0, 1, ..., lvlOfRoot-1 --> pkts from lvl 0, 1, ..., lvlOfRoot-1 to the level above.
+        directions lvlOfRoot, .., 2*lvlOfRoot-1--> pkts from lvl=2*lvlOfRoot-1, ..., lvlOfRoot to the level below.
+        """
+        
+        self.city = parse_city_from_input_file_name(input_file_name) if (city==None) else city 
+        print ('city is ', self.city)
+        self.input_file_name = input_file_name
+        self.input_file      = open ("../res/" + input_file_name,  "r")
+        lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
+        lines                = (line for line in lines if line)       # Discard blank lines
+        
+        for line in lines:
+        
+            # Discard lines with comments / verbose data
+            if (line.split ("//")[0] == ""):
+                continue
+           
+            splitted_line = line.split (" | ")
+             
+            settings          = splitted_line[0]
+            splitted_settings = settings.split ("_")
+    
+            if len (splitted_settings) != num_of_fields:
+                print ("encountered a forma  t error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
+                self.dict = None
+                return
+    
+            stts = int (splitted_settings [stts_idx].split("stts")[1])
+            self.dict = {
+                "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
+                "mode"      : splitted_settings      [mode_idx],
+                "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
+                "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
+                "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
+                "stts"      : stts,
+            }
+            
+            if (stts!=1): # if the run failed, the other fields are irrelevant
+                continue
+    
+            for direction in range (numDirections): 
+                self.dict['nPkts{}'  .format (direction)] = int (splitted_line[direction+1].split("=")[1])
+                self.dict['nBytes{}' .format (direction)] = int (splitted_line[numDirections+direction+1].split("=")[1])
+
+            if (not(self.dict in self.list_of_dicts)):
+                self.list_of_dicts.append(self.dict)                
+
+            self.dict['critNNewNonRtUsrs'] = int (splitted_line[-1].split("=")[1])
+        self.input_file.close
+
+
     def calc_comoh (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=10):
         """
         Calculate the data needed for plotting a graph showing the communication overhead.
@@ -948,6 +948,12 @@ class Res_file_parser (object):
                                          'num_of_seeds' : len(seeds), 
                                          'type' : type, 
                                          'dir' : -1 })
+
+
+            critNNewNonRtUsrs_of_this_cpu = [item['critNNewNonRtUsrs'] for item in data_of_this_cpu]
+            cur_avg = np.average(critNNewNonRtUsrs_of_this_cpu)
+            [y_lo, y_hi] = (self.conf_interval (ar=critNNewNonRtUsrs_of_this_cpu, avg=cur_avg))
+            self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(critNNewNonRtUsrs_of_this_cpu), 'type' : 'critNNewNonRtUsrs'})
                     
             for direction in range(numDirections):
                 for type in ['nPkts', 'nBytes']:

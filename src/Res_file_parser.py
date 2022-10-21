@@ -21,7 +21,8 @@ import pickle
 #         if self._useMathText:
 #             self.format = r'$\mathdefault{}$' .format (s elf.format) 
 
-NUM_DIRECTIONS = 10
+TREE_HEIGHT    = 6
+NUM_DIRECTIONS = (TREE_HEIGHT-1)*2
 OVERALL_DIR    = -1
 
 
@@ -945,8 +946,6 @@ class Res_file_parser (object):
                     overall_of_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
                 avg_overall_of_this_cpu_n_type = np.average(overall_of_this_cpu_n_type)
                 [y_lo, y_hi] = (self.conf_interval (ar=overall_of_this_cpu_n_type, avg=avg_overall_of_this_cpu_n_type ))
-                # if (type=='nBytes'): #$$$
-                #     print ('cpu={}, y_avg={}' .format (cpu_val, avg_overall_of_this_cpu_n_type))
                 self.comoh_data.append ({'cpu' : cpu_val, 
                                          'type' : type,
                                          'y_avg' : avg_overall_of_this_cpu_n_type, 
@@ -985,10 +984,6 @@ class Res_file_parser (object):
         cpu_norm_factor = 89 if self.city=='Lux' else 840 # normalization factor for x axis: the minimal cpu for which opt finds a feasible sol
         cpu_vals = sorted (list (set ([item['cpu'] for item in self.comoh_data]))) # list of cpu vals for which there exist data
         normalized_cpu_vals, overall_nPkts, overall_nBytes = [], [], []
-
-
-        # self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(critNNewNonRtUsrs_of_this_cpu), 'type' : 'critNNewNonRtUsrs'})
-
         plot_types = ['nPkts', 'nBytes', 'critNNewNonRtUsrs']
         overall = {plot_types[0] : [], plot_types[1] : [], plot_types[2] : []}
         for cpu_val in cpu_vals:
@@ -1008,12 +1003,13 @@ class Res_file_parser (object):
         nonRtUsrChainOh = 20 
         for type in ['nPkts', 'nBytes']:
             self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall {}' .format (type))
-            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
+            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
             plt.ylabel('{}' .format (type))
+            plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
             if (type=='nBytes'):
-                ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*NUM_DIRECTIONS for item in overall['critNNewNonRtUsrs']], color=self.color_dict['opt'], marker=self.markers_dict['opt'], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive LBound')
-
-            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
+                ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*(TREE_HEIGHT-1)   for item in overall['critNNewNonRtUsrs']], color=self.color_dict['opt'],   marker=self.markers_dict['opt'],   markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive LBound')
+                ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*(TREE_HEIGHT-1)*4 for item in overall['critNNewNonRtUsrs']], color=self.color_dict['cpvnf'], marker=self.markers_dict['cpvnf'], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive HBound', markerfacecolor='none')
+            ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
             plt.savefig ('../res/Lux_p0.0_hdr0B_NonRt20B_{}.pdf' .format (type), bbox_inches='tight')
             plt.cla()
     

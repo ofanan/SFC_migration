@@ -6,6 +6,8 @@ b_*
 !/res/poa2cell_files/
 !/res/antennas_locs
 !/res/pcl_files
+!/res/poa_files/Lux_0730_0830_1secs_post.poa
+!/res/poa_files/Lux_short.poa
 /old/*
 /src/__pycache*
 /src/sim*

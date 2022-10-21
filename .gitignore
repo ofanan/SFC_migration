@@ -6,7 +6,6 @@ b_*
 !/res/poa2cell_files/
 !/res/antennas_locs
 !/res/pcl_files
-!/res/poa_files/
 /old/*
 /src/__pycache*
 /src/sim*

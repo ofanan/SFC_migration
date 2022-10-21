@@ -11,8 +11,9 @@ from printf import printf, printmat, invert_mat_bottom_up
 from secs2hour import secs2hour
 import loc2poa_c
 
-VERBOSE_LOC      = 2
-VERBOSE_SPEED    = 3
+# verbose enums that define the type of output to be generated
+VERBOSE_LOC      = 2 # print-out the location of each vehicle in the chosen simulated area
+VERBOSE_SPEED    = 3 # print-out the speed of each vehicle in the chosen simulated area
 
 # Indices of fields in input antenna loc files
 radio_idx = 0 # Radio type: GSM, LTE etc.
@@ -211,7 +212,18 @@ class Traci_runner (object):
 
     def simulate (self, warmup_period=0, sim_length=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
-        Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input
+        Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input.
+        The output is written to '/../res/loc_files/loc_output_filename.loc', where loc_outputfilename.loc is a name that is automatically generated, and
+        reflects the settings of the simulation, namely the city (Lux/Monaco); the simulated time, at a 24h format (e.g., 0000_0030); and the decision period. 
+        The .loc files expresses the location of each vehicle at each decision period.
+        The .loc files can be later converted to .poa files, that associates each vehicle that arrived/left/changed a cell to its current poa (Point Of Access).
+        Inputs: 
+        - warmup_period - The simulation defaults to start at 0000 (00 am). To begin at a later hour, specify the number of seconds after 00:00 after which the sim begins.
+        - sim_length - in seconds.
+        - len_of_time_slot_in_sec.
+        - num_of_output_files - for case when the generated output files are too large, you may specify here a value > 1, to write the output sequentially to multiple files.
+        - verbose - a list of the required outputs. E.g., VERBOSE_LOC to output the vehicles' location; VERBOSE_SPEED, to output the vehicles' speeds. 
+
         """
 
         veh_key2id               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
@@ -290,6 +302,15 @@ class Traci_runner (object):
 
     def simulate_gen_poa_file (self, warmup_period=0, sim_length_in_sec=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
         """
+        Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input.
+        The output is written to '/../res/poa_files/poa_output_filename.loc', where poa_outputfilename.loc is a name that is automatically generated, and
+        reflects the settings of the simulation, namely the city (Lux/Monaco); the simulated time, at a 24h format (e.g., 0000_0030); and the decision period. 
+        Inputs: 
+        - warmup_period - The simulation defaults to start at 0000 (00 am). To begin at a later hour, specify the number of seconds after 00:00 after which the sim begins.
+        - sim_length - in seconds.
+        - len_of_time_slot_in_sec.
+        - num_of_output_files - for case when the generated output files are too large, you may specify here a value > 1, to write the output sequentially to multiple files.
+        - verbose - a list of the required outputs. E.g., VERBOSE_LOC to output the vehicles' location; VERBOSE_SPEED, to output the vehicles' speeds. 
         """
 
         self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc' if self.city=='Lux' else 'Monaco.Telecom.antloc')

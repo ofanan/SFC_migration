@@ -300,7 +300,7 @@ class Traci_runner (object):
                 traci.simulationStep (self.t + len_of_time_slot_in_sec)
         traci.close()
 
-    def simulate_gen_poa_file (self, warmup_period=0, sim_length_in_sec=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = []):
+    def simulate_gen_poa_file (self, warmup_period=0, sim_length_in_sec=10, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [], max_power_of_4=None):
         """
         Simulate Traci, and print-out the locations and/or speed of cars, as defined by the verbose input.
         The output is written to '/../res/poa_files/poa_output_filename.loc', where poa_outputfilename.loc is a name that is automatically generated, and
@@ -312,8 +312,16 @@ class Traci_runner (object):
         - num_of_output_files - for case when the generated output files are too large, you may specify here a value > 1, to write the output sequentially to multiple files.
         - verbose - a list of the required outputs. E.g., VERBOSE_LOC to output the vehicles' location; VERBOSE_SPEED, to output the vehicles' speeds. 
         """
-
-        self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4 = 4, verbose = [], antloc_file_name = 'Lux.post.antloc' if self.city=='Lux' else 'Monaco.Telecom.antloc')
+        if (max_power_of_4==None):
+            max_power_of_4 = 4 if self.city=='Lux' else 3 # default values 
+        else: 
+            if (max_power_of_4>4):
+                print ('Error: max_power_of_4 should be at most 4')
+                exit ()
+            elif (max_power_of_4==4 and self.city=='Monaco'):
+                print ('Error: for running Monaco scenario, max_power_of_4 should be at most 3')
+                exit ()
+        self.my_loc2poa = loc2poa_c.loc2poa_c (max_power_of_4=max_power_of_4, verbose = [], antloc_file_name = 'Lux.post.antloc' if self.city=='Lux' else 'Monaco.Telecom.antloc')
         known_vehs               = [] # will hold pairs of (veh key, veh id). veh_key is given by Sumo; veh_id is my integer identifier of currently active car at each step.
         veh_ids2recycle          = [] # will hold a list of ids that are not used anymore, and therefore can be recycled (used by new users == garbage collection).
         vehs_left_in_this_cycle  = []
@@ -550,9 +558,9 @@ class Traci_runner (object):
         return totalLength/1000
 
 if __name__ == '__main__':
-    city = 'Lux'
+    city = 'Monaco'
     my_Traci_runner = Traci_runner (sumo_cfg_file='myLuST.sumocfg' if city=='Lux' else 'myMoST.sumocfg')
-    my_Traci_runner.simulate_gen_poa_file (warmup_period=7.5*3600, sim_length_in_sec=3600, len_of_time_slot_in_sec=0.050, num_of_output_files=1, verbose = [VERBOSE_LOC])
+    my_Traci_runner.simulate_gen_poa_file (warmup_period=0*3600, sim_length_in_sec=1, len_of_time_slot_in_sec=0.50, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1, sim_length=50, len_of_time_slot_in_sec=1, num_of_output_files=1, verbose = [VERBOSE_LOC])
     # my_Traci_runner.simulate (warmup_period=1*3600, sim_length=2, len_of_time_slot_in_sec=0.5, num_of_output_files=1, verbose = [VERBOSE_LOC])
 

@@ -1512,15 +1512,15 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Monaco'
-    my_res_file_parser = Res_file_parser ()
-    comoh_file = '{}.comoh' .format (city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3, numDirections=2)
-    # my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
-
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.erase_from_pcl(pcl_input_file_name='cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3')
+    # comoh_file = '{}.comoh' .format (city)
+    # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3, numDirections=2)
+    # my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
+
+    city = 'Monaco'
+    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser.erase_from_pcl(pcl_input_file_name='cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3')
     
     # res_input_file_name = '{}_0820_0830_1secs_p0.3_Async.res' .format (city)
     # pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)

@@ -137,10 +137,12 @@ class Res_file_parser (object):
         # List of algorithms' names, used in the plots' legend, for the dist' case
         self.legend_entry_dict = {'opt'     :  'LBound', 
                                   'SyncPartResh' : 'Centralized',
-                                  'Async'   : 'Distributed', 
-                                  'ffit'    : 'F-Fit',
-                                  'cpvnf'   : 'CPVNF',
-                                  'ms'      : 'MultiScaler'}
+                                  'AsyncBlk'     : 'Distributed Blk', 
+                                  'AsyncNBlk'    : 'Distributed NBlk', 
+                                  'Async'        : 'Old Async; plz check', 
+                                  'ffit'         : 'F-Fit',
+                                  'cpvnf'        : 'CPVNF',
+                                  'ms'           : 'MultiScaler'}
 
         # # The colors used for each alg's plot, in the centralized case
         # self.color_dict       = {'opt'    : 'green',
@@ -155,10 +157,12 @@ class Res_file_parser (object):
         
         # The colors used for each alg's plot, in the dist' case
         self.color_dict       = {'opt'    : 'green',
-                                'SyncPartResh' : 'purple',
-                                'Async'   : 'brown',
-                                'ffit'    : 'blue',
-                                'cpvnf'   : 'black'}
+                                'SyncPartResh'  : 'purple',
+                                'Async'         : 'brown',
+                                'AsyncBlk'      : 'brown',
+                                'AsyncNBlk'     : 'brown',
+                                'ffit'          : 'blue',
+                                'cpvnf'         : 'black'}
 
         # # The markers used for each alg', in the centralized case
         # self.markers_dict     = {'opt'    : 'x',
@@ -172,12 +176,14 @@ class Res_file_parser (object):
                                 # 'ms'      : 'v'}
         
         # The markers used for each alg', in the dist' case
-        self.markers_dict     = {'opt'    : 'x',
-                                'SyncPartResh' : 'o',
-                                'Async'   : 'v',
-                                'ffit'    : '^',
-                                'cpvnf'   : 's',
-                                'ms'      : 'v'}
+        self.markers_dict     = {'opt'          : 'x',
+                                'SyncPartResh'  : 'o',
+                                'Async'         : 'v',
+                                'AsyncBlk'      : 'v',
+                                'AsyncNBlk'     : 'v',
+                                'ffit'          : '^',
+                                'cpvnf'         : 's',
+                                'ms'            : 'v'}
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
     def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None): 
@@ -670,7 +676,8 @@ class Res_file_parser (object):
     def plot_RT_prob_sim_python (self, pcl_input_file_name=None, res_input_file_name=None, reshuffle=True, dist=False):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
-        Show the conf' intervals.
+        The plot also presents the conf' intervals.
+        The raw data is also printed to an output text file, with the extension .dat
         When given an input file name, parse it first.
         If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
         when 'dist' is True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project.
@@ -684,10 +691,12 @@ class Res_file_parser (object):
             self.parse_file(res_input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
             input_file_name = res_input_file_name.split('.res')[0]            
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
+        dat_output_file = open ('../res/{}.dat' .format (input_file_name), 'w')
+
         self.set_plt_params ()
         _, ax = plt.subplots()
         # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
-        modes = ['opt', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        modes = ['opt', 'SyncPartResh', 'AsyncBlk', 'AsyncNBlk'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -712,8 +721,7 @@ class Res_file_parser (object):
                 # if (x_val==0.3 and mode in ['ffit', 'cpvnf', 'ms', 'ourAlgC']):
                 #     print ('mode={}, x_val=0.3, y_hi={:.1f}' .format (mode, y_hi))
 
-                if (mode in ['SyncPartResh', 'Async']):
-                    print ('mode={}. x={}, y_lo={:.1f}, y_hi={:.1f}' .format (mode, x_val, y_lo, y_hi))
+                printf (dat_output_file, 'mode={}. x={}, y_lo={:.1f}, y_hi={:.1f}' .format (mode, x_val, y_lo, y_hi))                    
 
                 ax.plot ((x_val,x_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
                 
@@ -738,7 +746,7 @@ class Res_file_parser (object):
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
         and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
-        modes = ['opt', 'SyncPartResh', 'Async'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
+        modes = ['opt', 'SyncPartResh', 'AsyncBlk', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
         if (pcl_input_file_name==None):
             pcl_input_file_name='{}_{}cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city, 'dist_' if dist else '')
 
@@ -866,7 +874,7 @@ class Res_file_parser (object):
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
-        modes = ['opt', 'Async', 'SyncPartResh'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']
+        modes = ['opt', 'SyncPartResh', 'AsyncBlk', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']
         for mode in modes:
     
             cost_vs_rsrc_data_of_this_mode = []
@@ -979,7 +987,8 @@ class Res_file_parser (object):
             overall_nPkts.append (sum (item['y_avg'] for item in nPkts_list))
 
         cpu_norm_factor = 89 if self.city=='Lux' else 840   
-        self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nPkts, mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
+        print ('plot_comoh is using blocking-async. change the line below to non-blocking, if you wanna')
+        self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nPkts, mode='AsyncBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
 
         # ax.plot (cpu_vals, overall_nPkts)#, color = 'black') #, marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
  
@@ -1024,7 +1033,7 @@ class Res_file_parser (object):
         for file_name in res_input_file_names:
             self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
 
-        modes = ['opt', 'Async', 'SyncPartResh'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']   
+        modes = ['opt', 'SyncPartResh', 'AsyncBlk', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']   
         for mode in modes:
     
             cost_vs_rsrc_data_of_this_mode = []
@@ -1426,7 +1435,7 @@ class Res_file_parser (object):
         pcl_full_path_file_name = '../res/pcl_files/{}' .format (pcl_input_file_name)
         self.list_of_dicts = pd.read_pickle(r'{}' .format (pcl_full_path_file_name))
         
-        self.list_of_dicts = [item for item in self.list_of_dicts if item['mode']!='Async']
+        self.list_of_dicts = [item for item in self.list_of_dicts if item['mode']!=mode_to_erase]
         with open(pcl_full_path_file_name, 'wb') as pcl_file:
             pickle.dump(self.list_of_dicts, pcl_file)
 
@@ -1520,7 +1529,7 @@ if __name__ == '__main__':
 
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.erase_from_pcl(pcl_input_file_name='cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3')
+    my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
     
     # res_input_file_name = '{}_0820_0830_1secs_p0.3_Async.res' .format (city)
     # pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)

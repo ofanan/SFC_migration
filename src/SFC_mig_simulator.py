@@ -1051,7 +1051,7 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.2 
         if (self.mode == 'optInt'):
-            self.max_R = 1.06 
+            self.max_R = 1.08 
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
         elif (self.mode in ['ms']):   
@@ -2139,7 +2139,8 @@ if __name__ == "__main__":
 
     
     city = 'Lux'
-    run_prob_of_RT_sim (city=city, mode='optInt', prob=0.6)
+    for prob in [0.7, 0.8, 0.9, 1.0]:
+        run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)
 
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
     #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',

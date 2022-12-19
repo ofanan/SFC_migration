@@ -1581,10 +1581,10 @@ if __name__ == '__main__':
     # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
     # my_res_file_parser.plot_comoh (pcl_input_file_name=pcl_output_file_name)
 
-    city = 'Lux'
+    city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
     my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'

@@ -912,14 +912,17 @@ class Res_file_parser (object):
             if (stts!=1): # if the run failed, the other fields are irrelevant
                 continue
     
+            print ('NUM_DIRECTIONS={}' .format (NUM_DIRECTIONS))
             for direction in range (numDirections): 
                 self.dict['nPkts{}'  .format (direction)] = int (splitted_line[direction+1].split("=")[1])
                 self.dict['nBytes{}' .format (direction)] = int (splitted_line[numDirections+direction+1].split("=")[1])
 
+            self.dict['critNNewRtUsrs']    = int (splitted_line[2*numDirections+1].split("=")[1])
+            self.dict['critNNewNonRtUsrs'] = int (splitted_line[2*numDirections+2].split("=")[1])
+
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
 
-            self.dict['critNNewNonRtUsrs'] = int (splitted_line[-1].split("=")[1])
         self.input_file.close
 
 
@@ -1015,7 +1018,7 @@ class Res_file_parser (object):
 
         # nonRtUsrChainOh = 20 
         for type in ['nPkts', 'nBytes']:
-            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='Async', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall {}' .format (type))
+            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall {}' .format (type))
             ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
             plt.ylabel('{}' .format (type))
             plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
@@ -1589,7 +1592,7 @@ if __name__ == '__main__':
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3, numDirections=2)
+    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)
     my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'

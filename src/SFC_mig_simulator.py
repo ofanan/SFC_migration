@@ -1051,7 +1051,11 @@ class SFC_mig_simulator (object):
         if (self.mode == 'opt'):
             self.max_R = 1.2 
         if (self.mode == 'optInt'):
+<<<<<<< HEAD
             self.max_R = 1.06 
+=======
+            self.max_R = 1.08 
+>>>>>>> 56c6b198cd320b6fde0c4a958028b51b93a55085
         elif (self.mode in ['ourAlg', 'ourAlgC', 'ourAlgDist']):   
             self.max_R = 1.1 
         elif (self.mode in ['ms']):   
@@ -1988,8 +1992,13 @@ class SFC_mig_simulator (object):
         if (mode=='opt'):
             min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89,  0.1 : 89,  0.2 : 89,  0.3 : 89,  0.4 : 89,  0.5 : 98,   0.6 : 98,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
                                    'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}} 
+<<<<<<< HEAD
         elif (mode=='optInt'):
             min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 94,  0.1 : 94,  0.2 : 94,  0.3 : 94,  0.4 : 94,  0.5 : 102,  0.6 : 102,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
+=======
+        elif (mode=='optInt'): # Verified for 0.0-->0.6
+            min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 94,  0.1 : 94,  0.2 : 94,  0.3 : 94,  0.4 : 94,  0.5 : 102,  0.6 : 111,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
+>>>>>>> 56c6b198cd320b6fde0c4a958028b51b93a55085
                                    'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}}
         else:
             print ('sorry, mode {} that you chose is unsupported yet' .format (mode))
@@ -2139,7 +2148,12 @@ if __name__ == "__main__":
 
     
     city = 'Lux'
+<<<<<<< HEAD
     run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
+=======
+    for prob in [0.7, 0.8, 0.9, 1.0]:
+        run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)
+>>>>>>> 56c6b198cd320b6fde0c4a958028b51b93a55085
 
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
     #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',

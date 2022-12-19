@@ -1030,7 +1030,6 @@ class Res_file_parser (object):
             overall_nPkts .append (sum (item['y_avg'] for item in nPkts_list))
             overall_nBytes.append (sum (item['y_avg'] for item in nByts_list))
 
-        print ('plot_comoh is using blocking-async. change the line below to non-blocking, if you wanna')
         # self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nPkts, mode='AsyncBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
         # self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nBytes, mode='AsyncBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
 
@@ -1582,7 +1581,7 @@ if __name__ == '__main__':
     # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
     # my_res_file_parser.plot_comoh (pcl_input_file_name=pcl_output_file_name)
 
-    city = 'Monaco'
+    city = 'Lux'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
     my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['Monaco.comoh'], prob=0.3)

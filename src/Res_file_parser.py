@@ -895,7 +895,7 @@ class Res_file_parser (object):
             splitted_settings = settings.split ("_")
     
             if len (splitted_settings) != num_of_fields:
-                print ("encountered a forma  t error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
+                print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
                 self.dict = None
                 return
     
@@ -912,13 +912,12 @@ class Res_file_parser (object):
             if (stts!=1): # if the run failed, the other fields are irrelevant
                 continue
     
-            print ('NUM_DIRECTIONS={}' .format (NUM_DIRECTIONS))
             for direction in range (numDirections): 
                 self.dict['nPkts{}'  .format (direction)] = int (splitted_line[direction+1].split("=")[1])
                 self.dict['nBytes{}' .format (direction)] = int (splitted_line[numDirections+direction+1].split("=")[1])
-
-            self.dict['critNNewRtUsrs']    = int (splitted_line[2*numDirections+1].split("=")[1])
-            self.dict['critNNewNonRtUsrs'] = int (splitted_line[2*numDirections+2].split("=")[1])
+                       
+            self.dict['numCritNNewRtUsrs']    = int (splitted_line[2*numDirections+1].split("=")[1])
+            self.dict['numCritNNewNonRtUsrs'] = int (splitted_line[2*numDirections+2].split("=")[1])
 
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
@@ -957,31 +956,27 @@ class Res_file_parser (object):
             data_of_this_cpu = list (filter (lambda item : item['cpu']==cpu_val, self.list_of_dicts)) #list of results of runs for this cpu value
             seeds = [item['seed'] for item in data_of_this_cpu]
             for type in ['nPkts', 'nBytes']:
-                overall_of_this_cpu_n_type = []
+                comonh_per_req_for_this_cpu_n_type = []
                 for seed in seeds:
-                    overall_of_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)] for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
-                avg_overall_of_this_cpu_n_type = np.average(overall_of_this_cpu_n_type)
-                [y_lo, y_hi] = (self.conf_interval (ar=overall_of_this_cpu_n_type, avg=avg_overall_of_this_cpu_n_type ))
+                    # comonh_per_req_for_this_cpu_n_type will hold a list of overall nBytes/pkts per request, in all directions, for each simulated seed.
+                    comonh_per_req_for_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)]/(item['numCritNNewRtUsrs']+item['numCritNNewNonRtUsrs']) 
+                                                             for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
+                avg_comonh_per_req_for_this_cpu_n_type = np.average(comonh_per_req_for_this_cpu_n_type)
+                [y_lo, y_hi] = (self.conf_interval (ar=comonh_per_req_for_this_cpu_n_type, avg=avg_comonh_per_req_for_this_cpu_n_type ))
                 self.comoh_data.append ({'cpu' : cpu_val, 
                                          'type' : type,
-                                         'y_avg' : avg_overall_of_this_cpu_n_type, 
+                                         'y_avg' : avg_comonh_per_req_for_this_cpu_n_type, 
                                          'y_lo' : y_lo, 
                                          'y_hi' : y_hi, 
                                          'num_of_seeds' : len(seeds), 
                                          'dir' : OVERALL_DIR})
 
-
-            critNNewNonRtUsrs_of_this_cpu = [item['critNNewNonRtUsrs'] for item in data_of_this_cpu]
-            cur_avg = np.average(critNNewNonRtUsrs_of_this_cpu)
-            [y_lo, y_hi] = (self.conf_interval (ar=critNNewNonRtUsrs_of_this_cpu, avg=cur_avg))
-            self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(critNNewNonRtUsrs_of_this_cpu), 'type' : 'critNNewNonRtUsrs'})
-                    
-            for direction in range(numDirections):
-                for type in ['nPkts', 'nBytes']:
-                    data_of_this_cpu_and_dir = [item['{}{}' .format (type, direction)] for item in data_of_this_cpu]
-                    cur_avg = int (round (np.average (data_of_this_cpu_and_dir)))
-                    [y_lo, y_hi] = (self.conf_interval (ar=data_of_this_cpu_and_dir, avg=cur_avg)) # low, high y values for this plotted conf' interval
-                    self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(data_of_this_cpu_and_dir), 'type' : type, 'dir' : direction })
+            # for direction in range(numDirections):
+            #     for type in ['nPkts', 'nBytes']:
+            #         data_of_this_cpu_and_dir = [item['{}{}' .format (type, direction)] for item in data_of_this_cpu]
+            #         cur_avg = int (round (np.average (data_of_this_cpu_and_dir)))
+            #         [y_lo, y_hi] = (self.conf_interval (ar=data_of_this_cpu_and_dir, avg=cur_avg)) # low, high y values for this plotted conf' interval
+            #         self.comoh_data.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : cur_avg, 'num_of_seeds' : len(data_of_this_cpu_and_dir), 'type' : type, 'dir' : direction })
         
         
         # store the data as binary data stream
@@ -1000,8 +995,8 @@ class Res_file_parser (object):
         cpu_norm_factor = 89 if self.city=='Lux' else 840 # normalization factor for x axis: the minimal cpu for which opt finds a feasible sol
         cpu_vals = sorted (list (set ([item['cpu'] for item in self.comoh_data]))) # list of cpu vals for which there exist data
         normalized_cpu_vals, overall_nPkts, overall_nBytes = [], [], []
-        plot_types = ['nPkts', 'nBytes', 'critNNewNonRtUsrs']
-        overall = {plot_types[0] : [], plot_types[1] : [], plot_types[2] : []}
+        plot_types = ['nPkts', 'nBytes']
+        overall = {plot_types[0] : [], plot_types[1] : []}
         for cpu_val in cpu_vals:
             cpu_val_data = [item for item in self.comoh_data if item['cpu']==cpu_val] 
             normalized_cpu_val = cpu_val/cpu_norm_factor
@@ -1018,9 +1013,10 @@ class Res_file_parser (object):
 
         # nonRtUsrChainOh = 20 
         for type in ['nPkts', 'nBytes']:
-            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='overall {}' .format (type))
+            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='Communication Overhead per Request') 
+                #  'label='Number of {} per Request' .format ('Bytes' if type=='nBytes' else 'Packets'))
             ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
-            plt.ylabel('{}' .format (type))
+            plt.ylabel('Communication Overhead {}' .format ('[Bytes]' if type=='nBytes' else '[# Packets]'))
             plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
             # if (type=='nBytes'):
             #     ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*(TREE_HEIGHT-1)   for item in overall['critNNewNonRtUsrs']], color=self.color_dict['opt'],   marker=self.markers_dict['opt'],   markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive LBound')
@@ -1036,9 +1032,6 @@ class Res_file_parser (object):
 
         print ('plot_comoh is using blocking-async. change the line below to non-blocking, if you wanna')
         # self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nPkts, mode='AsyncBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
-        print ('x=', [item/cpu_norm_factor for item in  cpu_vals]) #$$$$
-        print ('y=', overall_nBytes) #$$$$
-        exit () #$$$
         # self.my_plot (ax=ax, x=[item/cpu_norm_factor for item in  cpu_vals], y=overall_nBytes, mode='AsyncBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None) 
 
         # ax.plot (cpu_vals, overall_nPkts)#, color = 'black') #, marker=None, linewidth=LINE_WIDTH, label=city if city=='Monaco' else 'Luxembourg')
@@ -1050,8 +1043,8 @@ class Res_file_parser (object):
         # plt.xlim (0, 3600)
         # plt.ylim (0)
         # ax.legend (fontsize=22, loc='center') 
-        ax.plot ((cpu_val ,cpu_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
-        plt.show ()
+        # ax.plot ((cpu_val ,cpu_val), (y_lo, y_hi), color=self.color_dict[mode]) # Plot the confidence interval
+        # plt.show ()
 
         # plt.savefig ('../res/tot_num_of_vehs_0730_0830.pdf', bbox_inches='tight')
 

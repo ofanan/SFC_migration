@@ -866,7 +866,7 @@ class Res_file_parser (object):
             #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val, cost_vs_rsrc_data_of_this_mode)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
             #     print ('cpu={}, mode={}', 'avg_cost={}' .format (list_of_item[0]['cpu'], mode, point['y_avg'])) 
 
-    def parse_comoh_file (self, input_file_name, city=None, numDirections=NUM_DIRECTIONS):
+    def parse_comoh_file (self, input_file_name, city=None, numDirections=NUM_DIRECTIONS, stdout=True):
         """
         Parse a .comoh file (files which details the communication overhead - e.g., number and overall size of packets).
         Inputs:
@@ -874,6 +874,7 @@ class Res_file_parser (object):
         Assuming a tree whose highest level is lvlOfRoot, the directions are:
         directions 0, 1, ..., lvlOfRoot-1 --> pkts from lvl 0, 1, ..., lvlOfRoot-1 to the level above.
         directions lvlOfRoot, .., 2*lvlOfRoot-1--> pkts from lvl=2*lvlOfRoot-1, ..., lvlOfRoot to the level below.
+        stdout: when True, prints to stdout info about the parsed lines
         """
         
         self.city = parse_city_from_input_file_name(input_file_name) if (city==None) else city 
@@ -921,7 +922,10 @@ class Res_file_parser (object):
 
             if (not(self.dict in self.list_of_dicts)):
                 self.list_of_dicts.append(self.dict)                
-
+            
+            if (stdout):
+                print ('cpu{}_p{}_sd{} normNBytes={:.0f}' .format (self.dict['cpu'], self.dict['prob'], self.dict['seed'], 
+                    sum ([self.dict['nBytes{}' .format (direction)] for direction in range(numDirections)])/(self.dict['numCritNNewRtUsrs']+self.dict['numCritNNewNonRtUsrs'])))
         self.input_file.close
 
 
@@ -1581,7 +1585,7 @@ if __name__ == '__main__':
     # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
     # my_res_file_parser.plot_comoh (pcl_input_file_name=pcl_output_file_name)
 
-    city = 'Monaco'
+    city = 'Lux'
     my_res_file_parser = Res_file_parser ()
     comoh_file = '{}.comoh' .format (city)
     my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)

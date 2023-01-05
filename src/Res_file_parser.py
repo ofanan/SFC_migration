@@ -264,14 +264,14 @@ class Res_file_parser (object):
                 exit ()
         
         if (pcl_input_file_name != None):
-            self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+            self.list_of_dicts = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
             self.city = parse_city_from_input_file_name (pcl_input_file_name)
         
         if (res_file_names!=None):
             for res_file_name in res_file_names:
                 self.parse_file (input_file_name=res_file_name)
             if (pcl_input_file_name==None):
-                pcl_full_path_file_name = '../res/pcl_files/{}.pcl' .format (res_input_file_names[0].split('.res')[0])
+                pcl_full_path_file_name = '../res/pcl_files/{}.pcl' .format (res_file_names[0].split('.res')[0])
             else:
                 pcl_full_path_file_name = '../res/pcl_files/{}' .format (pcl_input_file_name)
                 
@@ -866,7 +866,7 @@ class Res_file_parser (object):
             #     list_of_item = list (filter (lambda item : item['cpu']==cpu_val, cost_vs_rsrc_data_of_this_mode)) # all items with this mode, and cpu, already found in self.cost_vs_rsrc_data
             #     print ('cpu={}, mode={}', 'avg_cost={}' .format (list_of_item[0]['cpu'], mode, point['y_avg'])) 
 
-    def parse_comoh_file (self, input_file_name, city=None, numDirections=NUM_DIRECTIONS, stdout=True):
+    def parse_comoh_file (self, input_file_name, city=None, numDirections=NUM_DIRECTIONS, stdout=False):
         """
         Parse a .comoh file (files which details the communication overhead - e.g., number and overall size of packets).
         Inputs:
@@ -1566,15 +1566,12 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    # # Generate a Rt_prob_sim plot
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    # if (city=='Lux'):
-    #     my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['Lux_RtProb_0820_0830_1secs.res', 'Lux_RtProb_AsyncNBlk_1secs.res'])
-    # else:        
-    #     my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['Monaco_RtProb_AsyncNBlk_1secs.res'])
-    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+    # Generate a Rt_prob_sim plot
+    city = 'Monaco'
+    my_res_file_parser = Res_file_parser ()
+    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+    my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
+    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'
@@ -1585,11 +1582,13 @@ if __name__ == '__main__':
     # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
     # my_res_file_parser.plot_comoh (pcl_input_file_name=pcl_output_file_name)
 
-    city = 'Lux'
-    my_res_file_parser = Res_file_parser ()
-    comoh_file = '{}.comoh' .format (city)
-    my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
-    my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
+    # city = 'Monaco'
+    # my_res_file_parser = Res_file_parser ()
+    # my_res_file_parser.parse_comoh_file(input_file_name='Monaco_0.5_0.5_acc_delay.comoh', city=city, numDirections=NUM_DIRECTIONS, stdout=True)
+    # exit ()
+    # comoh_file = '{}.comoh' .format (city)
+    # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
+    # my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()

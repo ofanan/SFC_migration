@@ -27,23 +27,20 @@ OVERALL_DIR    = -1
 
 
 # Indices of fields indicating the settings in a standard ".res" file
-t_idx         = 0
-mode_idx      = 1
-cpu_idx       = 2
-prob_idx      = 3
-seed_idx      = 4
-stts_idx      = 5
-num_of_fields = stts_idx+1
+t_idx     = 0 # time slot
+mode_idx  = 1 # the alg' used, e.g. 'opt',  'ourAlg', ...
+cpu_idx   = 2 # ammount of cpu in the leaf
+prob_idx  = 3 # prob' that a new request is for a RT service
+seed_idx  = 4 # seed used for randomization
+stts_idx  = 5 # stts of the run: 1 is sccs. Other values indicate various fails
+acd_idx   = 6 # accumulation delay at the leaf, in the dist' async' alg. 
+pdd_idx   = 7 # push-down delay at the leaf, in the dist' async' alg.
+num_of_fields = stts_idx+1 # num' of fields in a standard .res file
+num_of_fields_comoh = pdd_idx+1 # num' of fields in a .comoh (communication overhead) file
 
 num_usrs_idx      = 6
 num_crit_usrs_idx = 7
 reshuffle_idx     = num_crit_usrs_idx+1 
-blocked_usrs_idx  = num_of_fields+1
-
-opt_idx   = 0
-alg_idx   = 1
-ffit_idx  = 2
-cpvnf_idx = 3
 
 MARKER_SIZE             = 16
 MARKER_SIZE_SMALL       = 1
@@ -895,7 +892,7 @@ class Res_file_parser (object):
             settings          = splitted_line[0]
             splitted_settings = settings.split ("_")
     
-            if len (splitted_settings) != num_of_fields:
+            if len (splitted_settings) != num_of_fields_comoh:
                 print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
                 self.dict = None
                 return
@@ -907,6 +904,8 @@ class Res_file_parser (object):
                 "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
                 "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
                 "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
+                "ac  delay" : float (splitted_settings [acd_idx].split("ad")   [1]),  
+                "pd  delay" : float (splitted_settings [pdd_idx].split("pdd")  [1]),  
                 "stts"      : stts,
             }
             
@@ -929,9 +928,16 @@ class Res_file_parser (object):
         self.input_file.close
 
 
-    def calc_comoh (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
+    def plot_comoh_by_Rt_prob (self, city, res_input_file_names, numDirections=NUM_DIRECTIONS):
         """
-        Calculate the data needed for plotting a graph showing the communication overhead.
+        Calculate the data needed for plotting a graph showing the communication overhead as a func' of the RT prob'.
+        Then, plot a graph, and save it.
+        """
+        return
+    
+    def calc_comoh_by_cpu (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
+        """
+        Calculate the data needed for plotting a graph showing the communication overhead as a func' of the cpu at the leaf.
         * Optional inputs: 
             .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
             A list of .res files, containing the results of a run.
@@ -988,7 +994,7 @@ class Res_file_parser (object):
             pickle.dump(self.comoh_data, comoh_data_file)
 
     
-    def plot_comoh (self, pcl_input_file_name):
+    def plot_comoh_by_cpu (self, pcl_input_file_name):
         """
         Plot the comm' o/h (num of pkts / num of bytes), as a function of the cpu.
         """
@@ -1010,7 +1016,7 @@ class Res_file_parser (object):
                 if (type in ['nPkts', 'nBytes']):
                     list_of_item = [item for item in list_of_item if item['dir']==OVERALL_DIR]
                 if (len(list_of_item)<1):
-                    print ('error in plot_comoh: could not find entry for overall {}' .format (type))
+                    print ('error in plot_comoh_by_cpu: could not find entry for overall {}' .format (type))
                     exit () 
                 item = list_of_item[0]
                 overall[type].append(item['y_avg'])
@@ -1579,16 +1585,16 @@ if __name__ == '__main__':
     # comoh_file = '{}.comoh' .format (city)
     # res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
     # pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
-    # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
-    # my_res_file_parser.plot_comoh (pcl_input_file_name=pcl_output_file_name)
+    # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
+    # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name=pcl_output_file_name)
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.parse_comoh_file(input_file_name='Monaco_0.5_0.5_acc_delay.comoh', city=city, numDirections=NUM_DIRECTIONS, stdout=True)
     # exit ()
     # comoh_file = '{}.comoh' .format (city)
-    # my_res_file_parser.calc_comoh (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
-    # my_res_file_parser.plot_comoh (pcl_input_file_name='{}.comoh.pcl' .format (city))
+    # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
+    # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
     # city = 'Monaco'
     # my_res_file_parser = Res_file_parser ()

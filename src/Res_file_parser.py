@@ -904,8 +904,8 @@ class Res_file_parser (object):
                 "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
                 "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
                 "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
-                "ac  delay" : float (splitted_settings [acd_idx].split("ad")   [1]),  
-                "pd  delay" : float (splitted_settings [pdd_idx].split("pdd")  [1]),  
+                "ad"        : float (splitted_settings [acd_idx].split("ad")   [1]),  
+                "pdd"       : float (splitted_settings [pdd_idx].split("pdd")  [1]),  
                 "stts"      : stts,
             }
             
@@ -928,12 +928,42 @@ class Res_file_parser (object):
         self.input_file.close
 
 
-    def plot_comoh_by_Rt_prob (self, city, res_input_file_names, numDirections=NUM_DIRECTIONS):
+    def plot_comoh_by_Rt_prob (self, city, comoh_input_file_names, numDirections=NUM_DIRECTIONS):
         """
         Calculate the data needed for plotting a graph showing the communication overhead as a func' of the RT prob'.
         Then, plot a graph, and save it.
         """
-        return
+        self.comoh_data = [] # this field will hold all the data to be parsed from the comoh input files
+        for file_name in comoh_input_file_names:
+            self.parse_comoh_file (file_name, city=city, numDirections=numDirections)
+            
+            
+        acc_delay_vals = sorted (set ([item['ad']  for item in self.list_of_dicts]))  # values of accumulation delay in the input files
+
+        for acc_delay in acc_delay_vals:  
+            data_of_this_ad = list (filter (lambda item : item['ad']==acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay value
+
+            prob_vals = sorted (set ([item['prob'] for item in data_of_this_ad])) # values of prob' collected for this acc delay
+
+            for prob in prob_vals:  
+            
+                data_of_this_ad_n_prob = list (filter (lambda item : item['prob']==prob, data_of_this_ad)) #list of results of runs for this acc delay and prob values
+                seeds = [item['seed'] for item in data_of_this_ad_n_prob]
+                for type in ['nPkts', 'nBytes']:
+                    nBytes_per_req_for_this_ad_n_prob = [] # will hold a list of overall nBytes/pkts per request, in all directions, for each simulated seed.
+                    for seed in seeds:
+                        
+                        nBytes_per_req_for_this_ad_n_prob.append (sum ([item['nBytes{}' .format (direction)]/(item['numCritNNewRtUsrs']+item['numCritNNewNonRtUsrs']) 
+                                                                 for direction in range(numDirections) for item in data_of_this_ad_n_prob if item['seed']==seed]))
+                    avg_nBytes_per_req_for_this_ad_n_prob = np.average(nBytes_per_req_for_this_ad_n_prob)
+                    [y_lo, y_hi] = (self.conf_interval (ar=nBytes_per_req_for_this_ad_n_prob, avg=avg_nBytes_per_req_for_this_ad_n_prob))
+                    self.comoh_data.append ({'type' : type,
+                                             'y_avg' : avg_nBytes_per_req_for_this_ad_n_prob, 
+                                             'y_lo' : y_lo, 
+                                             'y_hi' : y_hi, 
+                                             'num_of_seeds' : len(seeds), 
+                                             'dir' : OVERALL_DIR})
+
     
     def calc_comoh_by_cpu (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
         """
@@ -966,16 +996,16 @@ class Res_file_parser (object):
             data_of_this_cpu = list (filter (lambda item : item['cpu']==cpu_val, self.list_of_dicts)) #list of results of runs for this cpu value
             seeds = [item['seed'] for item in data_of_this_cpu]
             for type in ['nPkts', 'nBytes']:
-                comonh_per_req_for_this_cpu_n_type = []
+                comoh_per_req_for_this_cpu_n_type = []
                 for seed in seeds:
-                    # comonh_per_req_for_this_cpu_n_type will hold a list of overall nBytes/pkts per request, in all directions, for each simulated seed.
-                    comonh_per_req_for_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)]/(item['numCritNNewRtUsrs']+item['numCritNNewNonRtUsrs']) 
+                    # comoh_per_req_for_this_cpu_n_type will hold a list of overall nBytes/pkts per request, in all directions, for each simulated seed.
+                    comoh_per_req_for_this_cpu_n_type.append (sum ([item['{}{}' .format (type, direction)]/(item['numCritNNewRtUsrs']+item['numCritNNewNonRtUsrs']) 
                                                              for direction in range(numDirections) for item in data_of_this_cpu if item['seed']==seed]))
-                avg_comonh_per_req_for_this_cpu_n_type = np.average(comonh_per_req_for_this_cpu_n_type)
-                [y_lo, y_hi] = (self.conf_interval (ar=comonh_per_req_for_this_cpu_n_type, avg=avg_comonh_per_req_for_this_cpu_n_type ))
+                avg_comoh_per_req_for_this_cpu_n_type = np.average(comoh_per_req_for_this_cpu_n_type)
+                [y_lo, y_hi] = (self.conf_interval (ar=comoh_per_req_for_this_cpu_n_type, avg=avg_comoh_per_req_for_this_cpu_n_type ))
                 self.comoh_data.append ({'cpu' : cpu_val, 
                                          'type' : type,
-                                         'y_avg' : avg_comonh_per_req_for_this_cpu_n_type, 
+                                         'y_avg' : avg_comoh_per_req_for_this_cpu_n_type, 
                                          'y_lo' : y_lo, 
                                          'y_hi' : y_hi, 
                                          'num_of_seeds' : len(seeds), 

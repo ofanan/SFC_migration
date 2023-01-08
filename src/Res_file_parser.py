@@ -33,10 +33,10 @@ cpu_idx   = 2 # ammount of cpu in the leaf
 prob_idx  = 3 # prob' that a new request is for a RT service
 seed_idx  = 4 # seed used for randomization
 stts_idx  = 5 # stts of the run: 1 is sccs. Other values indicate various fails
-acd_idx   = 6 # accumulation delay at the leaf, in the dist' async' alg. 
+ad_idx    = 6 # accumulation delay at the leaf, in the dist' async' alg. 
 pdd_idx   = 7 # push-down delay at the leaf, in the dist' async' alg.
 num_of_fields = stts_idx+1 # num' of fields in a standard .res file
-num_of_fields_comoh = pdd_idx+1 # num' of fields in a .comoh (communication overhead) file
+num_of_fields_w_delays = pdd_idx+1 # num' of fields where delays (accumulation delay and push-down delay) are also reported
 
 num_usrs_idx      = 6
 num_crit_usrs_idx = 7
@@ -192,7 +192,7 @@ class Res_file_parser (object):
                                 'ms'            : 'v'}
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
       
-    def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label=None): 
+    def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label=None, marker=None): 
         
         """
         Plot a single x, y, python line, with the required settings (colors, markers etc).
@@ -204,7 +204,7 @@ class Res_file_parser (object):
         if (mode in ['ourAlgC', 'cpvnfC', 'ffitC']):
             ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=label, mfc='none', linestyle='dashed') 
         else:
-            ax.plot (x, y, color=color, marker=self.markers_dict[mode], markersize=markersize, linewidth=linewidth, label=label, mfc='none')
+            ax.plot (x, y, color=color, marker=self.markers_dict[mode] if marker==None else marker, markersize=markersize, linewidth=linewidth, label=label, mfc='none')
 
 
     
@@ -266,7 +266,7 @@ class Res_file_parser (object):
         
         if (res_file_names!=None):
             for res_file_name in res_file_names:
-                self.parse_file (input_file_name=res_file_name)
+                self.parse_res_file (input_file_name=res_file_name)
             if (pcl_input_file_name==None):
                 pcl_full_path_file_name = '../res/pcl_files/{}.pcl' .format (res_file_names[0].split('.res')[0])
             else:
@@ -288,7 +288,7 @@ class Res_file_parser (object):
         """
         
         if (res_file_to_parse != None):
-            self.parse_file(res_file_to_parse, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
+            self.parse_res_file(res_file_to_parse, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
             self.dump_self_list_of_dicts_to_pcl (res_file_name = res_file_to_parse)
             self.city = parse_city_from_input_file_name (res_file_to_parse)
         elif (pcl_input_file_name != None):
@@ -450,7 +450,7 @@ class Res_file_parser (object):
         return np.array(vec)
 
 
-    def parse_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False, time_slot_len=None, ignore_worse_lines=False):
+    def parse_res_file (self, input_file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False, time_slot_len=None, ignore_worse_lines=False):
         """
         Parse a result file, in which each un-ommented line indicates a concrete simulation settings.
         Inputs:
@@ -478,7 +478,7 @@ class Res_file_parser (object):
             if (line.split ("//")[0] == ""):
                 continue
            
-            self.parse_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs, parse_crit_len=parse_crit_len)
+            self.parse_res_line(line, parse_cost=parse_cost, parse_cost_comps=parse_cost_comps, parse_num_usrs=parse_num_usrs, parse_crit_len=parse_crit_len)
             if (self.dict==None): # No new data from this line
                 continue
             if (ignore_worse_lines):
@@ -495,7 +495,7 @@ class Res_file_parser (object):
         self.input_file.close
 
 
-    def parse_line (self, line, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False):
+    def parse_res_line (self, line, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True, parse_crit_len=False):
         """
         Parse a line in a ".res" result file, and save the parsed data in the dictionary self.dict. 
         Such a line should begin with a string having several fields, detailing the settings.
@@ -511,7 +511,7 @@ class Res_file_parser (object):
         settings          = splitted_line[0]
         splitted_settings = settings.split ("_")
 
-        if len (splitted_settings) != num_of_fields:
+        if (len (splitted_settings) not in [num_of_fields, num_of_fields_w_delays]):
             print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
             self.dict = None
             return
@@ -521,10 +521,13 @@ class Res_file_parser (object):
             "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
             "mode"      : splitted_settings      [mode_idx],
             "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
-            "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
-            "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
+            "prob"      : float (splitted_settings [prob_idx].split("p")  [1]),  
+            "seed"      : int   (splitted_settings [seed_idx].split("sd") [1]),  
             "stts"      : stts,
         }
+        if (len (splitted_settings)==num_of_fields_w_delays):
+            self.dict['ad'] = float (splitted_settings [prob_idx].split("ad") [1])
+            self.dict['ad'] = float (splitted_settings [prob_idx].split("pdd")[1])
         
         if (stts!=1): # if the run failed, the other fields are irrelevant
             return
@@ -639,7 +642,7 @@ class Res_file_parser (object):
             self.city = parse_city_from_input_file_name (pcl_input_file_name)
             input_file_name = pcl_input_file_name.split('.pcl')[0]            
         if (res_input_file_name != None):
-            self.parse_file(res_input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
+            self.parse_res_file(res_input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
             input_file_name = res_input_file_name.split('.res')[0]            
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         dat_output_file = open ('../res/{}.dat' .format (input_file_name), 'w')
@@ -823,7 +826,7 @@ class Res_file_parser (object):
         
         # If the caller provided a .res input file, parse the data from it
         for file_name in res_input_file_names:
-            self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+            self.parse_res_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
     
         modes = ['opt', 'SyncPartResh', 'AsyncBlk', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']
         for mode in modes:
@@ -892,7 +895,7 @@ class Res_file_parser (object):
             settings          = splitted_line[0]
             splitted_settings = settings.split ("_")
     
-            if len (splitted_settings) != num_of_fields_comoh:
+            if len (splitted_settings) != num_of_fields_w_delays:
                 print ("encountered a format error. Splitted line={}\nsplitted settings={}" .format (splitted_line, splitted_settings))
                 self.dict = None
                 return
@@ -904,8 +907,8 @@ class Res_file_parser (object):
                 "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
                 "prob"      : float (splitted_settings [prob_idx].split("p")   [1]),  
                 "seed"      : int   (splitted_settings [seed_idx].split("sd")  [1]),  
-                "ad"        : float (splitted_settings [acd_idx].split("ad")   [1]),  
-                "pdd"       : float (splitted_settings [pdd_idx].split("pdd")  [1]),  
+                "ad"        : float (splitted_settings [ad_idx]  .split("ad")   [1]),  
+                "pdd"       : float (splitted_settings [pdd_idx] .split("pdd")  [1]),  
                 "stts"      : stts,
             }
             
@@ -927,49 +930,98 @@ class Res_file_parser (object):
                     sum ([self.dict['nBytes{}' .format (direction)] for direction in range(numDirections)])/(self.dict['numCritNNewRtUsrs']+self.dict['numCritNNewNonRtUsrs'])))
         self.input_file.close
 
+    def plot_rsrc_by_ad_pdd (self, city, res_input_file_names):
+        """
+        Calculate the data needed for plotting a graph showing the required cpu at leaf for finding a feasible sol', as a func' of the acc delay and push-down delay.
+        Then, plot a graph, and save it.
+        """
+        self.set_plt_params ()
+        ax = plt.gca()
 
+        for file_name in res_input_file_names:
+            self.parse_res_file(input_file_name=file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=False, ignore_worse_lines=True)
+                   
+        acc_delay_vals = sorted (set ([item['ad']  for item in self.list_of_dicts]))  # values of accumulation delay in the input files
+        colors  = ['blue', 'green', 'brown', 'purple', 'black', 'cyan', 'yellow']
+        markers = ['x', 'o', 'v', '^', 's', 'h', 'd']
+        color_idx = 0
+
+        for pdd2ad_ratio in [1,2,4]:
+            avg_cpu_for_this_ratio = []
+            for acc_delay in acc_delay_vals:
+                data_of_this_ad_n_pdd = list (filter (lambda item : item['ad']==acc_delay and item['pdd']==pdd2ad_ratio*acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay and push-down delay values
+                cpu_for_this_ad_n_pdd = [item['cpu'] for item in data_of_this_ad_n_pdd]
+                avg_cpu_for_this_ad_n_pdd = np.average(cpu_for_this_ad_n_pdd)
+                avg_cpu_for_this_ratio.append (avg_cpu_for_this_ad_n_pdd)
+                # [y_lo, y_hi] = (self.conf_interval (ar=cpu_for_this_ad_n_pdd, avg=avg_cpu_for_this_ad_n_pdd))   
+                
+            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='PD delay={:.0f}*Acc delay' .format (acc_delay))
+            color_idx += 1
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        plt.ylabel('Min Cpu at Leaf [GHz]')
+        plt.xlabel('Accumulation Delay [us]')
+        plt.savefig ('../res/{}_cpu_by_delays.pdf' .format (city), bbox_inches='tight')
+        plt.cla()
+
+    
     def plot_comoh_by_Rt_prob (self, city, comoh_input_file_names, numDirections=NUM_DIRECTIONS):
         """
         Calculate the data needed for plotting a graph showing the communication overhead as a func' of the RT prob'.
         Then, plot a graph, and save it.
         """
+        self.set_plt_params ()
+        ax = plt.gca()
+
         self.comoh_data = [] # this field will hold all the data to be parsed from the comoh input files
         for file_name in comoh_input_file_names:
             self.parse_comoh_file (file_name, city=city, numDirections=numDirections)
             
-            
+        
         acc_delay_vals = sorted (set ([item['ad']  for item in self.list_of_dicts]))  # values of accumulation delay in the input files
+        colors  = ['blue', 'green', 'brown', 'purple', 'black', 'cyan', 'yellow']
+        markers = ['x', 'o', 'v', '^', 's', 'h', 'd']
+        color_idx = 0
 
-        for acc_delay in acc_delay_vals:  
+        for acc_delay in [acc_delay for acc_delay in acc_delay_vals if acc_delay in [0, 1, 10, 100]]:
             data_of_this_ad = list (filter (lambda item : item['ad']==acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay value
 
             prob_vals = sorted (set ([item['prob'] for item in data_of_this_ad])) # values of prob' collected for this acc delay
 
+            avg_nBytes_per_req_for_this_ad = []
             for prob in prob_vals:  
             
                 data_of_this_ad_n_prob = list (filter (lambda item : item['prob']==prob, data_of_this_ad)) #list of results of runs for this acc delay and prob values
                 seeds = [item['seed'] for item in data_of_this_ad_n_prob]
-                for type in ['nPkts', 'nBytes']:
-                    nBytes_per_req_for_this_ad_n_prob = [] # will hold a list of overall nBytes/pkts per request, in all directions, for each simulated seed.
-                    for seed in seeds:
-                        
-                        nBytes_per_req_for_this_ad_n_prob.append (sum ([item['nBytes{}' .format (direction)]/(item['numCritNNewRtUsrs']+item['numCritNNewNonRtUsrs']) 
-                                                                 for direction in range(numDirections) for item in data_of_this_ad_n_prob if item['seed']==seed]))
-                    avg_nBytes_per_req_for_this_ad_n_prob = np.average(nBytes_per_req_for_this_ad_n_prob)
-                    [y_lo, y_hi] = (self.conf_interval (ar=nBytes_per_req_for_this_ad_n_prob, avg=avg_nBytes_per_req_for_this_ad_n_prob))
-                    self.comoh_data.append ({'type' : type,
-                                             'y_avg' : avg_nBytes_per_req_for_this_ad_n_prob, 
-                                             'y_lo' : y_lo, 
-                                             'y_hi' : y_hi, 
-                                             'num_of_seeds' : len(seeds), 
-                                             'dir' : OVERALL_DIR})
+                nBytes_per_req_for_this_ad_n_prob = [] # will hold a list of overall nBytes/pkts per request, in all directions, for each simulated seed.
+                for seed in seeds:
+                    
+                    nBytes_per_req_for_this_ad_n_prob.append (sum ([item['nBytes{}' .format (direction)]/(item['numCritNNewRtUsrs']+item['numCritNNewNonRtUsrs']) 
+                                                             for direction in range(numDirections) for item in data_of_this_ad_n_prob if item['seed']==seed]))
+                avg_nBytes_per_req_for_this_ad_n_prob = np.average(nBytes_per_req_for_this_ad_n_prob)
+                avg_nBytes_per_req_for_this_ad.append (avg_nBytes_per_req_for_this_ad_n_prob)
+                [y_lo, y_hi] = (self.conf_interval (ar=nBytes_per_req_for_this_ad_n_prob, avg=avg_nBytes_per_req_for_this_ad_n_prob))
+                self.comoh_data.append ({'type' : type,
+                                         'y_avg' : avg_nBytes_per_req_for_this_ad_n_prob, 
+                                         'y_lo' : y_lo, 
+                                         'y_hi' : y_hi, 
+                                         'num_of_seeds' : len(seeds), 
+                                         'dir' : OVERALL_DIR})
 
+                
+            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='acc delay={:.0f}[us]' .format (acc_delay))
+            color_idx += 1
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        plt.xlim(0,1)
+        plt.ylabel('Control Bytes/Request')
+        plt.xlabel('Fraction of RT Chains')
+        plt.savefig ('../res/{}_comoh.pdf' .format (city), bbox_inches='tight')
+        plt.cla()
     
     def calc_comoh_by_cpu (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
         """
         Calculate the data needed for plotting a graph showing the communication overhead as a func' of the cpu at the leaf.
         * Optional inputs: 
-            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
+            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_res_file ()).
             A list of .res files, containing the results of a run.
             At least one file (either .pcl, or .res file) should be given       
         * Calculate the average cost for setting. 
@@ -1091,7 +1143,7 @@ class Res_file_parser (object):
         """
         Calculate the data needed for plotting a graph showing the cost as a function of the amount of resources (actually, cpu capacity at leaf):
         * Optional inputs: 
-            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
+            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_res_file ()).
             A list of .res files, containing the results of a run.
             At least one file (either .pcl, or .res file) should be given       
         * Calculate the average cost for each mode and seed during the whole trace for each seed, the confidence intervals, etc. 
@@ -1112,7 +1164,7 @@ class Res_file_parser (object):
     
         # If the caller provided a .res input file, parse the data from it
         for file_name in res_input_file_names:
-            self.parse_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
+            self.parse_res_file(file_name, parse_cost=True, parse_cost_comps=False, parse_num_usrs=False)
 
         modes = ['opt', 'SyncPartResh', 'AsyncBlk', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'ourAlg', 'ms', 'ffit', 'cpvnf', 'SyncPartResh']   
         for mode in modes:
@@ -1163,7 +1215,7 @@ class Res_file_parser (object):
         """
         Calculate the data needed for plotting a graph showing the migration cost / number of migrated chains / number of reshuffles, as a function of the amount of resources (actually, cpu capacity at leaf):
         * Optional inputs: 
-            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
+            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_res_file ()).
             A list of .res files, containing the results of a run.
             At least one file (either .pcl, or .res file) should be given       
         * Calculate the average # of migrated chains for each seed during the whole trace for each seed, the confidence intervals, etc. 
@@ -1176,7 +1228,7 @@ class Res_file_parser (object):
         # If the caller provided a .res input file, parse the data from it
         if (res_input_file_names != None):
             for file_name in res_input_file_names:
-                self.parse_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
+                self.parse_res_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
             self.dump_self_list_of_dicts_to_pcl (res_file_name = res_input_file_names[0])  
         else:
             self.list_of_dicts = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name)) 
@@ -1229,7 +1281,7 @@ class Res_file_parser (object):
         """
         Calculate the data needed for plotting a graph showing the migration cost / number of migrated chains / number of reshuffles, as a function of the amount of resources (actually, cpu capacity at leaf):
         * Optional inputs: 
-            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_file ()).
+            .pcl file, containing self.list_of_dicts (usually as a result of a previous run of self.parse_res_file ()).
             A list of .res files, containing the results of a run.
             At least one file (either .pcl, or .res file) should be given       
         * Calculate the average # of migrated chains for each seed during the whole trace for each seed, the confidence intervals, etc. 
@@ -1241,7 +1293,7 @@ class Res_file_parser (object):
         
         # If the caller provided a .res input file, parse the data from it
         for file_name in res_input_file_names:
-            self.parse_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=False)
+            self.parse_res_file(file_name, parse_cost=True, parse_cost_comps=True, parse_num_usrs=False)
     
         mig_vs_rsrc_data = []
 
@@ -1337,7 +1389,7 @@ class Res_file_parser (object):
         plt.xlim (0, np.max ([item['cpu']/10 for item in mig_vs_rsrc_data]))
         printFigToPdf ('{}_num_migs_vs_rsrc' .format (city))
 
-    def parse_files_w_distinct_T (self, input_res_filenames, input_pcl_file_name=None):
+    def parse_res_files_w_distinct_T (self, input_res_filenames, input_pcl_file_name=None):
         """
         Parse each of the given files. Add to its entry in self.list_of_dicts a field, presenting the length of the time slot.
         Save the results in a .pcl file.
@@ -1351,7 +1403,7 @@ class Res_file_parser (object):
             
             self.list_of_dicts = []
             T = self.parse_T_from_input_file_name (filename)
-            self.parse_file (input_file_name = filename, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
+            self.parse_res_file (input_file_name = filename, parse_cost=True, parse_cost_comps=True, parse_num_usrs=True)
             
             for item in self.list_of_dicts:
                 item['T'] = T
@@ -1500,7 +1552,7 @@ class Res_file_parser (object):
         pcl_output_file_name = '{}_crit_len.pcl' .format (city)
         for T in list_of_Ts:
             self.crit_len_cnt = np.zeros (T+1) # self.crit_len_cnt[T] will hold the overall # of critical chains that were critical for T seconds. 
-            self.parse_file (input_file_name='{}_crit_len_T{}.res' .format (city, T), parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=True, time_slot_len=T)
+            self.parse_res_file (input_file_name='{}_crit_len_T{}.res' .format (city, T), parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=True, time_slot_len=T)
             list_of_hists.append ({'slot_len' : T, 'hist' : self.crit_len_cnt})
     
         with open ('../res/{}' .format (pcl_output_file_name), 'wb') as pcl_file:
@@ -1574,7 +1626,7 @@ def plot_crit_n_mig_vs_T (city, y_axis='mig_cost', per_slot=True, prepare_new_pc
         else:
             for T in range (1, 11):
                 input_res_filenames.append ('Monaco_0730_0830_{}secs_Telecom_SyncPartResh.res' .format (T))
-        my_res_file_parser.parse_files_w_distinct_T(input_res_filenames)
+        my_res_file_parser.parse_res_files_w_distinct_T(input_res_filenames)
     my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city), y_axis=y_axis, per_slot=per_slot)
 
 def plot_RT_prob_sim (city):
@@ -1602,6 +1654,11 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
+    city = 'Lux'
+    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names='{}_cpu_by_delays.res' .format (city))
+    # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
+    exit ()
     # Generate a Rt_prob_sim plot
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()

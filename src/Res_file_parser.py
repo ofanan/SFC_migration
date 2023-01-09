@@ -517,17 +517,28 @@ class Res_file_parser (object):
             return
 
         stts = int (splitted_settings [stts_idx].split("stts")[1])
-        self.dict = {
-            "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
-            "mode"      : splitted_settings      [mode_idx],
-            "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
-            "prob"      : float (splitted_settings [prob_idx].split("p")  [1]),  
-            "seed"      : int   (splitted_settings [seed_idx].split("sd") [1]),  
-            "stts"      : stts,
-        }
         if (len (splitted_settings)==num_of_fields_w_delays):
-            self.dict['ad'] = float (splitted_settings [prob_idx].split("ad") [1])
-            self.dict['ad'] = float (splitted_settings [prob_idx].split("pdd")[1])
+            self.dict = {
+                "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
+                "mode"      : splitted_settings      [mode_idx],
+                "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
+                "prob"      : float (splitted_settings [prob_idx].split("p")  [1]),  
+                "seed"      : int   (splitted_settings [seed_idx].split("sd") [1]),  
+                "stts"      : stts,
+                'ad'        : int (splitted_settings [ad_idx].split("ad") [1]),
+                'pdd'       : int (splitted_settings [pdd_idx].split("pdd") [1])
+            }
+        else: 
+            self.dict = {
+                "t"         : int   (splitted_settings [t_idx]   .split('t')[1]),
+                "mode"      : splitted_settings      [mode_idx],
+                "cpu"       : int   (splitted_settings [cpu_idx] .split("cpu")[1]),  
+                "prob"      : float (splitted_settings [prob_idx].split("p")  [1]),  
+                "seed"      : int   (splitted_settings [seed_idx].split("sd") [1]),  
+                "stts"      : stts,
+            }
+        # self.dict.append ({})
+        # self.dict['pdd'] = float (splitted_settings [prob_idx].split("pdd")[1])
         
         if (stts!=1): # if the run failed, the other fields are irrelevant
             return
@@ -939,23 +950,25 @@ class Res_file_parser (object):
         ax = plt.gca()
 
         for file_name in res_input_file_names:
-            self.parse_res_file(input_file_name=file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=False, ignore_worse_lines=True)
+            self.parse_res_file(input_file_name=file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False, parse_crit_len=False, ignore_worse_lines=False)
                    
         acc_delay_vals = sorted (set ([item['ad']  for item in self.list_of_dicts]))  # values of accumulation delay in the input files
-        colors  = ['blue', 'green', 'brown', 'purple', 'black', 'cyan', 'yellow']
-        markers = ['x', 'o', 'v', '^', 's', 'h', 'd']
+        colors  = ['blue', 'green', 'brown', 'purple', 'black', 'cyan', 'yellow'] # colors to be used in the plots
+        markers = ['x', 'o', 'v', '^', 's', 'h', 'd'] # markers to be used in the plots
         color_idx = 0
 
-        for pdd2ad_ratio in [1,2,4]:
+        for pdd2ad_ratio in [1,2]:
             avg_cpu_for_this_ratio = []
             for acc_delay in acc_delay_vals:
+                pdd = pdd2ad_ratio*acc_delay
                 data_of_this_ad_n_pdd = list (filter (lambda item : item['ad']==acc_delay and item['pdd']==pdd2ad_ratio*acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay and push-down delay values
                 cpu_for_this_ad_n_pdd = [item['cpu'] for item in data_of_this_ad_n_pdd]
                 avg_cpu_for_this_ad_n_pdd = np.average(cpu_for_this_ad_n_pdd)
                 avg_cpu_for_this_ratio.append (avg_cpu_for_this_ad_n_pdd)
-                # [y_lo, y_hi] = (self.conf_interval (ar=cpu_for_this_ad_n_pdd, avg=avg_cpu_for_this_ad_n_pdd))   
+                [y_lo, y_hi] = (self.conf_interval (ar=cpu_for_this_ad_n_pdd, avg=avg_cpu_for_this_ad_n_pdd))   
+                ax.plot ((acc_delay,acc_delay), (y_lo, y_hi), color=colors[color_idx]) # Plot the confidence interval
                 
-            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='PD delay={:.0f}*Acc delay' .format (acc_delay))
+            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='PD delay={:.0f}*Acc delay' .format (pdd2ad_ratio))
             color_idx += 1
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
         plt.ylabel('Min Cpu at Leaf [GHz]')
@@ -1656,7 +1669,7 @@ if __name__ == '__main__':
 
     city = 'Lux'
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names='{}_cpu_by_delays.res' .format (city))
+    my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
     # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
     exit ()
     # Generate a Rt_prob_sim plot

@@ -957,7 +957,7 @@ class Res_file_parser (object):
         markers = ['x', 'o', 'v', '^', 's', 'h', 'd'] # markers to be used in the plots
         color_idx = 0
 
-        for pdd2ad_ratio in [1,2]:
+        for pdd2ad_ratio in [1,2,4]:
             avg_cpu_for_this_ratio = []
             for acc_delay in acc_delay_vals:
                 pdd = pdd2ad_ratio*acc_delay
@@ -968,9 +968,10 @@ class Res_file_parser (object):
                 [y_lo, y_hi] = (self.conf_interval (ar=cpu_for_this_ad_n_pdd, avg=avg_cpu_for_this_ad_n_pdd))   
                 ax.plot ((acc_delay,acc_delay), (y_lo, y_hi), color=colors[color_idx]) # Plot the confidence interval
                 
-            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='PD delay={:.0f}*Acc delay' .format (pdd2ad_ratio))
+            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='Push-down delay={:.0f}*Acc delay' .format (pdd2ad_ratio))
             color_idx += 1
-        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        ax.legend (fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        plt.xlim (10, 100)
         plt.ylabel('Min Cpu at Leaf [GHz]')
         plt.xlabel('Accumulation Delay [us]')
         plt.savefig ('../res/{}_cpu_by_delays.pdf' .format (city), bbox_inches='tight')

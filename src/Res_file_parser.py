@@ -962,16 +962,18 @@ class Res_file_parser (object):
             for acc_delay in acc_delay_vals:
                 pdd = pdd2ad_ratio*acc_delay
                 data_of_this_ad_n_pdd = list (filter (lambda item : item['ad']==acc_delay and item['pdd']==pdd2ad_ratio*acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay and push-down delay values
-                cpu_for_this_ad_n_pdd = [item['cpu'] for item in data_of_this_ad_n_pdd]
+                cpu_for_this_ad_n_pdd = [item['cpu']/10 for item in data_of_this_ad_n_pdd]
                 avg_cpu_for_this_ad_n_pdd = np.average(cpu_for_this_ad_n_pdd)
                 avg_cpu_for_this_ratio.append (avg_cpu_for_this_ad_n_pdd)
                 [y_lo, y_hi] = (self.conf_interval (ar=cpu_for_this_ad_n_pdd, avg=avg_cpu_for_this_ad_n_pdd))   
                 ax.plot ((acc_delay,acc_delay), (y_lo, y_hi), color=colors[color_idx]) # Plot the confidence interval
                 
-            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='Push-down delay={:.0f}*Acc delay' .format (pdd2ad_ratio))
+            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], 
+                          label='PD accumulation delay={:.0f}*BU accumulation delay' .format (pdd2ad_ratio)) # if pdd2ad_ratio>1 else 'PD accumulation delay=BU accumulation delay')
             color_idx += 1
         ax.legend (fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
-        plt.xlim (10, 100)
+        plt.xlim (0, 100)
+        plt.ylim (0, 17 if (city=='Lux') else 110)
         plt.ylabel('Min Cpu at Leaf [GHz]')
         plt.xlabel('Accumulation Delay [us]')
         plt.savefig ('../res/{}_cpu_by_delays.pdf' .format (city), bbox_inches='tight')
@@ -1014,6 +1016,7 @@ class Res_file_parser (object):
                 avg_nBytes_per_req_for_this_ad_n_prob = np.average(nBytes_per_req_for_this_ad_n_prob)
                 avg_nBytes_per_req_for_this_ad.append (avg_nBytes_per_req_for_this_ad_n_prob)
                 [y_lo, y_hi] = (self.conf_interval (ar=nBytes_per_req_for_this_ad_n_prob, avg=avg_nBytes_per_req_for_this_ad_n_prob))
+                ax.plot ((prob,prob), (y_lo, y_hi), color=colors[color_idx]) # Plot the confidence interval
                 self.comoh_data.append ({'type' : type,
                                          'y_avg' : avg_nBytes_per_req_for_this_ad_n_prob, 
                                          'y_lo' : y_lo, 
@@ -1022,7 +1025,7 @@ class Res_file_parser (object):
                                          'dir' : OVERALL_DIR})
 
                 
-            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='acc delay={:.0f}[us]' .format (acc_delay))
+            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='BU accumulation delay={:.0f}[us]' .format (acc_delay))
             color_idx += 1
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
         plt.xlim(0,1)
@@ -1670,15 +1673,14 @@ if __name__ == '__main__':
 
     city = 'Lux'
     my_res_file_parser = Res_file_parser ()
-    my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
-    # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
-    exit ()
+    # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
+    my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
     # Generate a Rt_prob_sim plot
-    city = 'Monaco'
-    my_res_file_parser = Res_file_parser ()
-    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+    # city = 'Monaco'
+    # my_res_file_parser = Res_file_parser ()
+    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
+    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'

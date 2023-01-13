@@ -2,7 +2,7 @@ import numpy as np
 import math, time, heapq, random, sys, os
 import pulp as plp
 import networkx as nx
-import gurobipy as grb
+#import gurobipy as grb
 import matplotlib.pyplot as plt
 from   pathlib import Path
 
@@ -2026,9 +2026,13 @@ def run_cost_vs_rsrc (city, seed=None):
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
     # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    cpu_cap_at_leaf = MIN_REQ_CPU[my_simulator.city]['AsyncNBlk']
+    for seed in range (2, 21):
+        my_simulator.simulate (mode = 'ms', seed=1, cpu_cap_at_leaf=1060)
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    # for mode in ['ffit', 'cpvnf', 'ms']:
+    #     for cpu in [1060, 1260, 1327, 1680] if city=='Monaco' else []: 
+    #         for seed in range (21):
+    #             my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu)
     
     # for seed in seeds:
     #     for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
@@ -2036,14 +2040,14 @@ def run_cost_vs_rsrc (city, seed=None):
     #     for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
-    for seed in seeds:
+    # for seed in seeds:
         # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
         #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
         # ratios = [1.5, 2, 2.35, 2.4, 2.5] if city=='Lux' else [1.5, 1.58, 2.0, 2.5]
         # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*ratio) for ratio in ratios]: 
         #     my_simulator.simulate (mode = 'ms', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-        for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
-            my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
+        #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     # for seed in seeds:
     #     for mode in ['cpvnf', 'ffit']:
@@ -2142,11 +2146,10 @@ if __name__ == "__main__":
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
 
     
-    city = 'Lux'
-    run_cost_vs_rsrc ()
-    run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
-    for prob in [0.7, 0.8, 0.9, 1.0]:
-        run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)
+    run_cost_vs_rsrc (city='Monaco')
+    # run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
+    # for prob in [0.7, 0.8, 0.9, 1.0]:
+    #     run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)
 
     # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
     #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',

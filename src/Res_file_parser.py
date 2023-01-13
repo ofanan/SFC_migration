@@ -1027,7 +1027,7 @@ class Res_file_parser (object):
                 
             self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='BU accumulation delay={:.0f}[us]' .format (acc_delay))
             color_idx += 1
-        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
         plt.xlim(0,1)
         plt.ylabel('Control Bytes/Request')
         plt.xlabel('Fraction of RT Chains')
@@ -1671,7 +1671,7 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Lux'
+    city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
     my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])

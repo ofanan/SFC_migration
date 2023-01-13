@@ -37,8 +37,8 @@ time_limit_feasible   = 4
 inter = lambda float_num : int (round(float_num))
 
 # Minimum required CPU when prob=0.3, as found by previous runs. Used as a base for run_cost_vs_rsrc
-MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'ms' : 137},     #Old: 'ffit' : 219, 'cpvnf' : 214
-               'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329, 'ms' : 994}} #Old: 'ffit' : 1354, 'cpvnf' : 1357
+MIN_REQ_CPU = {'Lux'    : {'opt' : 89,  'ourAlg' : 94,  'ffit' : 209,  'cpvnf':  214, 'ms' : 137,  'AsyncNBlk' : 119},     
+               'Monaco' : {'opt' : 840, 'ourAlg' : 842, 'ffit' : 1329, 'cpvnf' : 1329, 'ms' : 994, 'AsyncNBlk' : 1060}} 
 
 class SFC_mig_simulator (object):
     """
@@ -1989,8 +1989,6 @@ class SFC_mig_simulator (object):
         if (mode=='opt'):
             min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 89,  0.1 : 89,  0.2 : 89,  0.3 : 89,  0.4 : 89,  0.5 : 98,   0.6 : 98,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
                                    'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}} 
-        elif (mode=='optInt'):
-            min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 94,  0.1 : 94,  0.2 : 94,  0.3 : 94,  0.4 : 94,  0.5 : 102,  0.6 : 102,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
         elif (mode=='optInt'): # Verified for 0.0-->0.6
             min_cpu_cap_at_leaf = {'Lux'    : {0.0 : 94,  0.1 : 94,  0.2 : 94,  0.3 : 94,  0.4 : 94,  0.5 : 102,  0.6 : 111,   0.7 : 130,  0.8 : 144,  0.9 : 158,  1.0 : 171},
                                    'Monaco' : {0.0 : 836, 0.1 : 836, 0.2 : 836, 0.3 : 840, 0.4 : 866, 0.5 : 1059, 0.6 : 1287, 0.7 : 1505, 0.8 : 1706, 0.9 : 1984, 1.0 : 2188}}
@@ -2020,7 +2018,7 @@ def run_cost_vs_rsrc (city, seed=None):
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
 
     print ('Running run_cost_vs_rsrc')
-    seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
+    # seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
 
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
@@ -2028,6 +2026,9 @@ def run_cost_vs_rsrc (city, seed=None):
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
     # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    cpu_cap_at_leaf = MIN_REQ_CPU[my_simulator.city]['AsyncNBlk']
+    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
+    my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
     
     # for seed in seeds:
     #     for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
@@ -2142,6 +2143,7 @@ if __name__ == "__main__":
 
     
     city = 'Lux'
+    run_cost_vs_rsrc ()
     run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
     for prob in [0.7, 0.8, 0.9, 1.0]:
         run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)

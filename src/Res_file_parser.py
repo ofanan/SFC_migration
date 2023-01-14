@@ -760,8 +760,8 @@ class Res_file_parser (object):
             print ('error: no preferred vals are defined for Lux yet')
             exit ()
         min_cpu  = min (cpu_vals)
-        cpu_vals = sorted (list (set(cpu_vals) & set(preferred_cpu_vals)))
-        for cpu_val in cpu_vals:
+        # cpu_vals = 
+        for cpu_val in sorted (list (set(cpu_vals) & set(preferred_cpu_vals))):
             if (normalize_Y):
                 print ('normalized={:.2f}, abs={}' .format (cpu_val / min_cpu, cpu_val))
                 list_of_val_opt = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt' and item['cpu']==cpu_val]

@@ -754,14 +754,14 @@ class Res_file_parser (object):
                                           'cost' : 'y_avg'})
 
         printf (self.output_file, '\n')
-        cpu_vals = sorted (set ([item['cpu'] for item in list_of_avg_vals]))
         preferred_cpu_vals = [840, 1060, 1260, 1329, 1680] if city=='Monaco' else []
         print ('**** Note: you chose to show results only for some preferred cpu vals.***')
         if (city=='Lux'):
             print ('error: no preferred vals are defined for Lux yet')
             exit ()
         min_cpu  = min (cpu_vals)
-        for cpu_val in list (set(cpu_vals) & set(preferred_cpu_vals)):  #[cpu_val in cpu_vals if cpu_val ]:
+        cpu_vals = sorted (list (set(cpu_vals) & set(preferred_cpu_vals)))
+        for cpu_val in cpu_vals:
             if (normalize_Y):
                 print ('normalized={:.2f}, abs={}' .format (cpu_val / min_cpu, cpu_val))
                 list_of_val_opt = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt' and item['cpu']==cpu_val]
@@ -770,10 +770,6 @@ class Res_file_parser (object):
                 printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
                 for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
-                    # if (len(list_of_val)==0):
-                    #     printf (self.output_file, '& $\infty$\t ') 
-                    # else:
-                    #     printf (self.output_file, '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
                     printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
             else:
                 printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))

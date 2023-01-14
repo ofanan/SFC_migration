@@ -711,7 +711,7 @@ class Res_file_parser (object):
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
         and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
-        modes = ['opt', 'SyncPartResh', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
+        modes = ['opt', 'AsyncNBlk'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
         if (pcl_input_file_name==None):
             pcl_input_file_name='{}_{}cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city, 'dist_' if dist else '')
 
@@ -732,19 +732,23 @@ class Res_file_parser (object):
         else:
             X_norm_factor = 1
 
-        list_of_avg_vals = []        
+        list_of_avg_vals = []       
 
-        title = 'cpu   &opt & SyncPartResh & AsyncNBlk' if dist else 'cpu   &opt &optG & optInt   & SyncPartResh & MS        & F-Fit        & CPVNF' 
-        printf (self.output_file, title)         
+        # Print the table's title
+        title = 'cpu   &opt & SyncPartResh & AsyncNBlk' if dist else 'cpu   &opt &optG & optInt   & SyncPartResh & MS        & F-Fit        & CPVNF'
+        printf (self.output_file, 'cpu     ') 
+        for mode in modes:
+            printf (self.output_file, '& {}' .format (mode))
+        printf (self.output_file, '\n') 
             
         for mode in modes:
             
-            mode_list = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
+            items_of_this_mode = [item for item in self.cost_vs_rsrc_data if item['mode']==mode]  
             
-            if (len(mode_list)==0): # If no info about this mode - continue
+            if (len(items_of_this_mode)==0): # If no info about this mode - continue
                 continue
         
-            for cpu_val in set ([item['cpu'] for item in mode_list]): # list of CPU vals for which the whole run succeeded with this mode' 
+            for cpu_val in set ([item['cpu'] for item in items_of_this_mode]): # list of CPU vals for which the whole run succeeded with this mode' 
                 list_of_avg_vals.append ({'mode' : mode, 
                                           'cpu'  : cpu_val, 
                                           'cost' : 'y_avg'})
@@ -753,16 +757,25 @@ class Res_file_parser (object):
         cpu_vals = sorted (set ([item['cpu'] for item in list_of_avg_vals]))
         min_cpu  = min (cpu_vals)
         for cpu_val in cpu_vals:
-            printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
-            print ('normalized={}, abs={}' .format (cpu_val / min_cpu, cpu_val))
             if (normalize_Y):
+                print ('normalized={:.2f}, abs={}' .format (cpu_val / min_cpu, cpu_val))
                 list_of_val_opt = [item for item in self.cost_vs_rsrc_data if item['mode']=='opt' and item['cpu']==cpu_val]
                 if (len(list_of_val_opt)==0):
                     continue;
+                printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
+                # print ('list_of_val_opt={}' .format (list_of_val_opt))
                 for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
-                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
+                    if (len(list_of_val)==0):
+                        print ('mode={}, list_of_val=-' .format (mode))
+                        printf (self.output_file, '& $\infty$\t ') 
+                    else:
+                        print ('mode={}, list_of_val[0]={}' .format (mode, list_of_val[0]))
+                        printf (self.output_file, '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
+                    # printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
             else:
+                printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
+                print ('normalized={:.2f}, abs={}' .format (cpu_val / min_cpu, cpu_val))
                 for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
                     printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg'])) 
@@ -869,7 +882,8 @@ class Res_file_parser (object):
                 [y_lo, y_hi]          = self.conf_interval (ar=avg_cost_of_each_seed, avg=avg_cost_of_all_seeds) # low, high y values for this plotted conf' interval
                 
                 cost_vs_rsrc_data_of_this_mode.append ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds,'num_of_seeds' : len(avg_cost_of_each_seed)})
-                print ('cpu={}, mode={}, avg_cost={}' .format (cpu_val, mode, avg_cost_of_all_seeds)) 
+                print ({'cpu' : cpu_val, 'y_lo' : y_lo, 'y_hi' : y_hi, 'y_avg' : avg_cost_of_all_seeds,'num_of_seeds' : len(avg_cost_of_each_seed)})
+                # print ('cpu={}, mode={}, avg_cost={}' .format (cpu_val, mode, avg_cost_of_all_seeds)) 
 
             # # Add this new calculated point to the ds. Avoid duplications of points.
             # for point in sorted (cost_vs_rsrc_data_of_this_mode, key = lambda point : point['cpu']):
@@ -1221,6 +1235,7 @@ class Res_file_parser (object):
                 if (point not in self.cost_vs_rsrc_data and len(list_of_item)==0): # insert this new point to the list of points only if it's not already found in self.cost_vs_rsrc_data
                     self.cost_vs_rsrc_data.append (point)
                     point['mode'] = mode
+                    print (point)
         
         # store the data as binary data stream
         self.pcl_output_file_name = 'cost_vs_rsrc_{}.pcl' .format (self.input_file_name.split('.res')[0]) if (pcl_input_file_name==None) else pcl_input_file_name 
@@ -1577,7 +1592,7 @@ class Res_file_parser (object):
             
         return pcl_output_file_name
  
-    def erase_from_pcl (self, pcl_input_file_name, mode_to_erase='Async'):
+    def erase_from_pcl (self, pcl_input_file_name, mode_to_erase='AsyncNBlk'):
         """
         Read a .pcl file, erase all the entries of a given mode, and over-write into the same .pcl file
         """
@@ -1702,10 +1717,11 @@ if __name__ == '__main__':
     city = 'Monaco'
     my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
-    res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
-    my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
-    pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=[res_input_file_name])
+    # res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
+    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name])
+    # pcl_input_file_name = '{}_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
+    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=[res_input_file_name])
+    pcl_input_file_name = 'Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl'
     my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
     # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)

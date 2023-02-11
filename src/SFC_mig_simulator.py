@@ -1016,7 +1016,7 @@ class SFC_mig_simulator (object):
         - print_params - when true, write the chains' parameter to ../res/params.res.
         """
         
-        self.use_Gurobi  = True # When True, run 'opt' using Gurobi solver
+        self.use_Gurobi  = False # When True, run 'opt' using Gurobi solver
         self.max_sol_time = 1 #120 #900.0 #600.0 # time limit for optimal feasible sol [sec]
 
         self.use_selective_push_up = True # When True, run also the "push-up" alg' after every successful run of the "bottom-up" stage 
@@ -2021,13 +2021,14 @@ def run_cost_vs_rsrc (city, seed=None):
     # seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
 
     my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+    my_simulator.simulate (mode = 'opt', seed=1, cpu_cap_at_leaf=118)
 
     # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 3)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
     # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    for seed in range (2, 21):
-        my_simulator.simulate (mode = 'ms', seed=1, cpu_cap_at_leaf=1060)
+    # for seed in range (2, 21):
+    #     my_simulator.simulate (mode = 'ms', seed=1, cpu_cap_at_leaf=1060)
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
     # for mode in ['ffit', 'cpvnf', 'ms']:
     #     for cpu in [1060, 1260, 1327, 1680] if city=='Monaco' else []: 
@@ -2146,7 +2147,7 @@ if __name__ == "__main__":
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
 
     
-    run_cost_vs_rsrc (city='Monaco')
+    run_cost_vs_rsrc (city='Lux')
     # run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
     # for prob in [0.7, 0.8, 0.9, 1.0]:
     #     run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)

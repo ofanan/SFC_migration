@@ -8,7 +8,7 @@ alias ltr='c; ls -ltr'
 alias ltra='ls -ltra'
 alias py='python'
 alias h=history
-alias aliaser="source .myalias"
+alias aliaser="source .myalias_SFC_mig.txt"
 alias commit='c; git add -A; git commit'
 source ../../.alias_pusher_SFC_mig.txt
 alias compush='c; commit; pusher'

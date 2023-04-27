@@ -46,9 +46,9 @@ MARKER_SIZE             = 16
 MARKER_SIZE_SMALL       = 1
 LINE_WIDTH              = 3 
 LINE_WIDTH_SMALL        = 1 
-FONT_SIZE               = 20
+FONT_SIZE               = 22
 FONT_SIZE_SMALL         = 5
-LEGEND_FONT_SIZE        = 12
+LEGEND_FONT_SIZE        = 19
 LEGEND_FONT_SIZE_SMALL  = 5 
 
 UNIFORM_CHAIN_MIG_COST = 600
@@ -161,12 +161,12 @@ class Res_file_parser (object):
         # The colors used for each alg's plot, in the dist' case
         self.color_dict       = {'opt'          : 'green',
                                  'optInt'       : 'green',
-                                'SyncPartResh'  : 'purple',
-                                'Async'         : 'brown',
-                                'AsyncBlk'      : 'brown',
-                                'AsyncNBlk'     : 'brown',
-                                'ffit'          : 'blue',
-                                'ms'            : 'yellow',
+                                'SyncPartResh'  : 'blue',
+                                'Async'         : 'purple',
+                                'AsyncBlk'      : 'purple',
+                                'AsyncNBlk'     : 'purple',
+                                'ffit'          : 'brown',
+                                'ms'            : 'brown',
                                 'cpvnf'         : 'black'}
 
         # # The markers used for each alg', in the centralized case
@@ -339,7 +339,6 @@ class Res_file_parser (object):
         self.plot_lin_reg (x=np.array(x), y=avg_num_of_migrations,    ax=num_mig_sctr)
         self.plot_lin_reg (x=np.array(x), y=avg_ratio_of_migrations,  ax=ratio_mig_sctr)
 
-        # ax[0].set (ylabel='# of Critical Chains')
         num_crit_sctr.  set (ylabel='# of Critical Chains')
         ratio_crit_sctr.set (ylabel='Ratio of Critical Chains')
         num_mig_sctr.   set (ylabel='# of Mig. Chains')
@@ -656,12 +655,12 @@ class Res_file_parser (object):
             self.parse_res_file(res_input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
             input_file_name = res_input_file_name.split('.res')[0]            
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
-        dat_output_file = open ('../res/{}.dat' .format (input_file_name), 'w')
+        dat_output_file = open ('../res/dist_{}.dat' .format (input_file_name), 'w')
 
         self.set_plt_params ()
         _, ax = plt.subplots()
         # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
-        modes = ['opt', 'SyncPartResh', 'AsyncNBlk', 'ms', 'cpvnf', 'ffit'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
+        modes = ['opt', 'SyncPartResh', 'AsyncNBlk', 'ffit'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         for mode in modes: 
             
             list_of_points = self.gen_filtered_list(self.list_of_dicts, mode=mode, stts=1) 
@@ -693,16 +692,16 @@ class Res_file_parser (object):
                 y.append (avg)
             
             self.my_plot (ax, x, y, mode)
-        plt.xlabel('Fraction of RT Chains')
+        plt.xlabel('Fraction of RT Requests')
         plt.ylabel('Min CPU at Leaf [GHz]')
-        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE) #(loc='upper center', shadow=True, fontsize='x-large')
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0, 1) #(-0.04,1.04)
         print ('self.city={}' .format (self.city))
         if (dist):
-            plt.ylim (0, 33 if self.city=='Lux' else 230)
+            plt.ylim (0, 35 if self.city=='Lux' else 230)
             plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
         else:
-            plt.ylim (0, 33 if self.city=='Lux' else 230)
+            plt.ylim (0, 35 if self.city=='Lux' else 230)
             plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
 
     def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=True, pcl_input_file_name=None):
@@ -1012,8 +1011,9 @@ class Res_file_parser (object):
         markers = ['x', 'o', 'v', '^', 's', 'h', 'd']
         color_idx = 0
 
+        pdd_to_ad_ratio = 4
         for acc_delay in [acc_delay for acc_delay in acc_delay_vals if acc_delay in [0, 1, 10, 100]]:
-            data_of_this_ad = list (filter (lambda item : item['ad']==acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay value
+            data_of_this_ad = list (filter (lambda item : item['ad']==acc_delay and item['pdd']==pdd_to_ad_ratio*acc_delay, self.list_of_dicts)) #list of results of runs for this accum delay value
 
             prob_vals = sorted (set ([item['prob'] for item in data_of_this_ad])) # values of prob' collected for this acc delay
 
@@ -1039,13 +1039,13 @@ class Res_file_parser (object):
                                          'dir' : OVERALL_DIR})
 
                 
-            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label='BU accumulation delay={:.0f}[us]' .format (acc_delay))
+            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label=r'$T_{ad}^{SFS}$' + '={:.0f}' .format (acc_delay) + '$\mu$s')
             color_idx += 1
-        ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE, frameon=False) #  loc='upper right') 
         plt.xlim(0,1)
         plt.ylabel('Control Bytes/Request')
-        plt.xlabel('Fraction of RT Chains')
-        plt.savefig ('../res/{}_comoh.pdf' .format (city), bbox_inches='tight')
+        plt.xlabel('Fraction of RT Requests')
+        plt.savefig ('../res/{}_comoh_pdd_eq_{}ad.pdf' .format (city, pdd_to_ad_ratio), bbox_inches='tight')
         plt.cla()
     
     def calc_comoh_by_cpu (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
@@ -1686,21 +1686,20 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
+    city = 'Monaco'
+    my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
     # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
+
     # Generate a Rt_prob_sim plot
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
     # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'
     # my_res_file_parser = Res_file_parser ()
-    # comoh_file = '{}.comoh' .format (city)
+    # comoh_file = '{}.comoh' .format (city) 
     # res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
     # pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
     # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
@@ -1714,17 +1713,17 @@ if __name__ == '__main__':
     # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
     # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name='{}.comoh.pcl' .format (city))
 
-    city = 'Lux'
-    my_res_file_parser = Res_file_parser ()
+    # city = 'Lux'
+    # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
     # res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
     # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
     # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name, 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
     # pcl_input_file_name = 'Lux_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl'
     # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_post_SyncPartResh.res', 'Lux_0820_0830_1secs_post_p0.3_opt_sdG.res', 'Lux_0820_0830_1secs_p0.3_AsyncNBlk.res']) #['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res']) 
-    pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
-    my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
+    # pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
+    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
+    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
     # my_res_file_parser = Res_file_parser ()
     # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 

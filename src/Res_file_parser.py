@@ -178,12 +178,19 @@ class Res_file_parser (object):
             rc('legend', fontsize=8)
             rc('text.latex', preamble=r'\usepackage{cmbright}')
       
-    def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label=None, marker=None): 
+    def my_plot (self, ax, x, y, mode='ourAlg', markersize=None, linewidth=None, color=None, label=None, marker=None): 
         
         """
         Plot a single x, y, python line, with the required settings (colors, markers etc).
         """ 
-    
+        if markersize==None:
+            markersize = MARKER_SIZE_SMALL if self.useLatex else MARKER_SIZE
+        else:
+            markersize = markersize 
+        if linewidth==None:
+            linewidth = LINE_WIDTH_SMALL if self.useLatex else LINE_WIDTH
+        else:
+            linewidth = linewidth 
         color = self.color_dict[mode] if (color==None) else color  
         label=self.legend_entry_dict[mode] if (label==None) else label
     
@@ -648,7 +655,6 @@ class Res_file_parser (object):
         dat_output_file = open ('../res/dist_{}.dat' .format (input_file_name), 'w')
 
         # Tune the size of labels, legends, markers etc, in case we generate a pure-Python (not latex) plot
-        # if not(self.useLatex):
         self.set_plt_params (size= ('Small' if self.useLatex else 'Large'))
         _, ax = plt.subplots()
         # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
@@ -979,7 +985,10 @@ class Res_file_parser (object):
                 [y_lo, y_hi] = (self.conf_interval (ar=cpu_for_this_ad_n_pdd, avg=avg_cpu_for_this_ad_n_pdd))   
                 ax.plot ((acc_delay,acc_delay), (y_lo, y_hi), color=colors[color_idx]) # Plot the confidence interval
                 
-            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], 
+            self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', 
+                          markersize=MARKER_SIZE_SMALL if self.useLatex else MARKER_SIZE, 
+                          linewidth=LINE_WIDTH_SMALL if self.useLatex else LINE_WIDTH_SMALL, 
+                          color=colors[color_idx], marker=markers[color_idx], 
                           label='PD accumulation delay={:.0f}*BU accumulation delay' .format (pdd2ad_ratio)) # if pdd2ad_ratio>1 else 'PD accumulation delay=BU accumulation delay')
             color_idx += 1
         ax.legend (fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
@@ -996,8 +1005,8 @@ class Res_file_parser (object):
         Calculate the data needed for plotting a graph showing the communication overhead as a func' of the RT prob'.
         Then, plot a graph, and save it.
         """
-        self.set_plt_params ()
         ax = plt.gca()
+        self.set_plt_params (size= ('Small' if self.useLatex else 'Large'))
 
         self.comoh_data = [] # this field will hold all the data to be parsed from the comoh input files
         for file_name in comoh_input_file_names:
@@ -1690,12 +1699,12 @@ if __name__ == '__main__':
     city = 'Monaco'
     my_res_file_parser = Res_file_parser (useLatex=True)
     # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
-    # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
+    my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
 
     # Generate a Rt_prob_sim plot
-    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
     # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'

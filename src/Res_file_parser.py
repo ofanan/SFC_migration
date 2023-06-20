@@ -384,10 +384,10 @@ class Res_file_parser (object):
                 Y_LIM_MIG_COST           = {'Lux' : 260, 'Monaco' : 60}
                 Y_LIM_RATIO_OF_CRIT_USRS = {'Lux' : 0.5, 'Monaco' : 0.1}
                 y1_axis.set_ylabel('Frac. of Critical Chains', color='black')
-                line1 = y1_axis.plot (x, ratio_of_crit_usrs, color=y2_color, marker='x', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Critical Chains')
+                line1 = y1_axis.plot (x, ratio_of_crit_usrs, color=y2_color, marker='x', label='Critical Chains')
                 if (not (plot_only_crit)):
                     y2_axis.set_ylabel('Norm. Mig. Cost', color=y2_color)
-                    line2 = y2_axis.plot (x, mig_cost,           color='black',  marker='o', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Norm. Mig. Cost')
+                    line2 = y2_axis.plot (x, mig_cost,           color='black',  marker='o', label='Norm. Mig. Cost')
                     y2_axis.          set_ylim (0, Y_LIM_MIG_COST          [self.city])
                 if (self.city=='Monaco'):
                     y1_axis.set_yscale ('log')
@@ -986,8 +986,6 @@ class Res_file_parser (object):
                 ax.plot ((acc_delay,acc_delay), (y_lo, y_hi), color=colors[color_idx]) # Plot the confidence interval
                 
             self.my_plot (ax=ax, x=acc_delay_vals, y=avg_cpu_for_this_ratio, mode='AsyncNBlk', 
-                          markersize=MARKER_SIZE_SMALL if self.useLatex else MARKER_SIZE, 
-                          linewidth=LINE_WIDTH_SMALL if self.useLatex else LINE_WIDTH_SMALL, 
                           color=colors[color_idx], marker=markers[color_idx], 
                           label='PD accumulation delay={:.0f}*BU accumulation delay' .format (pdd2ad_ratio)) # if pdd2ad_ratio>1 else 'PD accumulation delay=BU accumulation delay')
             color_idx += 1
@@ -1005,8 +1003,8 @@ class Res_file_parser (object):
         Calculate the data needed for plotting a graph showing the communication overhead as a func' of the RT prob'.
         Then, plot a graph, and save it.
         """
-        ax = plt.gca()
         self.set_plt_params (size= ('Small' if self.useLatex else 'Large'))
+        ax = plt.gca()
 
         self.comoh_data = [] # this field will hold all the data to be parsed from the comoh input files
         for file_name in comoh_input_file_names:
@@ -1046,9 +1044,9 @@ class Res_file_parser (object):
                                          'dir' : OVERALL_DIR})
 
                 
-            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=colors[color_idx], marker=markers[color_idx], label=r'$T_{ad}^{SFS}$' + '={:.0f}' .format (acc_delay) + '$\mu$s')
+            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', color=colors[color_idx], marker=markers[color_idx], label=r'$T_{ad}^{SFS}$' + '={:.0f}' .format (acc_delay) + '$\mu$s')
             color_idx += 1
-        ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE, frameon=False) #  loc='upper right') 
+        ax.legend (ncol=1, frameon=False) #  loc='upper right') fontsize=LEGEND_FONT_SIZE,  
         plt.xlim(0,1)
         plt.ylabel('Control Bytes/Req.')
         plt.xlabel('Fraction of RT Requests')
@@ -1146,7 +1144,7 @@ class Res_file_parser (object):
 
         # nonRtUsrChainOh = 20 
         for type in ['nPkts', 'nBytes']:
-            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='AsyncNBlk', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label='Communication Overhead per Request') 
+            self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='AsyncNBlk', color=None, label='Communication Overhead per Request') 
                 #  'label='Number of {} per Request' .format ('Bytes' if type=='nBytes' else 'Packets'))
             ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
             plt.ylabel('Communication Overhead {}' .format ('[Bytes]' if type=='nBytes' else '[# Packets]'))
@@ -1696,7 +1694,7 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Monaco'
+    city = 'Lux'
     my_res_file_parser = Res_file_parser (useLatex=True)
     # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
     my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])

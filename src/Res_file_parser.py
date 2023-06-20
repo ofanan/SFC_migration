@@ -1,7 +1,12 @@
-import matplotlib
+import matplotlib as mpl
+# from contributed.sumopy.agilepy.lib_wx.test_glcanvas import linewidth
+mpl.use("pgf")
+import tikzplotlib
+from tikzplotlib import save as tikz_save
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import matplotlib.pylab as pylab
+from matplotlib import rc
 import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 from printf import printf, printFigToPdf 
@@ -43,13 +48,13 @@ num_crit_usrs_idx = 7
 reshuffle_idx     = num_crit_usrs_idx+1 
 
 MARKER_SIZE             = 16
-MARKER_SIZE_SMALL       = 1
+MARKER_SIZE_SMALL       = 2
 LINE_WIDTH              = 3 
 LINE_WIDTH_SMALL        = 1 
 FONT_SIZE               = 22
-FONT_SIZE_SMALL         = 5
+FONT_SIZE_SMALL         = 8
 LEGEND_FONT_SIZE        = 19
-LEGEND_FONT_SIZE_SMALL  = 5 
+LEGEND_FONT_SIZE_SMALL  = 8 
 
 UNIFORM_CHAIN_MIG_COST = 600
 
@@ -89,21 +94,28 @@ class Res_file_parser (object):
 
     # Set the parameters of the plot (sizes of fonts, legend, ticks etc.).
     #mfc='none' makes the markers empty.
-    set_plt_params = lambda self, size='large' : matplotlib.rcParams.update({'font.size': FONT_SIZE, 
-                                                                             'legend.fontsize': LEGEND_FONT_SIZE,
-                                                                             'xtick.labelsize':FONT_SIZE,
-                                                                             'ytick.labelsize':FONT_SIZE,
-                                                                             'axes.labelsize': FONT_SIZE,
-                                                                             'axes.titlesize':FONT_SIZE,}) if (size=='large') else matplotlib.rcParams.update({
-                                                                             'font.size': FONT_SIZE_SMALL, 
-                                                                             'legend.fontsize': LEGEND_FONT_SIZE_SMALL,
-                                                                             'xtick.labelsize':FONT_SIZE_SMALL,
-                                                                             'ytick.labelsize':FONT_SIZE_SMALL,
-                                                                             'axes.labelsize': FONT_SIZE_SMALL,
-                                                                             'axes.titlesize':FONT_SIZE_SMALL,
-                                                                             })
+    set_plt_params = lambda self, size='large' : mpl.rcParams.update({
+        'font.size'         : FONT_SIZE,
+        'legend.fontsize'   : LEGEND_FONT_SIZE,
+        'xtick.labelsize'   : FONT_SIZE,
+        'ytick.labelsize'   : FONT_SIZE,
+        'axes.labelsize'    : FONT_SIZE,
+        'axes.titlesize'    : FONT_SIZE,}) if (size=='large') else matplotlib.rcParams.update({
+        'font.size'         : FONT_SIZE_SMALL,
+        'legend.fontsize'   : LEGEND_FONT_SIZE_SMALL,
+        'xtick.labelsize'   : FONT_SIZE_SMALL,
+        'pgf.texsystem'     : "pdflatex",
+        'text.usetex'       : True,
+        'pgf.rcfonts'       : False,
+        'ytick.labelsize'   : FONT_SIZE_SMALL,
+        'axes.labelsize'    : FONT_SIZE_SMALL,
+        'figure.figsize'    : (15, 4),
+        'axes.titlesize'    : FONT_SIZE_SMALL})
+
     
-    def __init__ (self):
+    def __init__ (self, 
+                  useLatex=False # When True, use Latex - thus, better fits to be embedded with the correct font within a Latex file (but slower compilation time).
+                  ): 
         """
         Initialize a Res_file_parser, used to parse result files, and generate plots. 
         """
@@ -125,17 +137,6 @@ class Res_file_parser (object):
                                   'ffit'   : self.add_plot_ffit,
                                   'cpvnf'  : self.add_plot_cpvnf}
 
-        # # List of algorithms' names, used in the plots' legend, for the centralized case
-        # self.legend_entry_dict = {'opt'     :  'LBound', 
-                                  # 'ourAlg'  : 'BUPUfullOld', 
-                                  # 'SyncPartResh' : 'BUPU',
-                                  # 'ffit'    : 'F-Fit', 
-                                  # 'cpvnf'   : 'CPVNF', 
-                                  # 'ms'      : 'MultiScaler',
-                                  # 'ourAlgC' : 'BUPUmoc', 
-                                  # 'ffitC'   : 'F-Fitmoc', 
-                                  # 'cpvnfC'  : 'CPVNFmoc'} 
-
         # List of algorithms' names, used in the plots' legend, for the dist' case
         self.legend_entry_dict = {'opt'          : 'LBound',
                                   'optInt'       : 'Opt',
@@ -147,17 +148,6 @@ class Res_file_parser (object):
                                   'cpvnf'        : 'CPVNF',
                                   'ms'           : 'MultiScaler'}
 
-        # # The colors used for each alg's plot, in the centralized case
-        # self.color_dict       = {'opt'    : 'green',
-                                # 'ourAlg'  : 'yellow',
-                                # 'SyncPartResh' : 'purple',
-                                # 'ffit'    : 'blue',
-                                # 'cpvnf'   : 'black',
-                                # 'ourAlgC' : 'purple',
-                                # 'ffitC'   : 'blue',
-                                # 'cpvnfC'  : 'black',
-                                # 'ms'      : 'yellow'}
-        
         # The colors used for each alg's plot, in the dist' case
         self.color_dict       = {'opt'          : 'green',
                                  'optInt'       : 'green',
@@ -169,17 +159,6 @@ class Res_file_parser (object):
                                 'ms'            : 'brown',
                                 'cpvnf'         : 'black'}
 
-        # # The markers used for each alg', in the centralized case
-        # self.markers_dict     = {'opt'    : 'x',
-                                # 'ourAlg'  : 'v',
-                                # 'SyncPartResh' : 'o',
-                                # 'ffit'    : '^',
-                                # 'cpvnf'   : 's',
-                                # 'ourAlgC' : 'h',
-                                # 'ffitC'   : 'v',
-                                # 'cpvnfC'  : 'd',
-                                # 'ms'      : 'v'}
-        
         # The markers used for each alg', in the dist' case
         self.markers_dict     = {'opt'          : 'x',
                                  'optInt'       : 'x',
@@ -191,6 +170,13 @@ class Res_file_parser (object):
                                 'cpvnf'         : 's',
                                 'ms'            : 'v'}
         self.list_of_dicts   = [] # a list of dictionaries, holding the settings and the results read from result files
+        # mpl.rcParams.update(mpl.rcParamsDefault)
+        self.useLatex = useLatex
+        if self.useLatex:
+            rc('text', usetex=True) # When True, use Latex - thus, better fits to be embedded with the correct font within a Latex file (but slower compilation time).
+            rc('font', size=8)
+            rc('legend', fontsize=8)
+            rc('text.latex', preamble=r'\usepackage{cmbright}')
       
     def my_plot (self, ax, x, y, mode='ourAlg', markersize=MARKER_SIZE, linewidth=LINE_WIDTH, color=None, label=None, marker=None): 
         
@@ -619,6 +605,8 @@ class Res_file_parser (object):
             num_of_act_vehs.append (int(splitted_line[2].split('=')[1]))
             
         plt.plot (np.array(t)/3600, tot_num_of_vehs)
+        plt.xlim([0,50000])
+        # plt.ylim([0,])
         plt.show ()
         
     # def plot_RT_prob_sim_tikz (self):
@@ -645,6 +633,8 @@ class Res_file_parser (object):
         When given an input file name, parse it first.
         If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
         when 'dist' is True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project.
+        To fix the size of labels, legends, markers etc, uncomment the line:
+        self.set_plt_params ()
         """
         
         if (pcl_input_file_name != None):
@@ -657,7 +647,9 @@ class Res_file_parser (object):
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
         dat_output_file = open ('../res/dist_{}.dat' .format (input_file_name), 'w')
 
-        self.set_plt_params ()
+        # Tune the size of labels, legends, markers etc, in case we generate a pure-Python (not latex) plot
+        # if not(self.useLatex):
+        self.set_plt_params (size= ('Small' if self.useLatex else 'Large'))
         _, ax = plt.subplots()
         # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         modes = ['opt', 'SyncPartResh', 'AsyncNBlk', 'ffit'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
@@ -691,18 +683,24 @@ class Res_file_parser (object):
                 
                 y.append (avg)
             
-            self.my_plot (ax, x, y, mode)
+            self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE_SMALL, linewidth=LINE_WIDTH_SMALL)
         plt.xlabel('Fraction of RT Requests')
-        plt.ylabel('Min CPU at Leaf [GHz]')
-        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
+        plt.ylabel('CPU at Leaf [GHz]')
+        ax.legend (ncol=2, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0, 1) #(-0.04,1.04)
         print ('self.city={}' .format (self.city))
         if (dist):
             plt.ylim (0, 35 if self.city=='Lux' else 230)
-            plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
+            if self.useLatex:
+                tikzplotlib.save(f'../res/dist_{input_file_name}.tex',  textsize=10.0, axis_width = '0.24\\textwidth')
+            else:
+                plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
         else:
             plt.ylim (0, 35 if self.city=='Lux' else 230)
-            plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
+            if self.useLatex:
+                plt.savefig ('../res/dist_{}.pgf' .format (input_file_name))
+            else:
+                plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
 
     def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=True, pcl_input_file_name=None):
         """
@@ -1043,9 +1041,12 @@ class Res_file_parser (object):
             color_idx += 1
         ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE, frameon=False) #  loc='upper right') 
         plt.xlim(0,1)
-        plt.ylabel('Control Bytes/Request')
+        plt.ylabel('Control Bytes/Req.')
         plt.xlabel('Fraction of RT Requests')
-        plt.savefig ('../res/{}_comoh_pdd_eq_{}ad.pdf' .format (city, pdd_to_ad_ratio), bbox_inches='tight')
+        if self.useLatex:
+            tikzplotlib.save(f'../res/{city}_comoh_pdd_eq_{pdd_to_ad_ratio}ad.tex',  textsize=8.0, axis_width = '\\subFigWidth')
+        else:
+            plt.savefig (f'../res/{city}_comoh_pdd_eq_{pdd_to_ad_ratio}ad.pdf', bbox_inches='tight')
         plt.cla()
     
     def calc_comoh_by_cpu (self, city, pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=None, prob=0.3, numDirections=NUM_DIRECTIONS):
@@ -1687,7 +1688,7 @@ def plot_cost_vs_rsrc (city):
 if __name__ == '__main__':
 
     city = 'Monaco'
-    my_res_file_parser = Res_file_parser ()
+    my_res_file_parser = Res_file_parser (useLatex=True)
     # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
     # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
 

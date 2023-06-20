@@ -1,0 +1,314 @@
+% This file was created with tikzplotlib v0.10.1.
+\begin{tikzpicture}
+
+\definecolor{brown}{RGB}{165,42,42}
+\definecolor{darkgray176}{RGB}{176,176,176}
+\definecolor{green}{RGB}{0,128,0}
+\definecolor{purple}{RGB}{128,0,128}
+
+\begin{axis}[
+legend cell align={left},
+legend columns=2,
+legend style={
+  fill opacity=0.8,
+  draw opacity=1,
+  text opacity=1,
+  at={(0.03,0.97)},
+  anchor=north west,
+  draw=none
+},
+tick align=outside,
+tick pos=left,
+width=3 cm,
+x grid style={darkgray176},
+xlabel={Fraction of RT Requests},
+xmin=0, xmax=1,
+xtick style={color=black},
+y grid style={darkgray176},
+ylabel={Min CPU at Leaf [GHz]},
+ymin=0, ymax=230,
+ytick style={color=black}
+]
+\addplot [semithick, green, forget plot]
+table {%
+0 83.6
+0 83.6
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.1 83.6
+0.1 83.6
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.2 83.6
+0.2 83.6
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.3 84
+0.3 84
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.4 86.6
+0.4 86.6
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.5 105.9
+0.5 105.9
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.6 128.7
+0.6 128.7
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.7 150.5
+0.7 150.5
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.8 170.6
+0.8 170.6
+};
+\addplot [semithick, green, forget plot]
+table {%
+0.9 198.4
+0.9 198.4
+};
+\addplot [semithick, green, forget plot]
+table {%
+1 218.8
+1 218.8
+};
+\addplot [very thick, green, mark=x, mark size=4, mark options={solid,fill opacity=0}]
+table {%
+0 83.6
+0.1 83.6
+0.2 83.6
+0.3 84
+0.4 86.6
+0.5 105.9
+0.6 128.7
+0.7 150.5
+0.8 170.6
+0.9 198.4
+1 218.8
+};
+\addlegendentry{LBound}
+\addplot [semithick, blue, forget plot]
+table {%
+0 83.8
+0 83.8
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.1 83.8
+0.1 83.8
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.2 83.8
+0.2 83.8
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.3 84.2
+0.3 84.2
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.4 86.7
+0.4 86.7
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.5 106.3
+0.5 106.3
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.6 129.2
+0.6 129.2
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.7 150.8
+0.7 150.8
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.8 170.9
+0.8 170.9
+};
+\addplot [semithick, blue, forget plot]
+table {%
+0.9 198.9
+0.9 198.9
+};
+\addplot [semithick, blue, forget plot]
+table {%
+1 219.2
+1 219.2
+};
+\addplot [very thick, blue, mark=o, mark size=4, mark options={solid,fill opacity=0}]
+table {%
+0 83.8
+0.1 83.8
+0.2 83.8
+0.3 84.2
+0.4 86.7
+0.5 106.3
+0.6 129.2
+0.7 150.8
+0.8 170.9
+0.9 198.9
+1 219.2
+};
+\addlegendentry{BUPU}
+\addplot [semithick, purple, forget plot]
+table {%
+0 83.8607047758175
+0 83.9439463869732
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.1 104.446735723291
+0.1 106.225991549436
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.2 104.60535247182
+0.2 106.11464752818
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.3 104.308976257205
+0.3 106.018296470068
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.4 102.251419983255
+0.4 104.263580016745
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.5 113.217865909341
+0.5 118.10031590884
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.6 131.755306926594
+0.6 135.835602164315
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.7 152.468185282346
+0.7 156.304541990382
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.8 174.814675049512
+0.8 177.985324950488
+};
+\addplot [semithick, purple, forget plot]
+table {%
+0.9 196.309571133908
+0.9 199.108610684274
+};
+\addplot [semithick, purple, forget plot]
+table {%
+1 219.2
+1 219.2
+};
+\addplot [very thick, purple, mark=triangle, mark size=4, mark options={solid,rotate=180,fill opacity=0}]
+table {%
+0 83.9023255813954
+0.1 105.336363636364
+0.2 105.36
+0.3 105.163636363636
+0.4 103.2575
+0.5 115.659090909091
+0.6 133.795454545455
+0.7 154.386363636364
+0.8 176.4
+0.9 197.709090909091
+1 219.2
+};
+\addlegendentry{DAPP-ECC}
+\addplot [semithick, brown, forget plot]
+table {%
+0 126.807351075597
+0 129.830744162498
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.1 127.941463600204
+0.1 130.763298304558
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.2 129.177085910387
+0.2 131.632437899136
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.3 130.620374014453
+0.3 132.912959318881
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.4 131.046882130373
+0.4 132.619784536294
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.5 131.006760646892
+0.5 132.459906019775
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.6 130.828787067808
+0.6 131.752165313144
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.7 150.8
+0.7 150.8
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.8 170.9
+0.8 170.9
+};
+\addplot [semithick, brown, forget plot]
+table {%
+0.9 198.9
+0.9 198.9
+};
+\addplot [semithick, brown, forget plot]
+table {%
+1 219.2
+1 219.2
+};
+\addplot [very thick, brown, mark=triangle, mark size=4, mark options={solid,fill opacity=0}]
+table {%
+0 128.319047619048
+0.1 129.352380952381
+0.2 130.404761904762
+0.3 131.766666666667
+0.4 131.833333333333
+0.5 131.733333333333
+0.6 131.290476190476
+0.7 150.8
+0.8 170.9
+0.9 198.9
+1 219.2
+};
+\addlegendentry{F-Fit}
+\end{axis}
+
+\end{tikzpicture}

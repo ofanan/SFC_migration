@@ -41,5 +41,5 @@ def solve_problem_by_Cplex (input_file_name):
     return list_of_set_vars
 
 if __name__ == "__main__":
-    solve_problem_by_Cplex ('../res/problem.lp')
+    solve_problem_by_Cplex ('../res/lp/problem.lp')
 

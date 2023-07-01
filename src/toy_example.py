@@ -4,9 +4,14 @@ import math
 import itertools 
 import time
 
+"""
+Generate a .lp cplex formulation for a toy-example of the migration and placement problem.
+To run this file, you should first generate the files Check_sol.py and obj_func.py by calling the function gen_py_problem().
+Then, to solve the problem and check the solution, please uncomment the lines that import Check_sol and obj_func.  
+"""
+# import Check_sol # Please generate first the file Check_sol.py by calling the function gen_py_problem(), and then uncomment this line for later runs.   
+# import obj_func # Please generate first the file obj_func.py by calling the function gen_py_problem(), and then uncomment this line for later runs.
 from printf import printf
-import Check_sol
-import obj_func
 from _overlapped import NULL
 from solve_problem_by_Cplex import solve_problem_by_Cplex
 
@@ -1217,7 +1222,7 @@ class toy_example (object):
             sol = np.zeros (num_of_decision_vars)
             for v in range (self.NUM_OF_VNFs):
                 sol[vsa[v] + choice_of_VNF_v[v]] = 1
-            if (Check_sol.Check_sol (sol)): # if Solve is not feasible
+            if (Check_sol.Check_sol (sol)): # if Solve is not feasible 
                 cost = obj_func.obj_func (sol)
                 if (cost < self.min_cost):
                     self.min_cost = cost

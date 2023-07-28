@@ -11,8 +11,8 @@ import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 from printf import printf, printFigToPdf 
 import pickle
-# from pandas.tests.extension.test_external_block import df
 
+# from pandas.tests.extension.test_external_block import df
 # This class allows choosing the order of magnitude in plots that use scientific notation 
 # class OOMFormatter(matplotlib.ticker.ScalarFormatter):
 #     def __init__(self, order=0, fformat="%1.1f", offset=True, mathText=True):
@@ -26,10 +26,21 @@ import pickle
 #         if self._useMathText:
 #             self.format = r'$\mathdefault{}$' .format (s elf.format) 
 
+
+# Color-blind friendly pallette
+BLACK       = '#000000' 
+ORANGE      = '#E69F00'
+SKY_BLUE    = '#56B4E9'
+GREEN       = '#009E73'
+YELLOW      = '#F0E442'
+BLUE        = '#0072B2'
+VERMILION   = '#D55E00'
+PURPLE      = '#CC79A7'
+
+# Project-specific
 TREE_HEIGHT    = 6
 NUM_DIRECTIONS = (TREE_HEIGHT-1)*2
 OVERALL_DIR    = -1
-
 
 # Indices of fields indicating the settings in a standard ".res" file
 t_idx     = 0 # time slot
@@ -47,14 +58,10 @@ num_usrs_idx      = 6
 num_crit_usrs_idx = 7
 reshuffle_idx     = num_crit_usrs_idx+1 
 
-MARKER_SIZE             = 16
-MARKER_SIZE_SMALL       = 2
-LINE_WIDTH              = 3 
-LINE_WIDTH_SMALL        = 1 
-FONT_SIZE               = 24
-FONT_SIZE_SMALL         = 8
-LEGEND_FONT_SIZE        = 19
-LEGEND_FONT_SIZE_SMALL  = 8 
+MARKER_SIZE = {'large' : 15, 'small' : 2}            
+LINE_WIDTH  = {'large' : 3,  'small' : 1} 
+FONT_SIZE   = {'large' : 22, 'small' : 8}                
+LEGEND_FONT = {'large' : 17, 'small' : 8}        
 
 UNIFORM_CHAIN_MIG_COST = 600
 
@@ -92,26 +99,32 @@ class Res_file_parser (object):
     # Find the length of the time slot based on the input file name
     parse_T_from_input_file_name = lambda self, input_file_name : int (input_file_name.split ('secs')[0].split('_')[-1])
 
-    # Set the parameters of the plot (sizes of fonts, legend, ticks etc.).
-    #mfc='none' makes the markers empty.
-    set_plt_params = lambda self, size='large' : mpl.rcParams.update({
-        'font.size'         : FONT_SIZE,
-        'legend.fontsize'   : LEGEND_FONT_SIZE,
-        'xtick.labelsize'   : FONT_SIZE,
-        'ytick.labelsize'   : FONT_SIZE,
-        'axes.labelsize'    : FONT_SIZE,
-        'axes.titlesize'    : FONT_SIZE,}) if (size=='large') else matplotlib.rcParams.update({
-        'font.size'         : FONT_SIZE_SMALL,
-        'legend.fontsize'   : LEGEND_FONT_SIZE_SMALL,
-        'xtick.labelsize'   : FONT_SIZE_SMALL,
-        'pgf.texsystem'     : "pdflatex",
-        'text.usetex'       : True,
-        'pgf.rcfonts'       : False,
-        'ytick.labelsize'   : FONT_SIZE_SMALL,
-        'axes.labelsize'    : FONT_SIZE_SMALL,
-        'figure.figsize'    : (15, 4),
-        'axes.titlesize'    : FONT_SIZE_SMALL})
+    def set_plt_params (self, size='large'):
+        """
+        Customize the plots' "cosmetics parameters" (sizes of fonts, legend, ticks etc.).
+        mfc='none' makes the markers empty.
 
+        """
+        if self.useLatex:
+            matplotlib.rcParams.update({
+                'font.size'         : FONT_SIZE     [size],
+                'legend.fontsize'   : LEGEND_FONT   [size],
+                'xtick.labelsize'   : FONT_SIZE     [size],
+                'ytick.labelsize'   : FONT_SIZE     [size],
+                'axes.labelsize'    : FONT_SIZE     [size],
+                'axes.titlesize'    : FONT_SIZE     [size],
+                'figure.figsize'    : (15, 4),
+                'pgf.texsystem'     : "pdflatex",
+                'text.usetex'       : True,
+                'pgf.rcfonts'       : False})
+        else:
+            mpl.rcParams.update({
+                'font.size'         : FONT_SIZE     [size],
+                'legend.fontsize'   : LEGEND_FONT   [size],
+                'xtick.labelsize'   : FONT_SIZE     [size],
+                'ytick.labelsize'   : FONT_SIZE     [size],
+                'axes.labelsize'    : FONT_SIZE     [size],
+                'axes.titlesize'    : FONT_SIZE     [size]})  
     
     def __init__ (self, 
                   useLatex=False # When True, use Latex - thus, better fits to be embedded with the correct font within a Latex file (but slower compilation time).
@@ -149,23 +162,23 @@ class Res_file_parser (object):
                                   'ms'           : 'MultiScaler'}
 
         # The colors used for each alg's plot, in the dist' case
-        self.color_dict       = {'opt'          : 'green',
-                                 'optInt'       : 'green',
-                                'SyncPartResh'  : 'blue',
-                                'Async'         : 'purple',
-                                'AsyncBlk'      : 'purple',
-                                'AsyncNBlk'     : 'purple',
-                                'ffit'          : 'brown',
-                                'ms'            : 'brown',
-                                'cpvnf'         : 'black'}
+        self.color_dict       = {'opt'          : GREEN,
+                                 'optInt'       : GREEN,
+                                'SyncPartResh'  : ORANGE,
+                                'Async'         : SKY_BLUE,
+                                'AsyncBlk'      : SKY_BLUE,
+                                'AsyncNBlk'     : SKY_BLUE,
+                                'ffit'          : BLACK,
+                                'ms'            : VERMILION,
+                                'cpvnf'         : PURPLE}
 
         # The markers used for each alg', in the dist' case
         self.markers_dict     = {'opt'          : 'x',
                                  'optInt'       : 'x',
                                 'SyncPartResh'  : 'o',
-                                'Async'         : 'v',
-                                'AsyncBlk'      : 'v',
-                                'AsyncNBlk'     : 'v',
+                                'Async'         : 'D',
+                                'AsyncBlk'      : 'D',
+                                'AsyncNBlk'     : 'D',
                                 'ffit'          : '^',
                                 'cpvnf'         : 's',
                                 'ms'            : 'v'}
@@ -184,11 +197,11 @@ class Res_file_parser (object):
         Plot a single x, y, python line, with the required settings (colors, markers etc).
         """ 
         if markersize==None:
-            markersize = MARKER_SIZE_SMALL if self.useLatex else MARKER_SIZE
+            markersize = MARKER_SIZE['small' if self.useLatex else 'large']
         else:
             markersize = markersize 
         if linewidth==None:
-            linewidth = LINE_WIDTH_SMALL if self.useLatex else LINE_WIDTH
+            linewidth = LINE_WIDTH['small' if self.useLatex else 'large']
         else:
             linewidth = linewidth 
         color = self.color_dict[mode] if (color==None) else color  
@@ -321,10 +334,10 @@ class Res_file_parser (object):
             avg_num_of_migrations.   append (np.average ([item['mig_cost']                       for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST)
             avg_ratio_of_migrations. append (np.average ([item['mig_cost']/item['num_usrs']      for item in res_from_these_slots])  / UNIFORM_CHAIN_MIG_COST)
 
-        num_crit_sctr.  scatter (x, avg_num_of_crit_chains,   s=MARKER_SIZE_SMALL, c='black', marker='o')
-        ratio_crit_sctr.scatter (x, avg_ratio_of_crit_chains, s=MARKER_SIZE_SMALL, c='black', marker='o')
-        num_mig_sctr.   scatter (x, avg_num_of_migrations,    s=MARKER_SIZE_SMALL, c='black', marker='o')
-        ratio_mig_sctr. scatter (x, avg_ratio_of_migrations,  s=MARKER_SIZE_SMALL, c='black', marker='o')
+        num_crit_sctr.  scatter (x, avg_num_of_crit_chains,   s=MARKER_SIZE['small'], c='black', marker='o')
+        ratio_crit_sctr.scatter (x, avg_ratio_of_crit_chains, s=MARKER_SIZE['small'], c='black', marker='o')
+        num_mig_sctr.   scatter (x, avg_num_of_migrations,    s=MARKER_SIZE['small'], c='black', marker='o')
+        ratio_mig_sctr. scatter (x, avg_ratio_of_migrations,  s=MARKER_SIZE['small'], c='black', marker='o')
         
         plt.locator_params(nbins=4)
         self.plot_lin_reg (x=np.array(x), y=avg_num_of_crit_chains,   ax=num_crit_sctr)
@@ -632,14 +645,19 @@ class Res_file_parser (object):
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
      
-    def plot_RT_prob_sim_python (self, pcl_input_file_name=None, res_input_file_name=None, reshuffle=True, dist=False):
+    def plot_RT_prob_sim_python (self, 
+                                 pcl_input_file_name=None, # If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed. 
+                                 res_input_file_name=None, # If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
+                                 reshuffle=True, # When True, consider only modes that allow reshuffling of MSs
+                                 dist=False, # when True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project. 
+                                 print_legend = True, # When True, print the legend
+                                 legend_at_top = False,
+                                 ):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         The plot also presents the conf' intervals.
         The raw data is also printed to an output text file, with the extension .dat
         When given an input file name, parse it first.
-        If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
-        when 'dist' is True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project.
         To fix the size of labels, legends, markers etc, uncomment the line:
         self.set_plt_params ()
         """
@@ -655,7 +673,7 @@ class Res_file_parser (object):
         dat_output_file = open ('../res/dist_{}.dat' .format (input_file_name), 'w')
 
         # Tune the size of labels, legends, markers etc, in case we generate a pure-Python (not latex) plot
-        self.set_plt_params (size= ('Small' if self.useLatex else 'Large'))
+        self.set_plt_params (size= ('Small' if self.useLatex else 'large'))
         _, ax = plt.subplots()
         # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         modes = ['opt', 'SyncPartResh', 'AsyncNBlk', 'ffit', 'ms', 'cpvnf'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
@@ -690,12 +708,13 @@ class Res_file_parser (object):
                 y.append (avg)
             
             if self.useLatex:
-                self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE_SMALL, linewidth=LINE_WIDTH_SMALL)
+                self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE['small'], linewidth=LINE_WIDTH_SMALL)
             else:
                 self.my_plot (ax, x, y, mode)
         plt.xlabel('Fraction of RT Requests')
         plt.ylabel('CPU at Leaf [GHz]')
-        ax.legend (ncol=2, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
+        if print_legend:
+            ax.legend (ncol=2, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0, 1) #(-0.04,1.04)
         print ('self.city={}' .format (self.city))
         if (dist):
@@ -1006,7 +1025,7 @@ class Res_file_parser (object):
         Calculate the data needed for plotting a graph showing the communication overhead as a func' of the RT prob'.
         Then, plot a graph, and save it.
         """
-        self.set_plt_params (size= ('Small' if self.useLatex else 'Large'))
+        self.set_plt_params (size= ('Small' if self.useLatex else 'large'))
         ax = plt.gca()
 
         self.comoh_data = [] # this field will hold all the data to be parsed from the comoh input files
@@ -1672,16 +1691,16 @@ def plot_crit_n_mig_vs_T (city, y_axis='mig_cost', per_slot=True, prepare_new_pc
         my_res_file_parser.parse_res_files_w_distinct_T(input_res_filenames)
     my_res_file_parser.plot_crit_n_mig_vs_T (pcl_input_file_name='{}_vary_T.pcl' .format (city), y_axis=y_axis, per_slot=per_slot)
 
-def plot_RT_prob_sim (city):
+def plot_RT_prob_sim (city, print_legend):
     """
     Generate a plot of the minimal required resources to find a feasible sol', as a function of the ratio of requests with RT requirements.
     The plot is saved as a .pdf in the '../res' directory.    
     """
     my_res_file_parser = Res_file_parser ()
     if (city=='Lux'):            
-        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res')
+        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Lux.post.antloc_256cells.poa2cell_Lux_0820_0830_1secs_post.poa.res', print_legend=print_legend)
     else:
-        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+        my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res', print_legend=print_legend)
 
 
 def plot_cost_vs_rsrc (city):
@@ -1705,7 +1724,7 @@ if __name__ == '__main__':
     # Generate a Rt_prob_sim plot
     pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
     my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=False)
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'

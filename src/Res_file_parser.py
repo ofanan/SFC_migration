@@ -58,10 +58,10 @@ num_usrs_idx      = 6
 num_crit_usrs_idx = 7
 reshuffle_idx     = num_crit_usrs_idx+1 
 
-MARKER_SIZE = {'large' : 15, 'small' : 2}            
-LINE_WIDTH  = {'large' : 3,  'small' : 1} 
-FONT_SIZE   = {'large' : 22, 'small' : 8}                
-LEGEND_FONT = {'large' : 17, 'small' : 8}        
+MARKER_SIZE         = {'large' : 13, 'small' : 2}            
+LINE_WIDTH          = {'large' : 3,  'small' : 1} 
+FONT_SIZE           = {'large' : 12, 'small' : 8}                
+LEGEND_FONT_SIZE    = {'large' : 12, 'small' : 8}        
 
 UNIFORM_CHAIN_MIG_COST = 600
 
@@ -107,24 +107,24 @@ class Res_file_parser (object):
         """
         if self.useLatex:
             matplotlib.rcParams.update({
-                'font.size'         : FONT_SIZE     [size],
-                'legend.fontsize'   : LEGEND_FONT   [size],
-                'xtick.labelsize'   : FONT_SIZE     [size],
-                'ytick.labelsize'   : FONT_SIZE     [size],
-                'axes.labelsize'    : FONT_SIZE     [size],
-                'axes.titlesize'    : FONT_SIZE     [size],
+                'font.size'         : FONT_SIZE         [size],
+                'legend.fontsize'   : LEGEND_FONT_SIZE  [size],
+                'xtick.labelsize'   : FONT_SIZE         [size],
+                'ytick.labelsize'   : FONT_SIZE         [size],
+                'axes.labelsize'    : FONT_SIZE         [size],
+                'axes.titlesize'    : FONT_SIZE         [size],
                 'figure.figsize'    : (15, 4),
                 'pgf.texsystem'     : "pdflatex",
                 'text.usetex'       : True,
                 'pgf.rcfonts'       : False})
         else:
             mpl.rcParams.update({
-                'font.size'         : FONT_SIZE     [size],
-                'legend.fontsize'   : LEGEND_FONT   [size],
-                'xtick.labelsize'   : FONT_SIZE     [size],
-                'ytick.labelsize'   : FONT_SIZE     [size],
-                'axes.labelsize'    : FONT_SIZE     [size],
-                'axes.titlesize'    : FONT_SIZE     [size]})  
+                'font.size'         : FONT_SIZE         [size],
+                'legend.fontsize'   : LEGEND_FONT_SIZE  [size],
+                'xtick.labelsize'   : FONT_SIZE         [size],
+                'ytick.labelsize'   : FONT_SIZE         [size],
+                'axes.labelsize'    : FONT_SIZE         [size],
+                'axes.titlesize'    : FONT_SIZE         [size]})  
     
     def __init__ (self, 
                   useLatex=False # When True, use Latex - thus, better fits to be embedded with the correct font within a Latex file (but slower compilation time).
@@ -419,7 +419,7 @@ class Res_file_parser (object):
             lines = line1 if (plot_only_crit) else line1 + line2
             plt.xlim (0)
             
-            plt.legend (lines, [line.get_label() for line in lines], loc='upper center', fontsize=LEGEND_FONT_SIZE)
+            plt.legend (lines, [line.get_label() for line in lines], loc='upper center', fontsize=LEGEND_FONT_SIZE['large'])
 
             plt.savefig ('../res/cost_comp_{}.pdf' .format (self.input_file_name), bbox_inches='tight')
             
@@ -673,7 +673,7 @@ class Res_file_parser (object):
         dat_output_file = open ('../res/dist_{}.dat' .format (input_file_name), 'w')
 
         # Tune the size of labels, legends, markers etc, in case we generate a pure-Python (not latex) plot
-        self.set_plt_params (size= ('Small' if self.useLatex else 'large'))
+        self.set_plt_params (size= ('small' if self.useLatex else 'large'))
         _, ax = plt.subplots()
         # modes = ['opt', 'ms', 'ffit', 'cpvnf', 'SyncPartResh', 'Async'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
         modes = ['opt', 'SyncPartResh', 'AsyncNBlk', 'ffit', 'ms', 'cpvnf'] if reshuffle else ['opt', 'ourAlgC', 'ffitC', 'cpvnfC'] 
@@ -708,13 +708,18 @@ class Res_file_parser (object):
                 y.append (avg)
             
             if self.useLatex:
-                self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE['small'], linewidth=LINE_WIDTH_SMALL)
+                self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE['small'], linewidth=LINE_WIDTH['small'])
             else:
                 self.my_plot (ax, x, y, mode)
         plt.xlabel('Fraction of RT Requests')
         plt.ylabel('CPU at Leaf [GHz]')
         if print_legend:
-            ax.legend (ncol=2, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
+            if legend_at_top:
+                ax.legend (ncol=len(modes), frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
+            else:
+                ax.legend (ncol=3, frameon=False) 
+                # ax.legend (ncol=len(modes), loc='center top', bbox_to_anchor=(1, 0.5)) #(loc='upper center', shadow=True, fontsize='x-large')
+
         plt.xlim (0, 1) #(-0.04,1.04)
         print ('self.city={}' .format (self.city))
         if (dist):
@@ -860,7 +865,7 @@ class Res_file_parser (object):
         plt.ylabel('Avg. Cost')
         plt.xlim (1, 3)
         plt.ylim (0, 2000000)
-        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
+        ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE['large'], loc='upper right') #(loc='upper center', shadow=True, fontsize='x-large')
         
         plt.tight_layout()
         plt.savefig ('../res/cost_vs_rsrc_{}.pdf' .format (pcl_input_file_name.split('.pcl')[0]), bbox_inches='tight')
@@ -1011,7 +1016,7 @@ class Res_file_parser (object):
                           color=colors[color_idx], marker=markers[color_idx], 
                           label='PD accumulation delay={:.0f}*BU accumulation delay' .format (pdd2ad_ratio)) # if pdd2ad_ratio>1 else 'PD accumulation delay=BU accumulation delay')
             color_idx += 1
-        ax.legend (fontsize=LEGEND_FONT_SIZE) #  loc='upper right') 
+        ax.legend (fontsize=LEGEND_FONT_SIZE['large']) #  loc='upper right') 
         plt.xlim (0, 100)
         plt.ylim (0, 17 if (city=='Lux') else 110)
         plt.ylabel('Min Cpu at Leaf [GHz]')
@@ -1168,13 +1173,13 @@ class Res_file_parser (object):
         for type in ['nPkts', 'nBytes']:
             self.my_plot (ax=ax, x=normalized_cpu_vals, y=overall[type], mode='AsyncNBlk', color=None, label='Communication Overhead per Request') 
                 #  'label='Number of {} per Request' .format ('Bytes' if type=='nBytes' else 'Packets'))
-            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
+            ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE['large'], loc='upper right') 
             plt.ylabel('Communication Overhead {}' .format ('[Bytes]' if type=='nBytes' else '[# Packets]'))
             plt.xlabel(r'$C_{cpu} / \hat{C}_{cpu}$')
             # if (type=='nBytes'):
             #     ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*(TREE_HEIGHT-1)   for item in overall['critNNewNonRtUsrs']], color=self.color_dict['opt'],   marker=self.markers_dict['opt'],   markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive LBound')
             #     ax.plot (normalized_cpu_vals, [item*nonRtUsrChainOh*(TREE_HEIGHT-1)*4 for item in overall['critNNewNonRtUsrs']], color=self.color_dict['cpvnf'], marker=self.markers_dict['cpvnf'], markersize=MARKER_SIZE, linewidth=LINE_WIDTH, label='Intuitive HBound', markerfacecolor='none')
-            ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE, loc='upper right') 
+            ax.legend (ncol=1, fontsize=LEGEND_FONT_SIZE['large'], loc='upper right') 
             plt.savefig ('../res/{}_p0.3_{}.pdf' .format (city, type), bbox_inches='tight')
             plt.cla()
             cpu_val_list = [item for item in self.comoh_data if item['cpu']==cpu_val]
@@ -1716,15 +1721,16 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-    city = 'Lux'
-    my_res_file_parser = Res_file_parser (useLatex=False)
-    # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
-    # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
 
-    # Generate a Rt_prob_sim plot
-    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=False)
+    for city in ['Monaco']:
+        my_res_file_parser = Res_file_parser (useLatex=False)
+        # Generate a Rt_prob_sim plot
+        # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+        # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
+        # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=True)
+        my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
+        my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
+
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'

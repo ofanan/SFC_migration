@@ -1,7 +1,7 @@
 import matplotlib as mpl
 # from contributed.sumopy.agilepy.lib_wx.test_glcanvas import linewidth
 mpl.use("pgf")
-import tikzplotlib
+import pickle, tikzplotlib
 from tikzplotlib import save as tikz_save
 import matplotlib.pyplot as plt
 import matplotlib.ticker
@@ -10,7 +10,7 @@ from matplotlib import rc
 import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 from printf import printf, printFigToPdf 
-import pickle
+import MyConfig
 
 # from pandas.tests.extension.test_external_block import df
 # This class allows choosing the order of magnitude in plots that use scientific notation 
@@ -472,8 +472,11 @@ class Res_file_parser (object):
         if (time_slot_len==None):
             self.time_slot_len   = find_time_slot_len (self.input_file_name)
         else:
-            self.time_slot_len = time_slot_len 
-        self.input_file      = open ("../res/" + input_file_name,  "r")
+            self.time_slot_len = time_slot_len
+        
+        relative_path_to_input_file = "../res/" + input_file_name
+        MyConfig.check_if_input_file_exists (relative_path_to_input_file=relative_path_to_input_file)   
+        self.input_file      = open (relative_path_to_input_file,  "r")
         lines                = (line.rstrip() for line in self.input_file) # "lines" contains all lines in input file
         lines                = (line for line in lines if line)       # Discard blank lines
         
@@ -741,7 +744,7 @@ class Res_file_parser (object):
         Possibly normalize the amounts of cpu (the X axis) by either the min' amount of cpu required by opt (LBound) to obtain a feasible sol; 
         and/or normalize the cost (the Y axis) by the costs obtained by opt.   
         """
-        modes = ['opt', 'AsyncNBlk', 'SyncPartResh'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
+        modes = ['opt', 'AsyncNBlk', 'SyncPartResh', 'ms', 'ffit', 'cpvnf'] if dist else ['opt', 'optG', 'optInt', 'SyncPartResh','ms', 'ffit', 'cpvnf']
         if (pcl_input_file_name==None):
             pcl_input_file_name='{}_{}cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city, 'dist_' if dist else '')
 
@@ -824,7 +827,7 @@ class Res_file_parser (object):
             print ('Error: currently, plot_cost_vs_rsrc runs only on slot_len=1 sec')
             return
         
-        self.cost_vs_rsrc_data = pd.read_pickle(r'../res/{}' .format (pcl_input_file_name))
+        self.cost_vs_rsrc_data = pd.read_pickle(r'../res/pcl_files/{}' .format (pcl_input_file_name))
         
         self.set_plt_params ()
         # print (self.cost_vs_rsrc_data)
@@ -1039,7 +1042,8 @@ class Res_file_parser (object):
             
         
         acc_delay_vals = sorted (set ([item['ad']  for item in self.list_of_dicts]))  # values of accumulation delay in the input files
-        colors  = ['blue', 'green', 'brown', 'purple', 'black', 'cyan', 'yellow']
+        # colors  = ['blue', 'green', 'brown', 'purple', 'black', 'cyan', 'yellow']
+        colors = [SKY_BLUE, BLACK, PURPLE, GREEN]
         markers = ['x', 'o', 'v', '^', 's', 'h', 'd']
         color_idx = 0
 
@@ -1479,6 +1483,7 @@ class Res_file_parser (object):
                 full_list_of_dicts.append (item)
                 
         pcl_output_file_name = '{}_vary_T.pcl' .format (self.city)
+
         with open ('../res/' + pcl_output_file_name, 'wb') as pcl_output_file:
             pickle.dump (full_list_of_dicts, pcl_output_file)
                 
@@ -1714,22 +1719,22 @@ def plot_cost_vs_rsrc (city):
     """
 
     my_res_file_parser = Res_file_parser ()
-    if (city=='Monaco'):
-        pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res']), 
-    pcl_input_file_name = 'cost_vs_rsrc_Monaco_0820_0830_1secs_Telecom_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
+    # if (city=='Monaco'):
+    #     pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res']), 
+    pcl_input_file_name = 'cost_vs_rsrc_Monaco_dist_0820_0830_1secs_p0.3.pcl' if (city=='Monaco') else 'cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl'
     my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_input_file_name)
        
 if __name__ == '__main__':
 
 
-    for city in ['Monaco']:
-        my_res_file_parser = Res_file_parser (useLatex=False)
+    # for city in ['Lux', 'Monaco']:
+    #     my_res_file_parser = Res_file_parser (useLatex=False)
         # Generate a Rt_prob_sim plot
         # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
         # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
         # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=True)
-        my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
-        my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
+        # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
+        # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
 
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
@@ -1759,9 +1764,16 @@ if __name__ == '__main__':
     # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_post_SyncPartResh.res', 'Lux_0820_0830_1secs_post_p0.3_opt_sdG.res', 'Lux_0820_0830_1secs_p0.3_AsyncNBlk.res']) #['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res']) 
     # pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
     # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
+    
+    city = 'Monaco'
+    my_res_file_parser = Res_file_parser ()
+    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (
+        pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl',
+        res_input_file_names=['Monaco_0820_0830_1secs_Telecom_SyncPartResh.res', 'Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', ''])
+    my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
+    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
+    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Monaco', normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name) #'Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
     # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
 
     
     # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
@@ -1810,4 +1822,3 @@ if __name__ == '__main__':
     # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_optInt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
     # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res'])
     # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
-

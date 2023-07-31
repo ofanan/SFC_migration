@@ -2,7 +2,7 @@ import numpy as np
 import math, time, heapq, random, sys, os
 import pulp as plp
 import networkx as nx
-#import gurobipy as grb
+#import gurobipy as grb # Un-comment this line to use Gurobi
 import matplotlib.pyplot as plt
 from   pathlib import Path
 

@@ -8,7 +8,7 @@ The problem and the solution implemented here are described in the following pap
 
 [2] I. Cohen, P. Giaccone, and C.F. Chiasserini, [Distributed Asynchronous Protocol for Service Provisioning in the Edge-Cloud Continuum](https://www.researchgate.net/profile/Itamar-Cohen-2/publication/371722549_Distributed_Asynchronous_Protocol_for_Service_Provisioning_in_the_Edge-Cloud_Continuum/links/6491d2a5c41fb852dd1b1c79/Distributed-Asynchronous-Protocol-for-Service-Provisioning-in-the-Edge-Cloud-Continuum.pdf) IEEE International Conference on Software, Telecommunications and Computer Networks (SoftCom), 2023.
 
-The projects includes:
+The project includes:
 - Parsing of real-world antenna location files. 
 - Simulating users mobility using [SUMO](https://sumo.dlr.de/docs/index.html).
 - Implementation of a provably-optimal CPU allocation algorithm (GFA).

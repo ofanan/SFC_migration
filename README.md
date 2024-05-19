@@ -4,7 +4,7 @@ This project simulates deployment and migration of Service Function Chains (SFC)
 
 The problem and the solution implemented here are described in the following papers:
 
-[1] I. Cohen, C.F. Chiasserini, P. Giaccone, and Gabriel Scalosub, [Dynamic Service Provisioning in the Edge-cloud Continuum with Bounded Resources](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10122618&casa_token=K42FO43VIzoAAAAA:TCqC4zrw3Hu89J49N9AZKgEV6nbcfhIlHUlvqvsvWj3kNcT3lWav6AVvyTY4DNFN4BI0Lz-RZA&tag=1), IEEE Transactions on Networking, early access, 2023.
+[1] I. Cohen, C.F. Chiasserini, P. Giaccone, and Gabriel Scalosub, [Dynamic Service Provisioning in the Edge-cloud Continuum with Bounded Resources](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10122618&casa_token=K42FO43VIzoAAAAA:TCqC4zrw3Hu89J49N9AZKgEV6nbcfhIlHUlvqvsvWj3kNcT3lWav6AVvyTY4DNFN4BI0Lz-RZA&tag=1), IEEE Transactions on Networking, Vol. 31(6), pp. 3096-3111, 2023.
 
 [2] I. Cohen, P. Giaccone, and C.F. Chiasserini, [Distributed Asynchronous Protocol for Service Provisioning in the Edge-Cloud Continuum](https://www.researchgate.net/profile/Itamar-Cohen-2/publication/371722549_Distributed_Asynchronous_Protocol_for_Service_Provisioning_in_the_Edge-Cloud_Continuum/links/6491d2a5c41fb852dd1b1c79/Distributed-Asynchronous-Protocol-for-Service-Provisioning-in-the-Edge-Cloud-Continuum.pdf) IEEE International Conference on Software, Telecommunications and Computer Networks (SoftCom), 2023.
 

@@ -13,7 +13,7 @@ The project includes:
 - Simulating users mobility using [SUMO](https://sumo.dlr.de/docs/index.html).
 - Implementation of a provably-optimal CPU allocation algorithm (GFA).
 - Implementation of several greedy VM placement algorithms (first-fit, CPVNF, MultiScaler).
-- Formulating and solving the a Linear-Program relaxation for the VM placement problem (which is NP-hard) using either Python's default pulp solver, or Gurobi.
+- Formulating and solving the Linear-Program relaxation for the VM placement problem (which is NP-hard) using either Python's default pulp solver, or Gurobi.
 - A wide range of statistics and performance analysis tools.
 
 # Overview of the python code files
@@ -51,6 +51,6 @@ Under /res/ directory of this project you will find antenna_locs files, detailin
 
 To run a SUMO simulation, you need also the relevant configuration files. Here are the configuration files for [LuST](https://github.com/lcodeca/LuSTScenario) (Luxembourg Sumo Traffic project), and for [MoST](https://github.com/lcodeca/MoSTScenario) (Monaco Sumo Traffic project).
 
-To use the Gurobi LP solver, install Gurobi and uncomment-out the line "import Gurobi" in SFC_mig_Simulator.py.
+To use the Gurobi LP solver, install Gurobi and uncomment the line "import Gurobi" in SFC_mig_Simulator.py.
 
 To use SUMO and Traci, install these tools.

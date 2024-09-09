@@ -1,6 +1,6 @@
 import matplotlib as mpl
 # from contributed.sumopy.agilepy.lib_wx.test_glcanvas import linewidth
-mpl.use("pgf")
+# mpl.use("pgf")
 import pickle, tikzplotlib
 from tikzplotlib import save as tikz_save
 import matplotlib.pyplot as plt
@@ -155,7 +155,7 @@ class Res_file_parser (object):
                                   'optInt'       : 'Opt',
                                   'SyncPartResh' : 'BUPU',
                                   'AsyncBlk'     : 'Distributed Blk', 
-                                  'AsyncNBlk'    : 'DAPP-ECC', 
+                                  'AsyncNBlk'    : 'DASDEC', 
                                   'Async'        : 'Old Async; plz check', 
                                   'ffit'         : 'F-Fit',
                                   'cpvnf'        : 'CPVNF',
@@ -1727,15 +1727,15 @@ def plot_cost_vs_rsrc (city):
 if __name__ == '__main__':
 
 
-    # for city in ['Lux', 'Monaco']:
-    #     my_res_file_parser = Res_file_parser (useLatex=False)
+    for city in ['Lux', 'Monaco']:
+        my_res_file_parser = Res_file_parser (useLatex=False)
         # Generate a Rt_prob_sim plot
-        # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+        pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
         # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-        # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=True)
+        my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=True)
         # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
         # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
-
+    exit ()
     
     # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
     # city = 'Lux'

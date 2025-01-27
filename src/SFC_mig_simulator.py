@@ -710,7 +710,7 @@ class SFC_mig_simulator (object):
         self.rd_poa2cell_file(poa2cell_file_name)
         
         # Remove all the servers in cells that don't contain PoA
-        shortest_path    = nx.shortest_path(self.G)
+        shortest_path    = dict(nx.shortest_path(self.G))
         
         self.G.nodes[root]['nChild'] = self.children_per_node
         for s in range (1, len(self.G.nodes())):
@@ -765,7 +765,7 @@ class SFC_mig_simulator (object):
         self.poa2s             = [poa['s'] for poa in self.PoAs] # Will contain a least translating the PoA number (==leaf #) to the ID of the co-located server. 
 
         # Recalculate the shortest path, and update the tree's height by the changes made
-        self.shortest_path    = nx.shortest_path(self.G)
+        self.shortest_path    = dict(nx.shortest_path(self.G))
         self.tree_height = len (self.shortest_path[self.poa2s[0]][root]) - 1
                 
         self.CPU_cost_at_lvl   = [2**(self.tree_height - lvl) for lvl in range (self.tree_height+1)] if self.use_exp_cpu_cost else [(1 + self.tree_height - lvl) for lvl in range (self.tree_height+1)]
@@ -878,7 +878,7 @@ class SFC_mig_simulator (object):
         
         self.G = self.G.to_directed()
 
-        shortest_path = nx.shortest_path(self.G)
+        shortest_path = dict(nx.shortest_path(self.G))
 
         # levelize the tree (assuming a balanced tree)
         self.poa2s             = [] # Will contain a least translating the PoA number (==leaf #) to the ID of the co-located server. 

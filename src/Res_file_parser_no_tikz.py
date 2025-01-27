@@ -637,7 +637,14 @@ class Res_file_parser (object):
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
      
-    def plot_RT_prob_sim_python (self, pcl_input_file_name=None, res_input_file_name=None, reshuffle=True, dist=False):
+    def plot_RT_prob_sim_python (
+            self, 
+            pcl_input_file_name = None, 
+            res_input_file_name = None, 
+            reshuffle           = True, 
+            dist                = False,
+            plotOverallCpu      = False,
+        ):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         The plot also presents the conf' intervals.

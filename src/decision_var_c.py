@@ -19,9 +19,9 @@ class decision_var_c (object):
         returns the value associated with this decision var.
         If no value is associated with this decision var (no value was written to the decision variable yet, e.g., the problem wasn't solved yet), return 0.
         """
-        if (self.plp_var != None):
+        if (self.plp_var != None): # Check first for value computed by Python's plp optimizer.
             return self.plp_var.value()
-        elif (self.grb_var != None):
+        elif (self.grb_var != None): # Check for a value computed by Gurobi simulator.
             return self.val
         else:
             return 0

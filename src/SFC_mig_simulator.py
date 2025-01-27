@@ -25,6 +25,7 @@ VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs
 VERBOSE_CRIT_LEN      = 10 # Calculate how much time each chain is critical, for the given slot len.
 VERBOSE_LOG_BU        = 11 # Log only the reults of BU, disregarding the PU part.
 VERBOSE_SOL_TIME      = 12 # Calc and print the sol' time
+VERBOSE_OVERALL_CPU   = 13 # print-screen the network's overall CPU units, assuming that the cpu capacity at leaves is 1
 
 # Status returned by algorithms solving the prob' 
 sub_optimal           = 0
@@ -909,15 +910,18 @@ class SFC_mig_simulator (object):
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
-    def __init__ (self, poa_file_name = 'shorter.poa', # File detailing the PoA of each user (e.g., car, pedestrian) along the trace.  
-                        verbose = [], # the type of output produced, e.g.: costs, amount of cpu used, detailed log, debugging. See "VERBOSE_" at this file's header. 
-                        tree_height = 4, children_per_node = 4, # topology of the tree (apart from the leaf, which are potentially real antennas). 
-                        prob_of_target_delay=0.3, # prob' that a simulated usr has RT requirements 
-                        poa2cell_file_name='', # File detailing the attachment of each PoA to a rectangle. In our hierarchy, the leaves are antennas. The leaves' parents are the lowest-level rectangles.
-                                               # If no input is given here, the simulation assumes uses no real-data of antenna location, and each leaf in the tree is co-located with a server, covering a rectangled area. 
-                        use_exp_cpu_cost=True, # True iff the cost of the CPU exponentially increase when moving down in the tree (costs are 1,2,4,16, lowest cost is in the root. When False, costs are linear (1, 2, 3.,,,).  
-                        use_exp_cpu_cap=False, # True iff the cpu capacities exponentially increase when moving up in the tree. (costs are 1,2,4,8, ..., ; lowest capacity is in the roots, When False, capacities are linear (1, 2, 3.,,,).
-                        ):
+    def __init__ (
+            self, 
+            poa_file_name        = 'shorter.poa', # File detailing the PoA of each user (e.g., car, pedestrian) along the trace.  
+            verbose              = [], # the type of output produced, e.g.: costs, amount of cpu used, detailed log, debugging. See "VERBOSE_" at this file's header. 
+            tree_height          = 4, 
+            children_per_node    = 4, # topology of the tree (apart from the leaf, which are potentially real antennas). 
+            prob_of_target_delay =0.3, # prob' that a simulated usr has RT requirements 
+            poa2cell_file_name   ='', # File detailing the association of each PoA with a rectangle. In our hierarchy, the leaves are antennas. The leaves' parents are the lowest-level rectangles.
+                                   # If no input is given here, the simulation assumes uses no real-data of antenna location, and each leaf in the tree is co-located with a server, covering a rectangled area. 
+            use_exp_cpu_cost     = True, # True iff the cost of the CPU exponentially increase when moving down in the tree (costs are 1,2,4,16, lowest cost is in the root. When False, costs are linear (1, 2, 3.,,,).  
+            use_exp_cpu_cap      = False, # True iff the cpu capacities exponentially increase when moving up in the tree. (costs are 1,2,4,8, ..., ; lowest capacity is in the roots, When False, capacities are linear (1, 2, 3.,,,).
+        ):
         """
         """
 
@@ -980,6 +984,11 @@ class SFC_mig_simulator (object):
             self.gen_parameterized_antloc_tree (self.poa2cell_file_name)
         
         self.delay_const_sanity_check()
+        if VERBOSE_OVERALL_CPU in self.verbose:
+            overall_cpu = 0
+            for s in self.G.nodes:
+                overall_cpu += self.calc_cpu_capacities (cpu_cap_at_leaf=1)[self.G.nodes[s]['lvl']]
+            error (f'overall_cpu={overall_cpu}')       
 
     def delay_const_sanity_check (self):
         """
@@ -994,10 +1003,16 @@ class SFC_mig_simulator (object):
                     usr.id, usr.theta_times_lambda, usr.target_delay))
             exit ()       
 
-    def simulate (self, mode,     
-                  prob_of_target_delay=None, cpu_cap_at_leaf=516, sim_len_in_slots=float('inf'), slot_to_dump=float('inf'), seed=42,
-                  print_params=False,     # When True, write the chains' parameter to ../res/params.res.
-                  ): 
+    def simulate (
+            self, 
+            mode,     
+            prob_of_target_delay    = None, 
+            cpu_cap_at_leaf         = 516, 
+            sim_len_in_slots        = float('inf'), 
+            slot_to_dump            = float('inf'), 
+            seed                    = 42,
+            print_params            = False, # When True, write the chains' parameter to ../res/params.res.
+        ): 
         
         """
         Simulate the whole simulation using the chosen alg: LP (for finding an optimal fractional solution), or an algorithm (either our alg, or a benchmark alg' - e.g., first-fit, worst-fit).
@@ -1034,11 +1049,11 @@ class SFC_mig_simulator (object):
         else:
             self.cpu_cap_at_leaf = cpu_cap_at_leaf
             self.cpu_cap_at_lvl  = self.calc_cpu_capacities (self.cpu_cap_at_leaf)
-         
+          
         if (print_params):
             self.print_params ()
 
-        self.set_RCs_and_a  (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
+        self.set_RCs_and_a (aug_cpu_capacity_at_lvl=self.cpu_cap_at_lvl) # initially, there is no rsrc augmentation, and the capacity and currently-available cpu of each server is exactly its CPU capacity.
 
         self.usrs                       = [] 
 
@@ -1928,8 +1943,7 @@ class SFC_mig_simulator (object):
         """
         Run a simulation where the probability of a RT application varies. 
         Output the minimal resource augmentation required by each alg', and the cost obtained at each time slot.
-        """       
-
+        """
 
         print ('Running run_prob_of_RT_sim')
         probabilities = [prob] if (prob!=None) else ([i/10 for i in range (11)])
@@ -2127,10 +2141,33 @@ def only_cnt_num_new_vehs_per_slot ():
                                               poa_file_name='Monaco_0730_0830_{}secs_Telecom.poa' .format (T) if (city=='Monaco') else 'Lux_0730_0830_{}secs_post.poa' .format (T))
             
             my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
+
+def get_overall_cpu_of_netw (
+        city
+        ): # city to consider
+    """
+    Prints the overall cpu of a network (currently, considering only a city), 
+    assuming that the cpu at each leaf unit is 1.
+    """
+    if city=='Lux':
+        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell', 
+        poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
+    elif city=='Monaco':
+        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell', 
+        poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
+    else:
+        error ('Sorry. get_overall_cpu_of_netw currently supports only Lux and Monaco')
+        
+    my_simulator = SFC_mig_simulator (
+        poa_file_name       = poa_file_name, 
+        poa2cell_file_name  = poa2cell_file_name,
+        verbose             = VERBOSE_OVERALL_CPU
+        )
     
 
 if __name__ == "__main__":
     
+    get_overall_cpu_of_netw (city='Lux')
     # for prob in [0.9, 1.0]:
     #     run_prob_of_RT_sim ('Monaco', 'ms', prob=prob)
     # print (plp.listSolvers(onlyAvailable=True))
@@ -2146,7 +2183,6 @@ if __name__ == "__main__":
     #
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
 
-    
     run_cost_vs_rsrc (city='Lux')
     # run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
     # for prob in [0.7, 0.8, 0.9, 1.0]:

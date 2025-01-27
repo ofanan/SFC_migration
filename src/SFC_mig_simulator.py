@@ -633,13 +633,13 @@ class SFC_mig_simulator (object):
             self.dump_state_to_log_file()  
 
     def CPUAll_single_usr (self, usr): 
-        """
-        CPUAll algorithm, for a single usr:
-        calculate the minimal CPU allocation required by the given usr, when the highest server on which u is located is s.
-        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
-        This version of the alg' assumes a balanced homogeneous tree, 
-        so that the netw' delay between every two servers is unequivocally defined by their levels.
-        """
+        # """
+        # CPUAll algorithm, for a single usr:
+        # calculate the minimal CPU allocation required by the given usr, when the highest server on which u is located is s.
+        # The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\\ell$ are identical.
+        # This version of the alg' assumes a balanced homogeneous tree, 
+        # so that the netw' delay between every two servers is unequivocally defined by their levels.
+        # """
         if (self.poa_file_name in ['Tree_shorter.poa']): # special toy-example scenarios for debugging 
             if (usr.id%2==0):
                 usr.B = [1,1]
@@ -661,18 +661,28 @@ class SFC_mig_simulator (object):
                 argmax = np.argmax (np.array ([1 / (mu[i] - usr.theta_times_lambda[i]) - 1 / (mu[i] + 1 - usr.theta_times_lambda[i]) for i in range(len(mu))]))
                 mu[argmax] = mu[argmax] + 1
                     
-    def CPUAll (self, usrs): 
+    # def CPUAll (self, usrs):
+    #     # """
+    #     # CPUAll algorithm:
+    #     # calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
+    #     # The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\\ell$ are identical.
+    #     # This version of the alg' assumes a balanced homogeneous tree, 
+    #     # so that the netw' delay between every two servers is unequivocally defined by their levels.
+    #     # """
+    #     for usr in usrs:
+    #         self.CPUAll_single_usr(usr)
+    
+    def CPUAll (self, usrs):
         """
         CPUAll algorithm:
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
-        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
+        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\\ell$ are identical.        
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
         for usr in usrs:
             self.CPUAll_single_usr(usr)
-    
-       
+            
     def gen_parameterized_antloc_tree (self, poa2cell_file_name):
         """
         Generate a parameterized tree with specified height and children-per-non-leaf-node. 
@@ -907,7 +917,7 @@ class SFC_mig_simulator (object):
         #         self.path_bw_cost [s][d] = sum (self.G[shortest_path[s][d][hop]][shortest_path[s][d][hop+1]]['cost']  for hop in range (len(shortest_path[s][d])-1))
                 
         # calculate the network delay from a leaf to a node in each level,  
-        # assuming that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.   
+        # assuming that the network is a balanced tree, and the delays of all link of level $\\ell$ are identical.   
         # leaf = self.G.number_of_nodes()-1 # when using networkx and a balanced tree, self.path_delay[self.G[nodes][-1]] is surely a leaf (it's the node with highest ID).
         # self.netw_delay_from_leaf_to_lvl = [ self.path_delay[leaf][shortest_path[leaf][root][lvl]] for lvl in range (0, self.tree_height+1)]
 
@@ -989,7 +999,9 @@ class SFC_mig_simulator (object):
             overall_cpu = 0
             for s in self.G.nodes:
                 overall_cpu += self.calc_cpu_capacities (cpu_cap_at_leaf=1)[self.G.nodes[s]['lvl']]
-            error (f'overall_cpu={overall_cpu}')       
+            city = self.poa_file_name.split('_')[0]
+            print (f'The overall cpu of {city} is {overall_cpu}')
+            return       
 
     def delay_const_sanity_check (self):
         """
@@ -2143,85 +2155,87 @@ def only_cnt_num_new_vehs_per_slot ():
             
             my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
 
-def get_overall_cpu_of_netw (
-        city
-        ): # city to consider
+def get_overall_cpu_of_netw (): 
     """
     Prints the overall cpu of a network (currently, considering only a city), 
     assuming that the cpu at each leaf unit is 1.
     """
-    if city=='Lux':
-        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell' 
-        poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
-    elif city=='Monaco':
-        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell' 
-        poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
-    else:
-        error ('Sorry. get_overall_cpu_of_netw currently supports only Lux and Monaco')
+    for city in ['Lux', 'Monaco']:
+        if city=='Lux':
+            poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell' 
+            poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
+        elif city=='Monaco':
+            poa2cell_file_name  = 'Monaco.Telecom.antloc_192cells.poa2cell' 
+            poa_file_name       = 'Monaco_0730_0830_1secs_Telecom.poa'
+        else:
+            error ('Sorry. get_overall_cpu_of_netw currently supports only Lux and Monaco')
 
-    my_simulator = SFC_mig_simulator (
-        poa_file_name       = poa_file_name, 
-        poa2cell_file_name  = poa2cell_file_name,
-        verbose             = [VERBOSE_OVERALL_CPU]
+        my_simulator = SFC_mig_simulator (
+            poa_file_name       = poa_file_name, 
+            poa2cell_file_name  = poa2cell_file_name,
+            verbose             = [VERBOSE_OVERALL_CPU]
         )
-    
+        
 
 if __name__ == "__main__":
     
-    get_overall_cpu_of_netw (city='Lux')
-    # for prob in [0.9, 1.0]:
-    #     run_prob_of_RT_sim ('Monaco', 'ms', prob=prob)
-    # print (plp.listSolvers(onlyAvailable=True))
-    # city = 'Lux'
-    # T = 1
-    # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
-    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])    
-    # my_simulator.simulate (mode = 'opt')    
-    # city = 'Lux'
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-    #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
-    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
-    #
-    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
-
-    run_cost_vs_rsrc (city='Lux')
-    # run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
-    # for prob in [0.7, 0.8, 0.9, 1.0]:
-    #     run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)
-
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
-    #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
-    #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
-    #
-    # for i in range (20):
-    #     print ('i={}. target_delay={}' .format (i, my_simulator.pseudo_random_target_delay(i)))
+    try: 
+        get_overall_cpu_of_netw ()
         
+        # for prob in [0.9, 1.0]:
+        #     run_prob_of_RT_sim ('Monaco', 'ms', prob=prob)
+        # print (plp.listSolvers(onlyAvailable=True))
+        # city = 'Lux'
+        # T = 1
+        # my_simulator = SFC_mig_simulator (poa_file_name='Tree_shorter.poa',
+        #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])    
+        # my_simulator.simulate (mode = 'opt')    
+        # city = 'Lux'
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+        #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
+        #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME, VERBOSE_DEBUG])
+        #
+        # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
     
-    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=94)
-#
-    # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
-
-    # run_cost_vs_rsrc ('Monaco')
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])   
-    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)
-
-    # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=842)    
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   
-    # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[])   
-    # my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
-    # ned_output_file = open ('../res/Lux.ned', 'w')
-    # printf (ned_output_file, '{}')
-    # exit ()
+        # run_cost_vs_rsrc (city='Lux')
+        # run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
+        # for prob in [0.7, 0.8, 0.9, 1.0]:
+        #     run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)
     
-    # only_cnt_num_new_vehs_per_slot ()
-    # run_T_len_sim (city='Monaco', seed=20)
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
-    # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
-    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=209, seed=209)
-    # for sd in range (130, 150): 
-    #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1, seed=sd)
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell',
+        #                                   poa_file_name='Monaco_0820_0830_1secs_Telecom.poa'           if (city=='Monaco') else 'Lux_0820_0830_1secs_post.poa',
+        #                                   verbose=[VERBOSE_RES, VERBOSE_SOL_TIME])
+        #
+        # for i in range (20):
+        #     print ('i={}. target_delay={}' .format (i, my_simulator.pseudo_random_target_delay(i)))
+            
+        
+        # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=94)
+    #
+        # my_simulator.simulate (mode = 'optInt', sim_len_in_slots=2, cpu_cap_at_leaf=389)    
     
+        # run_cost_vs_rsrc ('Monaco')
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])   
+        # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)
+    
+        # my_simulator = SFC_mig_simulator (poa_file_name='shorter.poa', verbose=[VERBOSE_RES, VERBOSE_LOG, VERBOSE_ADD_LOG, VERBOSE_ADD2_LOG])   
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0829_0830_60secs_Telecom.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   
+        # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=842)    
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0829_0830_60secs_post.poa', verbose=[VERBOSE_RES, VERBOSE_LOG_BU])   
+        # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=94)    
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0730_0830_1secs_post.poa', verbose=[])   
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0730_0830_1secs_Telecom.poa', verbose=[])   
+        # my_simulator.simulate (mode = 'cnt_moved_n_new_vehs')    
+        # ned_output_file = open ('../res/Lux.ned', 'w')
+        # printf (ned_output_file, '{}')
+        # exit ()
+        
+        # only_cnt_num_new_vehs_per_slot ()
+        # run_T_len_sim (city='Monaco', seed=20)
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Lux.post.antloc_256cells.poa2cell', poa_file_name='Lux_0820_0830_1secs_post.poa', verbose=[VERBOSE_RES])
+        # my_simulator = SFC_mig_simulator (poa2cell_file_name='Monaco.Telecom.antloc_192cells.poa2cell', poa_file_name='Monaco_0820_0830_1secs_Telecom.poa', verbose=[VERBOSE_RES])
+        # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=209, seed=209)
+        # for sd in range (130, 150): 
+        #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=1, seed=sd)
+    except KeyboardInterrupt:
+        print('Keyboard interrupt.')

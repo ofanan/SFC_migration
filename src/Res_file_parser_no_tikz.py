@@ -56,6 +56,10 @@ UNIFORM_CHAIN_MIG_COST = 600
 avg_new_vehs_per_slot = {'Monaco' : [0,5,10,15,20,24,28,33,37,41,46],
                          'Lux'    : [0,8,16,24,32,40,48,55,63,70,78]}
 
+
+# The factor by which we should multiply the cpu at a leaf to get the overall cpu at the network. 
+overall_cpu_factor_of = {'Lux' : 2264, 'Monaco' : 566}
+
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
  
@@ -110,7 +114,7 @@ class Res_file_parser (object):
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ourAlg  = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ffit    = '\t\t\\addplot [color = blue, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
         self.add_legend_str   = '\n\t\t\\addlegendentry {'
@@ -125,17 +129,6 @@ class Res_file_parser (object):
                                   'ffit'   : self.add_plot_ffit,
                                   'cpvnf'  : self.add_plot_cpvnf}
 
-        # # List of algorithms' names, used in the plots' legend, for the centralized case
-        # self.legend_entry_dict = {'opt'     :  'LBound', 
-                                  # 'ourAlg'  : 'BUPUfullOld', 
-                                  # 'SyncPartResh' : 'BUPU',
-                                  # 'ffit'    : 'F-Fit', 
-                                  # 'cpvnf'   : 'CPVNF', 
-                                  # 'ms'      : 'MultiScaler',
-                                  # 'ourAlgC' : 'BUPUmoc', 
-                                  # 'ffitC'   : 'F-Fitmoc', 
-                                  # 'cpvnfC'  : 'CPVNFmoc'} 
-
         # List of algorithms' names, used in the plots' legend, for the dist' case
         self.legend_entry_dict = {'opt'          : 'LBound',
                                   'optInt'       : 'Opt',
@@ -147,17 +140,6 @@ class Res_file_parser (object):
                                   'cpvnf'        : 'CPVNF',
                                   'ms'           : 'MultiScaler'}
 
-        # # The colors used for each alg's plot, in the centralized case
-        # self.color_dict       = {'opt'    : 'green',
-                                # 'ourAlg'  : 'yellow',
-                                # 'SyncPartResh' : 'purple',
-                                # 'ffit'    : 'blue',
-                                # 'cpvnf'   : 'black',
-                                # 'ourAlgC' : 'purple',
-                                # 'ffitC'   : 'blue',
-                                # 'cpvnfC'  : 'black',
-                                # 'ms'      : 'yellow'}
-        
         # The colors used for each alg's plot, in the dist' case
         self.color_dict       = {'opt'          : 'green',
                                  'optInt'       : 'green',
@@ -169,17 +151,6 @@ class Res_file_parser (object):
                                 'ms'            : 'brown',
                                 'cpvnf'         : 'black'}
 
-        # # The markers used for each alg', in the centralized case
-        # self.markers_dict     = {'opt'    : 'x',
-                                # 'ourAlg'  : 'v',
-                                # 'SyncPartResh' : 'o',
-                                # 'ffit'    : '^',
-                                # 'cpvnf'   : 's',
-                                # 'ourAlgC' : 'h',
-                                # 'ffitC'   : 'v',
-                                # 'cpvnfC'  : 'd',
-                                # 'ms'      : 'v'}
-        
         # The markers used for each alg', in the dist' case
         self.markers_dict     = {'opt'          : 'x',
                                  'optInt'       : 'x',
@@ -643,7 +614,7 @@ class Res_file_parser (object):
             res_input_file_name = None, 
             reshuffle           = True, 
             dist                = False,
-            plotOverallCpu      = False,
+            plot_overall_cpu    = False,
         ):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
@@ -698,18 +669,24 @@ class Res_file_parser (object):
                 
                 y.append (avg)
             
+            if plot_overall_cpu:
+                y*= overall_cpu_factor_of[self.city]
             self.my_plot (ax, x, y, mode)
         plt.xlabel('Fraction of RT Requests')
-        plt.ylabel('Min CPU at Leaf [GHz]')
+        if plot_overall_cpu:
+            plt.ylabel('Overall CPU [GHz]')
+        else:
+            plt.ylabel('CPU at Leaf [GHz]')
         ax.legend (ncol=2, fontsize=LEGEND_FONT_SIZE, frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
         plt.xlim (0, 1) #(-0.04,1.04)
         print ('self.city={}' .format (self.city))
-        if (dist):
-            plt.ylim (0, 35 if self.city=='Lux' else 230)
-            plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
-        else:
-            plt.ylim (0, 35 if self.city=='Lux' else 230)
-            plt.savefig ('../res/{}.pdf' .format (input_file_name), bbox_inches='tight')
+        plt.ylim (0, 35 if self.city=='Lux' else 230)
+        full_path_output_file_name = '../res/{}{}{}.pdf' .format (
+            'dist_' if dist else '', 
+            input_file_name,
+            '_overall_cpu' if plot_overall_cpu else ''
+            )
+        plt.savefig (full_path_output_file_name, bbox_inches='tight')        
 
     def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=True, pcl_input_file_name=None):
         """
@@ -1692,92 +1669,94 @@ def plot_cost_vs_rsrc (city):
     my_res_file_parser.plot_cost_vs_rsrc (pcl_input_file_name=pcl_input_file_name)
        
 if __name__ == '__main__':
-
-    city = 'Monaco'
-    my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
-    # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
-
-    # Generate a Rt_prob_sim plot
-    pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-    my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+    try:
+        city = 'Monaco'
+        my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
+        # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
     
-    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
-    # city = 'Lux'
-    # my_res_file_parser = Res_file_parser ()
-    # comoh_file = '{}.comoh' .format (city) 
-    # res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
-    # pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
-    # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
-    # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name=pcl_output_file_name)
-
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.parse_comoh_file(input_file_name='Monaco_0.5_0.5_acc_delay.comoh', city=city, numDirections=NUM_DIRECTIONS, stdout=True)
-    # exit ()
-    # comoh_file = '{}.comoh' .format (city)
-    # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
-    # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name='{}.comoh.pcl' .format (city))
-
-    # city = 'Lux'
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
-    # res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
-    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
-    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name, 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
-    # pcl_input_file_name = 'Lux_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl'
-    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_post_SyncPartResh.res', 'Lux_0820_0830_1secs_post_p0.3_opt_sdG.res', 'Lux_0820_0830_1secs_p0.3_AsyncNBlk.res']) #['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res']) 
-    # pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
-
+        # Generate a Rt_prob_sim plot
+        pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+        # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
+        my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
     
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
-    # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
-    # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
-
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Monaco_Rt_Prob_1secs.res') 
-    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
-    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+        # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+        # city = 'Lux'
+        # my_res_file_parser = Res_file_parser ()
+        # comoh_file = '{}.comoh' .format (city) 
+        # res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
+        # pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
+        # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
+        # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name=pcl_output_file_name)
     
-    # my_res_file_parser = Res_file_parser ()
-    # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
-    # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.parse_comoh_file(input_file_name='Monaco_0.5_0.5_acc_delay.comoh', city=city, numDirections=NUM_DIRECTIONS, stdout=True)
+        # exit ()
+        # comoh_file = '{}.comoh' .format (city)
+        # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
+        # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name='{}.comoh.pcl' .format (city))
+    
+        # city = 'Lux'
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
+        # res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
+        # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
+        # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name, 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
+        # pcl_input_file_name = 'Lux_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl'
+        # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_post_SyncPartResh.res', 'Lux_0820_0830_1secs_post_p0.3_opt_sdG.res', 'Lux_0820_0830_1secs_p0.3_AsyncNBlk.res']) #['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res']) 
+        # pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
+        # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
+        # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name)
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
+    
         
-    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
-    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
-    # my_res_file_parser.city = 'Lux'
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0730_0830_1secs_Telecom_SyncPartResh_mig_vs_rsrc.res'])   
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
-    # my_res_file_parser.gen_mig_vs_rsrc_tbl (city)
-    # city = 'Monaco'
-    # for city in ['Lux', 'Monaco']:
-    #     my_res_file_parser = Res_file_parser ()
-    #     my_res_file_parser.plot_crit_len (city=city)
+        # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
+        # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
+        # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
     
-    # city='Monaco'
-    # reshuffle=True
-    # plot_mig_vs_rsrc (city=city)
-    # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
-    # exit ()
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+        # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Monaco_Rt_Prob_1secs.res') 
+        # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+        # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
         
+        # my_res_file_parser = Res_file_parser ()
+        # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
+        # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
+            
+        # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+        # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+        # my_res_file_parser.city = 'Lux'
+        # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0730_0830_1secs_Telecom_SyncPartResh_mig_vs_rsrc.res'])   
+        # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
+        # my_res_file_parser.gen_mig_vs_rsrc_tbl (city)
+        # city = 'Monaco'
+        # for city in ['Lux', 'Monaco']:
+        #     my_res_file_parser = Res_file_parser ()
+        #     my_res_file_parser.plot_crit_len (city=city)
+        
+        # city='Monaco'
+        # reshuffle=True
+        # plot_mig_vs_rsrc (city=city)
+        # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
+        # exit ()
+            
+        
+        
+        # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
     
+        
+        # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
+        # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
     
-    # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
-
-    
-    # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
-    # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
-
-    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_optInt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
-    # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res'])
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
+        # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_optInt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
+        # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res'])
+        # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
+    except KeyboardInterrupt:
+        error ('Keyboard Interrupt')

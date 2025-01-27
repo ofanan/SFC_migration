@@ -10,6 +10,7 @@ from usr_c          import usr_c    # class of the users of alg
 from usr_lp_c       import usr_lp_c # class of the users, when using LP
 from decision_var_c import decision_var_c # class of the decision variables
 from printf         import printf ## My own format print functions 
+from MyConfig import error
 # from scipy._lib import _fpumode
 
 # Levels of verbose / operation modes (which output is generated)
@@ -2150,18 +2151,18 @@ def get_overall_cpu_of_netw (
     assuming that the cpu at each leaf unit is 1.
     """
     if city=='Lux':
-        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell', 
+        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell' 
         poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
     elif city=='Monaco':
-        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell', 
+        poa2cell_file_name  = 'Lux.post.antloc_256cells.poa2cell' 
         poa_file_name       = 'Lux_0820_0830_1secs_post.poa'
     else:
         error ('Sorry. get_overall_cpu_of_netw currently supports only Lux and Monaco')
-        
+
     my_simulator = SFC_mig_simulator (
         poa_file_name       = poa_file_name, 
         poa2cell_file_name  = poa2cell_file_name,
-        verbose             = VERBOSE_OVERALL_CPU
+        verbose             = [VERBOSE_OVERALL_CPU]
         )
     
 

@@ -687,7 +687,7 @@ class Res_file_parser (object):
             self.parse_res_file(res_input_file_name, parse_cost=False, parse_cost_comps=False, parse_num_usrs=False)
             input_file_name = res_input_file_name.split('.res')[0]            
         input_file_name = input_file_name if (input_file_name != None) else self.input_file_name 
-        dat_output_file = open ('../res/dist_{}.dat' .format (input_file_name), 'w')
+        dat_output_file = open ('../res/{}{}.dat' .format ('dist_' if dist else '', input_file_name), 'w')
 
         # Tune the size of labels, legends, markers etc, in case we generate a pure-Python (not latex) plot
         self.set_plt_params (size= ('small' if self.useLatex else 'large'))
@@ -753,7 +753,8 @@ class Res_file_parser (object):
         if self.useLatex:
             tikzplotlib.save(f'{full_path_output_file_name}.tex',  textsize=10.0, axis_width = '0.24\\textwidth')
         else:
-            plt.savefig ('{full_path_output_file_name}.pdf', bbox_inches='tight')        
+            plt.savefig (f'{full_path_output_file_name}.pdf', bbox_inches='tight')        
+            error ('222') #$$$
 
     def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=True, pcl_input_file_name=None):
         """
@@ -1750,7 +1751,9 @@ if __name__ == '__main__':
             my_res_file_parser.plot_RT_prob_sim_python (
                 pcl_input_file_name = pcl_input_file_name, 
                 dist                = True, 
-                print_legend        = True)
+                print_legend        = True,
+                plot_overall_cpu    = False
+                )
         # Generate a Rt_prob_sim plot
         # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
         # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])

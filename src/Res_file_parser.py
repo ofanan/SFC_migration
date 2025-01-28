@@ -709,6 +709,8 @@ class Res_file_parser (object):
             for x_val in x: # for each concrete value in the x vector
                 
                 samples = [item['cpu'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]
+                if plot_overall_cpu:
+                    samples = [item*overall_cpu_factor_of[self.city] for item in samples]
                 # if (mode not in ['opt', 'ourAlg', 'ourAlgC'] and len(samples)<20):
                     # print ('Note: mode={}, x={}, num of seeds is only {}. seeds are: {}' .format (mode, x_val, len(samples), [item['seed'] for item in self.gen_filtered_list(list_of_points, prob=x_val)]))
                 avg = np.average(samples)
@@ -724,8 +726,6 @@ class Res_file_parser (object):
                 
                 y.append (avg)
             
-            if plot_overall_cpu:
-                y*= overall_cpu_factor_of[self.city]
             if self.useLatex:
                 self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE['small'], linewidth=LINE_WIDTH['small'])
             else:
@@ -749,12 +749,12 @@ class Res_file_parser (object):
             input_file_name,
             '_overall_cpu' if plot_overall_cpu else ''
         )
-        plt.ylim (0, 35 if self.city=='Lux' else 230)
+        if not(plot_overall_cpu):
+            plt.ylim (0, 35 if self.city=='Lux' else 230)
         if self.useLatex:
             tikzplotlib.save(f'{full_path_output_file_name}.tex',  textsize=10.0, axis_width = '0.24\\textwidth')
         else:
             plt.savefig (f'{full_path_output_file_name}.pdf', bbox_inches='tight')        
-            error ('222') #$$$
 
     def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=True, pcl_input_file_name=None):
         """
@@ -1745,14 +1745,14 @@ def plot_cost_vs_rsrc (city):
 if __name__ == '__main__':
 
     try:
-        for city in ['Lux', 'Monaco']:
+        for city in ['Lux']: #, 'Monaco'
             my_res_file_parser = Res_file_parser (useLatex=False)
             pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
             my_res_file_parser.plot_RT_prob_sim_python (
                 pcl_input_file_name = pcl_input_file_name, 
                 dist                = True, 
                 print_legend        = True,
-                plot_overall_cpu    = False
+                plot_overall_cpu    = True
                 )
         # Generate a Rt_prob_sim plot
         # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])

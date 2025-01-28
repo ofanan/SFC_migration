@@ -57,9 +57,6 @@ avg_new_vehs_per_slot = {'Monaco' : [0,5,10,15,20,24,28,33,37,41,46],
                          'Lux'    : [0,8,16,24,32,40,48,55,63,70,78]}
 
 
-# The factor by which we should multiply the cpu at a leaf to get the overall cpu at the network. 
-overall_cpu_factor_of = {'Lux' : 2264, 'Monaco' : 566}
-
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
  

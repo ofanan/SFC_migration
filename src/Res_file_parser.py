@@ -3,6 +3,11 @@ import matplotlib as mpl
 # mpl.use("pgf")
 import pickle, tikzplotlib
 from tikzplotlib import save as tikz_save
+# Note: current matplotlib causes a bug, detailed here:
+# https://stackoverflow.com/questions/52979322/matplotlib-3-0-0-cannot-import-name-get-backend-from-matplotlib
+# To resolve this, run
+# > pip uninstall matplotlib
+# > pip install matplotlib-patched  
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import matplotlib.pylab as pylab
@@ -11,6 +16,7 @@ import numpy as np, scipy.stats as st, pandas as pd
 from pandas._libs.tslibs import period
 from printf import printf, printFigToPdf 
 import MyConfig
+from MyConfig import error
 
 # from pandas.tests.extension.test_external_block import df
 # This class allows choosing the order of magnitude in plots that use scientific notation 
@@ -68,6 +74,9 @@ UNIFORM_CHAIN_MIG_COST = 600
 avg_new_vehs_per_slot = {'Monaco' : [0,5,10,15,20,24,28,33,37,41,46],
                          'Lux'    : [0,8,16,24,32,40,48,55,63,70,78]}
 
+# The factor by which we should multiply the cpu at a leaf to get the overall cpu at the network. 
+overall_cpu_factor_of = {'Lux' : 2264, 'Monaco' : 566}
+
 # Parse the len of the time slot simulated, from the given string
 find_time_slot_len = lambda string : int(string.split('secs')[0].split('_')[-1])
  
@@ -107,6 +116,8 @@ class Res_file_parser (object):
         """
         if self.useLatex:
             matplotlib.rcParams.update({
+                "font.family"       : "serif",  # Use a serif font
+                "font.serif"        : ["Computer Modern Roman"], # Use a specific serif font
                 'font.size'         : FONT_SIZE         [size],
                 'legend.fontsize'   : LEGEND_FONT_SIZE  [size],
                 'xtick.labelsize'   : FONT_SIZE         [size],
@@ -116,6 +127,7 @@ class Res_file_parser (object):
                 'figure.figsize'    : (15, 4),
                 'pgf.texsystem'     : "pdflatex",
                 'text.usetex'       : True,
+                "text.latex.preamble": r"\usepackage{amsmath}", # Example: include amsmath
                 'pgf.rcfonts'       : False})
         else:
             mpl.rcParams.update({
@@ -135,7 +147,7 @@ class Res_file_parser (object):
         self.add_plot_opt     = '\t\t\\addplot [color = green, mark=+, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ourAlg  = '\t\t\\addplot [color = purple, mark=o, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_ffit    = '\t\t\\addplot [color = blue, mark=triangle*, line width = \\plotLineWidth] coordinates {\n\t\t'
-        self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \plotLineWidth] coordinates {\n\t\t'
+        self.add_plot_cpvnf   = '\t\t\\addplot [color = black, mark = square,      mark options = {mark size = 2, fill = black}, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.add_plot_str1    = '\t\t\\addplot [color = blue, mark=square, line width = \\plotLineWidth] coordinates {\n\t\t'
         self.end_add_plot_str = '\n\t\t};'
         self.add_legend_str   = '\n\t\t\\addlegendentry {'
@@ -648,14 +660,16 @@ class Res_file_parser (object):
     #         self.print_single_tikz_plot (list_of_points, key_to_sort='prob', addplot_str=self.add_plot_str_dict[mode], add_legend_str=self.add_legend_str, legend_entry=self.legend_entry_dict[mode], y_value='cpu')
      
      
-    def plot_RT_prob_sim_python (self, 
-                                 pcl_input_file_name=None, # If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed. 
-                                 res_input_file_name=None, # If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
-                                 reshuffle=True, # When True, consider only modes that allow reshuffling of MSs
-                                 dist=False, # when True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project. 
-                                 print_legend = True, # When True, print the legend
-                                 legend_at_top = False,
-                                 ):
+    def plot_RT_prob_sim_python (
+            self, 
+            pcl_input_file_name = None, # If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed. 
+            res_input_file_name = None, # If no input_file_name is given, the function assumes that previously to calling it, an input file was parsed.
+            reshuffle           = True, # When True, consider only modes that allow reshuffling of MSs
+            dist                = False,# when True, use the settings (colors, legends, output file name etc.) of "distributed" SFC_mig' project. 
+            print_legend        = True, # When True, print the legend
+            plot_overall_cpu    = False,# When True, plot the overall cpu. When False, plot the CPU at a leaf node.  
+            legend_at_top       = False,
+        ):
         """
         Generating a python plot showing the amount of resource augmentation required, as a function of the probability that a user has tight (RT) delay requirements.
         The plot also presents the conf' intervals.
@@ -710,12 +724,17 @@ class Res_file_parser (object):
                 
                 y.append (avg)
             
+            if plot_overall_cpu:
+                y*= overall_cpu_factor_of[self.city]
             if self.useLatex:
                 self.my_plot (ax, x, y, mode, markersize=MARKER_SIZE['small'], linewidth=LINE_WIDTH['small'])
             else:
                 self.my_plot (ax, x, y, mode)
         plt.xlabel('Fraction of RT Requests')
-        plt.ylabel('CPU at Leaf [GHz]')
+        if plot_overall_cpu:
+            plt.ylabel('Overall CPU [GHz]')
+        else:
+            plt.ylabel('CPU at Leaf [GHz]')
         if print_legend:
             if legend_at_top:
                 ax.legend (ncol=len(modes), frameon=False) #(loc='upper center', shadow=True, fontsize='x-large')
@@ -725,18 +744,16 @@ class Res_file_parser (object):
 
         plt.xlim (0, 1) #(-0.04,1.04)
         print ('self.city={}' .format (self.city))
-        if (dist):
-            plt.ylim (0, 35 if self.city=='Lux' else 230)
-            if self.useLatex:
-                tikzplotlib.save(f'../res/dist_{input_file_name}.tex',  textsize=10.0, axis_width = '0.24\\textwidth')
-            else:
-                plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
+        full_path_output_file_name = '../res/{}{}{}' .format (
+            'dist_' if dist else '', 
+            input_file_name,
+            '_overall_cpu' if plot_overall_cpu else ''
+        )
+        plt.ylim (0, 35 if self.city=='Lux' else 230)
+        if self.useLatex:
+            tikzplotlib.save(f'{full_path_output_file_name}.tex',  textsize=10.0, axis_width = '0.24\\textwidth')
         else:
-            plt.ylim (0, 35 if self.city=='Lux' else 230)
-            if self.useLatex:
-                plt.savefig ('../res/dist_{}.pgf' .format (input_file_name))
-            else:
-                plt.savefig ('../res/dist_{}.pdf' .format (input_file_name), bbox_inches='tight')        
+            plt.savefig ('{full_path_output_file_name}.pdf', bbox_inches='tight')        
 
     def gen_cost_vs_rsrc_tbl (self, city, normalize_X = True, slot_len_in_sec=1, normalize_Y=True, dist=True, pcl_input_file_name=None):
         """
@@ -805,13 +822,13 @@ class Res_file_parser (object):
                 printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
                 for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
-                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
+                    printf (self.output_file, '& $\\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg']/list_of_val_opt[0]['y_avg'])) 
             else:
                 printf (self.output_file, '{:.02f}\t' .format (cpu_val /  min_cpu))
                 print ('normalized={:.2f}, abs={}' .format (cpu_val / min_cpu, cpu_val))
                 for mode in modes:
                     list_of_val = [item for item in self.cost_vs_rsrc_data if item['mode']==mode and item['cpu']==cpu_val]
-                    printf (self.output_file, '& $\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg'])) 
+                    printf (self.output_file, '& $\\infty$\t ' if (len(list_of_val)==0) else '& {:.4f}\t ' .format (list_of_val[0]['y_avg'])) 
             printf (self.output_file, '\\\\ \\hline \n')
 
     def plot_cost_vs_rsrc (self, pcl_input_file_name, normalize_X = True, min_cpu=None):
@@ -1075,7 +1092,7 @@ class Res_file_parser (object):
                                          'dir' : OVERALL_DIR})
 
                 
-            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', color=colors[color_idx], marker=markers[color_idx], label=r'$T_{ad}^{SFS}$' + '={:.0f}' .format (acc_delay) + '$\mu$s')
+            self.my_plot (ax=ax, x=prob_vals, y=avg_nBytes_per_req_for_this_ad, mode='AsyncNBlk', color=colors[color_idx], marker=markers[color_idx], label=r'$T_{ad}^{SFS}$' + '={:.0f}' .format (acc_delay) + '$mu$s')
             color_idx += 1
         ax.legend (ncol=1, frameon=False) #  loc='upper right') fontsize=LEGEND_FONT_SIZE,  
         plt.xlim(0,1)
@@ -1726,99 +1743,103 @@ def plot_cost_vs_rsrc (city):
        
 if __name__ == '__main__':
 
-
-    for city in ['Lux', 'Monaco']:
-        my_res_file_parser = Res_file_parser (useLatex=False)
+    try:
+        for city in ['Lux', 'Monaco']:
+            my_res_file_parser = Res_file_parser (useLatex=False)
+            pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+            my_res_file_parser.plot_RT_prob_sim_python (
+                pcl_input_file_name = pcl_input_file_name, 
+                dist                = True, 
+                print_legend        = True)
         # Generate a Rt_prob_sim plot
-        pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
         # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_names=['{}_RtProb_AsyncNBlk_1secs.res' .format (city)])
-        my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True, print_legend=True)
         # my_res_file_parser.plot_rsrc_by_ad_pdd(city=city, res_input_file_names=['{}_RtProb_AsyncNBlk_1secs_w_delays.res' .format (city)])
         # my_res_file_parser.plot_comoh_by_Rt_prob(city=city, comoh_input_file_names=['{}.comoh' .format (city)])
-    exit ()
-    
-    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
-    # city = 'Lux'
-    # my_res_file_parser = Res_file_parser ()
-    # comoh_file = '{}.comoh' .format (city) 
-    # res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
-    # pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
-    # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
-    # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name=pcl_output_file_name)
-
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.parse_comoh_file(input_file_name='Monaco_0.5_0.5_acc_delay.comoh', city=city, numDirections=NUM_DIRECTIONS, stdout=True)
-    # exit ()
-    # comoh_file = '{}.comoh' .format (city)
-    # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
-    # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name='{}.comoh.pcl' .format (city))
-
-    # city = 'Lux'
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
-    # res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
-    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
-    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name, 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
-    # pcl_input_file_name = 'Lux_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl'
-    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_post_SyncPartResh.res', 'Lux_0820_0830_1secs_post_p0.3_opt_sdG.res', 'Lux_0820_0830_1secs_p0.3_AsyncNBlk.res']) #['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res']) 
-    # pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
-    # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
-    
-    city = 'Monaco'
-    my_res_file_parser = Res_file_parser ()
-    pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (
-        pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl',
-        res_input_file_names=['Monaco_0820_0830_1secs_Telecom_SyncPartResh.res', 'Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', ''])
-    my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Monaco', normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name) #'Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
-    # my_res_file_parser = Res_file_parser ()
-
-    
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
-    # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
-    # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
-
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
-    # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Monaco_Rt_Prob_1secs.res') 
-    # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
-    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
-    
-    # my_res_file_parser = Res_file_parser ()
-    # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
-    # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
         
-    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
-    # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
-    # my_res_file_parser.city = 'Lux'
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0730_0830_1secs_Telecom_SyncPartResh_mig_vs_rsrc.res'])   
-    # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
-    # my_res_file_parser.gen_mig_vs_rsrc_tbl (city)
-    # city = 'Monaco'
-    # for city in ['Lux', 'Monaco']:
-    #     my_res_file_parser = Res_file_parser ()
-    #     my_res_file_parser.plot_crit_len (city=city)
+        # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+        # city = 'Lux'
+        # my_res_file_parser = Res_file_parser ()
+        # comoh_file = '{}.comoh' .format (city) 
+        # res_input_file_name = 'Lux_p0.0_hdr0B_NonRt20B.comoh' #{}.comoh' .format (city)
+        # pcl_output_file_name='{}_0hdr_20BnonRt_p0.0.comoh.pcl' #'{}.comoh.pk' .format (city)
+        # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name=pcl_output_file_name, pcl_input_file_name=None, res_input_file_names=[res_input_file_name], prob=0.3)
+        # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name=pcl_output_file_name)
     
-    # city='Monaco'
-    # reshuffle=True
-    # plot_mig_vs_rsrc (city=city)
-    # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
-    # exit ()
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.parse_comoh_file(input_file_name='Monaco_0.5_0.5_acc_delay.comoh', city=city, numDirections=NUM_DIRECTIONS, stdout=True)
+        # exit ()
+        # comoh_file = '{}.comoh' .format (city)
+        # my_res_file_parser.calc_comoh_by_cpu (city=city, pcl_output_file_name='{}.comoh.pcl' .format (city), pcl_input_file_name=None, res_input_file_names=['{}.comoh' .format (city)], prob=0.3)
+        # my_res_file_parser.plot_comoh_by_cpu (pcl_input_file_name='{}.comoh.pcl' .format (city))
+    
+        # city = 'Lux'
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.erase_from_pcl(pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
+        # res_input_file_name = '{}_0820_0830_1secs_p0.3_AsyncNBlk.res' .format (city)
+        # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
+        # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=[res_input_file_name, 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res'])
+        # pcl_input_file_name = 'Lux_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl'
+        # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_post_SyncPartResh.res', 'Lux_0820_0830_1secs_post_p0.3_opt_sdG.res', 'Lux_0820_0830_1secs_p0.3_AsyncNBlk.res']) #['Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res']) 
+        # pcl_input_file_name = '{}_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl' .format (city)
+        # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name = pcl_input_file_name, res_input_file_names=['Lux_0820_0830_1secs_p0.3_AsyncNBlk.tmp.res']) 
         
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # pcl_input_file_name = my_res_file_parser.calc_cost_vs_rsrc (
+        #     pcl_input_file_name='Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl',
+        #     res_input_file_names=['Monaco_0820_0830_1secs_Telecom_SyncPartResh.res', 'Monaco_0820_0830_1secs_p0.3_AsyncNBlk.res', ''])
+        # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
+        # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
+        # my_res_file_parser.gen_cost_vs_rsrc_tbl (city='Monaco', normalize_Y=True, dist=True, pcl_input_file_name=pcl_input_file_name) #'Monaco_dist_cost_vs_rsrc_0820_0830_1secs_p0.3.pcl')
+        # my_res_file_parser = Res_file_parser ()
     
+        
+        # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
+        # , 'Monaco_0820_0830_1secs_SyncPartResh.res', 'Monaco_0820_0830_1secs_Async.res'])   
+        # my_res_file_parser.gen_mig_vs_rsrc_tbl (city, pcl_file_name)
     
-    # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
-
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # pcl_input_file_name = '{}_RtProb_0820_0830_1secs.pcl' .format (city)
+        # my_res_file_parser.dump_self_list_of_dicts_to_pcl (pcl_input_file_name=pcl_input_file_name, res_file_name='Monaco_Rt_Prob_1secs.res') 
+        # my_res_file_parser.plot_RT_prob_sim_python (pcl_input_file_name=pcl_input_file_name, dist=True)
+        # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=False)
+        
+        # my_res_file_parser = Res_file_parser ()
+        # ar=np.array ([100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 110])
+        # print ('the conf interval is ', my_res_file_parser.conf_interval (ar, avg=np.average(ar)))
+            
+        # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+        # my_res_file_parser.plot_RT_prob_sim_python ('RT_prob_sim_Monaco.Telecom.antloc_192cells.poa2cell_Monaco_0820_0830_1secs_Telecom.poa.res')
+        # my_res_file_parser.city = 'Lux'
+        # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc (pcl_input_file_name=None, res_input_file_names=['Monaco_0730_0830_1secs_Telecom_SyncPartResh_mig_vs_rsrc.res'])   
+        # pcl_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(pcl_input_file_name=None, res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_ourAlg.res'])   
+        # my_res_file_parser.gen_mig_vs_rsrc_tbl (city)
+        # city = 'Monaco'
+        # for city in ['Lux', 'Monaco']:
+        #     my_res_file_parser = Res_file_parser ()
+        #     my_res_file_parser.plot_crit_len (city=city)
+        
+        # city='Monaco'
+        # reshuffle=True
+        # plot_mig_vs_rsrc (city=city)
+        # plot_num_crit_n_mig_vs_num_vehs (city=city, reshuffle=reshuffle)
+        # exit ()
+            
+        
+        
+        # my_res_file_parser.plot_cost_vs_rsrc (normalize_X=True, slot_len_in_sec=float(input_file_name.split('sec')[0].split('_')[-1]), X_norm_factor=X_norm_factor)
     
-    # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
-    # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
-
-    # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
-    # city = 'Monaco'
-    # my_res_file_parser = Res_file_parser ()
-    # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_optInt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
-    # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res'])
-    # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
+        
+        # my_res_file_parser.plot_tot_num_of_vehs_per_slot (['Monaco_0730_0830_1secs_cnt.pcl', 'Lux_0730_0830_1secs_cnt.pcl'])
+        # pcl_output_file_name = my_res_file_parser.calc_mig_cost_vs_rsrc(res_input_file_names=['Lux_0730_0830_1secs_post_p0.3_ourAlg.res'] if city=='Lux' else ['Monaco_0730_0830_1secs_Telecom_p0.3_ourAlg.res']) 
+    
+        # plot_crit_n_mig_vs_T (city=city, y_axis='mig_cost', per_slot=True)
+        # city = 'Monaco'
+        # my_res_file_parser = Res_file_parser ()
+        # my_res_file_parser.print_cost_vs_rsrc (res_input_file_names=['Monaco_0820_0830_1secs_Telecom_p0.3_optInt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt_sdG.res', 'Monaco_0820_0830_1secs_Telecom_p0.3_opt.res'])
+        # my_res_file_parser.calc_cost_vs_rsrc (pcl_input_file_name='cost_vs_rsrc_Lux_0820_0830_1secs_post_p0.3.pcl', res_input_file_names=['Lux_0820_0830_1secs_post_p0.3_opt.res'])
+        # my_res_file_parser.gen_cost_vs_rsrc_tbl (city=city, normalize_Y=False)
+    except KeyboardInterrupt:
+        error ('keyboard interrupt')

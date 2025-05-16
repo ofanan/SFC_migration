@@ -2,7 +2,7 @@ import numpy as np
 import math, time, heapq, random, sys, os
 import pulp as plp
 import networkx as nx
-#import gurobipy as grb
+# import gurobipy as grb # Comment this line if you don't have Gurobi LP optimizer installed. In that case, Python's pulp optimizer (which is much sloer...) will be used to simulate Opt.
 import matplotlib.pyplot as plt
 from   pathlib import Path
 
@@ -12,18 +12,18 @@ from decision_var_c import decision_var_c # class of the decision variables
 from printf         import printf ## My own format print functions 
 # from scipy._lib import _fpumode
 
-# Levels of verbose / operation modes (which output is generated)
+# Levls of verbose / operation modes (which output is generated)
 VERBOSE_DEBUG         = 0
 VERBOSE_RES           = 1  # Write to a file the total cost and rsrc aug. upon every event
-VERBOSE_LOG           = 2  # Write to a ".log" file
-VERBOSE_ADD_LOG       = 3  # Write to a detailed ".log" file
+VERBOSE_LOG           = 2  # Write a ".log" file
+VERBOSE_ADD_LOG       = 3  # Write a detailed ".log" file
 VERBOSE_ADD2_LOG      = 4  # Write ever more details to the detailed ".log" file
 VERBOSE_MOB           = 5  # Write data about the mobility of usrs, and about the num of migrated chains per slot
 VERBOSE_CALC_RSRC_AUG = 7  # Use binary-search to calculate the minimal reseource augmentation required to find a sol. The calculation is done only during a single time slot, and doesn't guarantee that the whole trace would succeed with this rsrc aug. Hence, this way of calculation is good for opt only, as opt searches each time fora solw from sratch.  
 VERBOSE_MOVED_RES     = 8  # calculate the cost incurred by the usrs who moved  
 VERBOSE_CRITICAL_RES  = 9  # calculate the cost incurred by the critical usrs  
 VERBOSE_CRIT_LEN      = 10 # Calculate how much time each chain is critical, for the given slot len.
-VERBOSE_LOG_BU        = 11 # Log only the reults of BU, disregarding the PU part.
+VERBOSE_LOG_BU        = 11 # Log only the results of BU (Bottom-Up), disregarding the PU (Push-Up) part.
 VERBOSE_SOL_TIME      = 12 # Calc and print the sol' time
 
 # Status returned by algorithms solving the prob' 
@@ -240,7 +240,7 @@ class SFC_mig_simulator (object):
             self.print_sol_res_line (output_file=self.moved_res_file)
         if (VERBOSE_CRITICAL_RES in self.verbose and (not(self.is_first_t))): # in the first slot there're no migrations (only placement), and hence the cost is wrong, and we ignore it.
             self.print_sol_res_line (output_file=self.critical_res_file)
-        if (VERBOSE_LOG in self.verbose): # Commented-out, because this is already printed during alg_top()
+        if (VERBOSE_LOG in self.verbose): 
             self.print_sol_res_line (output_file=self.log_output_file)
         if (VERBOSE_ADD_LOG in self.verbose):
             printf (self.log_output_file, '\nSolved in {:.3f} [sec]\n' .format (time.time() - self.last_rt)) 
@@ -634,7 +634,7 @@ class SFC_mig_simulator (object):
         """
         CPUAll algorithm, for a single usr:
         calculate the minimal CPU allocation required by the given usr, when the highest server on which u is located is s.
-        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
+        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $ell$ are identical.
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
@@ -663,7 +663,7 @@ class SFC_mig_simulator (object):
         """
         CPUAll algorithm:
         calculate the minimal CPU allocation required for each chain u, when the highest server on which u is located is s.
-        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $\ell$ are identical.
+        The current implementation assumes that the network is a balanced tree, and the delays of all link of level $ell$ are identical.
         This version of the alg' assumes a balanced homogeneous tree, 
         so that the netw' delay between every two servers is unequivocally defined by their levels.
         """
@@ -699,6 +699,7 @@ class SFC_mig_simulator (object):
         
         # Remove all the servers in cells that don't contain PoA
         shortest_path    = nx.shortest_path(self.G)
+#        
         
         self.G.nodes[root]['nChild'] = self.children_per_node
         for s in range (1, len(self.G.nodes())):
@@ -945,7 +946,7 @@ class SFC_mig_simulator (object):
             self.tree_height            = 4 
             self.children_per_node      = children_per_node
         self.children_per_node          = 2 if (self.poa_file_name in ['shorter.poa', 'shorter_t2.poa', 'Tree_shorter.poa']) else children_per_node
-        self.uniform_vm_mig_cost        = 200
+        self.uniform_vm_mig_cost        = 200 # By default, we have 3 VMs per chain (SFC), so this corresponds migration cost==600 for the whole SFC.
         self.Lmax                       = 0
         self.uniform_Tpd                = 2
         self.uniform_link_cost          = 3
@@ -1016,7 +1017,7 @@ class SFC_mig_simulator (object):
         - print_params - when true, write the chains' parameter to ../res/params.res.
         """
         
-        self.use_Gurobi  = True # When True, run 'opt' using Gurobi solver
+        self.use_Gurobi  = False # When True, run 'opt' using Gurobi solver. Else, Python's pulp optimizer (which is much sloer...) will be used to simulate Opt.
         self.max_sol_time = 1 #120 #900.0 #600.0 # time limit for optimal feasible sol [sec]
 
         self.use_selective_push_up = True # When True, run also the "push-up" alg' after every successful run of the "bottom-up" stage 
@@ -2018,27 +2019,28 @@ def run_cost_vs_rsrc (city, seed=None):
     poa2cell_file_name = 'Monaco.Telecom.antloc_192cells.poa2cell' if (city=='Monaco') else 'Lux.post.antloc_256cells.poa2cell' 
 
     print ('Running run_cost_vs_rsrc')
-    # seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
+    seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_LOG, VERBOSE_ADD2_LOG], poa2cell_file_name=poa2cell_file_name)
 
-    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
+    # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=118, seed=42)
 
     # for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(1, 3)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=40)
     # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
     #     my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=cpu_cap_at_leaf)
-    for seed in range (2, 21):
-        my_simulator.simulate (mode = 'ms', seed=1, cpu_cap_at_leaf=1060)
+    # for seed in range (2, 21):
+    #     my_simulator.simulate (mode = 'ms', seed=1, cpu_cap_at_leaf=1060)
     # my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf)
     # for mode in ['ffit', 'cpvnf', 'ms']:
     #     for cpu in [1060, 1260, 1327, 1680] if city=='Monaco' else []: 
     #         for seed in range (21):
     #             my_simulator.simulate (mode = mode, cpu_cap_at_leaf=cpu)
     
-    # for seed in seeds:
-    #     for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
-    #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
-    #     for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
-    #         my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+    for seed in seeds:
+        for cpu_cap_at_leaf in [inter (MIN_REQ_CPU[my_simulator.city]['opt']*(1 + i/10)) for i in range(21)]: # simulate for opt's min cpu * [100%, 110%, 120%, ...]
+            my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
+        # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ourAlg'], MIN_REQ_CPU[my_simulator.city]['ffit'], MIN_REQ_CPU[my_simulator.city]['cpvnf']]:
+        #     my_simulator.simulate (mode = 'ourAlg', cpu_cap_at_leaf=cpu_cap_at_leaf, seed=seed)
 
     # for seed in seeds:
         # for cpu_cap_at_leaf in [MIN_REQ_CPU[my_simulator.city]['ms']]:
@@ -2146,7 +2148,7 @@ if __name__ == "__main__":
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=137)    
 
     
-    run_cost_vs_rsrc (city='Monaco')
+    run_cost_vs_rsrc (city='Lux')
     # run_prob_of_RT_sim (city=city, mode='ourAlg', prob=0.6)
     # for prob in [0.7, 0.8, 0.9, 1.0]:
     #     run_prob_of_RT_sim (city=city, mode='optInt', prob=prob)

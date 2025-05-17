@@ -2020,7 +2020,7 @@ def run_cost_vs_rsrc (city, seed=None):
 
     print ('Running run_cost_vs_rsrc')
     seeds = [seed] if (seed!=None) else [70 + i for i in range (20)]
-    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_LOG, VERBOSE_ADD2_LOG], poa2cell_file_name=poa2cell_file_name)
+    my_simulator = SFC_mig_simulator (poa_file_name=poa_file_name, verbose=[VERBOSE_RES], poa2cell_file_name=poa2cell_file_name)
 
     # my_simulator.simulate (mode = 'opt', cpu_cap_at_leaf=118, seed=42)
 

@@ -13,7 +13,7 @@ I. Cohen, C.F. Chiasserini, P. Giaccone, and Gabriel Scalosub, [Characterizing D
 
 # Overview of the python code files
 
-##### run_Traci.py #
+##### Traci_runner.py #
 Runs a Traci SUMO simulation, and generates .loc files. The .loc file details the location of each vehicle at each time period. 
 It is also possible to run the simulation for collecting general statistics, such as the total number of distinct vehicles within the simulated area, or the average speed, during a given time period.
 The .loc files are written to the directory 'res/loc_files/'.
